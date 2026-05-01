@@ -1,0 +1,1 @@
+ALTER TABLE public.workout_sessions ADD COLUMN IF NOT EXISTS total_exercises integer NOT NULL DEFAULT 0;

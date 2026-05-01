@@ -1,0 +1,789 @@
+import {getLocalDateKey} from '@app/lib/date';
+import {
+  calculateHydrationStreak,
+  dedupeFeaturedTemplates,
+  getChallengeDay,
+  getCompletedChallengeDays,
+  getCurrentChallengeStreak,
+  mapDbExerciseRow,
+  mapTemplateExerciseRowToExercise,
+  mapTemplateRowToWorkout,
+  type DailyNutritionLog,
+  type HabitChallenge,
+  type HydrationLog,
+  type LibraryExercise,
+  type NutritionPlan,
+  type Workout,
+  type WorkoutExercise,
+  type WorkoutSession,
+} from '@app/shared';
+import {getSupabaseClient} from '@app/services/supabase/client';
+import type {Database, Json} from '@app/types/supabase';
+
+type ChallengeParticipationRow =
+  Database['public']['Tables']['challenge_participations']['Row'];
+type DailyHydrationLogRow =
+  Database['public']['Tables']['daily_hydration_logs']['Row'];
+type DailyNutritionLogRow =
+  Database['public']['Tables']['daily_nutrition_logs']['Row'];
+type ExerciseRow = Database['public']['Tables']['exercises']['Row'];
+type HabitLogRow = Database['public']['Tables']['habit_logs']['Row'];
+type NutritionPlanRow = Database['public']['Tables']['nutrition_plans']['Row'];
+type TemplateExerciseRow =
+  Database['public']['Tables']['template_exercises']['Row'];
+type WorkoutSessionRow =
+  Database['public']['Tables']['workout_sessions']['Row'];
+type WorkoutTemplateRow =
+  Database['public']['Tables']['workout_templates']['Row'];
+
+type HomeOverview = {
+  todaySession: WorkoutSession | null;
+  challenge: (HabitChallenge & {
+    challengeDay: number;
+    completedDays: number;
+    streak: number;
+    completedToday: number;
+    totalHabits: number;
+    progressPct: number;
+  }) | null;
+  nutritionPlan: NutritionPlan | null;
+  todayNutritionLog: DailyNutritionLog | null;
+  hydration: {
+    todayMl: number;
+    goalMl: number;
+    todayGlasses: number;
+    goalGlasses: number;
+    todayPercentage: number;
+    streak: number;
+  };
+};
+
+function getClient() {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    throw new Error('Supabase no está configurado.');
+  }
+
+  return client;
+}
+
+function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
+  return {
+    id: row.id,
+    workoutId: row.workout_id || '',
+    workoutTitle: row.workout_title,
+    userId: row.user_id,
+    date: row.date,
+    completed: row.completed || false,
+    duration: row.duration || 0,
+    caloriesBurned: row.calories_burned || 0,
+    status:
+      row.status === 'in_progress' ||
+      row.status === 'completed' ||
+      row.status === 'canceled'
+        ? row.status
+        : 'idle',
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    completedExercises: Array.isArray(row.completed_exercises)
+      ? row.completed_exercises.filter(
+          (item): item is string => typeof item === 'string',
+        )
+      : [],
+    totalExercises: row.total_exercises || 0,
+    createdAt: row.created_at,
+  };
+}
+
+async function cancelWorkoutSessionsByIds(ids: string[]): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
+
+  const client = getClient();
+  const {error} = await (client
+    .from('workout_sessions') as any)
+    .update({
+      status: 'canceled',
+      completed: false,
+      ended_at: new Date().toISOString(),
+    })
+    .in('id', ids);
+
+  if (error) {
+    throw error;
+  }
+}
+
+function isResumableSession(row: WorkoutSessionRow): boolean {
+  const completedExercises = Array.isArray(row.completed_exercises)
+    ? row.completed_exercises.filter(item => typeof item === 'string')
+    : [];
+
+  return row.status === 'canceled'
+    && (completedExercises.length > 0 || (row.duration || 0) > 0);
+}
+
+function calculateSessionDurationMinutes(
+  startedAt: string | null,
+  fallbackMinutes: number,
+): number {
+  if (!startedAt) {
+    return fallbackMinutes;
+  }
+
+  const elapsedMs = Date.now() - new Date(startedAt).getTime();
+  return Math.max(1, Math.round(elapsedMs / 60000));
+}
+
+function calculateWorkoutSessionCalories(
+  workout: Workout,
+  completedExercises: string[],
+): number {
+  if (workout.exercises.length === 0) {
+    return workout.calories;
+  }
+
+  return Math.round(
+    (workout.calories * completedExercises.length) / workout.exercises.length,
+  );
+}
+
+function mapNutritionPlan(row: NutritionPlanRow): NutritionPlan {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    targetCalories: row.target_calories,
+    targetProtein: row.target_protein,
+    targetCarbs: row.target_carbs ?? undefined,
+    targetFats: row.target_fats ?? undefined,
+    notes: row.notes ?? undefined,
+  };
+}
+
+function mapDailyNutritionLog(row: DailyNutritionLogRow): DailyNutritionLog {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    date: row.date,
+    calories: row.calories || 0,
+    protein: row.protein || 0,
+    carbs: row.carbs ?? undefined,
+    fats: row.fats ?? undefined,
+    adherence: row.adherence ?? undefined,
+  };
+}
+
+function parseChallengeHabits(
+  participation: ChallengeParticipationRow,
+): HabitChallenge['habits'] {
+  const rawHabits = Array.isArray(participation.habits)
+    ? participation.habits
+    : [];
+
+  return rawHabits.map((habit, index) => {
+    const item =
+      habit && typeof habit === 'object' && !Array.isArray(habit)
+        ? (habit as Record<string, Json>)
+        : {};
+
+    return {
+      id:
+        typeof item.id === 'string' ? item.id : `habit-${participation.id}-${index}`,
+      challengeId: participation.id,
+      category:
+        item.category === 'training' ||
+        item.category === 'health' ||
+        item.category === 'mind'
+          ? item.category
+          : 'training',
+      name: typeof item.name === 'string' ? item.name : '',
+    };
+  });
+}
+
+function buildHabitLogMap(
+  logs: HabitLogRow[],
+  totalHabits: number,
+): Record<string, boolean[]> {
+  const map: Record<string, boolean[]> = {};
+
+  logs.forEach(log => {
+    if (!map[log.date]) {
+      map[log.date] = Array.from({length: totalHabits}, () => false);
+    }
+
+    if (log.habit_index >= 0 && log.habit_index < totalHabits) {
+      map[log.date][log.habit_index] = log.completed || false;
+    }
+  });
+
+  return map;
+}
+
+export async function fetchWorkoutLibrary(): Promise<Workout[]> {
+  const client = getClient();
+  const {data: templates, error: templateError} = await client
+    .from('workout_templates')
+    .select('*')
+    .order('created_at', {ascending: false});
+
+  if (templateError) {
+    throw templateError;
+  }
+
+  const templateRows = (templates || []) as WorkoutTemplateRow[];
+
+  if (templateRows.length === 0) {
+    return [];
+  }
+
+  const templateIds = templateRows.map(template => template.id);
+  const {data: exerciseRows, error: exerciseError} = await client
+    .from('template_exercises')
+    .select('*')
+    .in('template_id', templateIds)
+    .order('sort_order');
+
+  if (exerciseError) {
+    throw exerciseError;
+  }
+
+  const templateExerciseRows = (exerciseRows || []) as TemplateExerciseRow[];
+
+  const exercisesByTemplate = templateExerciseRows.reduce<
+    Record<string, WorkoutExercise[]>
+  >((accumulator, exercise) => {
+    if (!accumulator[exercise.template_id]) {
+      accumulator[exercise.template_id] = [];
+    }
+
+    accumulator[exercise.template_id].push(
+      mapTemplateExerciseRowToExercise(exercise),
+    );
+
+    return accumulator;
+  }, {});
+
+  return dedupeFeaturedTemplates(templateRows).map(template =>
+    mapTemplateRowToWorkout(template, exercisesByTemplate),
+  );
+}
+
+export async function fetchEffectiveWorkoutSession(
+  userId: string,
+): Promise<WorkoutSession | null> {
+  const client = getClient();
+  const today = getLocalDateKey();
+
+  const {data: inProgressRows, error: inProgressError} = await client
+    .from('workout_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'in_progress')
+    .order('created_at', {ascending: false});
+
+  if (inProgressError) {
+    throw inProgressError;
+  }
+
+  const inProgress = (inProgressRows || []) as WorkoutSessionRow[];
+  const staleIds = inProgress
+    .filter(row => row.date !== today)
+    .map(row => row.id);
+
+  if (staleIds.length > 0) {
+    await cancelWorkoutSessionsByIds(staleIds);
+  }
+
+  const todayInProgress = inProgress.filter(row => row.date === today);
+
+  if (todayInProgress.length > 1) {
+    await cancelWorkoutSessionsByIds(todayInProgress.slice(1).map(row => row.id));
+  }
+
+  if (todayInProgress[0]) {
+    return mapWorkoutSession(todayInProgress[0]);
+  }
+
+  const {data: recentRows, error: recentError} = await client
+    .from('workout_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .order('created_at', {ascending: false})
+    .limit(20);
+
+  if (recentError) {
+    throw recentError;
+  }
+
+  const todayRows = (recentRows || []) as WorkoutSessionRow[];
+  const resumable = todayRows.find(isResumableSession);
+  const completed = todayRows.find(row => row.status === 'completed');
+
+  if (resumable) {
+    return mapWorkoutSession(resumable);
+  }
+
+  if (completed) {
+    return mapWorkoutSession(completed);
+  }
+
+  return null;
+}
+
+export async function startWorkoutSession(params: {
+  userId: string;
+  workout: Workout;
+}): Promise<WorkoutSession> {
+  const client = getClient();
+  const today = getLocalDateKey();
+  const now = new Date().toISOString();
+  const {data: inProgressRows, error: inProgressError} = await client
+    .from('workout_sessions')
+    .select('*')
+    .eq('user_id', params.userId)
+    .eq('status', 'in_progress')
+    .order('created_at', {ascending: false});
+
+  if (inProgressError) {
+    throw inProgressError;
+  }
+
+  const inProgress = (inProgressRows || []) as WorkoutSessionRow[];
+  const matchingTodaySession = inProgress.find(
+    row => row.workout_id === params.workout.id && row.date === today,
+  );
+
+  if (matchingTodaySession) {
+    const otherIds = inProgress
+      .filter(row => row.id !== matchingTodaySession.id)
+      .map(row => row.id);
+
+    if (otherIds.length > 0) {
+      await cancelWorkoutSessionsByIds(otherIds);
+    }
+
+    return mapWorkoutSession(matchingTodaySession);
+  }
+
+  if (inProgress.length > 0) {
+    await cancelWorkoutSessionsByIds(inProgress.map(row => row.id));
+  }
+
+  const {data, error} = await (client
+    .from('workout_sessions') as any)
+    .insert({
+      user_id: params.userId,
+      workout_id: params.workout.id,
+      workout_title: params.workout.title,
+      date: today,
+      status: 'in_progress',
+      started_at: now,
+      completed: false,
+      duration: 0,
+      calories_burned: 0,
+      completed_exercises: [],
+      total_exercises: params.workout.exercises.length,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapWorkoutSession(data as WorkoutSessionRow);
+}
+
+export async function persistWorkoutSessionExercises(params: {
+  sessionId: string;
+  completedExercises: string[];
+}): Promise<WorkoutSession> {
+  const client = getClient();
+  const {data, error} = await (client
+    .from('workout_sessions') as any)
+    .update({
+      completed_exercises: params.completedExercises,
+    })
+    .eq('id', params.sessionId)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapWorkoutSession(data as WorkoutSessionRow);
+}
+
+export async function completeWorkoutSession(params: {
+  session: WorkoutSession;
+  workout: Workout;
+  completedExercises: string[];
+}): Promise<WorkoutSession> {
+  const client = getClient();
+  const now = new Date().toISOString();
+  const duration = calculateSessionDurationMinutes(
+    params.session.startedAt,
+    params.session.duration,
+  );
+  const caloriesBurned = calculateWorkoutSessionCalories(
+    params.workout,
+    params.completedExercises,
+  );
+
+  const {data, error} = await (client
+    .from('workout_sessions') as any)
+    .update({
+      status: 'completed',
+      completed: true,
+      ended_at: now,
+      duration,
+      calories_burned: caloriesBurned,
+      completed_exercises: params.completedExercises,
+    })
+    .eq('id', params.session.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapWorkoutSession(data as WorkoutSessionRow);
+}
+
+export async function cancelWorkoutSession(params: {
+  session: WorkoutSession;
+  workout: Workout;
+  completedExercises: string[];
+}): Promise<WorkoutSession> {
+  const client = getClient();
+  const now = new Date().toISOString();
+  const duration = calculateSessionDurationMinutes(
+    params.session.startedAt,
+    params.session.duration,
+  );
+  const caloriesBurned = calculateWorkoutSessionCalories(
+    params.workout,
+    params.completedExercises,
+  );
+
+  const {data, error} = await (client
+    .from('workout_sessions') as any)
+    .update({
+      status: 'canceled',
+      completed: false,
+      ended_at: now,
+      duration,
+      calories_burned: caloriesBurned,
+      completed_exercises: params.completedExercises,
+    })
+    .eq('id', params.session.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapWorkoutSession(data as WorkoutSessionRow);
+}
+
+export async function resumeWorkoutSession(
+  session: WorkoutSession,
+): Promise<WorkoutSession> {
+  const client = getClient();
+  const resumedStartedAt =
+    session.duration > 0
+      ? new Date(Date.now() - session.duration * 60000).toISOString()
+      : session.startedAt || new Date().toISOString();
+
+  const {data, error} = await (client
+    .from('workout_sessions') as any)
+    .update({
+      status: 'in_progress',
+      started_at: resumedStartedAt,
+      ended_at: null,
+    })
+    .eq('id', session.id)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return mapWorkoutSession(data as WorkoutSessionRow);
+}
+
+export async function fetchExerciseLibrary(): Promise<LibraryExercise[]> {
+  const client = getClient();
+  let from = 0;
+  const pageSize = 500;
+  const rows: ExerciseRow[] = [];
+  let hasMore = true;
+
+  while (hasMore) {
+    const {data, error} = await client
+      .from('exercises')
+      .select('*')
+      .order('name')
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw error;
+    }
+
+    rows.push(...((data as ExerciseRow[]) || []));
+    hasMore = (data?.length || 0) === pageSize;
+    from += pageSize;
+  }
+
+  return rows.map(mapDbExerciseRow);
+}
+
+export async function fetchHomeOverview(params: {
+  userId: string;
+  dailyWaterGoal?: number | null;
+}): Promise<HomeOverview> {
+  const client = getClient();
+  const today = getLocalDateKey();
+
+  const [
+    workoutSessionResult,
+    challengeResult,
+    nutritionPlanResult,
+    todayNutritionResult,
+    hydrationTodayResult,
+    hydrationRecentResult,
+  ] = await Promise.all([
+    client
+      .from('workout_sessions')
+      .select('*')
+      .eq('user_id', params.userId)
+      .eq('date', today)
+      .order('created_at', {ascending: false})
+      .limit(1),
+    client
+      .from('challenge_participations')
+      .select('*')
+      .eq('user_id', params.userId)
+      .eq('status', 'active')
+      .order('created_at', {ascending: false})
+      .limit(1),
+    client
+      .from('nutrition_plans')
+      .select('*')
+      .eq('user_id', params.userId)
+      .eq('is_active', true)
+      .order('created_at', {ascending: false})
+      .limit(1),
+    client
+      .from('daily_nutrition_logs')
+      .select('*')
+      .eq('user_id', params.userId)
+      .eq('date', today)
+      .limit(1),
+    client
+      .from('daily_hydration_logs')
+      .select('*')
+      .eq('user_id', params.userId)
+      .eq('date', today)
+      .limit(1),
+    client
+      .from('daily_hydration_logs')
+      .select('*')
+      .eq('user_id', params.userId)
+      .order('date', {ascending: false})
+      .limit(14),
+  ]);
+
+  if (workoutSessionResult.error) {
+    throw workoutSessionResult.error;
+  }
+
+  if (challengeResult.error) {
+    throw challengeResult.error;
+  }
+
+  if (nutritionPlanResult.error) {
+    throw nutritionPlanResult.error;
+  }
+
+  if (todayNutritionResult.error) {
+    throw todayNutritionResult.error;
+  }
+
+  if (hydrationTodayResult.error) {
+    throw hydrationTodayResult.error;
+  }
+
+  if (hydrationRecentResult.error) {
+    throw hydrationRecentResult.error;
+  }
+
+  const todaySession = workoutSessionResult.data?.[0]
+    ? mapWorkoutSession(workoutSessionResult.data[0] as WorkoutSessionRow)
+    : null;
+
+  let challenge: HomeOverview['challenge'] = null;
+  const participation = challengeResult.data?.[0] as
+    | ChallengeParticipationRow
+    | undefined;
+
+  if (participation) {
+    const habits = parseChallengeHabits(participation);
+    const habitLogsResult = await client
+      .from('habit_logs')
+      .select('*')
+      .eq('participation_id', participation.id);
+
+    if (habitLogsResult.error) {
+      throw habitLogsResult.error;
+    }
+
+    const logMap = buildHabitLogMap(
+      (habitLogsResult.data || []) as HabitLogRow[],
+      habits.length || 3,
+    );
+    const completedToday = (logMap[today] || []).filter(Boolean).length;
+    const completedDays = getCompletedChallengeDays(logMap);
+    challenge = {
+      id: participation.id,
+      userId: participation.user_id,
+      status:
+        participation.status === 'active' ||
+        participation.status === 'completed' ||
+        participation.status === 'abandoned'
+          ? participation.status
+          : 'active',
+      startDate: participation.start_date,
+      habits,
+      challengeDay: getChallengeDay({
+        id: participation.id,
+        userId: participation.user_id,
+        status:
+          participation.status === 'active' ||
+          participation.status === 'completed' ||
+          participation.status === 'abandoned'
+            ? participation.status
+            : 'active',
+        startDate: participation.start_date,
+        habits,
+      }),
+      completedDays,
+      streak: getCurrentChallengeStreak(
+        {
+          id: participation.id,
+          userId: participation.user_id,
+          status:
+            participation.status === 'active' ||
+            participation.status === 'completed' ||
+            participation.status === 'abandoned'
+              ? participation.status
+              : 'active',
+          startDate: participation.start_date,
+          habits,
+        },
+        logMap,
+      ),
+      completedToday,
+      totalHabits: habits.length || 3,
+      progressPct: Math.round((completedDays / 33) * 100),
+    };
+  }
+
+  const nutritionPlan = nutritionPlanResult.data?.[0]
+    ? mapNutritionPlan(nutritionPlanResult.data[0] as NutritionPlanRow)
+    : null;
+
+  const todayNutritionLog = todayNutritionResult.data?.[0]
+    ? mapDailyNutritionLog(todayNutritionResult.data[0] as DailyNutritionLogRow)
+    : null;
+
+  const goalGlasses = params.dailyWaterGoal || 14;
+  const goalMl = goalGlasses * 250;
+  const todayHydration = (hydrationTodayResult.data?.[0] as DailyHydrationLogRow)
+    || null;
+  const todayMl = todayHydration?.water_ml || 0;
+  const hydrationLogRows = (hydrationRecentResult.data || []) as DailyHydrationLogRow[];
+  const hydrationLogs: HydrationLog[] = hydrationLogRows.map(
+    log => ({
+      date: log.date,
+      waterMl: log.water_ml,
+    }),
+  );
+
+  return {
+    todaySession,
+    challenge,
+    nutritionPlan,
+    todayNutritionLog,
+    hydration: {
+      todayMl,
+      goalMl,
+      todayGlasses: Math.round(todayMl / 250),
+      goalGlasses,
+      todayPercentage:
+        goalMl > 0 ? Math.min(100, Math.round((todayMl / goalMl) * 100)) : 0,
+      streak: calculateHydrationStreak(hydrationLogs, goalMl),
+    },
+  };
+}
+
+export async function addHydrationAmount(params: {
+  userId: string;
+  amountMl: number;
+}): Promise<void> {
+  const client = getClient();
+  const today = getLocalDateKey();
+  const {data: existing, error: fetchError} = await client
+    .from('daily_hydration_logs')
+    .select('*')
+    .eq('user_id', params.userId)
+    .eq('date', today)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
+  const existingRow = (existing as DailyHydrationLogRow | null) || null;
+
+  if (existingRow) {
+    const updatePayload: Database['public']['Tables']['daily_hydration_logs']['Update'] =
+      {
+        water_ml: (existingRow.water_ml || 0) + params.amountMl,
+        updated_at: new Date().toISOString(),
+      };
+    const {error} = await (client
+      .from('daily_hydration_logs') as any)
+      .update(updatePayload)
+      .eq('id', existingRow.id);
+
+    if (error) {
+      throw error;
+    }
+
+    return;
+  }
+
+  const insertPayload: Database['public']['Tables']['daily_hydration_logs']['Insert'] =
+    {
+      user_id: params.userId,
+      date: today,
+      water_ml: params.amountMl,
+    };
+
+  const {error} = await (client.from('daily_hydration_logs') as any).insert(
+    insertPayload,
+  );
+
+  if (error) {
+    throw error;
+  }
+}
