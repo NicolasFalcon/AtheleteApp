@@ -38,3 +38,4 @@ This repo is intentionally focused on foundation only:
 - connected placeholder screens
 
 Porting real product screens and business logic comes next.
+# AtheleteApp
