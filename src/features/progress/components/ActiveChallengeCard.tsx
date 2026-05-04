@@ -107,7 +107,7 @@ export function ActiveChallengeCard({
         <Pressable
           onPress={onOpen}
           style={({pressed}) => [styles.cta, pressed ? {opacity: 0.88} : null]}>
-          <Text style={styles.ctaLabel}>Ver reto</Text>
+          <Text style={styles.ctaLabel}>Comenzar reto</Text>
           <ArrowRight
             color={theme.colors.accentContrast}
             size={17}
@@ -118,23 +118,29 @@ export function ActiveChallengeCard({
     );
   }
 
+  const isCompleted = challenge.status === 'completed';
+
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
         <View style={styles.headerCopy}>
           <View style={styles.status}>
-            <Text style={styles.statusLabel}>Activo</Text>
+            <Text style={styles.statusLabel}>
+              {isCompleted ? 'Completado' : 'Activo'}
+            </Text>
           </View>
           <Text style={styles.title}>Athelete Core · 33</Text>
           <Text style={styles.subtitle}>
-            Día {challenge.challengeDay} de 33 · {challenge.progressPct}% completado
+            {isCompleted
+              ? `Día 33 de 33 · 100% completado`
+              : `Día ${challenge.challengeDay} de 33 · ${challenge.progressPct}% completado`}
           </Text>
         </View>
         <CircularProgress
-          value={challenge.progressPct}
+          value={isCompleted ? 100 : challenge.progressPct}
           size={86}
           strokeWidth={6}
-          label={`${challenge.progressPct}%`}
+          label={isCompleted ? '100%' : `${challenge.progressPct}%`}
         />
       </View>
 
@@ -149,7 +155,9 @@ export function ActiveChallengeCard({
       <Pressable
         onPress={onOpen}
         style={({pressed}) => [styles.cta, pressed ? {opacity: 0.88} : null]}>
-        <Text style={styles.ctaLabel}>Ver reto</Text>
+        <Text style={styles.ctaLabel}>
+          {isCompleted ? 'Ver reto' : 'Continuar reto'}
+        </Text>
         <ArrowRight
           color={theme.colors.accentContrast}
           size={17}

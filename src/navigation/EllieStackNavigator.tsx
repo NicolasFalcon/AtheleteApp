@@ -1,6 +1,7 @@
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {ELLIE_ROUTES} from '@app/constants/routes';
 import {NutritionPlanScreen} from '@app/screens/nutrition/NutritionPlanScreen';
+import {ChallengeScreen} from '@app/screens/progress/ChallengeScreen';
 import {EllieScreen} from '@app/screens/tabs/EllieScreen';
 import type {EllieStackParamList} from '@app/types/navigation';
 
@@ -10,6 +11,10 @@ export function EllieStackNavigator() {
   return (
     <Stack.Navigator screenOptions={{headerShown: false}}>
       <Stack.Screen name={ELLIE_ROUTES.Ellie} component={EllieScreen} />
+      <Stack.Screen
+        name={ELLIE_ROUTES.Challenge}
+        component={ChallengeScreen}
+      />
       <Stack.Screen
         name={ELLIE_ROUTES.NutritionPlan}
         component={NutritionPlanScreen}

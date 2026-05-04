@@ -1,41 +1,23 @@
-import {Alert, Pressable, StyleSheet, Text, View} from 'react-native';
-import {useNavigation} from '@react-navigation/native';
-import {Apple, ArrowLeft, Brain, Dumbbell, Trophy} from 'lucide-react-native';
-import {ScreenContainer} from '@app/components';
+import {Brain} from 'lucide-react-native';
+import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import {StyleSheet, Text, View} from 'react-native';
+import {AppHeader, ScreenContainer} from '@app/components';
 import {EmptyState, Loader} from '@app/components/ui';
+import {HOME_ROUTES} from '@app/constants/routes';
+import {QuizCategoryCard} from '@app/features/quiz/components/QuizCategoryCard';
+import {useQuizCategories} from '@app/hooks/useQuiz';
 import {useAppTheme} from '@app/hooks/useAppTheme';
-import {useQuizCategories} from '@app/hooks/useQuizCategories';
+import type {HomeStackParamList} from '@app/types/navigation';
 
-const categoryIcons: Record<string, typeof Brain> = {
-  brain: Brain,
-  dumbbell: Dumbbell,
-  apple: Apple,
-};
+type Props = NativeStackScreenProps<HomeStackParamList, 'QuizLanding'>;
 
-export function QuizLandingScreen() {
-  const navigation = useNavigation();
+export function QuizLandingScreen({navigation}: Props) {
   const {theme} = useAppTheme();
   const categoriesQuery = useQuizCategories();
 
   const styles = StyleSheet.create({
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.md,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.surfaceMuted,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    heading: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.titleSm,
-      fontWeight: theme.typography.weights.bold,
+    content: {
+      gap: theme.spacing.lg,
     },
     introCard: {
       borderRadius: theme.radii.xl,
@@ -47,6 +29,11 @@ export function QuizLandingScreen() {
       shadowColor: '#000000',
       ...theme.elevations.card,
     },
+    introRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+    },
     introTitle: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
@@ -56,70 +43,29 @@ export function QuizLandingScreen() {
     introText: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      lineHeight: 24,
-    },
-    card: {
-      borderRadius: theme.radii.xl,
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      padding: theme.spacing.lg,
-      flexDirection: 'row',
-      gap: theme.spacing.md,
-      shadowColor: '#000000',
-      ...theme.elevations.card,
-    },
-    iconBox: {
-      width: 54,
-      height: 54,
-      borderRadius: theme.radii.lg,
-      backgroundColor: theme.colors.surfaceMuted,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    content: {
-      flex: 1,
-      gap: 6,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.bold,
-    },
-    description: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 20,
+      lineHeight: 22,
     },
-    metaRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: theme.spacing.sm,
-    },
-    metaLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
+    list: {
+      gap: theme.spacing.md,
     },
   });
 
   return (
-    <ScreenContainer scrollable>
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={theme.colors.textPrimary} size={18} strokeWidth={2.2} />
-        </Pressable>
-        <Text style={styles.heading}>Aprende y gana</Text>
-      </View>
+    <ScreenContainer scrollable contentContainerStyle={styles.content}>
+      <AppHeader
+        showBackButton
+        title="Aprende y gana"
+        subtitle="Responde preguntas sobre entrenamiento, nutrición y ciencia del cuerpo. Gana puntos con cada quiz completado."
+      />
 
       <View style={styles.introCard}>
-        <Text style={styles.introTitle}>Quiz de fitness</Text>
+        <View style={styles.introRow}>
+          <Brain color={theme.colors.textPrimary} size={18} strokeWidth={2.1} />
+          <Text style={styles.introTitle}>Quiz de fitness</Text>
+        </View>
         <Text style={styles.introText}>
-          Responde preguntas sobre entrenamiento, nutrición y ciencia del cuerpo.
-          Gana puntos con cada quiz completado.
+          Elige una categoría, completa una sesión de 10 preguntas y suma puntos reales a tu perfil.
         </Text>
       </View>
 
@@ -128,51 +74,25 @@ export function QuizLandingScreen() {
       {categoriesQuery.isError ? (
         <EmptyState
           title="No pudimos cargar los quizzes"
-          description="La estructura está lista; vuelve a intentarlo más tarde."
+          description="Inténtalo de nuevo en unos minutos para recuperar las categorías activas."
         />
       ) : null}
 
-      {(categoriesQuery.data || []).map(category => {
-        const Icon = categoryIcons[category.icon] || Brain;
-
-        return (
-          <Pressable
+      <View style={styles.list}>
+        {(categoriesQuery.data || []).map(category => (
+          <QuizCategoryCard
             key={category.id}
+            category={category}
             onPress={() =>
-              Alert.alert(
-                category.name,
-                'El flujo completo de preguntas llegará en una siguiente fase.',
-              )
+              navigation.navigate(HOME_ROUTES.QuizQuestion, {
+                categoryId: category.id,
+                categoryName: category.name,
+                categoryIcon: category.icon,
+              })
             }
-            style={({pressed}) => [
-              styles.card,
-              pressed ? {transform: [{scale: 0.99}]} : null,
-            ]}>
-            <View style={styles.iconBox}>
-              <Icon color={theme.colors.textPrimary} size={26} strokeWidth={2.1} />
-            </View>
-            <View style={styles.content}>
-              <Text style={styles.title}>{category.name}</Text>
-              <Text style={styles.description}>{category.description}</Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>
-                  {category.questionCount} preguntas
-                </Text>
-                {typeof category.bestScore === 'number' ? (
-                  <Text style={styles.metaLabel}>Mejor: {category.bestScore}%</Text>
-                ) : null}
-                {category.attemptsCount > 0 ? (
-                  <Text style={styles.metaLabel}>
-                    {category.attemptsCount}{' '}
-                    {category.attemptsCount === 1 ? 'intento' : 'intentos'}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-            <Trophy color={theme.colors.textSecondary} size={18} strokeWidth={2} />
-          </Pressable>
-        );
-      })}
+          />
+        ))}
+      </View>
     </ScreenContainer>
   );
 }

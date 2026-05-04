@@ -11,6 +11,7 @@ type CurrentPlanSummaryCardProps = {
   challengeLabel: string;
   onEdit: () => void;
   onOpenNutrition?: () => void;
+  onOpenChallenge?: () => void;
 };
 
 function SetupItem({
@@ -94,6 +95,7 @@ export function CurrentPlanSummaryCard({
   challengeLabel,
   onEdit,
   onOpenNutrition,
+  onOpenChallenge,
 }: CurrentPlanSummaryCardProps) {
   const {theme} = useAppTheme();
 
@@ -159,7 +161,12 @@ export function CurrentPlanSummaryCard({
           value={nutritionLabel}
           onPress={onOpenNutrition}
         />
-        <SetupItem icon={Flame} label="Core 33" value={challengeLabel} />
+        <SetupItem
+          icon={Flame}
+          label="Core 33"
+          value={challengeLabel}
+          onPress={onOpenChallenge}
+        />
       </View>
     </Card>
   );

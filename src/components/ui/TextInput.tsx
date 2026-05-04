@@ -4,7 +4,9 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
   type TextInputProps,
+  type TextStyle,
 } from 'react-native';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 
@@ -13,6 +15,7 @@ type AppTextInputProps = TextInputProps & {
   hint?: string;
   error?: string;
   rightAccessory?: ReactNode;
+  inputStyle?: StyleProp<TextStyle>;
 };
 
 export function AppTextInput({
@@ -20,6 +23,7 @@ export function AppTextInput({
   hint,
   error,
   rightAccessory,
+  inputStyle,
   ...props
 }: AppTextInputProps) {
   const {theme} = useAppTheme();
@@ -71,7 +75,7 @@ export function AppTextInput({
       <View style={styles.inputWrapper}>
         <TextInput
           placeholderTextColor={theme.colors.textSecondary}
-          style={styles.input}
+          style={[styles.input, inputStyle]}
           {...props}
         />
         {rightAccessory ? <View style={styles.rightAccessory}>{rightAccessory}</View> : null}

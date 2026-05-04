@@ -1,8 +1,9 @@
 import {useMemo} from 'react';
-import {useQuery} from '@tanstack/react-query';
+import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@app/hooks/useAuth';
+import {invalidatePersonalRecordQueries} from '@app/lib/queryInvalidation';
 import {getSupabaseClient} from '@app/services/supabase/client';
-import type {PersonalRecord} from '@app/shared';
+import type {PRInsert, PersonalRecord} from '@app/shared';
 
 function mapPersonalRecordRow(row: any): PersonalRecord {
   return {
@@ -21,12 +22,13 @@ function mapPersonalRecordRow(row: any): PersonalRecord {
   };
 }
 
-export function usePersonalRecords() {
+export function usePersonalRecords(exerciseId?: string) {
   const {profile} = useAuth();
   const userId = profile?.id;
+  const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['personal-records', userId],
+    queryKey: ['personal-records', userId, exerciseId || 'all'],
     enabled: Boolean(userId),
     queryFn: async () => {
       const client = getSupabaseClient();
@@ -35,11 +37,17 @@ export function usePersonalRecords() {
         return [];
       }
 
-      const {data, error} = await (client as any)
+      let builder = (client as any)
         .from('personal_records')
         .select('*')
         .eq('user_id', userId)
         .order('recorded_at', {ascending: false});
+
+      if (exerciseId) {
+        builder = builder.eq('exercise_id', exerciseId);
+      }
+
+      const {data, error} = await builder;
 
       if (error) {
         throw error;
@@ -54,9 +62,71 @@ export function usePersonalRecords() {
     [query.data],
   );
 
+  const addMutation = useMutation({
+    mutationFn: async (pr: PRInsert) => {
+      const client = getSupabaseClient();
+
+      if (!client || !userId) {
+        throw new Error('No hay una sesión activa para registrar PRs.');
+      }
+
+      const {error} = await (client as any).from('personal_records').insert({
+        user_id: userId,
+        exercise_id: pr.exerciseId,
+        pr_type: pr.prType,
+        value_weight: pr.valueWeight ?? null,
+        value_reps: pr.valueReps ?? null,
+        value_duration_sec: pr.valueDurationSec ?? null,
+        value_distance_m: pr.valueDistanceM ?? null,
+        unit: pr.unit ?? 'kg',
+        notes: pr.notes ?? null,
+        recorded_at: pr.recordedAt ?? new Date().toISOString(),
+      });
+
+      if (error) {
+        throw error;
+      }
+    },
+    onSuccess: async () => {
+      if (userId) {
+        await invalidatePersonalRecordQueries(queryClient, userId);
+      }
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (recordId: string) => {
+      const client = getSupabaseClient();
+
+      if (!client || !userId) {
+        throw new Error('No hay una sesión activa para editar PRs.');
+      }
+
+      const {error} = await (client as any)
+        .from('personal_records')
+        .delete()
+        .eq('id', recordId)
+        .eq('user_id', userId);
+
+      if (error) {
+        throw error;
+      }
+    },
+    onSuccess: async () => {
+      if (userId) {
+        await invalidatePersonalRecordQueries(queryClient, userId);
+      }
+    },
+  });
+
   return {
     ...query,
     records: query.data || [],
     latestRecord,
+    addRecord: addMutation.mutateAsync,
+    deleteRecord: deleteMutation.mutateAsync,
+    isAddingRecord: addMutation.isPending,
+    isDeletingRecord: deleteMutation.isPending,
+    refresh: query.refetch,
   };
 }

@@ -15,6 +15,7 @@ const challengeBannerImage = {
 
 type ChallengeBannerCardProps = {
   challenge: {
+    status?: 'active' | 'completed' | 'abandoned';
     challengeDay: number;
     completedDays: number;
     streak: number;
@@ -32,6 +33,7 @@ export function ChallengeBannerCard({
   const {theme} = useAppTheme();
   const activeChallenge = challenge;
   const isActive = Boolean(activeChallenge);
+  const isCompleted = activeChallenge?.status === 'completed';
 
   const styles = StyleSheet.create({
     card: {
@@ -143,7 +145,9 @@ export function ChallengeBannerCard({
           </View>
           {isActive ? (
             <View style={styles.stateBadge}>
-              <Text style={styles.stateLabel}>EN CURSO</Text>
+              <Text style={styles.stateLabel}>
+                {isCompleted ? 'COMPLETADO' : 'EN CURSO'}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -155,21 +159,27 @@ export function ChallengeBannerCard({
           </>
         ) : (
           <>
-            <Text style={styles.title}>Día {activeChallenge!.challengeDay} de 33</Text>
+            <Text style={styles.title}>
+              {isCompleted
+                ? 'Core 33 completado'
+                : `Día ${activeChallenge!.challengeDay} de 33`}
+            </Text>
             <Text style={styles.subtitle}>
-              {activeChallenge!.completedToday === activeChallenge!.totalHabits
+              {isCompleted
+                ? `Terminaste el reto con ${activeChallenge!.completedDays} días cerrados.`
+                : activeChallenge!.completedToday === activeChallenge!.totalHabits
                 ? `Hoy ya completaste tus ${activeChallenge!.totalHabits} hábitos.`
                 : `Hoy llevas ${activeChallenge!.completedToday} de ${activeChallenge!.totalHabits} hábitos.`}
             </Text>
             <ProgressBar
-              value={activeChallenge!.progressPct}
+              value={isCompleted ? 100 : activeChallenge!.progressPct}
               max={100}
               color="#FFFFFF"
             />
             <View style={styles.pillsRow}>
               <View style={styles.pill}>
                 <Text style={styles.pillLabel}>
-                  {activeChallenge!.progressPct}% completado
+                  {isCompleted ? '100% completado' : `${activeChallenge!.progressPct}% completado`}
                 </Text>
               </View>
               <View style={styles.pill}>
@@ -187,7 +197,13 @@ export function ChallengeBannerCard({
         )}
 
         <Button
-          label={isActive ? 'Continuar reto' : 'Comenzar reto'}
+          label={
+            !isActive
+              ? 'Comenzar reto'
+              : isCompleted
+                ? 'Ver reto'
+                : 'Continuar reto'
+          }
           onPress={onPress}
           fullWidth={false}
           accessoryRight={

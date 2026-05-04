@@ -222,12 +222,18 @@ function buildHabitLogMap(
   return map;
 }
 
-export async function fetchWorkoutLibrary(): Promise<Workout[]> {
+export async function fetchWorkoutLibrary(userId?: string): Promise<Workout[]> {
   const client = getClient();
-  const {data: templates, error: templateError} = await client
+  let builder = client
     .from('workout_templates')
     .select('*')
     .order('created_at', {ascending: false});
+
+  builder = userId
+    ? builder.or(`created_by.eq.${userId},is_public.eq.true,created_by.is.null`)
+    : builder.or('is_public.eq.true,created_by.is.null');
+
+  const {data: templates, error: templateError} = await builder;
 
   if (templateError) {
     throw templateError;
@@ -572,7 +578,7 @@ export async function fetchHomeOverview(params: {
       .from('challenge_participations')
       .select('*')
       .eq('user_id', params.userId)
-      .eq('status', 'active')
+      .in('status', ['active', 'completed'])
       .order('created_at', {ascending: false})
       .limit(1),
     client

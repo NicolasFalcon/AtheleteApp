@@ -464,7 +464,9 @@ export function useEllieChat(params: {
       );
 
       await Promise.allSettled([
-        queryClient.invalidateQueries({queryKey: ['workouts', 'library']}),
+        queryClient.invalidateQueries({
+          queryKey: ['workouts', 'library', profile.id],
+        }),
         queryClient.invalidateQueries({
           queryKey: ['ellie', 'overview', profile.id],
         }),

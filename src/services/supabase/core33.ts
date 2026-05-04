@@ -1,0 +1,429 @@
+import {getLocalDateKey} from '@app/lib/date';
+import {
+  getChallengeDay,
+  getCompletedChallengeDays,
+  getCurrentChallengeStreak,
+  getLongestChallengeStreak,
+  type HabitChallenge,
+  type HabitCategory,
+} from '@app/shared';
+import {getSupabaseClient} from '@app/services/supabase/client';
+import type {Database, Json} from '@app/types/supabase';
+
+type ChallengeParticipationRow =
+  Database['public']['Tables']['challenge_participations']['Row'];
+type HabitLogRow = Database['public']['Tables']['habit_logs']['Row'];
+
+export type Core33HabitSelection = {
+  training: string;
+  health: string;
+  mind: string;
+};
+
+export type Core33TimelineDay = {
+  day: number;
+  date: string;
+  completedCount: number;
+  status: 'empty' | 'partial' | 'full';
+  isCurrent: boolean;
+};
+
+export type Core33State = {
+  challenge: (HabitChallenge & {
+    challengeDay: number;
+    completedDays: number;
+    completedToday: number;
+    currentStreak: number;
+    longestStreak: number;
+    progressPct: number;
+    overallPct: number;
+    totalHabits: number;
+  }) | null;
+  habitLogs: Record<string, boolean[]>;
+  today: string;
+  todayLogs: boolean[];
+  timeline: Core33TimelineDay[];
+};
+
+const CORE33_DAY_COMPLETED_POINTS = 20;
+const CORE33_COMPLETED_POINTS = 500;
+
+const CORE33_HABIT_PRESETS: Array<{
+  key: keyof Core33HabitSelection;
+  label: string;
+  category: HabitCategory;
+  options: string[];
+}> = [
+  {
+    key: 'training',
+    label: 'Entrenamiento',
+    category: 'training',
+    options: ['Entrenar 30 min', '10K pasos', 'Estirar 5 min'],
+  },
+  {
+    key: 'health',
+    label: 'Salud',
+    category: 'health',
+    options: ['Beber 2L de agua', 'Sin bebidas azucaradas', 'Comer 1 ensalada'],
+  },
+  {
+    key: 'mind',
+    label: 'Mentalidad',
+    category: 'mind',
+    options: ['Leer 10 min', 'Escribir diario 5 min', 'Meditar 5 min'],
+  },
+];
+
+function getClient() {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    throw new Error('Supabase no está configurado.');
+  }
+
+  return client;
+}
+
+function getChallengeStatus(value: string): HabitChallenge['status'] {
+  if (value === 'completed' || value === 'abandoned') {
+    return value;
+  }
+
+  return 'active';
+}
+
+function parseChallengeHabits(
+  participation: ChallengeParticipationRow,
+): HabitChallenge['habits'] {
+  const rawHabits = Array.isArray(participation.habits)
+    ? participation.habits
+    : [];
+
+  return rawHabits.map((habit, index) => {
+    const item =
+      habit && typeof habit === 'object' && !Array.isArray(habit)
+        ? (habit as Record<string, Json>)
+        : {};
+
+    return {
+      id:
+        typeof item.id === 'string'
+          ? item.id
+          : `habit-${participation.id}-${index}`,
+      challengeId: participation.id,
+      category:
+        item.category === 'training' ||
+        item.category === 'health' ||
+        item.category === 'mind'
+          ? item.category
+          : 'training',
+      name: typeof item.name === 'string' ? item.name : '',
+    };
+  });
+}
+
+function buildHabitLogMap(
+  logs: HabitLogRow[],
+  totalHabits: number,
+): Record<string, boolean[]> {
+  const map: Record<string, boolean[]> = {};
+
+  logs.forEach(log => {
+    if (!map[log.date]) {
+      map[log.date] = Array.from({length: totalHabits}, () => false);
+    }
+
+    if (log.habit_index >= 0 && log.habit_index < totalHabits) {
+      map[log.date][log.habit_index] = log.completed || false;
+    }
+  });
+
+  return map;
+}
+
+function buildCore33State(
+  participation: ChallengeParticipationRow | undefined,
+  logs: HabitLogRow[],
+): Core33State {
+  const today = getLocalDateKey();
+
+  if (!participation) {
+    return {
+      challenge: null,
+      habitLogs: {},
+      today,
+      todayLogs: [],
+      timeline: [],
+    };
+  }
+
+  const habits = parseChallengeHabits(participation);
+  const challenge: HabitChallenge = {
+    id: participation.id,
+    userId: participation.user_id,
+    status: getChallengeStatus(participation.status),
+    startDate: participation.start_date,
+    habits,
+  };
+  const totalHabits = habits.length || 3;
+  const habitLogs = buildHabitLogMap(logs, totalHabits);
+  const challengeDay = getChallengeDay(challenge);
+  const completedDays = getCompletedChallengeDays(habitLogs);
+  const completedToday = (habitLogs[today] || []).filter(Boolean).length;
+  const totalChecks = Object.values(habitLogs).reduce(
+    (sum, dayLogs) => sum + dayLogs.filter(Boolean).length,
+    0,
+  );
+  const timeline = Array.from({length: 33}, (_, index) => {
+    const date = new Date(`${challenge.startDate}T00:00:00`);
+    date.setDate(date.getDate() + index);
+    const dateKey = getLocalDateKey(date);
+    const dayLogs = habitLogs[dateKey] || [];
+    const completedCount = dayLogs.filter(Boolean).length;
+
+    return {
+      day: index + 1,
+      date: dateKey,
+      completedCount,
+      status:
+        completedCount === totalHabits
+          ? 'full'
+          : completedCount > 0
+            ? 'partial'
+            : 'empty',
+      isCurrent: index + 1 === challengeDay,
+    } satisfies Core33TimelineDay;
+  });
+
+  return {
+    challenge: {
+      ...challenge,
+      challengeDay,
+      completedDays,
+      completedToday,
+      currentStreak: getCurrentChallengeStreak(challenge, habitLogs),
+      longestStreak: getLongestChallengeStreak(challenge, habitLogs),
+      progressPct: Math.min(100, Math.round((completedDays / 33) * 100)),
+      overallPct: Math.min(
+        100,
+        Math.round((totalChecks / (33 * totalHabits)) * 100),
+      ),
+      totalHabits,
+    },
+    habitLogs,
+    today,
+    todayLogs: habitLogs[today] || Array.from({length: totalHabits}, () => false),
+    timeline,
+  };
+}
+
+async function fetchCurrentPoints(userId: string) {
+  const client = getClient();
+  const {data, error} = await (client.from('profiles') as any)
+    .select('points')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return typeof data?.points === 'number' ? data.points : 0;
+}
+
+async function addPoints(userId: string, amount: number) {
+  if (amount <= 0) {
+    return;
+  }
+
+  const client = getClient();
+  const currentPoints = await fetchCurrentPoints(userId);
+  const {error} = await (client.from('profiles') as any)
+    .update({points: currentPoints + amount})
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+async function unlockBadgeIfNeeded(userId: string, badgeId: string) {
+  const client = getClient();
+  const {data: existing, error: existingError} = await (client
+    .from('user_badges') as any)
+    .select('badge_id')
+    .eq('user_id', userId)
+    .eq('badge_id', badgeId)
+    .maybeSingle();
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  if (existing) {
+    return false;
+  }
+
+  const {error: insertError} = await (client.from('user_badges') as any).insert({
+    user_id: userId,
+    badge_id: badgeId,
+  });
+
+  if (insertError) {
+    throw insertError;
+  }
+
+  return true;
+}
+
+export function getCore33HabitPresets() {
+  return CORE33_HABIT_PRESETS;
+}
+
+export async function fetchCore33State(userId: string): Promise<Core33State> {
+  const client = getClient();
+  const {data, error} = await client
+    .from('challenge_participations')
+    .select('*')
+    .eq('user_id', userId)
+    .in('status', ['active', 'completed'])
+    .order('created_at', {ascending: false})
+    .limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  const participation = data?.[0] as ChallengeParticipationRow | undefined;
+
+  if (!participation) {
+    return buildCore33State(undefined, []);
+  }
+
+  const {data: logs, error: logsError} = await client
+    .from('habit_logs')
+    .select('*')
+    .eq('participation_id', participation.id);
+
+  if (logsError) {
+    throw logsError;
+  }
+
+  return buildCore33State(participation, (logs || []) as HabitLogRow[]);
+}
+
+export async function startCore33Challenge(params: {
+  userId: string;
+  habits: Core33HabitSelection;
+}): Promise<void> {
+  const client = getClient();
+  const today = getLocalDateKey();
+
+  await (client.from('challenge_participations') as any)
+    .update({status: 'abandoned'})
+    .eq('user_id', params.userId)
+    .eq('status', 'active');
+
+  const habitsJson = CORE33_HABIT_PRESETS.map(pillar => ({
+    id: `${pillar.key}-${Date.now()}`,
+    category: pillar.category,
+    name: params.habits[pillar.key],
+  }));
+
+  const {error} = await (client.from('challenge_participations') as any).insert({
+    user_id: params.userId,
+    status: 'active',
+    start_date: today,
+    habits: habitsJson,
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function restartCore33Challenge(params: {
+  userId: string;
+  challengeId: string;
+}): Promise<void> {
+  const client = getClient();
+  const {error} = await (client.from('challenge_participations') as any)
+    .update({status: 'abandoned'})
+    .eq('id', params.challengeId)
+    .eq('user_id', params.userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function toggleCore33Habit(params: {
+  userId: string;
+  challenge: NonNullable<Core33State['challenge']>;
+  habitLogs: Record<string, boolean[]>;
+  date: string;
+  habitIndex: number;
+}): Promise<void> {
+  const client = getClient();
+
+  if (params.challenge.status === 'completed') {
+    return;
+  }
+
+  const totalHabits = params.challenge.totalHabits || 3;
+  const currentDayLogs =
+    params.habitLogs[params.date] ||
+    Array.from({length: totalHabits}, () => false);
+  const previousDayCompleted =
+    currentDayLogs.length > 0 && currentDayLogs.every(Boolean);
+  const nextValue = !currentDayLogs[params.habitIndex];
+  const nextDayLogs = [...currentDayLogs];
+  nextDayLogs[params.habitIndex] = nextValue;
+  const nextHabitLogs = {
+    ...params.habitLogs,
+    [params.date]: nextDayLogs,
+  };
+  const nextDayCompleted = nextDayLogs.every(Boolean);
+
+  const {error} = await (client.from('habit_logs') as any).upsert(
+    {
+      participation_id: params.challenge.id,
+      user_id: params.userId,
+      date: params.date,
+      habit_index: params.habitIndex,
+      completed: nextValue,
+    },
+    {onConflict: 'participation_id,date,habit_index'},
+  );
+
+  if (error) {
+    throw error;
+  }
+
+  if (!previousDayCompleted && nextDayCompleted) {
+    await addPoints(params.userId, CORE33_DAY_COMPLETED_POINTS);
+
+    const streak = getCurrentChallengeStreak(params.challenge, nextHabitLogs);
+    if (streak >= 7) {
+      await unlockBadgeIfNeeded(params.userId, 'streak_7_days');
+    }
+
+    const completedDays = getCompletedChallengeDays(nextHabitLogs);
+    const challengeDay = getChallengeDay(params.challenge);
+
+    if (completedDays >= 33 && challengeDay >= 33) {
+      const {error: updateError} = await (client
+        .from('challenge_participations') as any)
+        .update({status: 'completed'})
+        .eq('id', params.challenge.id)
+        .eq('user_id', params.userId);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      await addPoints(params.userId, CORE33_COMPLETED_POINTS);
+      await unlockBadgeIfNeeded(params.userId, 'core33_finisher');
+    }
+  }
+}

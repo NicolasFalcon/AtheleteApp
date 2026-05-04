@@ -243,7 +243,12 @@ export function EllieScreen({navigation}: Props) {
         return;
       }
 
-      if (action === 'view_challenge' || action === 'view_progress') {
+      if (action === 'view_challenge') {
+        navigation.navigate(ELLIE_ROUTES.Challenge);
+        return;
+      }
+
+      if (action === 'view_progress') {
         navigation.getParent()?.navigate(TAB_ROUTES.Progress as never);
         return;
       }

@@ -110,7 +110,12 @@ export function ProgressScreen({navigation}: Props) {
             />
             <PersonalRecordsCard
               records={progress.recordSummaries}
-              onOpen={() => navigation.navigate(PROGRESS_ROUTES.PersonalRecords)}
+              onOpen={(exerciseId, exerciseName) =>
+                navigation.navigate(PROGRESS_ROUTES.PersonalRecords, {
+                  exerciseId,
+                  exerciseName,
+                })
+              }
             />
           </>
         ) : (

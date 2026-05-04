@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loader } from '@app/components/ui';
-import { TAB_ROUTES, HOME_ROUTES } from '@app/constants/routes';
+import {HOME_ROUTES, TAB_ROUTES} from '@app/constants/routes';
 import { RecoveryGuidanceCard } from '@app/features/home/components/RecoveryGuidanceCard';
 import { QuizPromoCard } from '@app/features/home/components/QuizPromoCard';
 import { RecentPRCard } from '@app/features/home/components/RecentPRCard';
@@ -91,12 +91,12 @@ export function HomeScreen({ navigation }: Props) {
     navigation.getParent()?.navigate(TAB_ROUTES.Ellie as never);
   };
 
-  const openProgressTab = () => {
-    navigation.getParent()?.navigate(TAB_ROUTES.Progress as never);
-  };
-
   const openQuizLanding = () => {
     navigation.navigate(HOME_ROUTES.QuizLanding);
+  };
+
+  const openChallengeFlow = () => {
+    navigation.navigate(HOME_ROUTES.Challenge);
   };
 
   const openNutritionPlan = () => {
@@ -105,6 +105,31 @@ export function HomeScreen({ navigation }: Props) {
 
   const openPersonalRecords = () => {
     navigation.navigate(HOME_ROUTES.PersonalRecords);
+  };
+
+  const openLatestPersonalRecord = () => {
+    const latest = personalRecordsQuery.latestRecord;
+
+    if (!latest) {
+      openPersonalRecords();
+      return;
+    }
+
+    const exerciseName =
+      (exercisesQuery.data || []).find(
+        exercise => exercise.id === latest.exerciseId,
+      )?.name || 'Ejercicio';
+
+    navigation.navigate(HOME_ROUTES.PersonalRecords, {
+      exerciseId: latest.exerciseId,
+      exerciseName,
+    });
+  };
+
+  const openRegisterPr = () => {
+    navigation.navigate(HOME_ROUTES.RegisterPr, {
+      showExercisePicker: true,
+    });
   };
 
   const handleTodayWorkoutPress = () => {
@@ -152,7 +177,7 @@ export function HomeScreen({ navigation }: Props) {
         <HomeHeader />
         <ChallengeBannerCard
           challenge={homeQuery.data?.challenge || null}
-          onPress={openProgressTab}
+          onPress={openChallengeFlow}
         />
         <TodayWorkoutCard
           session={homeQuery.data?.todaySession || null}
@@ -190,8 +215,8 @@ export function HomeScreen({ navigation }: Props) {
                 )?.name || null
               : null
           }
-          onOpen={openPersonalRecords}
-          onRegister={openPersonalRecords}
+          onOpen={openLatestPersonalRecord}
+          onRegister={openRegisterPr}
         />
         <RecoveryGuidanceCard onPress={openEllieTab} />
         <WearBanner onPress={() => setWearPreviewVisible(true)} />

@@ -20,12 +20,32 @@ export type PersonalRecord = {
   createdAt: string;
 };
 
+export type PRInsert = {
+  exerciseId: string;
+  prType: PRType;
+  valueWeight?: number | null;
+  valueReps?: number | null;
+  valueDurationSec?: number | null;
+  valueDistanceM?: number | null;
+  unit?: string | null;
+  notes?: string | null;
+  recordedAt?: string;
+};
+
 export const prTypeLabels: Record<PRType, string> = {
   max_weight: 'Peso máximo',
   weight_reps: 'Peso + repeticiones',
   max_reps: 'Repeticiones máximas',
   duration: 'Tiempo',
   distance: 'Distancia',
+};
+
+export const prTypeUnits: Record<PRType, string> = {
+  max_weight: 'kg',
+  weight_reps: 'kg',
+  max_reps: 'reps',
+  duration: 'seg',
+  distance: 'm',
 };
 
 export function getPRMainValue(pr: PersonalRecord): number {
@@ -59,4 +79,24 @@ export function formatPRValue(pr: PersonalRecord): string {
     case 'distance':
       return `${pr.valueDistanceM ?? 0} m`;
   }
+}
+
+export function getBestPR(
+  records: PersonalRecord[],
+  prType: PRType,
+): PersonalRecord | null {
+  const matching = records.filter(record => record.prType === prType);
+
+  if (matching.length === 0) {
+    return null;
+  }
+
+  return [...matching].sort((left, right) => {
+    const delta = getPRMainValue(right) - getPRMainValue(left);
+    if (delta !== 0) {
+      return delta;
+    }
+
+    return right.recordedAt.localeCompare(left.recordedAt);
+  })[0];
 }

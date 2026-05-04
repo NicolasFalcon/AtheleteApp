@@ -66,3 +66,31 @@ export function getCurrentChallengeStreak(
 
   return streak;
 }
+
+export function getLongestChallengeStreak(
+  challenge: HabitChallenge | null,
+  habitLogs: HabitLogMap,
+  totalDays = 33,
+): number {
+  if (!challenge) {
+    return 0;
+  }
+
+  let longest = 0;
+  let current = 0;
+  const start = new Date(`${challenge.startDate}T00:00:00`);
+
+  for (let index = 0; index < totalDays; index += 1) {
+    const date = new Date(start);
+    date.setDate(date.getDate() + index);
+
+    if (isChallengeDayCompleted(habitLogs, toDateKey(date))) {
+      current += 1;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+    }
+  }
+
+  return longest;
+}

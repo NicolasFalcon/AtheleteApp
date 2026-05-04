@@ -105,10 +105,14 @@ export function ProfileScreen({navigation}: Props) {
     ? `${profile.trainingDaysPerWeek} días/sem`
     : 'Sin frecuencia';
   const challengeSummary = overview?.challenge
-    ? `Día ${overview.challenge.challengeDay} de 33`
+    ? overview.challenge.status === 'completed'
+      ? 'Completado · 33 días'
+      : `Día ${overview.challenge.challengeDay} de 33`
     : 'Sin reto';
   const challengeMetaLabel = overview?.challenge
-    ? `Día ${overview.challenge.challengeDay}`
+    ? overview.challenge.status === 'completed'
+      ? 'Completado'
+      : `Día ${overview.challenge.challengeDay}`
     : 'Sin reto';
   const challengeValue = overview?.challenge
     ? String(overview.challenge.completedDays)
@@ -188,6 +192,7 @@ export function ProfileScreen({navigation}: Props) {
           challengeLabel={challengeSummary}
           onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
           onOpenNutrition={() => navigation.navigate(PROFILE_ROUTES.NutritionPlan)}
+          onOpenChallenge={() => navigation.navigate(PROFILE_ROUTES.Challenge)}
         />
 
         <BadgeGridCard

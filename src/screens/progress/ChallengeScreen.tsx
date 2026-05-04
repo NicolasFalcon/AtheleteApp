@@ -1,46 +1,115 @@
-import {StyleSheet, Text, View} from 'react-native';
+import {useEffect, useMemo, useState} from 'react';
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import {AppHeader, ScreenContainer} from '@app/components';
-import {Card, EmptyState, Loader} from '@app/components/ui';
-import {ActiveChallengeCard} from '@app/features/progress/components/ActiveChallengeCard';
-import {useProgressData} from '@app/hooks/useProgressData';
+import {EmptyState, Loader} from '@app/components/ui';
+import {Core33HabitSelectionView} from '@app/features/core33/components/Core33HabitSelectionView';
+import {Core33IntroView} from '@app/features/core33/components/Core33IntroView';
+import {Core33StepIndicator} from '@app/features/core33/components/Core33StepIndicator';
+import {Core33SummaryView} from '@app/features/core33/components/Core33SummaryView';
+import {Core33TrackerView} from '@app/features/core33/components/Core33TrackerView';
+import {useCore33} from '@app/hooks/useCore33';
 import {useAppTheme} from '@app/hooks/useAppTheme';
+import type {Core33HabitSelection} from '@app/services/supabase/core33';
+
+type Step = 'intro' | 'habits' | 'summary' | 'tracker';
+
+const EMPTY_SELECTION: Core33HabitSelection = {
+  training: '',
+  health: '',
+  mind: '',
+};
+
+const STEP_INDEX: Record<Exclude<Step, 'tracker'>, number> = {
+  intro: 1,
+  habits: 2,
+  summary: 3,
+};
 
 export function ChallengeScreen() {
   const {theme} = useAppTheme();
-  const {overviewQuery} = useProgressData();
+  const core33 = useCore33();
+  const [step, setStep] = useState<Step>('intro');
+  const [selectedHabits, setSelectedHabits] =
+    useState<Core33HabitSelection>(EMPTY_SELECTION);
+
+  const challenge = core33.stateQuery.data?.challenge || null;
+
+  useEffect(() => {
+    if (challenge) {
+      setStep('tracker');
+      return;
+    }
+
+    setSelectedHabits(current =>
+      step === 'tracker' ? EMPTY_SELECTION : current,
+    );
+
+    if (step === 'tracker') {
+      setStep('intro');
+    }
+  }, [challenge, step]);
 
   const styles = StyleSheet.create({
-    statsCard: {
-      padding: 16,
-      borderRadius: 24,
-      gap: 12,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
-      fontWeight: theme.typography.weights.bold,
-    },
-    row: {
-      flexDirection: 'row',
+    topMeta: {
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
+      marginTop: -4,
     },
-    label: {
+    trackerHint: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-    },
-    value: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
-      fontWeight: theme.typography.weights.semibold,
+      fontSize: 11,
+      textAlign: 'center',
     },
   });
 
-  if (overviewQuery.isLoading) {
+  const summaryTitle = useMemo(() => {
+    if (challenge?.status === 'completed') {
+      return 'Core 33 completado';
+    }
+
+    return 'Core · 33';
+  }, [challenge?.status]);
+
+  const handleStartChallenge = async () => {
+    await core33.startChallenge(selectedHabits);
+    setStep('tracker');
+  };
+
+  const handleRestartChallenge = async () => {
+    if (!challenge) {
+      return;
+    }
+
+    Alert.alert(
+      challenge.status === 'completed' ? 'Empezar otra vez' : 'Reiniciar reto',
+      challenge.status === 'completed'
+        ? 'Se cerrará esta versión del reto para que puedas empezar un nuevo Core 33 desde cero.'
+        : 'Tu versión actual del Core 33 se cerrará y tendrás que elegir hábitos nuevos para empezar otra vez.',
+      [
+        {text: 'Cancelar', style: 'cancel'},
+        {
+          text: 'Continuar',
+          style: 'destructive',
+          onPress: () => {
+            core33
+              .restartChallenge()
+              .then(() => {
+                setSelectedHabits(EMPTY_SELECTION);
+                setStep('intro');
+              })
+              .catch(() => {});
+          },
+        },
+      ],
+    );
+  };
+
+  if (core33.stateQuery.isLoading) {
     return (
       <ScreenContainer>
         <Loader label="Cargando reto..." />
@@ -48,44 +117,70 @@ export function ChallengeScreen() {
     );
   }
 
+  if (core33.stateQuery.error || !core33.stateQuery.data) {
+    return (
+      <ScreenContainer>
+        <AppHeader showBackButton title="Core · 33" />
+        <EmptyState
+          title="No pudimos cargar Core 33"
+          description="Vuelve a intentarlo en unos minutos o revisa la conexión con Supabase."
+        />
+      </ScreenContainer>
+    );
+  }
+
   return (
     <ScreenContainer scrollable>
-      <AppHeader showBackButton title="Core · 33" />
+      <AppHeader showBackButton title={summaryTitle} />
 
-      <ActiveChallengeCard
-        challenge={overviewQuery.data?.challenge || null}
-        onOpen={() => undefined}
-      />
-
-      {overviewQuery.data?.challenge ? (
-        <Card style={styles.statsCard}>
-          <Text style={styles.title}>Estado actual</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Hábitos completados hoy</Text>
-            <Text style={styles.value}>
-              {overviewQuery.data.challenge.completedToday}/
-              {overviewQuery.data.challenge.totalHabits}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Días cerrados</Text>
-            <Text style={styles.value}>
-              {overviewQuery.data.challenge.completedDays}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Racha actual</Text>
-            <Text style={styles.value}>
-              {overviewQuery.data.challenge.currentStreak} días
-            </Text>
-          </View>
-        </Card>
+      {step !== 'tracker' ? (
+        <View style={styles.topMeta}>
+          <Core33StepIndicator currentStep={STEP_INDEX[step]} />
+        </View>
       ) : (
-        <EmptyState
-          title="Todavía no has iniciado el reto"
-          description="Cuando actives Core · 33, verás aquí tu progreso real por día y tus hábitos elegidos."
-        />
+        <Text style={styles.trackerHint}>
+          Tu progreso se guarda en tiempo real y se refleja en Inicio, Progreso y Perfil.
+        </Text>
       )}
+
+      {step === 'intro' ? (
+        <Core33IntroView onNext={() => setStep('habits')} />
+      ) : null}
+
+      {step === 'habits' ? (
+        <Core33HabitSelectionView
+          value={selectedHabits}
+          onChange={setSelectedHabits}
+          onBack={() => setStep('intro')}
+          onNext={() => setStep('summary')}
+        />
+      ) : null}
+
+      {step === 'summary' ? (
+        <Core33SummaryView
+          habits={selectedHabits}
+          onBack={() => setStep('habits')}
+          onConfirm={() => {
+            handleStartChallenge().catch(() => {});
+          }}
+          loading={core33.isStarting}
+        />
+      ) : null}
+
+      {step === 'tracker' && challenge ? (
+        <Core33TrackerView
+          state={core33.stateQuery.data}
+          onToggleHabit={habitIndex =>
+            core33.toggleHabit({
+              date: core33.stateQuery.data!.today,
+              habitIndex,
+            }).catch(() => {})
+          }
+          onRestart={handleRestartChallenge}
+          toggling={core33.isToggling}
+          restarting={core33.isRestarting}
+        />
+      ) : null}
     </ScreenContainer>
   );
 }

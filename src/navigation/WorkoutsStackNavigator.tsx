@@ -1,5 +1,8 @@
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {WORKOUTS_ROUTES} from '@app/constants/routes';
+import {PersonalRecordsScreen} from '@app/screens/home/PersonalRecordsScreen';
+import {RegisterPrScreen} from '@app/screens/pr/RegisterPrScreen';
+import {AddExerciseToRoutineScreen} from '@app/screens/workouts/AddExerciseToRoutineScreen';
 import {CreateRoutineScreen} from '@app/screens/workouts/CreateRoutineScreen';
 import {ExerciseDetailScreen} from '@app/screens/workouts/ExerciseDetailScreen';
 import {WorkoutDetailScreen} from '@app/screens/workouts/WorkoutDetailScreen';
@@ -18,6 +21,14 @@ export function WorkoutsStackNavigator() {
         component={CreateRoutineScreen}
       />
       <Stack.Screen
+        name={WORKOUTS_ROUTES.EditRoutine}
+        component={CreateRoutineScreen}
+      />
+      <Stack.Screen
+        name={WORKOUTS_ROUTES.AddExerciseToRoutine}
+        component={AddExerciseToRoutineScreen}
+      />
+      <Stack.Screen
         name={WORKOUTS_ROUTES.WorkoutDetail}
         component={WorkoutDetailScreen}
       />
@@ -28,6 +39,14 @@ export function WorkoutsStackNavigator() {
       <Stack.Screen
         name={WORKOUTS_ROUTES.ExerciseDetail}
         component={ExerciseDetailScreen}
+      />
+      <Stack.Screen
+        name={WORKOUTS_ROUTES.PersonalRecords}
+        component={PersonalRecordsScreen}
+      />
+      <Stack.Screen
+        name={WORKOUTS_ROUTES.RegisterPr}
+        component={RegisterPrScreen}
       />
     </Stack.Navigator>
   );

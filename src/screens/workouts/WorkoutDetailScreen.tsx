@@ -8,13 +8,20 @@ import {
   Clock3,
   Dumbbell,
   Flame,
+  PencilLine,
   Play,
+  Trash2,
 } from 'lucide-react-native';
 import {Button, Chip, EmptyState, Loader} from '@app/components/ui';
+import {
+  HOME_ROUTES,
+  WORKOUTS_ROUTES,
+} from '@app/constants/routes';
 import {findExerciseByName, getWorkoutAccess} from '@app/shared';
 import {useAuth} from '@app/hooks/useAuth';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
+import {useRoutineBuilder} from '@app/hooks/useRoutineBuilder';
 import {useWorkoutLibrary} from '@app/hooks/useWorkoutLibrary';
 import {useWorkoutSession} from '@app/hooks/useWorkoutSession';
 import {WorkoutThumbnail} from '@app/features/workouts/components/WorkoutThumbnail';
@@ -39,6 +46,7 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
   const insets = useSafeAreaInsets();
   const workoutsQuery = useWorkoutLibrary();
   const exercisesQuery = useExerciseLibrary();
+  const routineBuilder = useRoutineBuilder();
   const workout = useMemo(
     () =>
       (workoutsQuery.data || []).find(
@@ -124,6 +132,11 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: theme.spacing.md,
+    },
+    ownerActions: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.sm,
     },
     metaItem: {
       flexDirection: 'row',
@@ -228,6 +241,10 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
 
   const access = getWorkoutAccess(workout, profile?.id);
   const stackNavigation = navigation as any;
+  const routeNames = navigation.getState().routeNames as string[];
+  const editRouteName = routeNames.includes(WORKOUTS_ROUTES.EditRoutine)
+    ? WORKOUTS_ROUTES.EditRoutine
+    : HOME_ROUTES.EditRoutine;
   const sessionButtonLabel =
     workoutSession?.status === 'in_progress'
       ? 'Continuar entreno'
@@ -253,6 +270,39 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
         error instanceof Error ? error.message : 'Inténtalo otra vez.',
       );
     }
+  };
+
+  const handleEditRoutine = () => {
+    stackNavigation.navigate(editRouteName as never, {
+      workoutId: workout.id,
+    } as never);
+  };
+
+  const handleDeleteRoutine = () => {
+    Alert.alert(
+      'Eliminar rutina',
+      'Esta rutina se eliminará de tu biblioteca. ¿Quieres continuar?',
+      [
+        {text: 'Cancelar', style: 'cancel'},
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await routineBuilder.deleteRoutine(workout.id);
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert(
+                'No pudimos eliminar la rutina',
+                error instanceof Error
+                  ? error.message
+                  : 'Inténtalo otra vez.',
+              );
+            }
+          },
+        },
+      ],
+    );
   };
 
   return (
@@ -304,6 +354,41 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
               <Chip key={muscle}>{muscle}</Chip>
             ))}
           </View>
+          {access.canEdit || access.canDelete ? (
+            <View style={styles.ownerActions}>
+              {access.canEdit ? (
+                <Button
+                  label="Editar rutina"
+                  variant="outline"
+                  fullWidth={false}
+                  onPress={handleEditRoutine}
+                  accessoryRight={
+                    <PencilLine
+                      color={theme.colors.textPrimary}
+                      size={16}
+                      strokeWidth={2.2}
+                    />
+                  }
+                />
+              ) : null}
+              {access.canDelete ? (
+                <Button
+                  label="Eliminar"
+                  variant="ghost"
+                  fullWidth={false}
+                  onPress={handleDeleteRoutine}
+                  accessoryRight={
+                    <Trash2
+                      color={theme.colors.danger}
+                      size={16}
+                      strokeWidth={2.2}
+                    />
+                  }
+                  textStyle={{color: theme.colors.danger}}
+                />
+              ) : null}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.section}>

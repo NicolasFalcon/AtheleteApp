@@ -7,7 +7,7 @@ import {formatPRValue, type PersonalRecord} from '@app/shared';
 
 type PersonalRecordsCardProps = {
   records: Array<PersonalRecord & {exerciseName: string}>;
-  onOpen: () => void;
+  onOpen: (exerciseId?: string, exerciseName?: string) => void;
 };
 
 export function PersonalRecordsCard({
@@ -130,7 +130,7 @@ export function PersonalRecordsCard({
             return (
               <Pressable
                 key={summary.exerciseId}
-                onPress={onOpen}
+                onPress={() => onOpen(summary.exerciseId, summary.exerciseName)}
                 style={({pressed}) => [
                   styles.row,
                   isLast ? styles.rowLast : null,

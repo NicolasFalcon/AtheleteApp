@@ -198,7 +198,7 @@ export async function fetchProgressOverview(params: {
       .from('challenge_participations')
       .select('*')
       .eq('user_id', params.userId)
-      .eq('status', 'active')
+      .in('status', ['active', 'completed'])
       .order('created_at', {ascending: false})
       .limit(1),
   ]);

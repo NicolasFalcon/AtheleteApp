@@ -1,5 +1,5 @@
 import {useMemo, useState} from 'react';
-import {Alert, Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
+import {Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
@@ -8,8 +8,14 @@ import {
   Plus,
 } from 'lucide-react-native';
 import {Button, Chip, EmptyState, Loader} from '@app/components/ui';
+import {
+  HOME_ROUTES,
+  WORKOUTS_ROUTES,
+} from '@app/constants/routes';
+import {ExercisePrSummaryCard} from '@app/features/pr/components/ExercisePrSummaryCard';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
+import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
 import {useWorkoutLibrary} from '@app/hooks/useWorkoutLibrary';
 import {
   bodyPartLabels,
@@ -64,6 +70,7 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
   const insets = useSafeAreaInsets();
   const [imageFailed, setImageFailed] = useState(false);
   const exercisesQuery = useExerciseLibrary();
+  const personalRecordsQuery = usePersonalRecords(route.params.exerciseId);
   const workoutsQuery = useWorkoutLibrary();
   const exercise = useMemo(
     () =>
@@ -230,7 +237,11 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
     },
   });
 
-  if (exercisesQuery.isLoading || workoutsQuery.isLoading) {
+  if (
+    exercisesQuery.isLoading ||
+    workoutsQuery.isLoading ||
+    personalRecordsQuery.isLoading
+  ) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Loader label="Cargando ejercicio..." />
@@ -239,6 +250,18 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
   }
 
   const stackNavigation = navigation as any;
+  const routeNames = navigation.getState().routeNames as string[];
+  const personalRecordsRoute = routeNames.includes(WORKOUTS_ROUTES.PersonalRecords)
+    ? WORKOUTS_ROUTES.PersonalRecords
+    : HOME_ROUTES.PersonalRecords;
+  const registerPrRoute = routeNames.includes(WORKOUTS_ROUTES.RegisterPr)
+    ? WORKOUTS_ROUTES.RegisterPr
+    : HOME_ROUTES.RegisterPr;
+  const addExerciseToRoutineRoute = routeNames.includes(
+    WORKOUTS_ROUTES.AddExerciseToRoutine,
+  )
+    ? WORKOUTS_ROUTES.AddExerciseToRoutine
+    : HOME_ROUTES.AddExerciseToRoutine;
 
   if (!exercise) {
     return (
@@ -287,6 +310,23 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
             <Chip>{levelLabels[exercise.level] || exercise.level}</Chip>
           </View>
         </View>
+
+        <ExercisePrSummaryCard
+          records={personalRecordsQuery.records}
+          onRegisterPr={() =>
+            stackNavigation.navigate(registerPrRoute as never, {
+              exerciseId: exercise.id,
+              exerciseName: exercise.name,
+              showExercisePicker: false,
+            } as never)
+          }
+          onViewHistory={() =>
+            stackNavigation.navigate(personalRecordsRoute as never, {
+              exerciseId: exercise.id,
+              exerciseName: exercise.name,
+            } as never)
+          }
+        />
 
         <SectionCard title="Cómo realizarlo">
           {exercise.howToPerform.length > 0 ? (
@@ -394,10 +434,10 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
         <Button
           label="Agregar a rutina"
           onPress={() =>
-            Alert.alert(
-              'Próximamente',
-              'La edición de rutinas llegará en la siguiente fase.',
-            )
+            stackNavigation.navigate(addExerciseToRoutineRoute as never, {
+              exerciseId: exercise.id,
+              exerciseName: exercise.name,
+            } as never)
           }
           accessoryRight={
             <Plus

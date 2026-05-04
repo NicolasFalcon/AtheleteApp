@@ -1,4 +1,9 @@
-import {getChallengeDay, getCompletedChallengeDays, type NutritionPlan} from '@app/shared';
+import {
+  getChallengeDay,
+  getCompletedChallengeDays,
+  type HabitChallenge,
+  type NutritionPlan,
+} from '@app/shared';
 import {getSupabaseClient} from '@app/services/supabase/client';
 import type {Database, Json} from '@app/types/supabase';
 
@@ -14,6 +19,7 @@ export type ProfileBadge = {
 
 export type ProfileChallengeSummary = {
   id: string;
+  status: HabitChallenge['status'];
   challengeDay: number;
   completedDays: number;
   progressPct: number;
@@ -175,7 +181,7 @@ export async function fetchProfileOverview(userId: string): Promise<ProfileOverv
       .from('challenge_participations')
       .select('*')
       .eq('user_id', userId)
-      .eq('status', 'active')
+      .in('status', ['active', 'completed'])
       .order('created_at', {ascending: false})
       .limit(1),
     client
@@ -245,6 +251,12 @@ export async function fetchProfileOverview(userId: string): Promise<ProfileOverv
 
     challenge = {
       id: participation.id,
+      status:
+        participation.status === 'active' ||
+        participation.status === 'completed' ||
+        participation.status === 'abandoned'
+          ? participation.status
+          : 'active',
       challengeDay: getChallengeDay({
         id: participation.id,
         userId: participation.user_id,

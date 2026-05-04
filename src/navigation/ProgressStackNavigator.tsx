@@ -3,6 +3,7 @@ import {PROGRESS_ROUTES} from '@app/constants/routes';
 import {PersonalRecordsScreen} from '@app/screens/home/PersonalRecordsScreen';
 import {NutritionPlanScreen} from '@app/screens/nutrition/NutritionPlanScreen';
 import {ChallengeScreen} from '@app/screens/progress/ChallengeScreen';
+import {RegisterPrScreen} from '@app/screens/pr/RegisterPrScreen';
 import {ProgressScreen} from '@app/screens/tabs/ProgressScreen';
 import type {ProgressStackParamList} from '@app/types/navigation';
 
@@ -15,6 +16,10 @@ export function ProgressStackNavigator() {
       <Stack.Screen
         name={PROGRESS_ROUTES.PersonalRecords}
         component={PersonalRecordsScreen}
+      />
+      <Stack.Screen
+        name={PROGRESS_ROUTES.RegisterPr}
+        component={RegisterPrScreen}
       />
       <Stack.Screen
         name={PROGRESS_ROUTES.Challenge}
