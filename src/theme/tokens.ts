@@ -50,9 +50,9 @@ export const typography = {
 
 export const elevations = {
   card: {
-    shadowOffset: {width: 0, height: 10},
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.055,
+    shadowRadius: 14,
+    elevation: 2,
   },
 } as const;

@@ -1,13 +1,13 @@
-import {ArrowLeft, Sparkles} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { ArrowLeft, Sparkles } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type EllieHeaderProps = {
   onBack?: () => void;
 };
 
-export function EllieHeader({onBack}: EllieHeaderProps) {
-  const {theme} = useAppTheme();
+export function EllieHeader({ onBack }: EllieHeaderProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     row: {
@@ -16,9 +16,9 @@ export function EllieHeader({onBack}: EllieHeaderProps) {
       gap: 12,
     },
     backButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.surfaceMuted,
@@ -30,9 +30,9 @@ export function EllieHeader({onBack}: EllieHeaderProps) {
       flex: 1,
     },
     avatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.surfaceMuted,
@@ -40,9 +40,8 @@ export function EllieHeader({onBack}: EllieHeaderProps) {
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 19,
+      fontSize: 18,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.5,
     },
     subtitle: {
       color: theme.colors.textSecondary,
@@ -57,16 +56,25 @@ export function EllieHeader({onBack}: EllieHeaderProps) {
       {onBack ? (
         <Pressable
           onPress={onBack}
-          style={({pressed}) => [
+          style={({ pressed }) => [
             styles.backButton,
-            pressed ? {opacity: 0.85} : null,
-          ]}>
-          <ArrowLeft color={theme.colors.textPrimary} size={21} strokeWidth={2} />
+            pressed ? { opacity: 0.85 } : null,
+          ]}
+        >
+          <ArrowLeft
+            color={theme.colors.textPrimary}
+            size={21}
+            strokeWidth={2}
+          />
         </Pressable>
       ) : null}
       <View style={styles.brandWrap}>
         <View style={styles.avatar}>
-          <Sparkles color={theme.colors.textPrimary} size={18} strokeWidth={2.1} />
+          <Sparkles
+            color={theme.colors.textPrimary}
+            size={18}
+            strokeWidth={2.1}
+          />
         </View>
         <View>
           <Text style={styles.title}>ELLIE</Text>

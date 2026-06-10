@@ -1,19 +1,19 @@
-import {Sparkles} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Sparkles } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type AiAnalysisCardProps = {
   insights: string[];
 };
 
-export function AiAnalysisCard({insights}: AiAnalysisCardProps) {
-  const {theme} = useAppTheme();
+export function AiAnalysisCard({ insights }: AiAnalysisCardProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
       padding: 16,
-      borderRadius: 24,
+      borderRadius: theme.radii.md,
       gap: 12,
     },
     header: {
@@ -26,7 +26,6 @@ export function AiAnalysisCard({insights}: AiAnalysisCardProps) {
       fontFamily: theme.typography.fontFamily,
       fontSize: 15,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.3,
     },
     list: {
       gap: 10,

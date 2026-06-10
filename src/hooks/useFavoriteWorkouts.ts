@@ -19,6 +19,9 @@ export function useFavoriteWorkouts() {
           setFavoriteWorkoutIds(parsed.filter(item => typeof item === 'string'));
         }
       } catch {
+        if (!cancelled) {
+          setFavoriteWorkoutIds([]);
+        }
       } finally {
         if (!cancelled) {
           setLoaded(true);
@@ -51,9 +54,20 @@ export function useFavoriteWorkouts() {
     async (id: string) => {
       const next = favoriteWorkoutIds.includes(id)
         ? favoriteWorkoutIds.filter(item => item !== id)
-        : [...favoriteWorkoutIds, id];
+        : [id, ...favoriteWorkoutIds];
 
       await persist(next);
+    },
+    [favoriteWorkoutIds, persist],
+  );
+
+  const removeWorkoutFavorite = useCallback(
+    async (id: string) => {
+      if (!favoriteWorkoutIds.includes(id)) {
+        return;
+      }
+
+      await persist(favoriteWorkoutIds.filter(item => item !== id));
     },
     [favoriteWorkoutIds, persist],
   );
@@ -62,6 +76,10 @@ export function useFavoriteWorkouts() {
     favoriteWorkoutIds,
     isWorkoutFavorite,
     toggleWorkoutFavorite,
+    removeWorkoutFavorite,
     loaded,
+    isLoading: !loaded,
+    isToggling: false,
+    error: null,
   };
 }

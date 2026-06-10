@@ -15,13 +15,13 @@
 APP_ENV=development
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-supabase-anon-key
-SUPABASE_PASSWORD_RESET_URL=https://habit-trail-flow.vercel.app/reset-password
+SUPABASE_PASSWORD_RESET_URL=athelete://reset-password
 ```
 
 Notas:
 
 - `SUPABASE_URL` y `SUPABASE_ANON_KEY` son obligatorias para habilitar auth real.
-- `SUPABASE_PASSWORD_RESET_URL` hoy apunta al flujo web existente de reset password.
+- `SUPABASE_PASSWORD_RESET_URL` apunta al deep link nativo de recuperación de contraseña.
 - No hay credenciales hardcodeadas en el código.
 
 ## Cómo funciona la persistencia de sesión
@@ -84,9 +84,33 @@ Campos usados hoy:
 - con sesión y `profiles.onboarding_completed = false`: `onboarding`
 - con sesión y `profiles.onboarding_completed = true`: `app`
 
-## Estado actual del reset password
+## Reset password nativo
 
-El reset password ya usa Supabase real.
+El reset password usa Supabase real y se resuelve dentro de la app, no en web.
 
-Hoy el correo apunta al flujo web existente definido por `SUPABASE_PASSWORD_RESET_URL`.
-Más adelante puede reemplazarse por deep linking nativo.
+Flujo:
+
+1. `ForgotPasswordScreen` llama `supabase.auth.resetPasswordForEmail`.
+2. Supabase envía un correo con `SUPABASE_PASSWORD_RESET_URL=athelete://reset-password`.
+3. iOS/Android abren Athelete con ese deep link.
+4. `AuthProvider` procesa `access_token`/`refresh_token` o `code`, activa una sesión temporal de recuperación y mantiene el flujo en Auth.
+5. `ResetPasswordScreen` llama `supabase.auth.updateUser({password})`.
+6. Al terminar, la app cierra la sesión temporal y vuelve al login.
+
+Configuración nativa:
+
+- iOS registra el scheme `athelete` en `ios/Athelete/Info.plist`.
+- Android registra `athelete://reset-password` en `android/app/src/main/AndroidManifest.xml`.
+
+Configuración requerida en Supabase:
+
+- En Auth URL Configuration, agrega `athelete://reset-password` a Redirect URLs.
+- Si Supabase no permite ese redirect, el correo puede seguir llegando pero el link será rechazado antes de abrir correctamente la app.
+
+Prueba rápida:
+
+```bash
+npm run start:reset
+```
+
+Luego solicita un correo desde "¿Olvidaste tu contraseña?" y abre el link en el mismo dispositivo o simulador.

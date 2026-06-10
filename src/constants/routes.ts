@@ -8,6 +8,7 @@ export const AUTH_ROUTES = {
   Login: 'Login',
   Register: 'Register',
   ForgotPassword: 'ForgotPassword',
+  ResetPassword: 'ResetPassword',
 } as const;
 
 export const ONBOARDING_ROUTES = {
@@ -27,6 +28,7 @@ export const TAB_ROUTES = {
 
 export const HOME_ROUTES = {
   Home: 'HomeRoot',
+  Notifications: 'Notifications',
   Challenge: 'Challenge',
   WorkoutDetail: 'WorkoutDetail',
   WorkoutSession: 'WorkoutSession',
@@ -66,6 +68,8 @@ export const PROGRESS_ROUTES = {
   RegisterPr: 'ProgressRegisterPr',
   Challenge: 'ProgressChallenge',
   NutritionPlan: 'NutritionPlan',
+  BodyScience: 'BodyScience',
+  BodyScienceArticle: 'BodyScienceArticle',
 } as const;
 
 export const PROFILE_ROUTES = {

@@ -1,4 +1,5 @@
 import {getSupabaseClient} from '@app/services/supabase/client';
+import {awardGamificationEvent} from '@app/services/supabase/gamification';
 import type {Workout} from '@app/shared';
 import {getWorkoutAccess} from '@app/shared';
 import {
@@ -165,6 +166,19 @@ export async function createRoutine(
       throw new Error(exerciseError.message);
     }
   }
+
+  await awardGamificationEvent({
+    userId,
+    eventKey: `custom_workout_created:${template.id}`,
+    eventType: 'custom_workout_created',
+    points: 150,
+    badgeIds: ['first_custom_workout'],
+    metadata: {
+      workoutId: template.id,
+      title: workout.title,
+      source: workout.source || 'custom',
+    },
+  });
 
   return (
     (await fetchRoutineById(String(template.id))) ||

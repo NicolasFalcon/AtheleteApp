@@ -1,17 +1,17 @@
-import {Heart, Sparkles} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Heart, Sparkles } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type RecoveryGuidanceCardProps = {
   onPress: () => void;
 };
 
-export function RecoveryGuidanceCard({onPress}: RecoveryGuidanceCardProps) {
-  const {theme} = useAppTheme();
+export function RecoveryGuidanceCard({ onPress }: RecoveryGuidanceCardProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: theme.radii.lg,
+      borderRadius: theme.radii.md,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
@@ -59,10 +59,11 @@ export function RecoveryGuidanceCard({onPress}: RecoveryGuidanceCardProps) {
   return (
     <Pressable
       onPress={onPress}
-      style={({pressed}) => [
+      style={({ pressed }) => [
         styles.card,
-        pressed ? {transform: [{scale: 0.99}]} : null,
-      ]}>
+        pressed ? { transform: [{ scale: 0.99 }] } : null,
+      ]}
+    >
       <View style={styles.iconBox}>
         <Heart color={theme.colors.textPrimary} size={20} strokeWidth={2.1} />
       </View>
@@ -73,7 +74,11 @@ export function RecoveryGuidanceCard({onPress}: RecoveryGuidanceCardProps) {
         </Text>
       </View>
       <View style={styles.actionBox}>
-        <Sparkles color={theme.colors.textPrimary} size={15} strokeWidth={2.2} />
+        <Sparkles
+          color={theme.colors.textPrimary}
+          size={15}
+          strokeWidth={2.2}
+        />
       </View>
     </Pressable>
   );

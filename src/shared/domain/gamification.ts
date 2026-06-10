@@ -7,6 +7,7 @@ export type BadgeId =
   | 'first_custom_workout'
   | 'quiz_master'
   | 'first_quiz'
+  | 'first_pr'
   | 'hydration_3_days'
   | 'hydration_7_days'
   | 'weekly_hydration_master';
@@ -66,6 +67,12 @@ export const ALL_BADGES: BadgeDefinition[] = [
     title: 'Primer Quiz',
     description: 'Completa tu primer quiz de fitness.',
     icon: 'file-pen',
+  },
+  {
+    id: 'first_pr',
+    title: 'Primer PR',
+    description: 'Registra tu primer récord personal.',
+    icon: 'trophy',
   },
   {
     id: 'hydration_3_days',

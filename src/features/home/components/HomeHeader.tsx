@@ -1,5 +1,5 @@
-import {Bell} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {StyleSheet, Text, View} from 'react-native';
+import {NotificationBadgeButton} from '@app/features/notifications/components/NotificationBadgeButton';
 import {useAuth} from '@app/hooks/useAuth';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {getGreeting} from '@app/lib/date';
@@ -15,9 +15,13 @@ function getInitials(name: string) {
 
 type HomeHeaderProps = {
   onOpenNotifications?: () => void;
+  notificationsCount?: number;
 };
 
-export function HomeHeader({onOpenNotifications}: HomeHeaderProps) {
+export function HomeHeader({
+  onOpenNotifications,
+  notificationsCount = 0,
+}: HomeHeaderProps) {
   const {profile} = useAuth();
   const {theme} = useAppTheme();
   const displayName = profile?.name?.trim() || 'Athelete';
@@ -59,16 +63,6 @@ export function HomeHeader({onOpenNotifications}: HomeHeaderProps) {
       fontSize: theme.typography.sizes.body,
       fontWeight: theme.typography.weights.semibold,
     },
-    bellButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-    },
   });
 
   return (
@@ -82,9 +76,10 @@ export function HomeHeader({onOpenNotifications}: HomeHeaderProps) {
           <Text style={styles.title}>{displayName}</Text>
         </View>
       </View>
-      <Pressable onPress={onOpenNotifications} style={styles.bellButton}>
-        <Bell color={theme.colors.textPrimary} size={18} strokeWidth={2.1} />
-      </Pressable>
+      <NotificationBadgeButton
+        count={notificationsCount}
+        onPress={onOpenNotifications}
+      />
     </View>
   );
 }

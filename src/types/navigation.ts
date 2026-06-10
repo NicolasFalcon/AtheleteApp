@@ -12,6 +12,7 @@ export type AuthStackParamList = {
   Login: undefined;
   Register: undefined;
   ForgotPassword: undefined;
+  ResetPassword: undefined;
 };
 
 export type OnboardingStackParamList = {
@@ -59,8 +60,13 @@ export type RegisterPrRouteParams = {
   showExercisePicker?: boolean;
 };
 
+export type NutritionPlanRouteParams = {
+  openLog?: boolean;
+};
+
 export type HomeStackParamList = {
   HomeRoot: undefined;
+  Notifications: undefined;
   Challenge: undefined;
   WorkoutDetail: WorkoutDetailRouteParams;
   WorkoutSession: WorkoutSessionRouteParams;
@@ -73,7 +79,7 @@ export type HomeStackParamList = {
   QuizResult: QuizResultRouteParams;
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;
-  NutritionPlan: undefined;
+  NutritionPlan: NutritionPlanRouteParams | undefined;
 };
 
 export type WorkoutsStackParamList = {
@@ -91,7 +97,7 @@ export type WorkoutsStackParamList = {
 export type EllieStackParamList = {
   EllieRoot: undefined;
   Challenge: undefined;
-  NutritionPlan: undefined;
+  NutritionPlan: NutritionPlanRouteParams | undefined;
 };
 
 export type ProgressStackParamList = {
@@ -99,7 +105,9 @@ export type ProgressStackParamList = {
   ProgressPersonalRecords: PersonalRecordsRouteParams | undefined;
   ProgressRegisterPr: RegisterPrRouteParams | undefined;
   ProgressChallenge: undefined;
-  NutritionPlan: undefined;
+  NutritionPlan: NutritionPlanRouteParams | undefined;
+  BodyScience: undefined;
+  BodyScienceArticle: {articleId: string};
 };
 
 export type ProfileStackParamList = {
@@ -107,7 +115,7 @@ export type ProfileStackParamList = {
   Challenge: undefined;
   EditProfile: undefined;
   Achievements: undefined;
-  NutritionPlan: undefined;
+  NutritionPlan: NutritionPlanRouteParams | undefined;
 };
 
 export type MainTabParamList = {

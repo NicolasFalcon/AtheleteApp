@@ -1,14 +1,21 @@
-import {ChevronRight, Sparkles, UtensilsCrossed} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Button, Card, ProgressBar} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {DailyNutritionLog, NutritionPlan} from '@app/shared';
+import {
+  ChevronRight,
+  Edit3,
+  Plus,
+  Sparkles,
+  UtensilsCrossed,
+} from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button, Card, ProgressBar } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { DailyNutritionLog, NutritionPlan } from '@app/shared';
 
 type NutritionOverviewCardProps = {
   plan: NutritionPlan | null;
   todayLog: DailyNutritionLog | null;
   onAskEllie: () => void;
   onOpenPlan?: () => void;
+  onLogNutrition?: () => void;
 };
 
 export function NutritionOverviewCard({
@@ -16,8 +23,16 @@ export function NutritionOverviewCard({
   todayLog,
   onAskEllie,
   onOpenPlan,
+  onLogNutrition,
 }: NutritionOverviewCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
+  const hasLog = Boolean(
+    todayLog &&
+      ((todayLog.calories || 0) > 0 ||
+        (todayLog.protein || 0) > 0 ||
+        (todayLog.carbs || 0) > 0 ||
+        (todayLog.fats || 0) > 0),
+  );
 
   const styles = StyleSheet.create({
     card: {
@@ -49,28 +64,44 @@ export function NutritionOverviewCard({
       lineHeight: 17,
     },
     emptyIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
+      width: 44,
+      height: 44,
+      borderRadius: theme.radii.sm,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.surfaceMuted,
-      marginBottom: theme.spacing.xs,
     },
     emptyState: {
+      flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: theme.spacing.sm,
-      gap: theme.spacing.xs,
+      paddingVertical: theme.spacing.xs,
+      gap: theme.spacing.sm,
+    },
+    emptyCopy: {
+      flex: 1,
+      gap: 3,
     },
     centeredButton: {
-      minHeight: 42,
+      minHeight: 40,
       borderRadius: theme.radii.pill,
-      alignSelf: 'center',
-      paddingHorizontal: 18,
+      alignSelf: 'flex-start',
+      paddingHorizontal: 16,
     },
     outlineButton: {
       minHeight: 42,
       borderRadius: theme.radii.pill,
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    actionButton: {
+      flex: 1,
+      minHeight: 42,
+      borderRadius: theme.radii.pill,
+    },
+    actionText: {
+      fontSize: 12,
     },
     macroRow: {
       gap: 6,
@@ -100,12 +131,16 @@ export function NutritionOverviewCard({
         <Text style={styles.title}>Nutrición de hoy</Text>
         <View style={styles.emptyState}>
           <View style={styles.emptyIcon}>
-            <UtensilsCrossed color={theme.colors.textSecondary} size={22} />
+            <UtensilsCrossed color={theme.colors.textSecondary} size={20} />
           </View>
-          <Text style={styles.subtitle}>Aún no tienes un plan de nutrición.</Text>
-          <Text style={styles.hint}>
-            ELLIE puede ayudarte a mantenerte constante con una guía sencilla.
-          </Text>
+          <View style={styles.emptyCopy}>
+            <Text style={styles.subtitle}>
+              Aún no tienes un plan de nutrición.
+            </Text>
+            <Text style={styles.hint}>
+              ELLIE puede ayudarte a mantenerte constante con una guía sencilla.
+            </Text>
+          </View>
         </View>
         <Button
           label="Pregúntale a ELLIE"
@@ -160,14 +195,21 @@ export function NutritionOverviewCard({
       <Pressable
         onPress={onOpenPlan}
         disabled={!onOpenPlan}
-        style={({pressed}) => [
+        style={({ pressed }) => [
           styles.headerRow,
-          onOpenPlan && pressed ? {opacity: 0.88} : null,
-        ]}>
+          onOpenPlan && pressed ? { opacity: 0.88 } : null,
+        ]}
+      >
         <View>
           <Text style={styles.title}>Nutrición de hoy</Text>
           <Text style={styles.hint}>
-            Objetivo: {plan.targetCalories} kcal · {plan.targetProtein}g proteína
+            Objetivo: {plan.targetCalories} kcal · {plan.targetProtein}g
+            proteína
+          </Text>
+          <Text style={styles.subtitle}>
+            {hasLog
+              ? 'Registro diario cargado.'
+              : 'Aún no registras tu consumo de hoy.'}
           </Text>
         </View>
         <ChevronRight color={theme.colors.textSecondary} size={18} />
@@ -183,15 +225,45 @@ export function NutritionOverviewCard({
           <ProgressBar value={macro.current} max={macro.goal} />
         </View>
       ))}
-      <Button
-        label="Pregúntale a ELLIE"
-        onPress={onAskEllie}
-        variant="outline"
-        style={styles.outlineButton}
-        accessoryRight={
-          <Sparkles color={theme.colors.textPrimary} size={16} strokeWidth={2.2} />
-        }
-      />
+      <View style={styles.actions}>
+        <Button
+          label="ELLIE"
+          onPress={onAskEllie}
+          variant="outline"
+          style={styles.actionButton}
+          textStyle={styles.actionText}
+          accessoryRight={
+            <Sparkles
+              color={theme.colors.textPrimary}
+              size={15}
+              strokeWidth={2.1}
+            />
+          }
+        />
+        {onLogNutrition ? (
+          <Button
+            label={hasLog ? 'Editar' : 'Registrar'}
+            onPress={onLogNutrition}
+            style={styles.actionButton}
+            textStyle={styles.actionText}
+            accessoryRight={
+              hasLog ? (
+                <Edit3
+                  color={theme.colors.accentContrast}
+                  size={14}
+                  strokeWidth={2.1}
+                />
+              ) : (
+                <Plus
+                  color={theme.colors.accentContrast}
+                  size={15}
+                  strokeWidth={2.2}
+                />
+              )
+            }
+          />
+        ) : null}
+      </View>
     </Card>
   );
 }

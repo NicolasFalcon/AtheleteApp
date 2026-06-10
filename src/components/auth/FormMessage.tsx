@@ -6,11 +6,13 @@ type FormMessageTone = 'error' | 'success' | 'neutral';
 type FormMessageProps = {
   message: string;
   tone?: FormMessageTone;
+  appearance?: 'theme' | 'dark';
 };
 
 export function FormMessage({
   message,
   tone = 'neutral',
+  appearance: _appearance = 'theme',
 }: FormMessageProps) {
   const { theme } = useAppTheme();
 
@@ -18,22 +20,22 @@ export function FormMessage({
     tone === 'error'
       ? 'rgba(167, 58, 58, 0.08)'
       : tone === 'success'
-        ? 'rgba(46, 107, 76, 0.08)'
-        : theme.colors.surface;
+      ? 'rgba(46, 107, 76, 0.08)'
+      : theme.colors.surface;
 
   const borderColor =
     tone === 'error'
       ? 'rgba(167, 58, 58, 0.22)'
       : tone === 'success'
-        ? 'rgba(46, 107, 76, 0.24)'
-        : theme.colors.border;
+      ? 'rgba(46, 107, 76, 0.24)'
+      : theme.colors.border;
 
   const textColor =
     tone === 'error'
       ? theme.colors.danger
       : tone === 'success'
-        ? theme.colors.success
-        : theme.colors.textSecondary;
+      ? theme.colors.success
+      : theme.colors.textSecondary;
 
   const styles = StyleSheet.create({
     container: {

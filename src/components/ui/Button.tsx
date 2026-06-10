@@ -36,17 +36,16 @@ export function Button({
   textStyle,
   accessoryRight,
 }: ButtonProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const backgroundColor =
     variant === 'primary'
       ? theme.colors.accent
       : variant === 'secondary' || variant === 'outline'
-        ? theme.colors.surface
-        : 'transparent';
+      ? theme.colors.surface
+      : 'transparent';
 
-  const borderColor =
-    variant === 'ghost' ? 'transparent' : theme.colors.border;
+  const borderColor = variant === 'ghost' ? 'transparent' : theme.colors.border;
 
   const textColor =
     variant === 'primary'
@@ -55,7 +54,7 @@ export function Button({
 
   const styles = StyleSheet.create({
     button: {
-      minHeight: 54,
+      minHeight: 48,
       borderRadius: theme.radii.md,
       alignItems: 'center',
       justifyContent: 'center',
@@ -84,11 +83,12 @@ export function Button({
     <Pressable
       disabled={disabled || loading}
       onPress={onPress}
-      style={({pressed}) => [
+      style={({ pressed }) => [
         styles.button,
         style,
-        pressed && !disabled && !loading ? {transform: [{scale: 0.99}]} : null,
-      ]}>
+        pressed && !disabled && !loading ? { opacity: 0.88 } : null,
+      ]}
+    >
       {loading ? (
         <ActivityIndicator color={textColor} />
       ) : (

@@ -1,4 +1,4 @@
-import type {PropsWithChildren} from 'react';
+import type { PropsWithChildren } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -7,7 +7,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type ChipProps = PropsWithChildren<{
   selected?: boolean;
@@ -15,13 +15,18 @@ type ChipProps = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
 }>;
 
-export function Chip({children, selected = false, onPress, style}: ChipProps) {
-  const {theme} = useAppTheme();
+export function Chip({
+  children,
+  selected = false,
+  onPress,
+  style,
+}: ChipProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     chip: {
-      minHeight: 34,
-      paddingHorizontal: theme.spacing.md,
+      minHeight: 32,
+      paddingHorizontal: theme.spacing.sm,
       borderRadius: theme.radii.pill,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: selected ? theme.colors.accent : theme.colors.border,
@@ -34,7 +39,7 @@ export function Chip({children, selected = false, onPress, style}: ChipProps) {
     label: {
       color: selected ? theme.colors.accentContrast : theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
+      fontSize: 13,
       fontWeight: theme.typography.weights.medium,
     },
   });
@@ -56,9 +61,10 @@ export function Chip({children, selected = false, onPress, style}: ChipProps) {
   return (
     <Pressable
       onPress={onPress}
-      style={({pressed}) => [
-        pressed ? {transform: [{scale: 0.98}]} : null,
-      ]}>
+      style={({ pressed }) => [
+        pressed ? { transform: [{ scale: 0.98 }] } : null,
+      ]}
+    >
       {content}
     </Pressable>
   );

@@ -8,6 +8,7 @@ import {
   type HabitCategory,
 } from '@app/shared';
 import {getSupabaseClient} from '@app/services/supabase/client';
+import {awardGamificationEvent} from '@app/services/supabase/gamification';
 import type {Database, Json} from '@app/types/supabase';
 
 type ChallengeParticipationRow =
@@ -217,65 +218,6 @@ function buildCore33State(
   };
 }
 
-async function fetchCurrentPoints(userId: string) {
-  const client = getClient();
-  const {data, error} = await (client.from('profiles') as any)
-    .select('points')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return typeof data?.points === 'number' ? data.points : 0;
-}
-
-async function addPoints(userId: string, amount: number) {
-  if (amount <= 0) {
-    return;
-  }
-
-  const client = getClient();
-  const currentPoints = await fetchCurrentPoints(userId);
-  const {error} = await (client.from('profiles') as any)
-    .update({points: currentPoints + amount})
-    .eq('id', userId);
-
-  if (error) {
-    throw error;
-  }
-}
-
-async function unlockBadgeIfNeeded(userId: string, badgeId: string) {
-  const client = getClient();
-  const {data: existing, error: existingError} = await (client
-    .from('user_badges') as any)
-    .select('badge_id')
-    .eq('user_id', userId)
-    .eq('badge_id', badgeId)
-    .maybeSingle();
-
-  if (existingError) {
-    throw existingError;
-  }
-
-  if (existing) {
-    return false;
-  }
-
-  const {error: insertError} = await (client.from('user_badges') as any).insert({
-    user_id: userId,
-    badge_id: badgeId,
-  });
-
-  if (insertError) {
-    throw insertError;
-  }
-
-  return true;
-}
-
 export function getCore33HabitPresets() {
   return CORE33_HABIT_PRESETS;
 }
@@ -401,11 +343,30 @@ export async function toggleCore33Habit(params: {
   }
 
   if (!previousDayCompleted && nextDayCompleted) {
-    await addPoints(params.userId, CORE33_DAY_COMPLETED_POINTS);
+    await awardGamificationEvent({
+      userId: params.userId,
+      eventKey: `core33_day:${params.challenge.id}:${params.date}`,
+      eventType: 'core33_day_completed',
+      points: CORE33_DAY_COMPLETED_POINTS,
+      metadata: {
+        challengeId: params.challenge.id,
+        date: params.date,
+        habitIndex: params.habitIndex,
+      },
+    });
 
     const streak = getCurrentChallengeStreak(params.challenge, nextHabitLogs);
     if (streak >= 7) {
-      await unlockBadgeIfNeeded(params.userId, 'streak_7_days');
+      await awardGamificationEvent({
+        userId: params.userId,
+        eventKey: `core33_streak_7:${params.challenge.id}`,
+        eventType: 'core33_day_completed',
+        badgeIds: ['streak_7_days'],
+        metadata: {
+          challengeId: params.challenge.id,
+          streak,
+        },
+      });
     }
 
     const completedDays = getCompletedChallengeDays(nextHabitLogs);
@@ -422,8 +383,18 @@ export async function toggleCore33Habit(params: {
         throw updateError;
       }
 
-      await addPoints(params.userId, CORE33_COMPLETED_POINTS);
-      await unlockBadgeIfNeeded(params.userId, 'core33_finisher');
+      await awardGamificationEvent({
+        userId: params.userId,
+        eventKey: `core33_completed:${params.challenge.id}`,
+        eventType: 'core33_completed',
+        points: CORE33_COMPLETED_POINTS,
+        badgeIds: ['core33_finisher'],
+        metadata: {
+          challengeId: params.challenge.id,
+          completedDays,
+          challengeDay,
+        },
+      });
     }
   }
 }

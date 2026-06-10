@@ -1,8 +1,8 @@
-import type {ReactNode} from 'react';
-import {ChevronRight} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import type { ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type ElliePriorityCardProps = {
   icon: ReactNode;
@@ -17,25 +17,25 @@ export function ElliePriorityCard({
   actionLabel,
   onPress,
 }: ElliePriorityCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
       padding: 0,
-      borderRadius: 24,
+      borderRadius: theme.radii.md,
       overflow: 'hidden',
     },
     pressable: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      paddingHorizontal: 15,
-      paddingVertical: 13,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
     },
     iconWrap: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       backgroundColor: theme.colors.surfaceMuted,
       alignItems: 'center',
       justifyContent: 'center',
@@ -73,10 +73,11 @@ export function ElliePriorityCard({
     <Card style={styles.card}>
       <Pressable
         onPress={onPress}
-        style={({pressed}) => [
+        style={({ pressed }) => [
           styles.pressable,
-          pressed ? {opacity: 0.86} : null,
-        ]}>
+          pressed ? { opacity: 0.86 } : null,
+        ]}
+      >
         <View style={styles.iconWrap}>{icon}</View>
         <View style={styles.content}>
           <Text style={styles.text}>{text}</Text>

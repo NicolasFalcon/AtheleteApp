@@ -1,5 +1,5 @@
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type SegmentedOption<T extends string> = {
   key: T;
@@ -10,18 +10,20 @@ type SegmentedControlProps<T extends string> = {
   value: T;
   options: SegmentedOption<T>[];
   onChange: (value: T) => void;
+  highlighted?: boolean;
 };
 
 export function SegmentedControl<T extends string>({
   value,
   options,
   onChange,
+  highlighted = false,
 }: SegmentedControlProps<T>) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     container: {
-      borderRadius: theme.radii.md,
+      borderRadius: theme.radii.sm,
       backgroundColor: theme.colors.surfaceMuted,
       padding: 4,
       flexDirection: 'row',
@@ -29,14 +31,16 @@ export function SegmentedControl<T extends string>({
     },
     option: {
       flex: 1,
-      minHeight: 42,
-      borderRadius: theme.radii.sm,
+      minHeight: 38,
+      borderRadius: theme.radii.xs,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: theme.spacing.sm,
     },
     optionActive: {
       backgroundColor: theme.colors.accent,
+      borderWidth: highlighted ? 1 : 0,
+      borderColor: highlighted ? theme.colors.border : 'transparent',
     },
     label: {
       color: theme.colors.textSecondary,
@@ -59,11 +63,12 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={option.key}
             onPress={() => onChange(option.key)}
-            style={({pressed}) => [
+            style={({ pressed }) => [
               styles.option,
               active ? styles.optionActive : null,
-              pressed ? {opacity: 0.9} : null,
-            ]}>
+              pressed ? { opacity: 0.9 } : null,
+            ]}
+          >
             <Text style={[styles.label, active ? styles.labelActive : null]}>
               {option.label}
             </Text>

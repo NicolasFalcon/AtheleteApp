@@ -1,15 +1,19 @@
 import {
+  type DailyNutritionLog,
   getChallengeDay,
   getCompletedChallengeDays,
   type HabitChallenge,
   type NutritionPlan,
 } from '@app/shared';
+import {getLocalDateKey} from '@app/lib/date';
 import {getSupabaseClient} from '@app/services/supabase/client';
 import type {Database, Json} from '@app/types/supabase';
 
 type ChallengeParticipationRow =
   Database['public']['Tables']['challenge_participations']['Row'];
 type NutritionPlanRow = Database['public']['Tables']['nutrition_plans']['Row'];
+type DailyNutritionLogRow =
+  Database['public']['Tables']['daily_nutrition_logs']['Row'];
 type WorkoutSessionRow = Database['public']['Tables']['workout_sessions']['Row'];
 
 export type ProfileBadge = {
@@ -31,6 +35,7 @@ export type ProfileOverview = {
   currentStreak: number;
   longestStreak: number;
   nutritionPlan: NutritionPlan | null;
+  todayNutritionLog: DailyNutritionLog | null;
   badges: ProfileBadge[];
   challenge: ProfileChallengeSummary | null;
 };
@@ -54,6 +59,19 @@ function mapNutritionPlan(row: NutritionPlanRow): NutritionPlan {
     targetCarbs: row.target_carbs ?? undefined,
     targetFats: row.target_fats ?? undefined,
     notes: row.notes ?? undefined,
+  };
+}
+
+function mapDailyNutritionLog(row: DailyNutritionLogRow): DailyNutritionLog {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    date: row.date,
+    calories: row.calories || 0,
+    protein: row.protein || 0,
+    carbs: row.carbs ?? undefined,
+    fats: row.fats ?? undefined,
+    adherence: row.adherence ?? undefined,
   };
 }
 
@@ -157,11 +175,13 @@ function calculateLongestStreak(dates: string[]): number {
 
 export async function fetchProfileOverview(userId: string): Promise<ProfileOverview> {
   const client = getClient();
+  const today = getLocalDateKey();
 
   const [
     profileResult,
     badgesResult,
     nutritionPlanResult,
+    todayNutritionResult,
     challengeResult,
     workoutSessionsResult,
   ] = await Promise.all([
@@ -176,6 +196,12 @@ export async function fetchProfileOverview(userId: string): Promise<ProfileOverv
       .eq('user_id', userId)
       .eq('is_active', true)
       .order('created_at', {ascending: false})
+      .limit(1),
+    client
+      .from('daily_nutrition_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', today)
       .limit(1),
     client
       .from('challenge_participations')
@@ -201,6 +227,9 @@ export async function fetchProfileOverview(userId: string): Promise<ProfileOverv
   if (nutritionPlanResult.error) {
     throw nutritionPlanResult.error;
   }
+  if (todayNutritionResult.error) {
+    throw todayNutritionResult.error;
+  }
   if (challengeResult.error) {
     throw challengeResult.error;
   }
@@ -221,6 +250,9 @@ export async function fetchProfileOverview(userId: string): Promise<ProfileOverv
   );
   const nutritionPlan = nutritionPlanResult.data?.[0]
     ? mapNutritionPlan(nutritionPlanResult.data[0] as NutritionPlanRow)
+    : null;
+  const todayNutritionLog = todayNutritionResult.data?.[0]
+    ? mapDailyNutritionLog(todayNutritionResult.data[0] as DailyNutritionLogRow)
     : null;
 
   let challenge: ProfileChallengeSummary | null = null;
@@ -294,6 +326,7 @@ export async function fetchProfileOverview(userId: string): Promise<ProfileOverv
     currentStreak: calculateCurrentStreak(completedDates),
     longestStreak: calculateLongestStreak(completedDates),
     nutritionPlan,
+    todayNutritionLog,
     badges,
     challenge,
   };

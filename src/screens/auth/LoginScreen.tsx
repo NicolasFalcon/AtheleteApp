@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { EmailIcon, PrivacyIcon } from '@app/assets/icons';
+import { AuthButton } from '@app/components/auth/AuthButton';
 import { BrandHeader } from '@app/components/auth/BrandHeader';
 import { AuthScreenLayout } from '@app/components/auth/AuthScreenLayout';
+import { AuthTextField } from '@app/components/auth/AuthTextField';
 import { FormMessage } from '@app/components/auth/FormMessage';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import type { AuthStackParamList } from '@app/types/navigation';
-import { AppTextInput, Button } from '@app/components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
@@ -21,39 +23,13 @@ export function LoginScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
-
-  const styles = StyleSheet.create({
-    footerText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      textAlign: 'center',
-    },
-    footerLink: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontWeight: theme.typography.weights.medium,
-    },
-    helperLink: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.medium,
-    },
-    accessory: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.medium,
-    },
-  });
+  const styles = createStyles(theme);
 
   const validate = () => {
     const nextErrors: typeof fieldErrors = {};
@@ -98,6 +74,7 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <AuthScreenLayout
+      centered
       footer={
         <Text style={styles.footerText}>
           ¿No tienes cuenta?{' '}
@@ -111,22 +88,26 @@ export function LoginScreen({ navigation }: Props) {
       }
       header={
         <BrandHeader
-          subtitle="Inicia sesión para continuar tu entrenamiento"
-          title="Bienvenido a Athelete"
+          showLogo
+          subtitle="Inicia sesión para continuar con tu progreso."
+          title="Qué bueno verte de nuevo"
         />
       }
     >
-      {error ? <FormMessage message={error} tone="error" /> : null}
+      {error ? (
+        <FormMessage appearance="dark" message={error} tone="error" />
+      ) : null}
       {!isSupabaseConfigured ? (
         <FormMessage
+          appearance="dark"
           message="Supabase no está configurado todavía. Agrega SUPABASE_URL y SUPABASE_ANON_KEY en .env para habilitar este flujo."
           tone="neutral"
         />
       ) : null}
-      <AppTextInput
+      <AuthTextField
         autoCapitalize="none"
-        autoCorrect={false}
         error={fieldErrors.email}
+        icon={<EmailIcon color={theme.colors.textSecondary} />}
         keyboardType="email-address"
         label="Correo electrónico"
         onChangeText={setEmail}
@@ -134,35 +115,57 @@ export function LoginScreen({ navigation }: Props) {
         textContentType="emailAddress"
         value={email}
       />
-      <AppTextInput
+      <AuthTextField
         autoCapitalize="none"
-        autoCorrect={false}
         error={fieldErrors.password}
+        icon={<PrivacyIcon color={theme.colors.textSecondary} />}
         label="Contraseña"
         onChangeText={setPassword}
         placeholder="••••••••"
-        rightAccessory={
-          <Text
-            onPress={() => setShowPassword(current => !current)}
-            style={styles.accessory}
-          >
-            {showPassword ? 'Ocultar' : 'Mostrar'}
-          </Text>
-        }
-        secureTextEntry={!showPassword}
+        passwordToggle
         textContentType="password"
         value={password}
       />
       <Pressable
+        hitSlop={8}
         onPress={() => navigation.navigate(AUTH_ROUTES.ForgotPassword)}
+        style={styles.helper}
       >
         <Text style={styles.helperLink}>¿Olvidaste tu contraseña?</Text>
       </Pressable>
-      <Button
+      <AuthButton
         label={submitting ? 'Iniciando sesión…' : 'Iniciar sesión'}
         loading={submitting}
         onPress={handleSubmit}
       />
     </AuthScreenLayout>
   );
+}
+
+type Theme = ReturnType<typeof useAppTheme>['theme'];
+
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    footerText: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.bodySm,
+      textAlign: 'center',
+    },
+    footerLink: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    helper: {
+      alignSelf: 'flex-end',
+      paddingVertical: theme.spacing.xs,
+    },
+    helperLink: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.caption,
+      fontWeight: theme.typography.weights.medium,
+    },
+  });
 }

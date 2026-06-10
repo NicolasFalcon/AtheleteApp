@@ -1,8 +1,8 @@
-import {Heart, Clock3, Flame} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {Workout} from '@app/shared';
-import {WorkoutThumbnail} from '@app/features/workouts/components/WorkoutThumbnail';
+import { Heart, Clock3, Flame } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { Workout } from '@app/shared';
+import { WorkoutThumbnail } from '@app/features/workouts/components/WorkoutThumbnail';
 
 type FeaturedWorkoutCardProps = {
   workout: Workout;
@@ -17,12 +17,12 @@ export function FeaturedWorkoutCard({
   onToggleFavorite,
   onPress,
 }: FeaturedWorkoutCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
       width: 172,
-      borderRadius: 24,
+      borderRadius: theme.radii.md,
       overflow: 'hidden',
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
@@ -32,7 +32,7 @@ export function FeaturedWorkoutCard({
     },
     image: {
       width: '100%',
-      height: 132,
+      height: 124,
     },
     topOverlay: {
       position: 'absolute',
@@ -147,10 +147,11 @@ export function FeaturedWorkoutCard({
   return (
     <Pressable
       onPress={onPress}
-      style={({pressed}) => [
+      style={({ pressed }) => [
         styles.card,
-        pressed ? {transform: [{scale: 0.98}]} : null,
-      ]}>
+        pressed ? { transform: [{ scale: 0.98 }] } : null,
+      ]}
+    >
       <View>
         <WorkoutThumbnail workout={workout} style={styles.image} />
         <View style={styles.topOverlay}>
@@ -173,7 +174,8 @@ export function FeaturedWorkoutCard({
               event.stopPropagation();
               onToggleFavorite();
             }}
-            style={styles.favoriteButton}>
+            style={styles.favoriteButton}
+          >
             <Heart
               color={isFavorite ? '#FFFFFF' : 'rgba(255,255,255,0.78)'}
               fill={isFavorite ? '#FFFFFF' : 'transparent'}

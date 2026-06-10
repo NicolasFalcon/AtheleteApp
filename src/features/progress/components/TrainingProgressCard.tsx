@@ -1,11 +1,11 @@
-import {useMemo} from 'react';
-import {Dumbbell} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {getLocalDateKey} from '@app/lib/date';
-import {ProgressBarChart} from '@app/features/progress/components/ProgressBarChart';
-import type {WorkoutSession} from '@app/shared';
+import { useMemo } from 'react';
+import { Dumbbell } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { getLocalDateKey } from '@app/lib/date';
+import { ProgressBarChart } from '@app/features/progress/components/ProgressBarChart';
+import type { WorkoutSession } from '@app/shared';
 
 type ProgressRange = 'week' | 'month';
 
@@ -20,7 +20,7 @@ function getRangeDays(range: ProgressRange) {
 
 function buildDateRange(range: ProgressRange): Date[] {
   const days = getRangeDays(range);
-  return Array.from({length: days}, (_, index) => {
+  return Array.from({ length: days }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - (days - 1 - index));
     return date;
@@ -60,39 +60,44 @@ export function TrainingProgressCard({
   sessions,
   range,
 }: TrainingProgressCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const chartData = useMemo<ChartPoint[]>(() => {
     const completed = sessions.filter(session => session.completed);
-    const byDate = completed.reduce<Record<string, {minutes: number; sessions: number; calories: number}>>(
-      (accumulator, session) => {
-        const key = session.date;
-        const current = accumulator[key] || {minutes: 0, sessions: 0, calories: 0};
-        accumulator[key] = {
-          minutes: current.minutes + Math.max(0, session.duration || 0),
-          sessions: current.sessions + 1,
-          calories: current.calories + Math.max(0, session.caloriesBurned || 0),
-        };
-        return accumulator;
-      },
-      {},
-    );
+    const byDate = completed.reduce<
+      Record<string, { minutes: number; sessions: number; calories: number }>
+    >((accumulator, session) => {
+      const key = session.date;
+      const current = accumulator[key] || {
+        minutes: 0,
+        sessions: 0,
+        calories: 0,
+      };
+      accumulator[key] = {
+        minutes: current.minutes + Math.max(0, session.duration || 0),
+        sessions: current.sessions + 1,
+        calories: current.calories + Math.max(0, session.caloriesBurned || 0),
+      };
+      return accumulator;
+    }, {});
 
     return buildDateRange(range).map(date => {
       const key = getLocalDateKey(date);
-      const totals = byDate[key] || {minutes: 0, sessions: 0, calories: 0};
+      const totals = byDate[key] || { minutes: 0, sessions: 0, calories: 0 };
 
       return {
         id: key,
         label:
           range === 'week'
             ? date
-                .toLocaleDateString('es-CL', {weekday: 'short'})
+                .toLocaleDateString('es-CL', { weekday: 'short' })
                 .replace('.', '')
                 .slice(0, 3)
             : String(date.getDate()),
         tooltipTitle: totals.sessions
-          ? `${totals.sessions} ${totals.sessions === 1 ? 'sesión' : 'sesiones'}`
+          ? `${totals.sessions} ${
+              totals.sessions === 1 ? 'sesión' : 'sesiones'
+            }`
           : formatFullLabel(date),
         tooltipLines: totals.sessions
           ? [formatDuration(totals.minutes), `${totals.calories} kcal`]
@@ -105,14 +110,18 @@ export function TrainingProgressCard({
   }, [range, sessions]);
 
   const totalSessions = chartData.reduce((sum, item) => sum + item.sessions, 0);
-  const totalMinutes = chartData.reduce((sum, item) => sum + item.primaryValue, 0);
+  const totalMinutes = chartData.reduce(
+    (sum, item) => sum + item.primaryValue,
+    0,
+  );
   const activeDays = chartData.filter(item => item.sessions > 0).length;
-  const averageMinutes = totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0;
+  const averageMinutes =
+    totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0;
 
   const styles = StyleSheet.create({
     card: {
       padding: 16,
-      borderRadius: 24,
+      borderRadius: theme.radii.md,
       gap: 12,
     },
     header: {
@@ -131,7 +140,6 @@ export function TrainingProgressCard({
       fontFamily: theme.typography.fontFamily,
       fontSize: 15,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.3,
     },
     summary: {
       color: theme.colors.textSecondary,
@@ -157,12 +165,16 @@ export function TrainingProgressCard({
     footer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 12,
+      gap: 8,
       paddingTop: 4,
     },
     metric: {
-      width: '47%',
-      gap: 2,
+      width: '48%',
+      gap: 3,
+      borderRadius: theme.radii.sm,
+      backgroundColor: theme.colors.background,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
     },
     metricLabel: {
       color: theme.colors.textSecondary,
@@ -181,7 +193,11 @@ export function TrainingProgressCard({
     <Card style={styles.card}>
       <View style={styles.header}>
         <View style={styles.titleRow}>
-          <Dumbbell color={theme.colors.textPrimary} size={16} strokeWidth={2} />
+          <Dumbbell
+            color={theme.colors.textPrimary}
+            size={16}
+            strokeWidth={2}
+          />
           <Text style={styles.title}>
             Entreno — {range === 'week' ? '7 días' : 'Mes'}
           </Text>
@@ -215,7 +231,9 @@ export function TrainingProgressCard({
         </View>
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Prom</Text>
-          <Text style={styles.metricValue}>{formatDuration(averageMinutes)}/sesión</Text>
+          <Text style={styles.metricValue}>
+            {formatDuration(averageMinutes)}/sesión
+          </Text>
         </View>
         <View style={styles.metric}>
           <Text style={styles.metricLabel}>Activos</Text>

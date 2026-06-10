@@ -1,13 +1,7 @@
-import {Send} from 'lucide-react-native';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Send } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type EllieChatInputBarProps = {
   draft: string;
@@ -28,7 +22,7 @@ export function EllieChatInputBar({
   onRestoreSavedDraft,
   onDismissSavedDraft,
 }: EllieChatInputBarProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const canSend = draft.trim().length > 0 && !disabled;
 
@@ -38,7 +32,7 @@ export function EllieChatInputBar({
       borderTopColor: theme.colors.border,
       backgroundColor: theme.colors.background,
       paddingHorizontal: 16,
-      paddingTop: 10,
+      paddingTop: 8,
       paddingBottom: Math.max(insets.bottom, 10),
       gap: 8,
     },
@@ -87,13 +81,13 @@ export function EllieChatInputBar({
     },
     inputWrap: {
       flex: 1,
-      minHeight: 52,
-      borderRadius: 26,
+      minHeight: 48,
+      borderRadius: 18,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingVertical: 10,
       justifyContent: 'center',
     },
     input: {
@@ -107,12 +101,14 @@ export function EllieChatInputBar({
       textAlignVertical: 'top',
     },
     sendButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: canSend ? theme.colors.accent : theme.colors.surfaceMuted,
+      backgroundColor: canSend
+        ? theme.colors.accent
+        : theme.colors.surfaceMuted,
     },
     draftActionMuted: {
       color: theme.colors.textSecondary,
@@ -161,12 +157,15 @@ export function EllieChatInputBar({
         <Pressable
           disabled={!canSend}
           onPress={onSend}
-          style={({pressed}) => [
+          style={({ pressed }) => [
             styles.sendButton,
-            pressed && canSend ? {opacity: 0.88} : null,
-          ]}>
+            pressed && canSend ? { opacity: 0.88 } : null,
+          ]}
+        >
           <Send
-            color={canSend ? theme.colors.accentContrast : theme.colors.textSecondary}
+            color={
+              canSend ? theme.colors.accentContrast : theme.colors.textSecondary
+            }
             size={18}
             strokeWidth={2}
           />

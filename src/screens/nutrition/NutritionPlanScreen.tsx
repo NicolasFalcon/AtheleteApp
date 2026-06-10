@@ -1,12 +1,15 @@
-import {useMemo} from 'react';
+import {useEffect, useMemo, useRef, useState} from 'react';
 import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';
+import {useRoute} from '@react-navigation/native';
 import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Button, Loader} from '@app/components/ui';
 import {TAB_ROUTES} from '@app/constants/routes';
 import {NutritionEmptyState} from '@app/features/nutrition/components/NutritionEmptyState';
+import {NutritionDailySummaryCard} from '@app/features/nutrition/components/NutritionDailySummaryCard';
 import {NutritionGuidelinesCard} from '@app/features/nutrition/components/NutritionGuidelinesCard';
+import {NutritionLogModal} from '@app/features/nutrition/components/NutritionLogModal';
 import {NutritionMacroGrid} from '@app/features/nutrition/components/NutritionMacroGrid';
 import {NutritionPlanActions} from '@app/features/nutrition/components/NutritionPlanActions';
 import {NutritionPlanHeader} from '@app/features/nutrition/components/NutritionPlanHeader';
@@ -20,6 +23,7 @@ import {
 import {useAuth} from '@app/hooks/useAuth';
 import {useNutritionPlan} from '@app/hooks/useNutritionPlan';
 import {useAppTheme} from '@app/hooks/useAppTheme';
+import type {NutritionPlanRouteParams} from '@app/types/navigation';
 
 const goalLabels: Record<string, string> = {
   lose_weight: 'Perder peso',
@@ -30,10 +34,13 @@ const goalLabels: Record<string, string> = {
 
 export function NutritionPlanScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const {theme} = useAppTheme();
   const {profile} = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
   const nutritionPlan = useNutritionPlan();
+  const [logModalVisible, setLogModalVisible] = useState(false);
+  const consumedOpenLogParam = useRef(false);
 
   const goalLabel = profile?.goal
     ? goalLabels[profile.goal] || 'Sin objetivo'
@@ -125,6 +132,18 @@ export function NutritionPlanScreen() {
     navigation.getParent()?.navigate(TAB_ROUTES.Ellie as never);
   };
 
+  useEffect(() => {
+    const params = route.params as NutritionPlanRouteParams | undefined;
+    if (
+      params?.openLog &&
+      nutritionPlan.data?.plan &&
+      !consumedOpenLogParam.current
+    ) {
+      consumedOpenLogParam.current = true;
+      setLogModalVisible(true);
+    }
+  }, [nutritionPlan.data?.plan, route.params]);
+
   const handleDeactivate = async () => {
     try {
       await nutritionPlan.deactivatePlan();
@@ -135,6 +154,24 @@ export function NutritionPlanScreen() {
     } catch (error) {
       Alert.alert(
         'No pudimos cancelar el plan',
+        error instanceof Error
+          ? error.message
+          : 'Inténtalo de nuevo en unos minutos.',
+      );
+    }
+  };
+
+  const handleSaveTodayLog = async (input: Parameters<typeof nutritionPlan.saveTodayLog>[0]) => {
+    try {
+      await nutritionPlan.saveTodayLog(input);
+      setLogModalVisible(false);
+      Alert.alert(
+        'Nutrición registrada',
+        'Tu registro de hoy ya está sincronizado con Inicio, Progreso y ELLIE.',
+      );
+    } catch (error) {
+      Alert.alert(
+        'No pudimos guardar tu nutrición',
         error instanceof Error
           ? error.message
           : 'Inténtalo de nuevo en unos minutos.',
@@ -193,6 +230,12 @@ export function NutritionPlanScreen() {
               todayLog={nutritionPlan.data.todayLog}
             />
 
+            <NutritionDailySummaryCard
+              plan={nutritionPlan.data.plan}
+              todayLog={nutritionPlan.data.todayLog}
+              onLogPress={() => setLogModalVisible(true)}
+            />
+
             <NutritionStructureCard meals={content.meals} />
 
             <NutritionGuidelinesCard guidelines={content.guidelines} />
@@ -205,6 +248,16 @@ export function NutritionPlanScreen() {
           </>
         )}
       </ScrollView>
+      {nutritionPlan.data?.plan ? (
+        <NutritionLogModal
+          visible={logModalVisible}
+          plan={nutritionPlan.data.plan}
+          todayLog={nutritionPlan.data.todayLog}
+          saving={nutritionPlan.isSavingTodayLog}
+          onClose={() => setLogModalVisible(false)}
+          onSave={handleSaveTodayLog}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

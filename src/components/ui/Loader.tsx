@@ -5,20 +5,21 @@ type LoaderProps = {
   label?: string;
 };
 
-export function Loader({label = 'Cargando...'}: LoaderProps) {
-  const {theme} = useAppTheme();
+export function Loader({ label = 'Cargando...' }: LoaderProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: theme.spacing.md,
+      gap: theme.spacing.sm,
+      padding: theme.spacing.xl,
     },
     label: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
+      fontSize: theme.typography.sizes.bodySm,
     },
   });
 

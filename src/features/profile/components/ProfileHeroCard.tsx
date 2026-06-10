@@ -1,6 +1,6 @@
-import {StyleSheet, Text, View} from 'react-native';
-import {Chip} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { StyleSheet, Text, View } from 'react-native';
+import { Chip } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type ProfileHeroCardProps = {
   name: string;
@@ -21,41 +21,39 @@ function StatCard({
   value: string;
   unit: string;
 }) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
       flex: 1,
-      borderRadius: 22,
-      paddingVertical: 14,
-      paddingHorizontal: 12,
+      borderRadius: theme.radii.sm,
+      paddingVertical: 10,
+      paddingHorizontal: 10,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 4,
-      shadowColor: '#000000',
-      ...theme.elevations.card,
+      gap: 3,
     },
     label: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1.6,
+      letterSpacing: 0,
       textTransform: 'uppercase',
     },
     value: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 17,
-      fontWeight: theme.typography.weights.bold,
+      fontSize: 16,
+      fontWeight: theme.typography.weights.semibold,
     },
     unit: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 11,
     },
   });
 
@@ -77,60 +75,75 @@ export function ProfileHeroCard({
   weightLabel,
   heightLabel,
 }: ProfileHeroCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     container: {
-      gap: 18,
+      gap: 12,
+    },
+    identityCard: {
+      borderRadius: theme.radii.md,
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      shadowColor: '#000000',
+      ...theme.elevations.card,
+      gap: 12,
+    },
+    identityRow: {
+      flexDirection: 'row',
       alignItems: 'center',
+      gap: 14,
     },
     avatar: {
-      width: 74,
-      height: 74,
-      borderRadius: 26,
+      width: 58,
+      height: 58,
+      borderRadius: 18,
       backgroundColor: theme.colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: '#000000',
-      shadowOpacity: 0.14,
-      shadowRadius: 18,
-      shadowOffset: {width: 0, height: 10},
-      elevation: 5,
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 3,
     },
     avatarLabel: {
       color: theme.colors.accentContrast,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 26,
+      fontSize: 24,
       fontWeight: theme.typography.weights.semibold,
     },
     textBlock: {
-      alignItems: 'center',
-      gap: 4,
+      flex: 1,
+      minWidth: 0,
+      gap: 3,
     },
     name: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 20,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.4,
     },
     email: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
+      fontSize: 13,
     },
     chips: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
       gap: 8,
       flexWrap: 'wrap',
     },
     chipBase: {
-      paddingHorizontal: 14,
+      paddingHorizontal: 12,
+      minHeight: 30,
     },
     chipMutedSurface: {
-      paddingHorizontal: 14,
+      paddingHorizontal: 12,
+      minHeight: 30,
       backgroundColor: theme.colors.surfaceMuted,
     },
     chipText: {
@@ -144,28 +157,42 @@ export function ProfileHeroCard({
     },
     stats: {
       flexDirection: 'row',
-      gap: 10,
+      gap: 8,
     },
   });
 
   return (
     <View style={styles.container}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarLabel}>{(name || 'U').charAt(0).toUpperCase()}</Text>
-      </View>
+      <View style={styles.identityCard}>
+        <View style={styles.identityRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarLabel}>
+              {(name || 'U').charAt(0).toUpperCase()}
+            </Text>
+          </View>
 
-      <View style={styles.textBlock}>
-        <Text style={styles.name}>{name || 'Usuario'}</Text>
-        <Text style={styles.email}>{email}</Text>
-      </View>
+          <View style={styles.textBlock}>
+            <Text numberOfLines={1} style={styles.name}>
+              {name || 'Usuario'}
+            </Text>
+            <Text numberOfLines={1} style={styles.email}>
+              {email}
+            </Text>
+          </View>
+        </View>
 
-      <View style={styles.chips}>
-        <Chip style={styles.chipBase}>
-          <Text style={styles.chipText}>{goalLabel}</Text>
-        </Chip>
-        <Chip style={styles.chipMutedSurface}>
-          <Text style={[styles.chipText, styles.chipMuted]}>{trainingLabel}</Text>
-        </Chip>
+        <View style={styles.chips}>
+          <Chip style={styles.chipBase}>
+            <Text numberOfLines={1} style={styles.chipText}>
+              {goalLabel}
+            </Text>
+          </Chip>
+          <Chip style={styles.chipMutedSurface}>
+            <Text numberOfLines={1} style={[styles.chipText, styles.chipMuted]}>
+              {trainingLabel}
+            </Text>
+          </Chip>
+        </View>
       </View>
 
       <View style={styles.stats}>

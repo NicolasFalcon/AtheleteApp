@@ -1,14 +1,21 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import {
+  EmailIcon,
+  PrivacyIcon,
+  ProfileIcon,
+  SuccessIcon,
+} from '@app/assets/icons';
+import { AuthButton } from '@app/components/auth/AuthButton';
 import { BrandHeader } from '@app/components/auth/BrandHeader';
 import { AuthScreenLayout } from '@app/components/auth/AuthScreenLayout';
+import { AuthTextField } from '@app/components/auth/AuthTextField';
 import { FormMessage } from '@app/components/auth/FormMessage';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import type { AuthStackParamList } from '@app/types/navigation';
-import { AppTextInput, Button } from '@app/components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 
@@ -23,46 +30,11 @@ export function RegisterScreen({ navigation }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [formError, setFormError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-
-  const styles = StyleSheet.create({
-    accessory: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.medium,
-    },
-    footerText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      textAlign: 'center',
-    },
-    footerLink: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontWeight: theme.typography.weights.medium,
-    },
-    successIcon: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: theme.colors.surfaceMuted,
-      alignItems: 'center',
-      justifyContent: 'center',
-      alignSelf: 'center',
-    },
-    successEmoji: {
-      fontSize: 28,
-    },
-    successBody: {
-      gap: theme.spacing.lg,
-    },
-  });
+  const styles = createStyles(theme);
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
@@ -117,11 +89,12 @@ export function RegisterScreen({ navigation }: Props) {
   if (emailSent) {
     return (
       <AuthScreenLayout
+        centered
         footer={
-          <Button
+          <AuthButton
             label="Volver a iniciar sesión"
             onPress={() => navigation.navigate(AUTH_ROUTES.Login)}
-            variant="outline"
+            variant="secondary"
           />
         }
         header={
@@ -131,12 +104,12 @@ export function RegisterScreen({ navigation }: Props) {
             title="Revisa tu correo"
           />
         }
-        onBack={() => navigation.navigate(AUTH_ROUTES.Login)}>
+        onBack={() => navigation.navigate(AUTH_ROUTES.Login)}
+      >
         <View style={styles.successBody}>
-          <View style={styles.successIcon}>
-            <Text style={styles.successEmoji}>✉️</Text>
-          </View>
+          <SuccessIcon color={theme.colors.textPrimary} />
           <FormMessage
+            appearance="dark"
             message={`Enviamos un enlace de verificación a ${email}. Verifica tu correo para continuar.`}
             tone="success"
           />
@@ -153,37 +126,43 @@ export function RegisterScreen({ navigation }: Props) {
           ¿Ya tienes cuenta?{' '}
           <Text
             onPress={() => navigation.navigate(AUTH_ROUTES.Login)}
-            style={styles.footerLink}>
+            style={styles.footerLink}
+          >
             Iniciar sesión
           </Text>
         </Text>
       }
       header={
         <BrandHeader
-          subtitle="Comienza tu camino fitness con Athelete"
-          title="Crear cuenta"
+          subtitle="Empieza hoy y construye tu progreso con Athelete."
+          title="Crea tu cuenta"
         />
       }
-      onBack={() => navigation.goBack()}>
-      {formError ? <FormMessage message={formError} tone="error" /> : null}
+      onBack={() => navigation.goBack()}
+    >
+      {formError ? (
+        <FormMessage appearance="dark" message={formError} tone="error" />
+      ) : null}
       {!isSupabaseConfigured ? (
         <FormMessage
+          appearance="dark"
           message="Supabase no está configurado todavía. Agrega SUPABASE_URL y SUPABASE_ANON_KEY en .env para habilitar este flujo."
           tone="neutral"
         />
       ) : null}
-      <AppTextInput
+      <AuthTextField
         error={fieldErrors.name}
+        icon={<ProfileIcon color={theme.colors.textSecondary} />}
         label="Nombre"
         onChangeText={setName}
         placeholder="Tu nombre"
         textContentType="name"
         value={name}
       />
-      <AppTextInput
+      <AuthTextField
         autoCapitalize="none"
-        autoCorrect={false}
         error={fieldErrors.email}
+        icon={<EmailIcon color={theme.colors.textSecondary} />}
         keyboardType="email-address"
         label="Correo electrónico"
         onChangeText={setEmail}
@@ -191,40 +170,55 @@ export function RegisterScreen({ navigation }: Props) {
         textContentType="emailAddress"
         value={email}
       />
-      <AppTextInput
+      <AuthTextField
         autoCapitalize="none"
-        autoCorrect={false}
         error={fieldErrors.password}
+        icon={<PrivacyIcon color={theme.colors.textSecondary} />}
         label="Contraseña"
         onChangeText={setPassword}
         placeholder="••••••••"
-        rightAccessory={
-          <Text
-            onPress={() => setShowPassword(current => !current)}
-            style={styles.accessory}>
-            {showPassword ? 'Ocultar' : 'Mostrar'}
-          </Text>
-        }
-        secureTextEntry={!showPassword}
+        passwordToggle
         textContentType="newPassword"
         value={password}
       />
-      <AppTextInput
+      <AuthTextField
         autoCapitalize="none"
-        autoCorrect={false}
         error={fieldErrors.confirmPassword}
+        icon={<PrivacyIcon color={theme.colors.textSecondary} />}
         label="Confirmar contraseña"
         onChangeText={setConfirmPassword}
         placeholder="••••••••"
-        secureTextEntry={!showPassword}
+        passwordToggle
         textContentType="newPassword"
         value={confirmPassword}
       />
-      <Button
+      <AuthButton
         label={submitting ? 'Creando cuenta…' : 'Crear cuenta'}
         loading={submitting}
         onPress={handleSubmit}
       />
     </AuthScreenLayout>
   );
+}
+
+type Theme = ReturnType<typeof useAppTheme>['theme'];
+
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    footerText: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.bodySm,
+      textAlign: 'center',
+    },
+    footerLink: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    successBody: {
+      alignItems: 'center',
+      gap: theme.spacing.xl,
+    },
+  });
 }

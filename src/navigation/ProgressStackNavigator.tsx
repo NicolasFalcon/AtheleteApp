@@ -2,6 +2,8 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {PROGRESS_ROUTES} from '@app/constants/routes';
 import {PersonalRecordsScreen} from '@app/screens/home/PersonalRecordsScreen';
 import {NutritionPlanScreen} from '@app/screens/nutrition/NutritionPlanScreen';
+import {BodyScienceArticleDetailScreen} from '@app/screens/progress/BodyScienceArticleDetailScreen';
+import {BodyScienceScreen} from '@app/screens/progress/BodyScienceScreen';
 import {ChallengeScreen} from '@app/screens/progress/ChallengeScreen';
 import {RegisterPrScreen} from '@app/screens/pr/RegisterPrScreen';
 import {ProgressScreen} from '@app/screens/tabs/ProgressScreen';
@@ -28,6 +30,14 @@ export function ProgressStackNavigator() {
       <Stack.Screen
         name={PROGRESS_ROUTES.NutritionPlan}
         component={NutritionPlanScreen}
+      />
+      <Stack.Screen
+        name={PROGRESS_ROUTES.BodyScience}
+        component={BodyScienceScreen}
+      />
+      <Stack.Screen
+        name={PROGRESS_ROUTES.BodyScienceArticle}
+        component={BodyScienceArticleDetailScreen}
       />
     </Stack.Navigator>
   );

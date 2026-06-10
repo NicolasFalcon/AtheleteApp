@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { RefreshCw } from 'lucide-react-native';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loader } from '@app/components/ui';
-import {HOME_ROUTES, TAB_ROUTES} from '@app/constants/routes';
+import { HOME_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import { RecoveryGuidanceCard } from '@app/features/home/components/RecoveryGuidanceCard';
 import { QuizPromoCard } from '@app/features/home/components/QuizPromoCard';
 import { RecentPRCard } from '@app/features/home/components/RecentPRCard';
@@ -11,12 +13,15 @@ import { useHomeFeed } from '@app/hooks/useHomeFeed';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useNotificationsOverview } from '@app/hooks/useNotificationsOverview';
+import { useNutritionPlan } from '@app/hooks/useNutritionPlan';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
 import { ChallengeBannerCard } from '@app/features/home/components/ChallengeBannerCard';
 import { HomeHeader } from '@app/features/home/components/HomeHeader';
 import { HydrationOverviewCard } from '@app/features/home/components/HydrationOverviewCard';
 import { NutritionOverviewCard } from '@app/features/home/components/NutritionOverviewCard';
+import { NutritionLogModal } from '@app/features/nutrition/components/NutritionLogModal';
 import { TodayWorkoutCard } from '@app/features/home/components/TodayWorkoutCard';
 import { WearBanner } from '@app/features/home/components/WearBanner';
 import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
@@ -27,12 +32,16 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'HomeRoot'>;
 
 export function HomeScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
+  const tabBarHeight = useBottomTabBarHeight();
   const { profile } = useAuth();
   const homeQuery = useHomeFeed();
+  const notificationsOverview = useNotificationsOverview();
+  const nutritionActions = useNutritionPlan();
   const personalRecordsQuery = usePersonalRecords();
   const exercisesQuery = useExerciseLibrary();
   const workoutsQuery = useWorkoutLibrary();
   const [wearPreviewVisible, setWearPreviewVisible] = useState(false);
+  const [nutritionLogVisible, setNutritionLogVisible] = useState(false);
 
   const recommendedWorkouts = useMemo(() => {
     const allWorkouts = workoutsQuery.data || [];
@@ -74,7 +83,7 @@ export function HomeScreen({ navigation }: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.xs,
-      paddingBottom: theme.spacing.xs,
+      paddingBottom: tabBarHeight + theme.spacing.md,
       gap: theme.spacing.md,
     },
   });
@@ -95,12 +104,31 @@ export function HomeScreen({ navigation }: Props) {
     navigation.navigate(HOME_ROUTES.QuizLanding);
   };
 
+  const openNotifications = () => {
+    navigation.navigate(HOME_ROUTES.Notifications);
+  };
+
   const openChallengeFlow = () => {
     navigation.navigate(HOME_ROUTES.Challenge);
   };
 
   const openNutritionPlan = () => {
     navigation.navigate(HOME_ROUTES.NutritionPlan);
+  };
+
+  const handleSaveNutritionLog = async (
+    input: Parameters<typeof nutritionActions.saveTodayLog>[0],
+  ) => {
+    try {
+      await nutritionActions.saveTodayLog(input);
+      setNutritionLogVisible(false);
+      Alert.alert('Nutrición registrada', 'Tu consumo de hoy quedó guardado.');
+    } catch (error) {
+      Alert.alert(
+        'No pudimos guardar tu nutrición',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      );
+    }
   };
 
   const openPersonalRecords = () => {
@@ -158,10 +186,26 @@ export function HomeScreen({ navigation }: Props) {
     return (
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <View style={styles.content}>
-          <HomeHeader />
+          <HomeHeader
+            notificationsCount={notificationsOverview.unreadCount}
+            onOpenNotifications={openNotifications}
+          />
           <EmptyState
             title="No pudimos cargar tu inicio"
             description="Revisa la configuración de Supabase o vuelve a intentarlo más tarde."
+            icon={
+              <RefreshCw
+                color={theme.colors.textSecondary}
+                size={20}
+                strokeWidth={2}
+              />
+            }
+            actionLabel="Reintentar"
+            onAction={() => {
+              Promise.all([homeQuery.refetch(), workoutsQuery.refetch()]).catch(
+                () => {},
+              );
+            }}
           />
         </View>
       </SafeAreaView>
@@ -174,7 +218,10 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <HomeHeader />
+        <HomeHeader
+          notificationsCount={notificationsOverview.unreadCount}
+          onOpenNotifications={openNotifications}
+        />
         <ChallengeBannerCard
           challenge={homeQuery.data?.challenge || null}
           onPress={openChallengeFlow}
@@ -187,6 +234,11 @@ export function HomeScreen({ navigation }: Props) {
           plan={homeQuery.data?.nutritionPlan || null}
           todayLog={homeQuery.data?.todayNutritionLog || null}
           onAskEllie={openEllieTab}
+          onLogNutrition={
+            homeQuery.data?.nutritionPlan
+              ? () => setNutritionLogVisible(true)
+              : undefined
+          }
           onOpenPlan={
             homeQuery.data?.nutritionPlan ? openNutritionPlan : undefined
           }
@@ -231,6 +283,16 @@ export function HomeScreen({ navigation }: Props) {
         visible={wearPreviewVisible}
         onClose={() => setWearPreviewVisible(false)}
       />
+      {homeQuery.data?.nutritionPlan ? (
+        <NutritionLogModal
+          visible={nutritionLogVisible}
+          plan={homeQuery.data.nutritionPlan}
+          todayLog={homeQuery.data.todayNutritionLog}
+          saving={nutritionActions.isSavingTodayLog}
+          onClose={() => setNutritionLogVisible(false)}
+          onSave={handleSaveNutritionLog}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

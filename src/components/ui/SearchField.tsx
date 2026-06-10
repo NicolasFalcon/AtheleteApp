@@ -1,6 +1,6 @@
-import {Search} from 'lucide-react-native';
-import {StyleSheet, TextInput, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Search } from 'lucide-react-native';
+import { StyleSheet, TextInput, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type SearchFieldProps = {
   value: string;
@@ -13,16 +13,16 @@ export function SearchField({
   onChangeText,
   placeholder,
 }: SearchFieldProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     container: {
-      minHeight: 48,
-      borderRadius: theme.radii.lg,
+      minHeight: 44,
+      borderRadius: theme.radii.md,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      paddingHorizontal: theme.spacing.md,
+      paddingHorizontal: 14,
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing.sm,
@@ -31,8 +31,8 @@ export function SearchField({
       flex: 1,
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      paddingVertical: theme.spacing.sm,
+      fontSize: 15,
+      paddingVertical: 10,
     },
   });
 

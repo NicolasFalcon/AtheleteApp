@@ -120,6 +120,18 @@ export async function sendPasswordReset(email: string): Promise<AuthResult> {
   return {error: normalizeAuthError(error)};
 }
 
+export async function updatePassword(password: string): Promise<AuthResult> {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    return {error: createConfigurationError()};
+  }
+
+  const {error} = await client.auth.updateUser({password});
+
+  return {error: normalizeAuthError(error)};
+}
+
 export async function signOut(): Promise<AuthResult> {
   const client = getSupabaseClient();
 

@@ -1,8 +1,8 @@
-import type {ReactNode} from 'react';
-import {ChevronRight} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import type { ReactNode } from 'react';
+import { ChevronRight } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type EllieActionPromptCardProps = {
   icon: ReactNode;
@@ -17,17 +17,17 @@ export function EllieActionPromptCard({
   subtitle,
   onPress,
 }: EllieActionPromptCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      padding: 14,
-      borderRadius: 24,
+      padding: 12,
+      borderRadius: theme.radii.md,
     },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
+      gap: 10,
     },
     iconWrap: {
       width: 42,
@@ -46,7 +46,6 @@ export function EllieActionPromptCard({
       fontFamily: theme.typography.fontFamily,
       fontSize: 15,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.3,
     },
     subtitle: {
       color: theme.colors.textSecondary,
@@ -63,9 +62,9 @@ export function EllieActionPromptCard({
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.background,
-      paddingHorizontal: 12,
-      paddingVertical: 9,
-      marginLeft: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      marginLeft: 4,
     },
     ctaLabel: {
       color: theme.colors.textPrimary,
@@ -85,10 +84,11 @@ export function EllieActionPromptCard({
         </View>
         <Pressable
           onPress={onPress}
-          style={({pressed}) => [
+          style={({ pressed }) => [
             styles.cta,
-            pressed ? {opacity: 0.86} : null,
-          ]}>
+            pressed ? { opacity: 0.86 } : null,
+          ]}
+        >
           <Text style={styles.ctaLabel}>Abrir en chat</Text>
           <ChevronRight color={theme.colors.textSecondary} size={15} />
         </Pressable>

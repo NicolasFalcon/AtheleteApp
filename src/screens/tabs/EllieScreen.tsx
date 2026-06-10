@@ -1,9 +1,10 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Dumbbell,
   Droplets,
+  RefreshCw,
   Sparkles,
   Target,
   TrendingUp,
@@ -17,36 +18,34 @@ import {
   Text,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {EmptyState, Loader} from '@app/components/ui';
-import {ELLIE_ROUTES, TAB_ROUTES} from '@app/constants/routes';
-import {EllieActionPromptCard} from '@app/features/ellie/components/EllieActionPromptCard';
-import {EllieBriefingCard} from '@app/features/ellie/components/EllieBriefingCard';
-import {EllieChatContextChips} from '@app/features/ellie/components/EllieChatContextChips';
-import {EllieChatInputBar} from '@app/features/ellie/components/EllieChatInputBar';
-import {EllieHeader} from '@app/features/ellie/components/EllieHeader';
-import {EllieMessageRenderer} from '@app/features/ellie/components/EllieMessageRenderer';
-import {ElliePriorityCard} from '@app/features/ellie/components/ElliePriorityCard';
-import {EllieQuickQuestionChips} from '@app/features/ellie/components/EllieQuickQuestionChips';
-import {EllieSegmentedControl} from '@app/features/ellie/components/EllieSegmentedControl';
-import {EllieWeeklySummaryCard} from '@app/features/ellie/components/EllieWeeklySummaryCard';
-import {useAuth} from '@app/hooks/useAuth';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {useEllieChat} from '@app/hooks/useEllieChat';
-import {useEllieData} from '@app/hooks/useEllieData';
-import type {EllieActionType} from '@app/shared';
-import type {EllieStackParamList} from '@app/types/navigation';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { EmptyState, Loader } from '@app/components/ui';
+import { ELLIE_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { EllieActionPromptCard } from '@app/features/ellie/components/EllieActionPromptCard';
+import { EllieBriefingCard } from '@app/features/ellie/components/EllieBriefingCard';
+import { EllieChatContextChips } from '@app/features/ellie/components/EllieChatContextChips';
+import { EllieChatInputBar } from '@app/features/ellie/components/EllieChatInputBar';
+import { EllieHeader } from '@app/features/ellie/components/EllieHeader';
+import { EllieMessageRenderer } from '@app/features/ellie/components/EllieMessageRenderer';
+import { ElliePriorityCard } from '@app/features/ellie/components/ElliePriorityCard';
+import { EllieQuickQuestionChips } from '@app/features/ellie/components/EllieQuickQuestionChips';
+import { EllieSegmentedControl } from '@app/features/ellie/components/EllieSegmentedControl';
+import { EllieWeeklySummaryCard } from '@app/features/ellie/components/EllieWeeklySummaryCard';
+import { useAuth } from '@app/hooks/useAuth';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useEllieChat } from '@app/hooks/useEllieChat';
+import { useEllieData } from '@app/hooks/useEllieData';
+import type { EllieActionType } from '@app/shared';
+import type { EllieStackParamList } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<EllieStackParamList, typeof ELLIE_ROUTES.Ellie>;
+type Props = NativeStackScreenProps<
+  EllieStackParamList,
+  typeof ELLIE_ROUTES.Ellie
+>;
 type EllieSection = 'analysis' | 'chat';
 
 function getActionIcon(
-  action:
-    | 'dumbbell'
-    | 'utensils'
-    | 'target'
-    | 'droplets'
-    | 'trending-up',
+  action: 'dumbbell' | 'utensils' | 'target' | 'droplets' | 'trending-up',
   color: string,
 ) {
   if (action === 'dumbbell') {
@@ -82,9 +81,9 @@ function getNudgeIcon(action: EllieActionType | null, color: string) {
   }
 }
 
-export function EllieScreen({navigation}: Props) {
-  const {theme} = useAppTheme();
-  const {profile} = useAuth();
+export function EllieScreen({ navigation }: Props) {
+  const { theme } = useAppTheme();
+  const { profile } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
   const ellieData = useEllieData();
   const [section, setSection] = useState<EllieSection>('analysis');
@@ -121,7 +120,6 @@ export function EllieScreen({navigation}: Props) {
       fontFamily: theme.typography.fontFamily,
       fontSize: 17,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.3,
     },
     sectionSubtitle: {
       color: theme.colors.textSecondary,
@@ -151,15 +149,12 @@ export function EllieScreen({navigation}: Props) {
       fontFamily: theme.typography.fontFamily,
       fontSize: 12,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1.6,
-      textTransform: 'uppercase',
     },
     chatHeaderTitle: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 20,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.4,
     },
     chatHeaderHint: {
       color: theme.colors.textSecondary,
@@ -176,8 +171,8 @@ export function EllieScreen({navigation}: Props) {
       alignItems: 'flex-start',
     },
     typingBubble: {
-      borderRadius: 22,
-      borderBottomLeftRadius: 14,
+      borderRadius: 18,
+      borderBottomLeftRadius: 6,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
@@ -206,7 +201,7 @@ export function EllieScreen({navigation}: Props) {
     }
 
     requestAnimationFrame(() => {
-      messagesRef.current?.scrollToEnd({animated: true});
+      messagesRef.current?.scrollToEnd({ animated: true });
     });
   }, [ellieChat.messages, ellieChat.isSending, section]);
 
@@ -253,7 +248,12 @@ export function EllieScreen({navigation}: Props) {
         return;
       }
 
-      if (action === 'log_hydration' || action === 'log_nutrition') {
+      if (action === 'log_nutrition') {
+        navigation.navigate(ELLIE_ROUTES.NutritionPlan, { openLog: true });
+        return;
+      }
+
+      if (action === 'log_hydration') {
         navigation.getParent()?.navigate(TAB_ROUTES.Home as never);
         return;
       }
@@ -291,11 +291,28 @@ export function EllieScreen({navigation}: Props) {
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <View style={styles.errorWrap}>
           <EllieHeader
-            onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+            onBack={
+              navigation.canGoBack() ? () => navigation.goBack() : undefined
+            }
           />
           <EmptyState
             title="No pudimos cargar ELLIE"
             description="Revisa la conexión con Supabase o vuelve a intentarlo en un momento."
+            icon={
+              <RefreshCw
+                color={theme.colors.textSecondary}
+                size={20}
+                strokeWidth={2}
+              />
+            }
+            actionLabel="Reintentar"
+            onAction={() => {
+              Promise.all([
+                ellieData.overviewQuery.refetch(),
+                ellieData.personalRecordsQuery.refetch(),
+                ellieData.exercisesQuery.refetch(),
+              ]).catch(() => {});
+            }}
           />
         </View>
       </SafeAreaView>
@@ -307,10 +324,13 @@ export function EllieScreen({navigation}: Props) {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
-        style={styles.keyboard}>
+        style={styles.keyboard}
+      >
         <View style={styles.shell}>
           <EllieHeader
-            onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
+            onBack={
+              navigation.canGoBack() ? () => navigation.goBack() : undefined
+            }
           />
 
           <EllieSegmentedControl value={section} onChange={setSection} />
@@ -318,7 +338,8 @@ export function EllieScreen({navigation}: Props) {
           {section === 'analysis' ? (
             <ScrollView
               contentContainerStyle={styles.analysisContent}
-              showsVerticalScrollIndicator={false}>
+              showsVerticalScrollIndicator={false}
+            >
               <EllieBriefingCard
                 heroText={
                   ellieData.heroInsight?.text ||
@@ -340,7 +361,10 @@ export function EllieScreen({navigation}: Props) {
                     {ellieData.priorityNudges.slice(0, 3).map(nudge => (
                       <ElliePriorityCard
                         key={nudge.id}
-                        icon={getNudgeIcon(nudge.action, theme.colors.textPrimary)}
+                        icon={getNudgeIcon(
+                          nudge.action,
+                          theme.colors.textPrimary,
+                        )}
                         text={nudge.text}
                         actionLabel={nudge.actionLabel || 'Abrir'}
                         onPress={() => handlePriorityAction(nudge.action)}
@@ -351,9 +375,12 @@ export function EllieScreen({navigation}: Props) {
               ) : null}
 
               <View style={styles.analysisSection}>
-                <Text style={styles.sectionTitle}>Pídele a ELLIE que actúe</Text>
+                <Text style={styles.sectionTitle}>
+                  Pídele a ELLIE que actúe
+                </Text>
                 <Text style={styles.sectionSubtitle}>
-                  Sugerencias directas y limpias para abrir la conversación correcta.
+                  Sugerencias directas y limpias para abrir la conversación
+                  correcta.
                 </Text>
                 <View style={styles.promptList}>
                   {ellieData.promptCards.slice(0, 4).map(card => (
@@ -385,7 +412,8 @@ export function EllieScreen({navigation}: Props) {
                 <Text style={styles.chatHeaderEyebrow}>Habla con ELLIE</Text>
                 <Text style={styles.chatHeaderTitle}>Conversación guiada</Text>
                 <Text style={styles.chatHeaderHint}>
-                  Haz preguntas directas o usa un acceso rápido para dejar el prompt listo.
+                  Haz preguntas directas o usa un acceso rápido para dejar el
+                  prompt listo.
                 </Text>
               </View>
               <EllieChatContextChips
@@ -409,19 +437,22 @@ export function EllieScreen({navigation}: Props) {
                     keyboardDismissMode="interactive"
                     keyboardShouldPersistTaps="handled"
                     contentInsetAdjustmentBehavior="automatic"
-                    automaticallyAdjustKeyboardInsets>
+                    automaticallyAdjustKeyboardInsets
+                  >
                     {ellieChat.messages.map(message => (
                       <EllieMessageRenderer
                         key={message.id}
                         message={message}
                         busyMessageId={ellieChat.busyMessageId}
                         busyAction={ellieChat.busyAction}
-                      onSaveWorkout={ellieChat.saveGeneratedWorkout}
-                      onActivatePlan={ellieChat.activateGeneratedNutritionPlan}
-                      onDiscard={ellieChat.discardGeneratedMessage}
-                      onRegenerate={ellieChat.regenerateGeneratedMessage}
-                      onOpenNutritionPlan={openNutritionPlan}
-                    />
+                        onSaveWorkout={ellieChat.saveGeneratedWorkout}
+                        onActivatePlan={
+                          ellieChat.activateGeneratedNutritionPlan
+                        }
+                        onDiscard={ellieChat.discardGeneratedMessage}
+                        onRegenerate={ellieChat.regenerateGeneratedMessage}
+                        onOpenNutritionPlan={openNutritionPlan}
+                      />
                     ))}
                     {ellieChat.isSending ? (
                       <View style={styles.typingWrap}>

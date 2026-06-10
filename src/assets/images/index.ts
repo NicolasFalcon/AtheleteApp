@@ -1,3 +1,11 @@
 export const logoAthelete = require('./logo-athelete.png');
 export const homeRecovery = require('./home-recovery.jpg');
 export const logoWhite = require('./logo-white.png');
+export const bodyScienceHeroTraining = require('./body-science/hero-training.jpg');
+export const bodyScienceThumbMindset = require('./body-science/thumb-mindset.jpg');
+export const bodyScienceThumbNutrition = require('./body-science/thumb-nutrition.jpg');
+export const bodyScienceThumbRecovery = require('./body-science/thumb-recovery.jpg');
+export const bodyScienceThumbTraining = require('./body-science/thumb-training.jpg');
+export const visualOnboardingTrainAnywhere = require('./visual-onboarding/train-anywhere.png');
+export const visualOnboardingTrackProgress = require('./visual-onboarding/track-progress.png');
+export const visualOnboardingReachGoals = require('./visual-onboarding/reach-goals.png');

@@ -1,8 +1,8 @@
-import {Heart, Clock3, Flame} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {Workout} from '@app/shared';
-import {WorkoutThumbnail} from '@app/features/workouts/components/WorkoutThumbnail';
+import { Heart, Clock3, Flame } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { Workout } from '@app/shared';
+import { WorkoutThumbnail } from '@app/features/workouts/components/WorkoutThumbnail';
 
 type WorkoutListItemProps = {
   workout: Workout;
@@ -23,25 +23,25 @@ export function WorkoutListItem({
   onToggleFavorite,
   onPress,
 }: WorkoutListItemProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: theme.radii.lg,
+      borderRadius: theme.radii.md,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 14,
-      gap: 14,
+      padding: 12,
+      gap: 12,
       shadowColor: '#000000',
       ...theme.elevations.card,
     },
     image: {
-      width: 92,
-      height: 92,
-      borderRadius: 18,
+      width: 82,
+      height: 82,
+      borderRadius: theme.radii.sm,
     },
     content: {
       flex: 1,
@@ -50,14 +50,13 @@ export function WorkoutListItem({
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: -0.4,
     },
     subtitle: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
+      fontSize: 13,
       lineHeight: 18,
     },
     metaRow: {
@@ -78,9 +77,9 @@ export function WorkoutListItem({
       fontSize: 12,
     },
     favoriteButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.background,
@@ -92,10 +91,11 @@ export function WorkoutListItem({
   return (
     <Pressable
       onPress={onPress}
-      style={({pressed}) => [
+      style={({ pressed }) => [
         styles.card,
-        pressed ? {transform: [{scale: 0.99}]} : null,
-      ]}>
+        pressed ? { transform: [{ scale: 0.99 }] } : null,
+      ]}
+    >
       <WorkoutThumbnail workout={workout} style={styles.image} />
       <View style={styles.content}>
         <Text numberOfLines={2} style={styles.title}>
@@ -120,9 +120,12 @@ export function WorkoutListItem({
           event.stopPropagation();
           onToggleFavorite();
         }}
-        style={styles.favoriteButton}>
+        style={styles.favoriteButton}
+      >
         <Heart
-          color={isFavorite ? theme.colors.textPrimary : theme.colors.textSecondary}
+          color={
+            isFavorite ? theme.colors.textPrimary : theme.colors.textSecondary
+          }
           fill={isFavorite ? theme.colors.textPrimary : 'transparent'}
           size={18}
           strokeWidth={2}

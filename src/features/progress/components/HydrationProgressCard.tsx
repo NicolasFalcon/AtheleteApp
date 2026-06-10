@@ -1,11 +1,11 @@
-import {useMemo} from 'react';
-import {Droplets} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {getLocalDateKey} from '@app/lib/date';
-import {ProgressBarChart} from '@app/features/progress/components/ProgressBarChart';
-import type {HydrationLog} from '@app/shared';
+import { useMemo } from 'react';
+import { Droplets } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { getLocalDateKey } from '@app/lib/date';
+import { ProgressBarChart } from '@app/features/progress/components/ProgressBarChart';
+import type { HydrationLog } from '@app/shared';
 
 type ProgressRange = 'week' | 'month';
 
@@ -17,7 +17,7 @@ type HydrationProgressCardProps = {
 
 function buildDateRange(range: ProgressRange): Date[] {
   const days = range === 'month' ? 30 : 7;
-  return Array.from({length: days}, (_, index) => {
+  return Array.from({ length: days }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - (days - 1 - index));
     return date;
@@ -29,7 +29,7 @@ export function HydrationProgressCard({
   goalGlasses,
   range,
 }: HydrationProgressCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const chartData = useMemo(() => {
     const byDate = logs.reduce<Record<string, number>>((accumulator, log) => {
@@ -48,7 +48,7 @@ export function HydrationProgressCard({
         label:
           range === 'week'
             ? date
-                .toLocaleDateString('es-CL', {weekday: 'short'})
+                .toLocaleDateString('es-CL', { weekday: 'short' })
                 .replace('.', '')
                 .slice(0, 3)
             : String(date.getDate()),
@@ -60,7 +60,9 @@ export function HydrationProgressCard({
     });
   }, [logs, range]);
 
-  const daysMetGoal = chartData.filter(point => point.primaryValue >= goalGlasses).length;
+  const daysMetGoal = chartData.filter(
+    point => point.primaryValue >= goalGlasses,
+  ).length;
   const averageLiters =
     chartData.reduce((sum, point) => sum + point.liters, 0) /
     Math.max(chartData.length, 1);
@@ -68,7 +70,7 @@ export function HydrationProgressCard({
   const styles = StyleSheet.create({
     card: {
       padding: 16,
-      borderRadius: 24,
+      borderRadius: theme.radii.md,
       gap: 12,
     },
     header: {
@@ -87,7 +89,6 @@ export function HydrationProgressCard({
       fontFamily: theme.typography.fontFamily,
       fontSize: 15,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.3,
     },
     summary: {
       color: theme.colors.textSecondary,
@@ -169,7 +170,8 @@ export function HydrationProgressCard({
 
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          Objetivo: {goalGlasses} vasos/día ({(goalGlasses * 250 / 1000).toFixed(1)} L)
+          Objetivo: {goalGlasses} vasos/día (
+          {((goalGlasses * 250) / 1000).toFixed(1)} L)
         </Text>
         <Text style={styles.footerText}>
           Prom: {averageLiters.toFixed(1)} L

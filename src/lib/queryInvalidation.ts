@@ -4,9 +4,23 @@ export async function invalidatePersonalRecordQueries(
   queryClient: QueryClient,
   userId: string,
 ) {
-  await queryClient.invalidateQueries({
-    queryKey: ['personal-records', userId],
-  });
+  await Promise.allSettled([
+    queryClient.invalidateQueries({
+      queryKey: ['personal-records', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['profile', 'overview', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['ellie', 'overview', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['home', 'overview', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'overview', userId],
+    }),
+  ]);
 }
 
 export async function invalidateWorkoutQueries(
@@ -25,6 +39,18 @@ export async function invalidateWorkoutQueries(
     }),
     queryClient.invalidateQueries({
       queryKey: ['workout-session', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['profile', 'overview', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['ellie', 'overview', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['home', 'overview', userId],
+    }),
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'overview', userId],
     }),
   ]);
 }

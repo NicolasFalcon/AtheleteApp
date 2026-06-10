@@ -1,7 +1,7 @@
-import {Flame, Trophy, Zap} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Flame, Trophy, Zap } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type AtheletePointsCardProps = {
   points: number;
@@ -22,24 +22,24 @@ function ProgressStat({
   value: string;
   meta: string;
 }) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
   const Icon = icon === 'flame' ? Flame : icon === 'trophy' ? Trophy : Zap;
 
   const styles = StyleSheet.create({
     card: {
       flex: 1,
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 13,
+      borderRadius: theme.radii.sm,
+      paddingHorizontal: 10,
+      paddingVertical: 11,
       backgroundColor: theme.colors.background,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      gap: 8,
+      gap: 7,
     },
     iconBadge: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
       backgroundColor: theme.colors.surfaceMuted,
       alignItems: 'center',
       justifyContent: 'center',
@@ -49,20 +49,20 @@ function ProgressStat({
       fontFamily: theme.typography.fontFamily,
       fontSize: 10,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1.3,
+      letterSpacing: 0,
       textTransform: 'uppercase',
-      minHeight: 28,
+      minHeight: 24,
     },
     value: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 18,
-      fontWeight: theme.typography.weights.bold,
+      fontSize: 17,
+      fontWeight: theme.typography.weights.semibold,
     },
     meta: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
+      fontSize: 10,
     },
   });
 
@@ -85,13 +85,13 @@ export function AtheletePointsCard({
   challengeDayLabel,
   challengeValue,
 }: AtheletePointsCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: 28,
-      padding: 18,
-      gap: 16,
+      borderRadius: theme.radii.md,
+      padding: 16,
+      gap: 12,
     },
     header: {
       flexDirection: 'row',
@@ -118,7 +118,7 @@ export function AtheletePointsCard({
       fontFamily: theme.typography.fontFamily,
       fontSize: 11,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1.8,
+      letterSpacing: 0,
       textTransform: 'uppercase',
     },
     title: {
@@ -130,18 +130,18 @@ export function AtheletePointsCard({
     },
     summaryPill: {
       borderRadius: theme.radii.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.surfaceMuted,
     },
     summaryLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1.3,
+      letterSpacing: 0,
       textTransform: 'uppercase',
     },
     pointsRow: {
@@ -152,24 +152,23 @@ export function AtheletePointsCard({
     points: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 42,
+      fontSize: 36,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -1.2,
     },
     pointsSuffix: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 13,
       fontWeight: theme.typography.weights.medium,
-      letterSpacing: 2,
+      letterSpacing: 0,
       marginBottom: 8,
       textTransform: 'uppercase',
     },
     description: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
-      lineHeight: 22,
+      fontSize: 13,
+      lineHeight: 20,
       maxWidth: 280,
     },
     statsRow: {
@@ -183,7 +182,11 @@ export function AtheletePointsCard({
       <View style={styles.header}>
         <View style={styles.headingGroup}>
           <View style={styles.iconWrap}>
-            <Zap color={theme.colors.accentContrast} size={18} strokeWidth={2.2} />
+            <Zap
+              color={theme.colors.accentContrast}
+              size={18}
+              strokeWidth={2.2}
+            />
           </View>
           <View>
             <Text style={styles.eyebrow}>Identidad de progreso</Text>
@@ -202,7 +205,8 @@ export function AtheletePointsCard({
           <Text style={styles.pointsSuffix}>pts</Text>
         </View>
         <Text style={styles.description}>
-          Gana puntos entrenando, completando retos y sosteniendo tu ritmo dentro del plan.
+          Gana puntos entrenando, completando retos y sosteniendo tu ritmo
+          dentro del plan.
         </Text>
       </View>
 

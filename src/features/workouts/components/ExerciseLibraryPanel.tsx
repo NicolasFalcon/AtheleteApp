@@ -4,12 +4,12 @@ import {
   SlidersHorizontal,
   Target,
 } from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {EmptyState, Loader} from '@app/components/ui';
-import {ExerciseFilterGroup} from '@app/features/workouts/components/ExerciseFilterGroup';
-import {ExerciseLibraryHeader} from '@app/features/workouts/components/ExerciseLibraryHeader';
-import {ExerciseListItem} from '@app/features/workouts/components/ExerciseListItem';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { StyleSheet, Text, View } from 'react-native';
+import { EmptyState, Loader } from '@app/components/ui';
+import { ExerciseFilterGroup } from '@app/features/workouts/components/ExerciseFilterGroup';
+import { ExerciseLibraryHeader } from '@app/features/workouts/components/ExerciseLibraryHeader';
+import { ExerciseListItem } from '@app/features/workouts/components/ExerciseListItem';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 import {
   bodyPartLabels,
   equipmentLabels,
@@ -42,7 +42,12 @@ const bodyPartFilterKeys = [
   'cardio',
 ] as const;
 
-const levelFilterKeys = ['all', 'beginner', 'intermediate', 'advanced'] as const;
+const levelFilterKeys = [
+  'all',
+  'beginner',
+  'intermediate',
+  'advanced',
+] as const;
 
 type ExerciseLibraryPanelProps = {
   exercises: LibraryExercise[];
@@ -81,7 +86,7 @@ export function ExerciseLibraryPanel({
   onToggleFavorite,
   onSelectExercise,
 }: ExerciseLibraryPanelProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
   const activeFiltersCount = [
     equipmentFilter,
     bodyPartFilter,
@@ -103,7 +108,7 @@ export function ExerciseLibraryPanel({
       fontFamily: theme.typography.fontFamily,
       fontSize: 11,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 2.2,
+      letterSpacing: 0,
       textTransform: 'uppercase',
     },
     list: {

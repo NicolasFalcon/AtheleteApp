@@ -4,6 +4,8 @@ import {invalidateNutritionPlanQueries} from '@app/lib/queryInvalidation';
 import {
   deactivateNutritionPlan,
   fetchNutritionPlanScreenData,
+  upsertTodayNutritionLog,
+  type NutritionLogInput,
 } from '@app/services/supabase/nutrition';
 
 export function useNutritionPlan() {
@@ -33,9 +35,28 @@ export function useNutritionPlan() {
     },
   });
 
+  const logMutation = useMutation({
+    mutationFn: async (input: NutritionLogInput) => {
+      if (!profile?.id) {
+        throw new Error('No hay una sesión activa.');
+      }
+
+      return upsertTodayNutritionLog(profile.id, input);
+    },
+    onSuccess: async () => {
+      if (!profile?.id) {
+        return;
+      }
+
+      await invalidateNutritionPlanQueries(queryClient, profile.id);
+    },
+  });
+
   return {
     ...planQuery,
     deactivatePlan: deactivateMutation.mutateAsync,
     isDeactivating: deactivateMutation.isPending,
+    saveTodayLog: logMutation.mutateAsync,
+    isSavingTodayLog: logMutation.isPending,
   };
 }

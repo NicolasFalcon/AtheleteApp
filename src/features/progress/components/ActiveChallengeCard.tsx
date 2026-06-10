@@ -1,8 +1,8 @@
-import {ArrowRight} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Card, Chip, CircularProgress} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {ProgressChallenge} from '@app/services/supabase/progress';
+import { ArrowRight } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Card, Chip, CircularProgress } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { ProgressChallenge } from '@app/services/supabase/progress';
 
 type ActiveChallengeCardProps = {
   challenge: ProgressChallenge | null;
@@ -13,12 +13,12 @@ export function ActiveChallengeCard({
   challenge,
   onOpen,
 }: ActiveChallengeCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
       padding: 16,
-      borderRadius: 24,
+      borderRadius: theme.radii.md,
       gap: 14,
     },
     header: {
@@ -37,7 +37,9 @@ export function ActiveChallengeCard({
       paddingHorizontal: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: challenge ? theme.colors.accent : theme.colors.surfaceMuted,
+      backgroundColor: challenge
+        ? theme.colors.accent
+        : theme.colors.surfaceMuted,
     },
     statusLabel: {
       color: challenge ? theme.colors.accentContrast : theme.colors.textPrimary,
@@ -50,7 +52,6 @@ export function ActiveChallengeCard({
       fontFamily: theme.typography.fontFamily,
       fontSize: 20,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.4,
       marginTop: 10,
     },
     subtitle: {
@@ -106,7 +107,11 @@ export function ActiveChallengeCard({
 
         <Pressable
           onPress={onOpen}
-          style={({pressed}) => [styles.cta, pressed ? {opacity: 0.88} : null]}>
+          style={({ pressed }) => [
+            styles.cta,
+            pressed ? { opacity: 0.88 } : null,
+          ]}
+        >
           <Text style={styles.ctaLabel}>Comenzar reto</Text>
           <ArrowRight
             color={theme.colors.accentContrast}
@@ -154,7 +159,11 @@ export function ActiveChallengeCard({
 
       <Pressable
         onPress={onOpen}
-        style={({pressed}) => [styles.cta, pressed ? {opacity: 0.88} : null]}>
+        style={({ pressed }) => [
+          styles.cta,
+          pressed ? { opacity: 0.88 } : null,
+        ]}
+      >
         <Text style={styles.ctaLabel}>
           {isCompleted ? 'Ver reto' : 'Continuar reto'}
         </Text>

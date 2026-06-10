@@ -1,8 +1,8 @@
-import {Clock3, Flame, Sparkles} from 'lucide-react-native';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {Workout} from '@app/shared';
-import {WorkoutThumbnail} from '@app/features/workouts/components/WorkoutThumbnail';
+import { Clock3, Flame, Sparkles } from 'lucide-react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { Workout } from '@app/shared';
+import { WorkoutThumbnail } from '@app/features/workouts/components/WorkoutThumbnail';
 
 type WorkoutCarouselProps = {
   title: string;
@@ -17,7 +17,7 @@ export function WorkoutCarousel({
   workouts,
   onSelectWorkout,
 }: WorkoutCarouselProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     headerRow: {
@@ -46,7 +46,7 @@ export function WorkoutCarousel({
     },
     card: {
       width: 158,
-      borderRadius: theme.radii.lg,
+      borderRadius: theme.radii.md,
       overflow: 'hidden',
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
@@ -117,22 +117,28 @@ export function WorkoutCarousel({
   return (
     <View style={styles.headerRow}>
       <View style={styles.titleRow}>
-        <Sparkles color={theme.colors.textPrimary} size={16} strokeWidth={2.1} />
+        <Sparkles
+          color={theme.colors.textPrimary}
+          size={16}
+          strokeWidth={2.1}
+        />
         <Text style={styles.titleLabel}>{title}</Text>
       </View>
       <Text style={styles.subtitleLabel}>{subtitle}</Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}>
+        contentContainerStyle={styles.listContent}
+      >
         {workouts.map(workout => (
           <Pressable
             key={workout.id}
             onPress={() => onSelectWorkout(workout.id)}
-            style={({pressed}) => [
+            style={({ pressed }) => [
               styles.card,
-              pressed ? {transform: [{scale: 0.98}]} : null,
-            ]}>
+              pressed ? { transform: [{ scale: 0.98 }] } : null,
+            ]}
+          >
             <View>
               <WorkoutThumbnail workout={workout} style={styles.image} />
               {workout.createdByAi || workout.sourceType === 'ellie' ? (

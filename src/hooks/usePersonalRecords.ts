@@ -2,6 +2,7 @@ import {useMemo} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {useAuth} from '@app/hooks/useAuth';
 import {invalidatePersonalRecordQueries} from '@app/lib/queryInvalidation';
+import {awardGamificationEvent} from '@app/services/supabase/gamification';
 import {getSupabaseClient} from '@app/services/supabase/client';
 import type {PRInsert, PersonalRecord} from '@app/shared';
 
@@ -70,7 +71,9 @@ export function usePersonalRecords(exerciseId?: string) {
         throw new Error('No hay una sesión activa para registrar PRs.');
       }
 
-      const {error} = await (client as any).from('personal_records').insert({
+      const {data, error} = await (client as any)
+        .from('personal_records')
+        .insert({
         user_id: userId,
         exercise_id: pr.exerciseId,
         pr_type: pr.prType,
@@ -81,10 +84,27 @@ export function usePersonalRecords(exerciseId?: string) {
         unit: pr.unit ?? 'kg',
         notes: pr.notes ?? null,
         recorded_at: pr.recordedAt ?? new Date().toISOString(),
-      });
+        })
+        .select('id, exercise_id, pr_type')
+        .single();
 
       if (error) {
         throw error;
+      }
+
+      if (data?.id) {
+        await awardGamificationEvent({
+          userId,
+          eventKey: `personal_record:${data.id}`,
+          eventType: 'personal_record_created',
+          points: 25,
+          badgeIds: ['first_pr'],
+          metadata: {
+            recordId: data.id,
+            exerciseId: data.exercise_id,
+            prType: data.pr_type,
+          },
+        });
       }
     },
     onSuccess: async () => {

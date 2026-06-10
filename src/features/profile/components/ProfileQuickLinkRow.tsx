@@ -1,7 +1,7 @@
-import type {LucideIcon} from 'lucide-react-native';
-import {ChevronRight} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import type { LucideIcon } from 'lucide-react-native';
+import { ChevronRight } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type ProfileQuickLinkRowProps = {
   icon: LucideIcon;
@@ -16,22 +16,18 @@ export function ProfileQuickLinkRow({
   subtitle,
   onPress,
 }: ProfileQuickLinkRowProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     row: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: 14,
-      borderRadius: 24,
-      paddingVertical: 16,
-      paddingHorizontal: 16,
+      gap: 12,
+      borderRadius: theme.radii.sm,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
       backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      shadowColor: '#000000',
-      ...theme.elevations.card,
     },
     left: {
       flexDirection: 'row',
@@ -40,9 +36,9 @@ export function ProfileQuickLinkRow({
       flex: 1,
     },
     iconWrap: {
-      width: 38,
-      height: 38,
-      borderRadius: 18,
+      width: 36,
+      height: 36,
+      borderRadius: theme.radii.sm,
       backgroundColor: theme.colors.surfaceMuted,
       alignItems: 'center',
       justifyContent: 'center',
@@ -54,20 +50,21 @@ export function ProfileQuickLinkRow({
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: theme.typography.weights.semibold,
     },
     subtitle: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 11,
     },
   });
 
   return (
     <Pressable
       onPress={onPress}
-      style={({pressed}) => [styles.row, pressed ? {opacity: 0.88} : null]}>
+      style={({ pressed }) => [styles.row, pressed ? { opacity: 0.88 } : null]}
+    >
       <View style={styles.left}>
         <View style={styles.iconWrap}>
           <Icon color={theme.colors.textSecondary} size={16} strokeWidth={2} />
@@ -77,7 +74,11 @@ export function ProfileQuickLinkRow({
           <Text style={styles.subtitle}>{subtitle}</Text>
         </View>
       </View>
-      <ChevronRight color={theme.colors.textSecondary} size={18} strokeWidth={2} />
+      <ChevronRight
+        color={theme.colors.textSecondary}
+        size={18}
+        strokeWidth={2}
+      />
     </Pressable>
   );
 }

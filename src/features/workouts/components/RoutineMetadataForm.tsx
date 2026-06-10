@@ -20,6 +20,7 @@ const difficultyLevels = [
 
 type RoutineMetadataFormProps = {
   title: string;
+  description: string;
   type: Workout['type'];
   difficulty: Workout['difficulty'];
   duration: number;
@@ -28,6 +29,7 @@ type RoutineMetadataFormProps = {
   tagsInput: string;
   hasManualCalories: boolean;
   onTitleChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
   onTypeChange: (value: Workout['type']) => void;
   onDifficultyChange: (value: Workout['difficulty']) => void;
   onDurationChange: (value: number) => void;
@@ -110,6 +112,7 @@ function NumberStepper({
 
 export function RoutineMetadataForm({
   title,
+  description,
   type,
   difficulty,
   duration,
@@ -118,6 +121,7 @@ export function RoutineMetadataForm({
   tagsInput,
   hasManualCalories,
   onTitleChange,
+  onDescriptionChange,
   onTypeChange,
   onDifficultyChange,
   onDurationChange,
@@ -167,6 +171,11 @@ export function RoutineMetadataForm({
       fontSize: theme.typography.sizes.caption,
       textDecorationLine: 'underline',
     },
+    descriptionInput: {
+      minHeight: 86,
+      textAlignVertical: 'top',
+      paddingTop: 12,
+    },
   });
 
   return (
@@ -176,6 +185,16 @@ export function RoutineMetadataForm({
         value={title}
         onChangeText={onTitleChange}
         placeholder="Ej: Full body del viernes"
+      />
+
+      <AppTextInput
+        label="Descripción"
+        value={description}
+        onChangeText={onDescriptionChange}
+        placeholder="Objetivo, contexto o foco de esta rutina"
+        hint="Opcional. Se mostrará en el detalle de rutina."
+        multiline
+        inputStyle={styles.descriptionInput}
       />
 
       <View style={styles.section}>

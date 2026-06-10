@@ -8,6 +8,7 @@ import {
   Clock3,
   Dumbbell,
   Flame,
+  Heart,
   PencilLine,
   Play,
   Trash2,
@@ -21,6 +22,7 @@ import {findExerciseByName, getWorkoutAccess} from '@app/shared';
 import {useAuth} from '@app/hooks/useAuth';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
+import {useFavoriteWorkouts} from '@app/hooks/useFavoriteWorkouts';
 import {useRoutineBuilder} from '@app/hooks/useRoutineBuilder';
 import {useWorkoutLibrary} from '@app/hooks/useWorkoutLibrary';
 import {useWorkoutSession} from '@app/hooks/useWorkoutSession';
@@ -46,6 +48,7 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
   const insets = useSafeAreaInsets();
   const workoutsQuery = useWorkoutLibrary();
   const exercisesQuery = useExerciseLibrary();
+  const workoutFavorites = useFavoriteWorkouts();
   const routineBuilder = useRoutineBuilder();
   const workout = useMemo(
     () =>
@@ -81,9 +84,8 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
       bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.34)',
     },
-    floatingButton: {
+    floatingButtonBase: {
       position: 'absolute',
-      left: theme.spacing.lg,
       width: 42,
       height: 42,
       borderRadius: 21,
@@ -92,6 +94,12 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
       backgroundColor: 'rgba(17,17,17,0.38)',
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: 'rgba(255,255,255,0.15)',
+    },
+    floatingBackButton: {
+      left: theme.spacing.lg,
+    },
+    floatingFavoriteButton: {
+      right: theme.spacing.lg,
     },
     content: {
       paddingBottom: 136,
@@ -217,7 +225,11 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
     },
   });
 
-  if (workoutsQuery.isLoading || exercisesQuery.isLoading) {
+  if (
+    workoutsQuery.isLoading ||
+    exercisesQuery.isLoading ||
+    !workoutFavorites.loaded
+  ) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Loader label="Cargando rutina..." />
@@ -312,8 +324,32 @@ export function WorkoutDetailScreen({navigation, route}: Props) {
         <View style={styles.heroOverlay} />
         <Pressable
           onPress={() => navigation.goBack()}
-          style={[styles.floatingButton, {top: insets.top + 10}]}>
+          style={[
+            styles.floatingButtonBase,
+            styles.floatingBackButton,
+            {top: insets.top + 10},
+          ]}>
           <ArrowLeft color="#FFFFFF" size={18} strokeWidth={2.2} />
+        </Pressable>
+        <Pressable
+          onPress={() => {
+            workoutFavorites.toggleWorkoutFavorite(workout.id).catch(() => {});
+          }}
+          style={[
+            styles.floatingButtonBase,
+            styles.floatingFavoriteButton,
+            {top: insets.top + 10},
+          ]}>
+          <Heart
+            color="#FFFFFF"
+            fill={
+              workoutFavorites.isWorkoutFavorite(workout.id)
+                ? '#FFFFFF'
+                : 'transparent'
+            }
+            size={18}
+            strokeWidth={2.2}
+          />
         </Pressable>
       </View>
 

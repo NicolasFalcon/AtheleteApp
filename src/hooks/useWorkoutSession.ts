@@ -30,6 +30,9 @@ export function useWorkoutSession(workout: Workout | null) {
     await Promise.all([
       queryClient.invalidateQueries({queryKey: ['home', 'overview', userId]}),
       queryClient.invalidateQueries({queryKey: buildSessionKey(userId)}),
+      queryClient.invalidateQueries({queryKey: ['profile', 'overview', userId]}),
+      queryClient.invalidateQueries({queryKey: ['ellie', 'overview', userId]}),
+      queryClient.invalidateQueries({queryKey: ['progress', 'overview', userId]}),
     ]);
   };
 

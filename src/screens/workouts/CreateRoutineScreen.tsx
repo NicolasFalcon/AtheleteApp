@@ -18,11 +18,13 @@ import type {
   RoutineBuilderStep,
 } from '@app/features/workouts/types';
 import {useAppTheme} from '@app/hooks/useAppTheme';
+import {useAuth} from '@app/hooks/useAuth';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
 import {useRoutineBuilder} from '@app/hooks/useRoutineBuilder';
 import {fetchRoutineById} from '@app/services/supabase/routines';
 import {
   findExerciseByName,
+  getWorkoutAccess,
   type LibraryExercise,
   type Workout,
 } from '@app/shared';
@@ -94,6 +96,7 @@ function getMetricMode(exercise: BuilderExercise): ExerciseMetricMode {
 
 export function CreateRoutineScreen({navigation, route}: Props) {
   const {theme} = useAppTheme();
+  const {profile} = useAuth();
   const exercisesQuery = useExerciseLibrary();
   const routineBuilder = useRoutineBuilder();
 
@@ -110,6 +113,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
   const mode: 'create' | 'edit' = initialWorkoutId ? 'edit' : 'create';
   const [step, setStep] = useState<RoutineBuilderStep>('details');
   const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [type, setType] = useState<Workout['type']>('strength');
   const [difficulty, setDifficulty] = useState<Workout['difficulty']>('intermediate');
   const [duration, setDuration] = useState(45);
@@ -134,6 +138,10 @@ export function CreateRoutineScreen({navigation, route}: Props) {
     () => editWorkoutQuery.data || null,
     [editWorkoutQuery.data],
   );
+  const workoutAccess = useMemo(
+    () => (workout ? getWorkoutAccess(workout, profile?.id) : null),
+    [profile?.id, workout],
+  );
 
   useEffect(() => {
     if (hasInitialized.current || exercisesQuery.isLoading) {
@@ -146,6 +154,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
       }
 
       setTitle(workout.title);
+      setDescription(workout.description || '');
       setType(workout.type);
       setDifficulty(workout.difficulty);
       setDuration(workout.duration);
@@ -372,12 +381,24 @@ export function CreateRoutineScreen({navigation, route}: Props) {
     setSelectedExercises(prev => {
       const next = [...prev];
       const nextIndex = direction === 'up' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= next.length) {
+        return prev;
+      }
+
       [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
       return next;
     });
   };
 
   const handleSave = async () => {
+    if (mode === 'edit' && workoutAccess && !workoutAccess.canEdit) {
+      Alert.alert(
+        'Rutina protegida',
+        'Solo puedes editar rutinas propias o rutinas generadas por ELLIE para tu cuenta.',
+      );
+      return;
+    }
+
     const parsedTargetMuscles = parseCommaSeparatedList(targetFocusInput);
     const parsedTags = parseCommaSeparatedList(tagsInput);
     const targetMuscles =
@@ -403,7 +424,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
         notes: exercise.notes.trim() ? exercise.notes.trim() : undefined,
       })),
       isPremium: workout?.isPremium || false,
-      description: workout?.description,
+      description: description.trim() || undefined,
       imageUrl: workout?.imageUrl,
       tags: parsedTags,
       createdByAi: workout?.createdByAi || false,
@@ -463,6 +484,20 @@ export function CreateRoutineScreen({navigation, route}: Props) {
     );
   }
 
+  if (mode === 'edit' && workoutAccess && !workoutAccess.canEdit) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.body}>
+          <EmptyState
+            title="Rutina de solo lectura"
+            description="Esta rutina pertenece a la biblioteca global. Puedes usarla como referencia, pero no editarla ni eliminarla."
+          />
+          <Button label="Volver al detalle" onPress={() => navigation.goBack()} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <RoutineBuilderHeader mode={mode} step={step} onBack={handleBack} />
@@ -473,6 +508,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
         {step === 'details' ? (
           <RoutineMetadataForm
             title={title}
+            description={description}
             type={type}
             difficulty={difficulty}
             duration={duration}
@@ -481,6 +517,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
             tagsInput={tagsInput}
             hasManualCalories={hasManualCalories}
             onTitleChange={setTitle}
+            onDescriptionChange={setDescription}
             onTypeChange={setType}
             onDifficultyChange={setDifficulty}
             onDurationChange={setDuration}

@@ -1,7 +1,7 @@
-import {ChevronRight, Plus, Trophy} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {formatPRValue, type PersonalRecord} from '@app/shared';
+import { ChevronRight, Plus, Trophy } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { formatPRValue, type PersonalRecord } from '@app/shared';
 
 type RecentPRCardProps = {
   record: PersonalRecord | null;
@@ -40,11 +40,11 @@ export function RecentPRCard({
   onOpen,
   onRegister,
 }: RecentPRCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     shell: {
-      borderRadius: theme.radii.lg,
+      borderRadius: theme.radii.md,
       overflow: 'hidden',
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
@@ -81,7 +81,6 @@ export function RecentPRCard({
       fontFamily: theme.typography.fontFamily,
       fontSize: 16,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: -0.3,
       flexShrink: 1,
     },
     subtitle: {
@@ -118,12 +117,17 @@ export function RecentPRCard({
     <View style={styles.shell}>
       <Pressable
         onPress={onOpen}
-        style={({pressed}) => [
+        style={({ pressed }) => [
           styles.topRow,
-          pressed ? {opacity: 0.94} : null,
-        ]}>
+          pressed ? { opacity: 0.94 } : null,
+        ]}
+      >
         <View style={styles.iconBox}>
-          <Trophy color={theme.colors.textPrimary} size={22} strokeWidth={2.1} />
+          <Trophy
+            color={theme.colors.textPrimary}
+            size={22}
+            strokeWidth={2.1}
+          />
         </View>
         <View style={styles.content}>
           {record ? (
@@ -132,7 +136,9 @@ export function RecentPRCard({
                 <Text numberOfLines={1} style={styles.title}>
                   🏆 {exerciseName || 'Récord personal'}
                 </Text>
-                <Text style={styles.timeLabel}>{formatRelativeTime(record.recordedAt)}</Text>
+                <Text style={styles.timeLabel}>
+                  {formatRelativeTime(record.recordedAt)}
+                </Text>
               </View>
               <Text numberOfLines={1} style={styles.subtitle}>
                 {formatPRValue(record)}
@@ -153,10 +159,11 @@ export function RecentPRCard({
       <View style={styles.divider} />
       <Pressable
         onPress={onRegister}
-        style={({pressed}) => [
+        style={({ pressed }) => [
           styles.footerButton,
-          pressed ? {opacity: 0.88} : null,
-        ]}>
+          pressed ? { opacity: 0.88 } : null,
+        ]}
+      >
         <Plus color={theme.colors.textPrimary} size={20} strokeWidth={2.2} />
         <Text style={styles.footerLabel}>Registrar nuevo PR</Text>
       </Pressable>

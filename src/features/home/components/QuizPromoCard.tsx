@@ -1,17 +1,17 @@
-import {Brain, ChevronRight} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Brain, ChevronRight } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type QuizPromoCardProps = {
   onPress: () => void;
 };
 
-export function QuizPromoCard({onPress}: QuizPromoCardProps) {
-  const {theme} = useAppTheme();
+export function QuizPromoCard({ onPress }: QuizPromoCardProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: theme.radii.lg,
+      borderRadius: theme.radii.md,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
@@ -45,7 +45,6 @@ export function QuizPromoCard({onPress}: QuizPromoCardProps) {
       fontFamily: theme.typography.fontFamily,
       fontSize: 16,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: -0.3,
     },
     badge: {
       paddingHorizontal: 8,
@@ -70,10 +69,11 @@ export function QuizPromoCard({onPress}: QuizPromoCardProps) {
   return (
     <Pressable
       onPress={onPress}
-      style={({pressed}) => [
+      style={({ pressed }) => [
         styles.card,
-        pressed ? {transform: [{scale: 0.99}]} : null,
-      ]}>
+        pressed ? { transform: [{ scale: 0.99 }] } : null,
+      ]}
+    >
       <View style={styles.iconBox}>
         <Brain color={theme.colors.textPrimary} size={22} strokeWidth={2.1} />
       </View>
@@ -85,7 +85,8 @@ export function QuizPromoCard({onPress}: QuizPromoCardProps) {
           </View>
         </View>
         <Text numberOfLines={2} style={styles.subtitle}>
-          Pon a prueba tus conocimientos sobre entrenamiento, nutrición y fitness.
+          Pon a prueba tus conocimientos sobre entrenamiento, nutrición y
+          fitness.
         </Text>
       </View>
       <ChevronRight color={theme.colors.textSecondary} size={18} />

@@ -1,7 +1,7 @@
-import {useEffect, useState} from 'react';
-import {ChevronRight, Dumbbell, Heart, Target} from 'lucide-react-native';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { useEffect, useState } from 'react';
+import { ChevronRight, Dumbbell, Heart, Target } from 'lucide-react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 import {
   bodyPartLabels,
   equipmentLabels,
@@ -22,7 +22,7 @@ export function ExerciseListItem({
   onToggleFavorite,
   onPress,
 }: ExerciseListItemProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -31,24 +31,24 @@ export function ExerciseListItem({
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: 28,
+      borderRadius: theme.radii.md,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 14,
-      gap: 14,
+      padding: 12,
+      gap: 12,
       overflow: 'hidden',
       shadowColor: '#000000',
       ...theme.elevations.card,
     },
     imageWrap: {
-      width: 86,
-      height: 92,
+      width: 80,
+      height: 86,
       flexShrink: 0,
       alignSelf: 'flex-start',
-      borderRadius: 24,
+      borderRadius: theme.radii.sm,
       overflow: 'hidden',
       backgroundColor: theme.colors.surfaceMuted,
       alignItems: 'center',
@@ -67,28 +67,27 @@ export function ExerciseListItem({
     content: {
       flex: 1,
       minWidth: 0,
-      gap: 8,
+      gap: 6,
     },
     levelLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 11,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 2.2,
+      letterSpacing: 0,
       textTransform: 'uppercase',
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: -0.4,
     },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
       flexWrap: 'wrap',
-      gap: 12,
+      gap: 10,
     },
     metaItem: {
       flexDirection: 'row',
@@ -98,7 +97,7 @@ export function ExerciseListItem({
     metaLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
+      fontSize: 12,
     },
     footer: {
       flexDirection: 'row',
@@ -114,11 +113,11 @@ export function ExerciseListItem({
     },
     favoriteButton: {
       position: 'absolute',
-      top: 14,
-      right: 14,
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      top: 12,
+      right: 12,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.background,
@@ -130,14 +129,15 @@ export function ExerciseListItem({
   return (
     <Pressable
       onPress={onPress}
-      style={({pressed}) => [
+      style={({ pressed }) => [
         styles.card,
-        pressed ? {transform: [{scale: 0.99}]} : null,
-      ]}>
+        pressed ? { transform: [{ scale: 0.99 }] } : null,
+      ]}
+    >
       <View style={styles.imageWrap}>
         {exercise.thumbnailUrl && !imageFailed ? (
           <Image
-            source={{uri: exercise.thumbnailUrl}}
+            source={{ uri: exercise.thumbnailUrl }}
             style={styles.image}
             resizeMode="cover"
             onError={() => setImageFailed(true)}
@@ -157,13 +157,21 @@ export function ExerciseListItem({
         </View>
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
-            <Dumbbell color={theme.colors.textSecondary} size={14} strokeWidth={2} />
+            <Dumbbell
+              color={theme.colors.textSecondary}
+              size={14}
+              strokeWidth={2}
+            />
             <Text style={styles.metaLabel}>
               {equipmentLabels[exercise.equipment] || exercise.equipment}
             </Text>
           </View>
           <View style={styles.metaItem}>
-            <Target color={theme.colors.textSecondary} size={14} strokeWidth={2} />
+            <Target
+              color={theme.colors.textSecondary}
+              size={14}
+              strokeWidth={2}
+            />
             <Text style={styles.metaLabel}>
               {bodyPartLabels[exercise.bodyPart] || exercise.bodyPart}
             </Text>
@@ -179,9 +187,12 @@ export function ExerciseListItem({
           event.stopPropagation();
           onToggleFavorite();
         }}
-        style={styles.favoriteButton}>
+        style={styles.favoriteButton}
+      >
         <Heart
-          color={isFavorite ? theme.colors.textPrimary : theme.colors.textSecondary}
+          color={
+            isFavorite ? theme.colors.textPrimary : theme.colors.textSecondary
+          }
           fill={isFavorite ? theme.colors.textPrimary : 'transparent'}
           size={18}
           strokeWidth={2}

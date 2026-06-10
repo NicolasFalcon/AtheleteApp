@@ -1,13 +1,7 @@
-import {Bell, LogOut, Monitor, Moon, Sun} from 'lucide-react-native';
-import {
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Bell, LogOut, Monitor, Moon, Sun } from 'lucide-react-native';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type ThemePreference = 'light' | 'dark' | 'system';
 type NotificationsState = {
@@ -26,38 +20,54 @@ type ProfilePreferencesCardProps = {
 
 function NotificationRow({
   label,
+  description,
   value,
   onChange,
 }: {
   label: string;
+  description: string;
   value: boolean;
   onChange: (value: boolean) => void;
 }) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     row: {
-      minHeight: 48,
-      borderRadius: 16,
+      minHeight: 56,
+      borderRadius: theme.radii.sm,
       backgroundColor: theme.colors.background,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      paddingHorizontal: 14,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
     },
+    copy: {
+      flex: 1,
+      gap: 2,
+    },
     label: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 14,
+      fontWeight: theme.typography.weights.medium,
+    },
+    description: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
     },
   });
 
   return (
     <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
+      <View style={styles.copy}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.description}>{description}</Text>
+      </View>
       <Switch
         value={value}
         onValueChange={onChange}
@@ -78,45 +88,45 @@ export function ProfilePreferencesCard({
   onToggleNotifications,
   onSignOut,
 }: ProfilePreferencesCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      padding: 18,
-      borderRadius: 28,
-      gap: 16,
+      padding: 16,
+      borderRadius: theme.radii.md,
+      gap: 12,
     },
     sectionTitle: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: theme.typography.weights.bold,
     },
     section: {
-      gap: 12,
+      gap: 10,
     },
     rowTitle: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      gap: 9,
     },
     rowLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: theme.typography.weights.medium,
     },
     themeSwitch: {
       flexDirection: 'row',
-      gap: 4,
+      gap: 3,
       backgroundColor: theme.colors.surfaceMuted,
-      borderRadius: 20,
+      borderRadius: theme.radii.sm,
       padding: 4,
     },
     themeOption: {
       flex: 1,
-      minHeight: 40,
-      borderRadius: 16,
+      minHeight: 36,
+      borderRadius: theme.radii.xs,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
@@ -124,17 +134,11 @@ export function ProfilePreferencesCard({
     },
     themeOptionActive: {
       backgroundColor: theme.colors.accent,
-      borderWidth: 1.5,
-      borderColor: '#D89B1D',
-      shadowColor: '#D89B1D',
-      shadowOpacity: 0.14,
-      shadowRadius: 10,
-      shadowOffset: {width: 0, height: 2},
     },
     themeLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: theme.typography.weights.medium,
     },
     themeLabelActive: {
@@ -146,18 +150,19 @@ export function ProfilePreferencesCard({
       backgroundColor: theme.colors.border,
     },
     notificationsList: {
-      gap: 10,
+      gap: 8,
     },
     signOutRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
+      minHeight: 44,
     },
     signOutLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: theme.typography.weights.medium,
     },
     signOutButton: {
@@ -173,9 +178,9 @@ export function ProfilePreferencesCard({
   });
 
   const options = [
-    {key: 'light' as const, label: 'Claro', icon: Sun},
-    {key: 'dark' as const, label: 'Oscuro', icon: Moon},
-    {key: 'system' as const, label: 'Sistema', icon: Monitor},
+    { key: 'light' as const, label: 'Claro', icon: Sun },
+    { key: 'dark' as const, label: 'Oscuro', icon: Moon },
+    { key: 'system' as const, label: 'Sistema', icon: Monitor },
   ];
 
   return (
@@ -196,13 +201,18 @@ export function ProfilePreferencesCard({
               <Pressable
                 key={option.key}
                 onPress={() => onChangeMode(option.key)}
-                style={({pressed}) => [
+                style={({ pressed }) => [
                   styles.themeOption,
                   active ? styles.themeOptionActive : null,
-                  pressed ? {opacity: 0.9} : null,
-                ]}>
+                  pressed ? { opacity: 0.9 } : null,
+                ]}
+              >
                 <Icon
-                  color={active ? theme.colors.accentContrast : theme.colors.textSecondary}
+                  color={
+                    active
+                      ? theme.colors.accentContrast
+                      : theme.colors.textSecondary
+                  }
                   size={14}
                   strokeWidth={2}
                 />
@@ -210,7 +220,8 @@ export function ProfilePreferencesCard({
                   style={[
                     styles.themeLabel,
                     active ? styles.themeLabelActive : null,
-                  ]}>
+                  ]}
+                >
                   {option.label}
                 </Text>
               </Pressable>
@@ -229,18 +240,21 @@ export function ProfilePreferencesCard({
         <View style={styles.notificationsList}>
           <NotificationRow
             label="Recordatorios de entreno"
+            description="Avisos para sostener tu semana"
             value={notifications.workouts}
-            onChange={value => onToggleNotifications({workouts: value})}
+            onChange={value => onToggleNotifications({ workouts: value })}
           />
           <NotificationRow
             label="Recordatorios de agua"
+            description="Hidratación y hábitos diarios"
             value={notifications.hydration}
-            onChange={value => onToggleNotifications({hydration: value})}
+            onChange={value => onToggleNotifications({ hydration: value })}
           />
           <NotificationRow
             label="Tips y novedades"
+            description="Mejoras y contenido útil"
             value={notifications.updates}
-            onChange={value => onToggleNotifications({updates: value})}
+            onChange={value => onToggleNotifications({ updates: value })}
           />
         </View>
       </View>
@@ -251,10 +265,11 @@ export function ProfilePreferencesCard({
         <Text style={styles.signOutLabel}>Cerrar sesión</Text>
         <Pressable
           onPress={onSignOut}
-          style={({pressed}) => [
+          style={({ pressed }) => [
             styles.signOutButton,
-            pressed ? {opacity: 0.82} : null,
-          ]}>
+            pressed ? { opacity: 0.82 } : null,
+          ]}
+        >
           <LogOut color="#D55C5C" size={16} strokeWidth={2} />
         </Pressable>
       </View>

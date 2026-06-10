@@ -1,7 +1,7 @@
-import {Sparkles} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Sparkles } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type EllieBriefingCardProps = {
   heroText: string;
@@ -14,19 +14,19 @@ export function EllieBriefingCard({
   insights,
   actionsCount,
 }: EllieBriefingCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      padding: 15,
-      gap: 12,
-      borderRadius: 28,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
+      borderRadius: theme.radii.md,
     },
     row: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
-      gap: 14,
+      gap: 12,
     },
     heroWrap: {
       flex: 1,
@@ -48,7 +48,7 @@ export function EllieBriefingCard({
       fontWeight: theme.typography.weights.semibold,
     },
     summary: {
-      borderRadius: 24,
+      borderRadius: theme.radii.sm,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.background,
@@ -61,7 +61,7 @@ export function EllieBriefingCard({
       fontFamily: theme.typography.monoFamily,
       fontSize: 10,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 2.3,
+      letterSpacing: 0,
       textTransform: 'uppercase',
       textAlign: 'center',
     },
@@ -84,10 +84,9 @@ export function EllieBriefingCard({
     hero: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: theme.typography.weights.bold,
       lineHeight: 26,
-      letterSpacing: -0.5,
       flex: 1,
       marginTop: 10,
     },
@@ -96,7 +95,7 @@ export function EllieBriefingCard({
       alignItems: 'flex-start',
       gap: 10,
       backgroundColor: theme.colors.background,
-      borderRadius: 16,
+      borderRadius: theme.radii.sm,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       paddingHorizontal: 13,
@@ -123,7 +122,11 @@ export function EllieBriefingCard({
       <View style={styles.row}>
         <View style={styles.heroWrap}>
           <View style={styles.badge}>
-            <Sparkles color={theme.colors.textPrimary} size={14} strokeWidth={2} />
+            <Sparkles
+              color={theme.colors.textPrimary}
+              size={14}
+              strokeWidth={2}
+            />
             <Text style={styles.badgeLabel}>Briefing de hoy</Text>
           </View>
           <Text style={styles.hero}>{heroText}</Text>

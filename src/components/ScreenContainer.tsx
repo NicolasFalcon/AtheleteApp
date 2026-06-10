@@ -19,7 +19,7 @@ export function ScreenContainer({
   scrollable = false,
   contentContainerStyle,
 }: ScreenContainerProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -29,9 +29,9 @@ export function ScreenContainer({
     content: {
       flex: 1,
       flexGrow: 1,
-      paddingHorizontal: theme.spacing.lg,
-      paddingVertical: theme.spacing.xl,
-      gap: theme.spacing.lg,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.md,
+      gap: theme.spacing.md,
     },
   });
 
@@ -41,7 +41,8 @@ export function ScreenContainer({
         <ScrollView
           contentContainerStyle={[styles.content, contentContainerStyle]}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+        >
           {children}
         </ScrollView>
       </SafeAreaView>

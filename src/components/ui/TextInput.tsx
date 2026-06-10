@@ -26,7 +26,7 @@ export function AppTextInput({
   inputStyle,
   ...props
 }: AppTextInputProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     container: {
@@ -37,11 +37,9 @@ export function AppTextInput({
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.bodySm,
       fontWeight: theme.typography.weights.medium,
-      textTransform: 'uppercase',
-      letterSpacing: 0.7,
     },
     inputWrapper: {
-      minHeight: 54,
+      minHeight: 50,
       borderRadius: theme.radii.md,
       paddingHorizontal: theme.spacing.md,
       borderWidth: StyleSheet.hairlineWidth,
@@ -53,7 +51,7 @@ export function AppTextInput({
     },
     input: {
       flex: 1,
-      minHeight: 54,
+      minHeight: 50,
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.body,
@@ -78,7 +76,9 @@ export function AppTextInput({
           style={[styles.input, inputStyle]}
           {...props}
         />
-        {rightAccessory ? <View style={styles.rightAccessory}>{rightAccessory}</View> : null}
+        {rightAccessory ? (
+          <View style={styles.rightAccessory}>{rightAccessory}</View>
+        ) : null}
       </View>
       {error || hint ? <Text style={styles.hint}>{error ?? hint}</Text> : null}
     </View>

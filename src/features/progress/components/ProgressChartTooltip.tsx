@@ -1,5 +1,5 @@
-import {StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type ProgressChartTooltipProps = {
   title: string;
@@ -10,23 +10,23 @@ export function ProgressChartTooltip({
   title,
   lines,
 }: ProgressChartTooltipProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     tooltip: {
       minWidth: 72,
       maxWidth: 120,
-      borderRadius: 14,
+      borderRadius: theme.radii.sm,
       paddingHorizontal: 10,
       paddingVertical: 9,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       shadowColor: '#000000',
-      shadowOpacity: 0.08,
-      shadowRadius: 16,
-      shadowOffset: {width: 0, height: 6},
-      elevation: 3,
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
       gap: 2,
     },
     title: {

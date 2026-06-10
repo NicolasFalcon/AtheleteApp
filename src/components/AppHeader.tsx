@@ -1,3 +1,4 @@
+import { ArrowLeft } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '@app/hooks/useAppTheme';
@@ -14,31 +15,26 @@ export function AppHeader({
   showBackButton = false,
 }: AppHeaderProps) {
   const navigation = useNavigation();
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     container: {
-      gap: theme.spacing.sm,
+      gap: theme.spacing.xs,
     },
     backButton: {
       alignSelf: 'flex-start',
-      paddingVertical: theme.spacing.xs,
-      paddingHorizontal: theme.spacing.sm,
-      borderRadius: theme.radii.pill,
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 20,
       backgroundColor: theme.colors.surfaceMuted,
-    },
-    backLabel: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      fontWeight: theme.typography.weights.medium,
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.display,
+      fontSize: theme.typography.sizes.title,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -1,
     },
     subtitle: {
       color: theme.colors.textSecondary,
@@ -51,8 +47,15 @@ export function AppHeader({
   return (
     <View style={styles.container}>
       {showBackButton && navigation.canGoBack() ? (
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backLabel}>Volver</Text>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <ArrowLeft
+            color={theme.colors.textPrimary}
+            size={20}
+            strokeWidth={2}
+          />
         </Pressable>
       ) : null}
       <Text style={styles.title}>{title}</Text>

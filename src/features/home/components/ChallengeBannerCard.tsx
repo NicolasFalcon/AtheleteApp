@@ -1,4 +1,4 @@
-import {ArrowRight} from 'lucide-react-native';
+import { ArrowRight } from 'lucide-react-native';
 import {
   ImageBackground,
   Pressable,
@@ -6,8 +6,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import {Button, ProgressBar} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { Button, ProgressBar } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 const challengeBannerImage = {
   uri: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1200&q=80',
@@ -30,20 +30,20 @@ export function ChallengeBannerCard({
   challenge,
   onPress,
 }: ChallengeBannerCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
   const activeChallenge = challenge;
   const isActive = Boolean(activeChallenge);
   const isCompleted = activeChallenge?.status === 'completed';
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: theme.radii.lg,
+      borderRadius: theme.radii.md,
       overflow: 'hidden',
       backgroundColor: '#0B0B0B',
       ...theme.elevations.card,
     },
     background: {
-      minHeight: 244,
+      minHeight: 214,
       justifyContent: 'center',
     },
     overlay: {
@@ -52,7 +52,7 @@ export function ChallengeBannerCard({
     },
     content: {
       padding: theme.spacing.md,
-      gap: theme.spacing.sm,
+      gap: theme.spacing.xs,
     },
     topRow: {
       flexDirection: 'row',
@@ -89,15 +89,14 @@ export function ChallengeBannerCard({
     title: {
       color: '#FFFFFF',
       fontFamily: theme.typography.fontFamily,
-      fontSize: 20,
+      fontSize: 19,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.6,
     },
     subtitle: {
       color: 'rgba(255,255,255,0.68)',
       fontFamily: theme.typography.fontFamily,
       fontSize: 14,
-      lineHeight: 18,
+      lineHeight: 20,
     },
     pillsRow: {
       flexDirection: 'row',
@@ -136,7 +135,8 @@ export function ChallengeBannerCard({
     <ImageBackground
       source={challengeBannerImage}
       imageStyle={styles.card}
-      style={styles.card}>
+      style={styles.card}
+    >
       <View style={styles.overlay} />
       <Pressable onPress={onPress} style={styles.content}>
         <View style={styles.topRow}>
@@ -155,7 +155,9 @@ export function ChallengeBannerCard({
         {!isActive ? (
           <>
             <Text style={styles.title}>3 hábitos. 33 días.</Text>
-            <Text style={styles.subtitle}>Disciplina real, un día a la vez.</Text>
+            <Text style={styles.subtitle}>
+              Disciplina real, un día a la vez.
+            </Text>
           </>
         ) : (
           <>
@@ -166,10 +168,17 @@ export function ChallengeBannerCard({
             </Text>
             <Text style={styles.subtitle}>
               {isCompleted
-                ? `Terminaste el reto con ${activeChallenge!.completedDays} días cerrados.`
-                : activeChallenge!.completedToday === activeChallenge!.totalHabits
-                ? `Hoy ya completaste tus ${activeChallenge!.totalHabits} hábitos.`
-                : `Hoy llevas ${activeChallenge!.completedToday} de ${activeChallenge!.totalHabits} hábitos.`}
+                ? `Terminaste el reto con ${
+                    activeChallenge!.completedDays
+                  } días cerrados.`
+                : activeChallenge!.completedToday ===
+                  activeChallenge!.totalHabits
+                ? `Hoy ya completaste tus ${
+                    activeChallenge!.totalHabits
+                  } hábitos.`
+                : `Hoy llevas ${activeChallenge!.completedToday} de ${
+                    activeChallenge!.totalHabits
+                  } hábitos.`}
             </Text>
             <ProgressBar
               value={isCompleted ? 100 : activeChallenge!.progressPct}
@@ -179,17 +188,15 @@ export function ChallengeBannerCard({
             <View style={styles.pillsRow}>
               <View style={styles.pill}>
                 <Text style={styles.pillLabel}>
-                  {isCompleted ? '100% completado' : `${activeChallenge!.progressPct}% completado`}
+                  {isCompleted
+                    ? '100% completado'
+                    : `${activeChallenge!.progressPct}% completado`}
                 </Text>
               </View>
               <View style={styles.pill}>
                 <Text style={styles.pillLabel}>
-                  {activeChallenge!.completedDays} días cerrados
-                </Text>
-              </View>
-              <View style={styles.pill}>
-                <Text style={styles.pillLabel}>
-                  Racha actual: {activeChallenge!.streak} días
+                  {activeChallenge!.completedDays} días · Racha{' '}
+                  {activeChallenge!.streak}
                 </Text>
               </View>
             </View>
@@ -201,8 +208,8 @@ export function ChallengeBannerCard({
             !isActive
               ? 'Comenzar reto'
               : isCompleted
-                ? 'Ver reto'
-                : 'Continuar reto'
+              ? 'Ver reto'
+              : 'Continuar reto'
           }
           onPress={onPress}
           fullWidth={false}

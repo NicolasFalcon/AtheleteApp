@@ -1,6 +1,7 @@
 import type {DailyNutritionLog, NutritionPlan} from '@app/shared';
 import {getLocalDateKey} from '@app/lib/date';
 import {getSupabaseClient} from '@app/services/supabase/client';
+import {awardGamificationEvent} from '@app/services/supabase/gamification';
 import type {Database} from '@app/types/supabase';
 
 type NutritionPlanRow = Database['public']['Tables']['nutrition_plans']['Row'];
@@ -16,6 +17,14 @@ export type NutritionPlanDetails = NutritionPlan & {
 export type NutritionPlanScreenData = {
   plan: NutritionPlanDetails | null;
   todayLog: DailyNutritionLog | null;
+};
+
+export type NutritionLogInput = {
+  calories: number;
+  protein: number;
+  carbs?: number;
+  fats?: number;
+  adherence?: number;
 };
 
 function getClient() {
@@ -107,4 +116,101 @@ export async function deactivateNutritionPlan(userId: string): Promise<void> {
   if (error) {
     throw error;
   }
+}
+
+export async function upsertTodayNutritionLog(
+  userId: string,
+  input: NutritionLogInput,
+): Promise<DailyNutritionLog> {
+  const client = getClient();
+  const today = getLocalDateKey();
+
+  const payload: Database['public']['Tables']['daily_nutrition_logs']['Update'] =
+    {
+      calories: input.calories,
+      protein: input.protein,
+      carbs: input.carbs ?? null,
+      fats: input.fats ?? null,
+      adherence: input.adherence ?? null,
+    };
+
+  const {data: existing, error: fetchError} = await client
+    .from('daily_nutrition_logs')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .maybeSingle();
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
+  const existingLog = (existing as DailyNutritionLogRow | null) || null;
+
+  if (existingLog) {
+    const {data, error} = await (client
+      .from('daily_nutrition_logs') as any)
+      .update(payload)
+      .eq('id', existingLog.id)
+      .eq('user_id', userId)
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message || 'No pudimos actualizar tu nutrición.');
+    }
+
+    const log = mapDailyNutritionLog(data as DailyNutritionLogRow);
+    await awardGamificationEvent({
+      userId,
+      eventKey: `nutrition_logged:${today}`,
+      eventType: 'nutrition_logged',
+      points: 10,
+      metadata: {
+        date: today,
+        calories: log.calories,
+        protein: log.protein,
+        updatedExisting: true,
+      },
+    });
+
+    return log;
+  }
+
+  const insertPayload: Database['public']['Tables']['daily_nutrition_logs']['Insert'] =
+    {
+      user_id: userId,
+      date: today,
+      calories: input.calories,
+      protein: input.protein,
+      carbs: input.carbs ?? null,
+      fats: input.fats ?? null,
+      adherence: input.adherence ?? null,
+    };
+
+  const {data, error} = await (client
+    .from('daily_nutrition_logs') as any)
+    .insert(insertPayload)
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message || 'No pudimos registrar tu nutrición.');
+  }
+
+  const log = mapDailyNutritionLog(data as DailyNutritionLogRow);
+  await awardGamificationEvent({
+    userId,
+    eventKey: `nutrition_logged:${today}`,
+    eventType: 'nutrition_logged',
+    points: 10,
+    metadata: {
+      date: today,
+      calories: log.calories,
+      protein: log.protein,
+      updatedExisting: false,
+    },
+  });
+
+  return log;
 }

@@ -4,17 +4,22 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   ArrowLeft,
+  BookOpen,
   ChevronRight,
+  Heart,
   Plus,
 } from 'lucide-react-native';
 import {Button, Chip, EmptyState, Loader} from '@app/components/ui';
 import {
   HOME_ROUTES,
+  PROGRESS_ROUTES,
+  TAB_ROUTES,
   WORKOUTS_ROUTES,
 } from '@app/constants/routes';
 import {ExercisePrSummaryCard} from '@app/features/pr/components/ExercisePrSummaryCard';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
+import {useFavoriteExercises} from '@app/hooks/useFavoriteExercises';
 import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
 import {useWorkoutLibrary} from '@app/hooks/useWorkoutLibrary';
 import {
@@ -70,6 +75,7 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
   const insets = useSafeAreaInsets();
   const [imageFailed, setImageFailed] = useState(false);
   const exercisesQuery = useExerciseLibrary();
+  const exerciseFavorites = useFavoriteExercises();
   const personalRecordsQuery = usePersonalRecords(route.params.exerciseId);
   const workoutsQuery = useWorkoutLibrary();
   const exercise = useMemo(
@@ -117,9 +123,8 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.bodySm,
     },
-    floatingButton: {
+    floatingButtonBase: {
       position: 'absolute',
-      left: theme.spacing.lg,
       width: 42,
       height: 42,
       borderRadius: 21,
@@ -128,6 +133,12 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
       backgroundColor: 'rgba(255,255,255,0.82)',
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
+    },
+    floatingBackButton: {
+      left: theme.spacing.lg,
+    },
+    floatingFavoriteButton: {
+      right: theme.spacing.lg,
     },
     content: {
       paddingHorizontal: theme.spacing.lg,
@@ -207,6 +218,32 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.bodySm,
     },
+    articleLink: {
+      marginTop: theme.spacing.sm,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.surfaceMuted,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing.sm,
+    },
+    articleLinkCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    articleLinkTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.bodySm,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    articleLinkSubtitle: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.caption,
+    },
     workoutLink: {
       borderRadius: theme.radii.md,
       backgroundColor: theme.colors.surfaceMuted,
@@ -240,6 +277,7 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
   if (
     exercisesQuery.isLoading ||
     workoutsQuery.isLoading ||
+    !exerciseFavorites.loaded ||
     personalRecordsQuery.isLoading
   ) {
     return (
@@ -262,6 +300,15 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
   )
     ? WORKOUTS_ROUTES.AddExerciseToRoutine
     : HOME_ROUTES.AddExerciseToRoutine;
+
+  const openProgressiveOverloadArticle = () => {
+    const parentNavigation = navigation.getParent() as any;
+
+    parentNavigation?.navigate(TAB_ROUTES.Progress, {
+      screen: PROGRESS_ROUTES.BodyScienceArticle,
+      params: {articleId: 'progressive-overload'},
+    });
+  };
 
   if (!exercise) {
     return (
@@ -294,9 +341,35 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
         )}
         <Pressable
           onPress={() => navigation.goBack()}
-          style={[styles.floatingButton, {top: insets.top + 10}]}>
+          style={[
+            styles.floatingButtonBase,
+            styles.floatingBackButton,
+            {top: insets.top + 10},
+          ]}>
           <ArrowLeft color={theme.colors.textPrimary} size={18} strokeWidth={2.2} />
         </Pressable>
+        {exercise ? (
+          <Pressable
+            onPress={() => {
+              exerciseFavorites.toggleExerciseFavorite(exercise.id).catch(() => {});
+            }}
+            style={[
+              styles.floatingButtonBase,
+              styles.floatingFavoriteButton,
+              {top: insets.top + 10},
+            ]}>
+            <Heart
+              color={theme.colors.textPrimary}
+              fill={
+                exerciseFavorites.isExerciseFavorite(exercise.id)
+                  ? theme.colors.textPrimary
+                  : 'transparent'
+              }
+              size={18}
+              strokeWidth={2.2}
+            />
+          </Pressable>
+        ) : null}
       </View>
 
       <ScrollView
@@ -402,6 +475,27 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
               {exercise.recommendations.endurance.reps}
             </Text>
           </View>
+          <Pressable
+            onPress={openProgressiveOverloadArticle}
+            style={({pressed}) => [
+              styles.articleLink,
+              pressed ? {opacity: 0.88} : null,
+            ]}>
+            <BookOpen
+              color={theme.colors.textPrimary}
+              size={18}
+              strokeWidth={2.1}
+            />
+            <View style={styles.articleLinkCopy}>
+              <Text style={styles.articleLinkTitle}>
+                Aprende sobre sobrecarga progresiva
+              </Text>
+              <Text style={styles.articleLinkSubtitle}>
+                Ciencia del cuerpo · 4 min de lectura
+              </Text>
+            </View>
+            <ChevronRight color={theme.colors.textSecondary} size={18} />
+          </Pressable>
         </SectionCard>
 
         {relatedWorkouts.length > 0 ? (

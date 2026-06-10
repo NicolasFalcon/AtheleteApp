@@ -1,12 +1,12 @@
-import {useMemo} from 'react';
-import {ChevronRight, Trophy} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {formatPRValue, type PersonalRecord} from '@app/shared';
+import { useMemo } from 'react';
+import { ChevronRight, Trophy } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { formatPRValue, type PersonalRecord } from '@app/shared';
 
 type PersonalRecordsCardProps = {
-  records: Array<PersonalRecord & {exerciseName: string}>;
+  records: Array<PersonalRecord & { exerciseName: string }>;
   onOpen: (exerciseId?: string, exerciseName?: string) => void;
 };
 
@@ -14,10 +14,13 @@ export function PersonalRecordsCard({
   records,
   onOpen,
 }: PersonalRecordsCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const summaries = useMemo(() => {
-    const groups = new Map<string, Array<PersonalRecord & {exerciseName: string}>>();
+    const groups = new Map<
+      string,
+      Array<PersonalRecord & { exerciseName: string }>
+    >();
 
     records.forEach(record => {
       const current = groups.get(record.exerciseId) || [];
@@ -47,7 +50,7 @@ export function PersonalRecordsCard({
   const styles = StyleSheet.create({
     card: {
       padding: 16,
-      borderRadius: 24,
+      borderRadius: theme.radii.md,
       gap: 12,
     },
     header: {
@@ -60,7 +63,6 @@ export function PersonalRecordsCard({
       fontFamily: theme.typography.fontFamily,
       fontSize: 15,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.3,
     },
     list: {
       gap: 2,
@@ -121,7 +123,8 @@ export function PersonalRecordsCard({
 
       {summaries.length === 0 ? (
         <Text style={styles.emptyText}>
-          Cuando registres tus primeros PRs, aparecerán aquí con sus mejores marcas y accesos rápidos al historial.
+          Cuando registres tus primeros PRs, aparecerán aquí con sus mejores
+          marcas y accesos rápidos al historial.
         </Text>
       ) : (
         <View style={styles.list}>
@@ -131,14 +134,19 @@ export function PersonalRecordsCard({
               <Pressable
                 key={summary.exerciseId}
                 onPress={() => onOpen(summary.exerciseId, summary.exerciseName)}
-                style={({pressed}) => [
+                style={({ pressed }) => [
                   styles.row,
                   isLast ? styles.rowLast : null,
-                  pressed ? {opacity: 0.86} : null,
-                ]}>
+                  pressed ? { opacity: 0.86 } : null,
+                ]}
+              >
                 <View style={styles.textGroup}>
-                  <Text style={styles.exerciseName}>{summary.exerciseName}</Text>
-                  <Text style={styles.value}>{formatPRValue(summary.latest)}</Text>
+                  <Text style={styles.exerciseName}>
+                    {summary.exerciseName}
+                  </Text>
+                  <Text style={styles.value}>
+                    {formatPRValue(summary.latest)}
+                  </Text>
                 </View>
                 <View style={styles.rightMeta}>
                   <Text style={styles.count}>

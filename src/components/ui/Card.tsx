@@ -6,14 +6,14 @@ type CardProps = PropsWithChildren<{
   style?: StyleProp<ViewStyle>;
 }>;
 
-export function Card({children, style}: CardProps) {
-  const {theme} = useAppTheme();
+export function Card({ children, style }: CardProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: theme.radii.lg,
-      padding: theme.spacing.lg,
-      gap: theme.spacing.md,
+      borderRadius: theme.radii.md,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,

@@ -1,4 +1,5 @@
 import {getLocalDateKey} from '@app/lib/date';
+import {awardGamificationEvent} from '@app/services/supabase/gamification';
 import {
   calculateHydrationStreak,
   dedupeFeaturedTemplates,
@@ -148,6 +149,25 @@ function calculateWorkoutSessionCalories(
   return Math.round(
     (workout.calories * completedExercises.length) / workout.exercises.length,
   );
+}
+
+async function getCompletedWorkoutCountThisWeek(userId: string) {
+  const client = getClient();
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  const weekStartKey = getLocalDateKey(weekStart);
+
+  const {count, error} = await (client.from('workout_sessions') as any)
+    .select('id', {count: 'exact', head: true})
+    .eq('user_id', userId)
+    .eq('completed', true)
+    .gte('date', weekStartKey);
+
+  if (error) {
+    throw error;
+  }
+
+  return count || 0;
 }
 
 function mapNutritionPlan(row: NutritionPlanRow): NutritionPlan {
@@ -459,7 +479,30 @@ export async function completeWorkoutSession(params: {
     throw error;
   }
 
-  return mapWorkoutSession(data as WorkoutSessionRow);
+  const nextSession = mapWorkoutSession(data as WorkoutSessionRow);
+  const completedThisWeek = await getCompletedWorkoutCountThisWeek(
+    params.session.userId,
+  );
+
+  await awardGamificationEvent({
+    userId: params.session.userId,
+    eventKey: `workout_completed:${params.session.id}`,
+    eventType: 'workout_completed',
+    points: 50,
+    badgeIds: [
+      'first_workout',
+      ...(completedThisWeek >= 3 ? (['week_consistency'] as const) : []),
+    ],
+    metadata: {
+      sessionId: params.session.id,
+      workoutId: params.workout.id,
+      workoutTitle: params.workout.title,
+      completedExercises: params.completedExercises.length,
+      completedThisWeek,
+    },
+  });
+
+  return nextSession;
 }
 
 export async function cancelWorkoutSession(params: {

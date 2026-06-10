@@ -4,15 +4,18 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type PropsWithChildren,
 } from 'react';
+import { Linking } from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 import {
   registerWithEmail,
   sendPasswordReset,
   signInWithEmail,
   signOut as signOutService,
+  updatePassword,
 } from '@app/services/supabase/auth';
 import {
   getSupabaseClient,
@@ -22,6 +25,7 @@ import {
   fetchProfile,
   updateOnboardingProfile,
 } from '@app/services/supabase/profile';
+import {parsePasswordRecoveryUrl} from '@app/lib/auth/passwordRecoveryUrl';
 import type {
   AppFlow,
   OnboardingData,
@@ -39,6 +43,11 @@ type AuthContextValue = {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
+  recoverPasswordSessionFromUrl: (url: string) => Promise<boolean>;
+  updateRecoveredPassword: (password: string) => Promise<void>;
+  finishPasswordRecovery: () => Promise<void>;
+  isPasswordRecoveryActive: boolean;
+  passwordRecoveryError: string;
   updateOnboardingDraft: (patch: Partial<OnboardingData>) => void;
   resetOnboardingDraft: () => void;
   completeOnboarding: (data: OnboardingData) => Promise<void>;
@@ -81,12 +90,37 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
   const [flow, setFlow] = useState<AppFlow>('auth');
   const [isHydrating, setIsHydrating] = useState(true);
+  const [isPasswordRecoveryActive, setIsPasswordRecoveryActive] = useState(false);
+  const [passwordRecoveryError, setPasswordRecoveryError] = useState('');
+  const handledRecoveryUrls = useRef(new Set<string>());
+  const passwordRecoveryInFlight = useRef(false);
+  const passwordRecoveryActive = useRef(false);
+
+  const activatePasswordRecovery = useCallback(
+    (nextSession: Session | null, errorMessage = '') => {
+      if (nextSession) {
+        setSession(nextSession);
+      }
+
+      setProfile(null);
+      setOnboardingDraft({});
+      setFlow('auth');
+      passwordRecoveryActive.current = true;
+      setIsPasswordRecoveryActive(true);
+      setPasswordRecoveryError(errorMessage);
+      setIsHydrating(false);
+    },
+    [],
+  );
 
   const clearAuthState = useCallback(() => {
     setSession(null);
     setProfile(null);
     setOnboardingDraft({});
     setFlow('auth');
+    passwordRecoveryActive.current = false;
+    setIsPasswordRecoveryActive(false);
+    setPasswordRecoveryError('');
   }, []);
 
   const hydrateProfile = useCallback(
@@ -129,6 +163,71 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [clearAuthState, hydrateProfile],
   );
 
+  const recoverPasswordSessionFromUrl = useCallback(
+    async (url: string) => {
+      const client = getSupabaseClient();
+
+      if (!client || handledRecoveryUrls.current.has(url)) {
+        return false;
+      }
+
+      const recoveryUrl = parsePasswordRecoveryUrl(url);
+
+      if (!recoveryUrl.isRecoveryUrl) {
+        return false;
+      }
+
+      handledRecoveryUrls.current.add(url);
+      passwordRecoveryInFlight.current = true;
+      setIsHydrating(true);
+
+      try {
+        if (recoveryUrl.credentials?.type === 'tokens') {
+          const {data, error} = await client.auth.setSession({
+            access_token: recoveryUrl.credentials.accessToken,
+            refresh_token: recoveryUrl.credentials.refreshToken,
+          });
+
+          if (error) {
+            throw error;
+          }
+
+          activatePasswordRecovery(data.session, '');
+          return true;
+        }
+
+        if (recoveryUrl.credentials?.type === 'code') {
+          const {data, error} = await client.auth.exchangeCodeForSession(
+            recoveryUrl.credentials.code,
+          );
+
+          if (error) {
+            throw error;
+          }
+
+          activatePasswordRecovery(data.session, '');
+          return true;
+        }
+
+        activatePasswordRecovery(
+          null,
+          'El enlace de recuperación no incluye una sesión válida. Solicita un nuevo enlace.',
+        );
+        return true;
+      } catch {
+        activatePasswordRecovery(
+          null,
+          'El enlace de recuperación expiró o ya fue usado. Solicita un nuevo enlace.',
+        );
+        return true;
+      } finally {
+        passwordRecoveryInFlight.current = false;
+        setIsHydrating(false);
+      }
+    },
+    [activatePasswordRecovery],
+  );
+
   useEffect(() => {
     const client = getSupabaseClient();
 
@@ -150,6 +249,13 @@ export function AuthProvider({ children }: PropsWithChildren) {
           return;
         }
 
+        if (
+          passwordRecoveryInFlight.current ||
+          passwordRecoveryActive.current
+        ) {
+          return;
+        }
+
         if (initialSession) {
           await hydrateProfile(initialSession);
         } else {
@@ -160,7 +266,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
           clearAuthState();
         }
       } finally {
-        if (!cancelled) {
+        if (!cancelled && !passwordRecoveryInFlight.current) {
           setIsHydrating(false);
         }
       }
@@ -184,6 +290,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
         return;
       }
 
+      if (passwordRecoveryActive.current && nextSession) {
+        setSession(nextSession);
+        return;
+      }
+
+      if (
+        (event === 'PASSWORD_RECOVERY' || passwordRecoveryInFlight.current) &&
+        nextSession
+      ) {
+        activatePasswordRecovery(nextSession, '');
+        return;
+      }
+
       syncSessionState(nextSession);
     });
 
@@ -191,7 +310,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [clearAuthState, hydrateProfile, syncSessionState]);
+  }, [
+    activatePasswordRecovery,
+    clearAuthState,
+    hydrateProfile,
+    syncSessionState,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    Linking.getInitialURL()
+      .then(url => {
+        if (!cancelled && url) {
+          recoverPasswordSessionFromUrl(url).catch(() => undefined);
+        }
+      })
+      .catch(() => undefined);
+
+    const subscription = Linking.addEventListener('url', event => {
+      recoverPasswordSessionFromUrl(event.url).catch(() => undefined);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, [recoverPasswordSessionFromUrl]);
 
   const refreshProfile = useCallback(async () => {
     if (!session) {
@@ -236,6 +381,33 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
+  const updateRecoveredPassword = useCallback(
+    async (password: string) => {
+      if (!session || !isPasswordRecoveryActive) {
+        throw new Error(
+          'No hay una sesión de recuperación activa. Solicita un nuevo enlace.',
+        );
+      }
+
+      const {error} = await updatePassword(password);
+
+      if (error) {
+        throw error;
+      }
+    },
+    [isPasswordRecoveryActive, session],
+  );
+
+  const finishPasswordRecovery = useCallback(async () => {
+    const {error} = await signOutService();
+
+    if (error) {
+      throw error;
+    }
+
+    clearAuthState();
+  }, [clearAuthState]);
+
   const updateOnboardingDraft = useCallback(
     (patch: Partial<OnboardingData>) => {
       setOnboardingDraft(current => ({
@@ -273,6 +445,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setProfile(null);
     setOnboardingDraft({});
     setFlow('auth');
+    passwordRecoveryActive.current = false;
+    setIsPasswordRecoveryActive(false);
+    setPasswordRecoveryError('');
   }, []);
 
   const value = useMemo(
@@ -287,6 +462,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       signIn,
       signUp,
       requestPasswordReset,
+      recoverPasswordSessionFromUrl,
+      updateRecoveredPassword,
+      finishPasswordRecovery,
+      isPasswordRecoveryActive,
+      passwordRecoveryError,
       updateOnboardingDraft,
       resetOnboardingDraft,
       completeOnboarding,
@@ -299,12 +479,17 @@ export function AuthProvider({ children }: PropsWithChildren) {
       onboardingDraft,
       profile,
       refreshProfile,
+      recoverPasswordSessionFromUrl,
       requestPasswordReset,
       resetOnboardingDraft,
       session,
       signIn,
       signOut,
       signUp,
+      finishPasswordRecovery,
+      isPasswordRecoveryActive,
+      passwordRecoveryError,
+      updateRecoveredPassword,
       updateOnboardingDraft,
     ],
   );

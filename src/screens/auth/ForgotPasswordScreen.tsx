@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { EmailIcon, SuccessIcon } from '@app/assets/icons';
+import { AuthButton } from '@app/components/auth/AuthButton';
 import { BrandHeader } from '@app/components/auth/BrandHeader';
 import { AuthScreenLayout } from '@app/components/auth/AuthScreenLayout';
+import { AuthTextField } from '@app/components/auth/AuthTextField';
 import { FormMessage } from '@app/components/auth/FormMessage';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
-import { env } from '@app/lib/config/env';
 import type { AuthStackParamList } from '@app/types/navigation';
-import { AppTextInput, Button } from '@app/components/ui';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
 
@@ -24,24 +25,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  const styles = StyleSheet.create({
-    successIcon: {
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: theme.colors.surfaceMuted,
-      alignItems: 'center',
-      justifyContent: 'center',
-      alignSelf: 'center',
-    },
-    successEmoji: {
-      fontSize: 28,
-    },
-    successBody: {
-      gap: theme.spacing.lg,
-    },
-  });
+  const styles = createStyles(theme);
 
   const handleSubmit = async () => {
     setError('');
@@ -70,26 +54,27 @@ export function ForgotPasswordScreen({ navigation }: Props) {
   if (sent) {
     return (
       <AuthScreenLayout
+        centered
         footer={
-          <Button
+          <AuthButton
             label="Volver a iniciar sesión"
             onPress={() => navigation.navigate(AUTH_ROUTES.Login)}
-            variant="outline"
+            variant="secondary"
           />
         }
         header={
           <BrandHeader
             compact
-            subtitle="Te enviamos un enlace para restablecer tu contraseña."
+            subtitle="Abre el enlace desde este dispositivo para crear tu nueva contraseña en Athelete."
             title="Revisa tu bandeja de entrada"
           />
         }
-        onBack={() => navigation.navigate(AUTH_ROUTES.Login)}>
+        onBack={() => navigation.navigate(AUTH_ROUTES.Login)}
+      >
         <View style={styles.successBody}>
-          <View style={styles.successIcon}>
-            <Text style={styles.successEmoji}>✉️</Text>
-          </View>
+          <SuccessIcon color={theme.colors.textPrimary} />
           <FormMessage
+            appearance="dark"
             message={`Enviamos un enlace de recuperación a ${email}.`}
             tone="success"
           />
@@ -105,26 +90,24 @@ export function ForgotPasswordScreen({ navigation }: Props) {
         <BrandHeader
           compact
           subtitle="Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña."
-          title="Recuperar contraseña"
+          title="¿Olvidaste tu contraseña?"
         />
       }
-      onBack={() => navigation.goBack()}>
-      {error ? <FormMessage message={error} tone="error" /> : null}
+      onBack={() => navigation.goBack()}
+    >
+      {error ? (
+        <FormMessage appearance="dark" message={error} tone="error" />
+      ) : null}
       {!isSupabaseConfigured ? (
         <FormMessage
+          appearance="dark"
           message="Supabase no está configurado todavía. Agrega SUPABASE_URL y SUPABASE_ANON_KEY en .env para habilitar este flujo."
           tone="neutral"
         />
       ) : null}
-      {isSupabaseConfigured && env.supabase.passwordResetUrl ? (
-        <FormMessage
-          message="Por ahora el enlace de recuperación redirige al flujo web de restablecimiento. El deep link nativo puede agregarse después."
-          tone="neutral"
-        />
-      ) : null}
-      <AppTextInput
+      <AuthTextField
         autoCapitalize="none"
-        autoCorrect={false}
+        icon={<EmailIcon color={theme.colors.textSecondary} />}
         keyboardType="email-address"
         label="Correo electrónico"
         onChangeText={setEmail}
@@ -132,11 +115,22 @@ export function ForgotPasswordScreen({ navigation }: Props) {
         textContentType="emailAddress"
         value={email}
       />
-      <Button
-        label={submitting ? 'Enviando…' : 'Enviar enlace de recuperación'}
+      <AuthButton
+        label={submitting ? 'Enviando…' : 'Enviar enlace'}
         loading={submitting}
         onPress={handleSubmit}
       />
     </AuthScreenLayout>
   );
+}
+
+type Theme = ReturnType<typeof useAppTheme>['theme'];
+
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    successBody: {
+      alignItems: 'center',
+      gap: theme.spacing.xl,
+    },
+  });
 }

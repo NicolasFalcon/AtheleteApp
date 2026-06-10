@@ -2,6 +2,7 @@ import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {HOME_ROUTES} from '@app/constants/routes';
 import {PersonalRecordsScreen} from '@app/screens/home/PersonalRecordsScreen';
 import {NutritionPlanScreen} from '@app/screens/nutrition/NutritionPlanScreen';
+import {NotificationsScreen} from '@app/screens/home/NotificationsScreen';
 import {RegisterPrScreen} from '@app/screens/pr/RegisterPrScreen';
 import {QuizLandingScreen} from '@app/screens/home/QuizLandingScreen';
 import {QuizQuestionScreen} from '@app/screens/quiz/QuizQuestionScreen';
@@ -21,6 +22,10 @@ export function HomeStackNavigator() {
   return (
     <Stack.Navigator screenOptions={{headerShown: false}}>
       <Stack.Screen name={HOME_ROUTES.Home} component={HomeScreen} />
+      <Stack.Screen
+        name={HOME_ROUTES.Notifications}
+        component={NotificationsScreen}
+      />
       <Stack.Screen
         name={HOME_ROUTES.Challenge}
         component={ChallengeScreen}

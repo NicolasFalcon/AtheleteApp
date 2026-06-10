@@ -1,4 +1,5 @@
 import {getSupabaseClient} from '@app/services/supabase/client';
+import {awardGamificationEvent} from '@app/services/supabase/gamification';
 
 export type EllieGeneratedExercise = {
   name: string;
@@ -148,6 +149,8 @@ export async function saveEllieNutritionPlan(
       };
     }
 
+    await awardEllieNutritionPlanActivation(userId, String(data.id));
+
     return {
       success: true,
       planId: String(data.id),
@@ -161,4 +164,21 @@ export async function saveEllieNutritionPlan(
           : 'No pudimos activar el plan nutricional.',
     };
   }
+}
+
+export async function awardEllieNutritionPlanActivation(
+  userId: string,
+  planId: string,
+) {
+  await awardGamificationEvent({
+    userId,
+    eventKey: `nutrition_plan_activated:${planId}`,
+    eventType: 'nutrition_plan_activated',
+    points: 40,
+    badgeIds: ['nutrition_started'],
+    metadata: {
+      planId,
+      source: 'ellie',
+    },
+  });
 }

@@ -1,15 +1,15 @@
-import {Sparkles} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {EllieUiMessage} from '@app/hooks/useEllieChat';
-import {EllieRichTextMessage} from '@app/features/ellie/components/EllieRichTextMessage';
+import { Sparkles } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { EllieUiMessage } from '@app/hooks/useEllieChat';
+import { EllieRichTextMessage } from '@app/features/ellie/components/EllieRichTextMessage';
 
 type EllieMessageBubbleProps = {
   message: EllieUiMessage;
 };
 
-export function EllieMessageBubble({message}: EllieMessageBubbleProps) {
-  const {theme} = useAppTheme();
+export function EllieMessageBubble({ message }: EllieMessageBubbleProps) {
+  const { theme } = useAppTheme();
   const isAssistant = message.role === 'assistant';
 
   const styles = StyleSheet.create({
@@ -17,39 +17,39 @@ export function EllieMessageBubble({message}: EllieMessageBubbleProps) {
       alignItems: isAssistant ? 'flex-start' : 'flex-end',
     },
     bubble: {
-      maxWidth: isAssistant ? '86%' : '80%',
-      borderRadius: 24,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      backgroundColor: isAssistant
-        ? theme.colors.surface
-        : theme.colors.accent,
+      maxWidth: isAssistant ? '88%' : '82%',
+      borderRadius: 18,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: isAssistant ? theme.colors.surface : theme.colors.accent,
       borderWidth: isAssistant ? StyleSheet.hairlineWidth : 0,
       borderColor: theme.colors.border,
       shadowColor: isAssistant ? '#000000' : 'transparent',
       shadowOpacity: isAssistant ? 0.04 : 0,
       shadowRadius: isAssistant ? 12 : 0,
-      shadowOffset: isAssistant ? {width: 0, height: 6} : {width: 0, height: 0},
+      shadowOffset: isAssistant
+        ? { width: 0, height: 6 }
+        : { width: 0, height: 0 },
       elevation: isAssistant ? 1 : 0,
     },
     bubbleAssistant: {
-      borderBottomLeftRadius: 14,
+      borderBottomLeftRadius: 6,
     },
     bubbleUser: {
-      borderBottomRightRadius: 14,
+      borderBottomRightRadius: 6,
     },
     brandRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      marginBottom: 10,
+      marginBottom: 8,
     },
     brandLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 11,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 0.2,
+      letterSpacing: 0,
     },
   });
 
@@ -59,10 +59,15 @@ export function EllieMessageBubble({message}: EllieMessageBubbleProps) {
         style={[
           styles.bubble,
           isAssistant ? styles.bubbleAssistant : styles.bubbleUser,
-        ]}>
+        ]}
+      >
         {isAssistant ? (
           <View style={styles.brandRow}>
-            <Sparkles color={theme.colors.textPrimary} size={13} strokeWidth={2} />
+            <Sparkles
+              color={theme.colors.textPrimary}
+              size={13}
+              strokeWidth={2}
+            />
             <Text style={styles.brandLabel}>ELLIE</Text>
           </View>
         ) : null}

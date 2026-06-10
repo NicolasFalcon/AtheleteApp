@@ -1,4 +1,5 @@
 import {getSupabaseClient} from '@app/services/supabase/client';
+import {awardGamificationEvent} from '@app/services/supabase/gamification';
 import type {
   QuizAttempt,
   QuizCategoryPreview,
@@ -147,35 +148,6 @@ export async function fetchQuizQuestions(
   );
 }
 
-async function unlockBadgeIfNeeded(userId: string, badgeId: string) {
-  const client = getClient();
-  const {data: existing, error: existingError} = await (client
-    .from('user_badges') as any)
-    .select('badge_id')
-    .eq('user_id', userId)
-    .eq('badge_id', badgeId)
-    .maybeSingle();
-
-  if (existingError) {
-    throw existingError;
-  }
-
-  if (existing) {
-    return false;
-  }
-
-  const {error: insertError} = await (client.from('user_badges') as any).insert({
-    user_id: userId,
-    badge_id: badgeId,
-  });
-
-  if (insertError) {
-    throw insertError;
-  }
-
-  return true;
-}
-
 async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
   const client = getClient();
   const [{data: attempts, error: attemptsError}, {data: categories, error: catsError}] =
@@ -208,8 +180,18 @@ async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
   perfectCategories.add(categoryId);
 
   if (allCategoryIds.length > 0 && allCategoryIds.every(id => perfectCategories.has(id))) {
-    await unlockBadgeIfNeeded(userId, 'quiz_master');
-    return true;
+    const awardResult = await awardGamificationEvent({
+      userId,
+      eventKey: 'quiz_master',
+      eventType: 'quiz_completed',
+      badgeIds: ['quiz_master'],
+      metadata: {
+        categoryId,
+        perfectCategoryCount: perfectCategories.size,
+      },
+    });
+
+    return awardResult.badgesUnlocked.includes('quiz_master');
   }
 
   return false;
@@ -244,30 +226,22 @@ export async function submitQuizAttempt(params: {
     throw error;
   }
 
-  const {data: profile, error: profileError} = await (client
-    .from('profiles') as any)
-    .select('points')
-    .eq('id', params.userId)
-    .maybeSingle();
-
-  if (profileError) {
-    throw profileError;
-  }
-
-  const currentPoints =
-    typeof profile?.points === 'number' ? profile.points : 0;
-
-  const {error: updateError} = await (client.from('profiles') as any)
-    .update({points: currentPoints + params.pointsEarned})
-    .eq('id', params.userId);
-
-  if (updateError) {
-    throw updateError;
-  }
-
   const unlockedBadges: string[] = [];
-  const unlockedFirstQuiz = await unlockBadgeIfNeeded(params.userId, 'first_quiz');
-  if (unlockedFirstQuiz) {
+  const attemptAward = await awardGamificationEvent({
+    userId: params.userId,
+    eventKey: `quiz_attempt:${data.id}`,
+    eventType: 'quiz_completed',
+    points: params.pointsEarned,
+    badgeIds: ['first_quiz'],
+    metadata: {
+      categoryId: params.categoryId,
+      score,
+      correctCount: params.correctCount,
+      totalQuestions: params.totalQuestions,
+    },
+  });
+
+  if (attemptAward.badgesUnlocked.includes('first_quiz')) {
     unlockedBadges.push('first_quiz');
   }
 
