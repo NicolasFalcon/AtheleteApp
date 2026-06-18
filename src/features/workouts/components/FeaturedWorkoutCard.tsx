@@ -21,7 +21,7 @@ export function FeaturedWorkoutCard({
 
   const styles = StyleSheet.create({
     card: {
-      width: 172,
+      width: 244,
       borderRadius: theme.radii.md,
       overflow: 'hidden',
       backgroundColor: theme.colors.surface,
@@ -32,7 +32,7 @@ export function FeaturedWorkoutCard({
     },
     image: {
       width: '100%',
-      height: 124,
+      height: 182,
     },
     topOverlay: {
       position: 'absolute',
@@ -94,10 +94,10 @@ export function FeaturedWorkoutCard({
       left: 0,
       right: 0,
       bottom: 0,
-      paddingHorizontal: 12,
-      paddingBottom: 12,
-      paddingTop: 34,
-      backgroundColor: 'rgba(0,0,0,0.4)',
+      paddingHorizontal: 14,
+      paddingBottom: 14,
+      paddingTop: 54,
+      backgroundColor: 'rgba(0,0,0,0.48)',
     },
     eyebrow: {
       color: 'rgba(255,255,255,0.72)',
@@ -110,27 +110,28 @@ export function FeaturedWorkoutCard({
     title: {
       color: '#FFFFFF',
       fontFamily: theme.typography.fontFamily,
-      fontSize: 16,
+      fontSize: 20,
       fontWeight: theme.typography.weights.semibold,
-      lineHeight: 22,
-      marginTop: 2,
+      lineHeight: 25,
+      letterSpacing: -0.4,
+      marginTop: 3,
     },
     bottom: {
-      paddingHorizontal: 12,
-      paddingTop: 10,
-      paddingBottom: 12,
-      gap: 10,
+      paddingHorizontal: 14,
+      paddingTop: 11,
+      paddingBottom: 13,
+      gap: 9,
     },
     description: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-      lineHeight: 16,
+      fontSize: 12,
+      lineHeight: 17,
     },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: theme.spacing.sm,
+      gap: theme.spacing.md,
     },
     metaItem: {
       flexDirection: 'row',

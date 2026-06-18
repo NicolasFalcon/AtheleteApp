@@ -1,6 +1,7 @@
-import {Pressable, StyleSheet, Text} from 'react-native';
-import {Chip, HorizontalItemRail} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { MoreHorizontal } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Chip, HorizontalItemRail } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type EllieChatContextChipsProps = {
   chips: Array<{
@@ -20,7 +21,7 @@ export function EllieChatContextChips({
   onSelectPrompt,
   onClearChat,
 }: EllieChatContextChipsProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     rail: {
@@ -39,47 +40,50 @@ export function EllieChatContextChips({
       fontSize: 11,
       fontWeight: theme.typography.weights.medium,
     },
+    wrapper: {
+      gap: 8,
+    },
     clearButton: {
-      minHeight: 32,
-      paddingHorizontal: 12,
-      borderRadius: theme.radii.pill,
-      backgroundColor: '#F6E8E6',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: '#E9C4BE',
+      alignSelf: 'flex-end',
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 5,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
     },
     clearLabel: {
-      color: '#C3473B',
+      color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: theme.typography.weights.medium,
     },
   });
 
   return (
-    <HorizontalItemRail contentStyle={styles.rail}>
+    <View style={styles.wrapper}>
+      <HorizontalItemRail contentStyle={styles.rail}>
+        {chips.map(chip => (
+          <Chip
+            key={chip.label}
+            onPress={() => onSelectPrompt(chip.prompt)}
+            style={styles.chip}
+          >
+            <Text style={styles.chipLabel}>{chip.label}</Text>
+          </Chip>
+        ))}
+      </HorizontalItemRail>
       {hasHistory ? (
         <Pressable
           disabled={isClearing}
           onPress={onClearChat}
-          style={({pressed}) => [
-            styles.clearButton,
-            pressed && !isClearing ? {opacity: 0.86} : null,
-          ]}>
+          style={styles.clearButton}
+        >
+          <MoreHorizontal color={theme.colors.textSecondary} size={14} />
           <Text style={styles.clearLabel}>
-            {isClearing ? 'Borrando...' : 'Borrar'}
+            {isClearing ? 'Borrando historial...' : 'Borrar conversación'}
           </Text>
         </Pressable>
       ) : null}
-      {chips.map(chip => (
-        <Chip
-          key={chip.label}
-          onPress={() => onSelectPrompt(chip.prompt)}
-          style={styles.chip}>
-          <Text style={styles.chipLabel}>{chip.label}</Text>
-        </Chip>
-      ))}
-    </HorizontalItemRail>
+    </View>
   );
 }

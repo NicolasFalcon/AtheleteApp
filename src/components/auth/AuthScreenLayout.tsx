@@ -6,7 +6,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +18,7 @@ type AuthScreenLayoutProps = PropsWithChildren<{
   onBack?: () => void;
   footer?: ReactNode;
   centered?: boolean;
+  topActions?: ReactNode;
 }>;
 
 export function AuthScreenLayout({
@@ -28,8 +28,9 @@ export function AuthScreenLayout({
   onBack,
   footer,
   centered = false,
+  topActions,
 }: AuthScreenLayoutProps) {
-  const { theme, mode, setPreferredMode } = useAppTheme();
+  const { theme, mode } = useAppTheme();
   const styles = createStyles(theme);
 
   return (
@@ -44,46 +45,17 @@ export function AuthScreenLayout({
       >
         <View style={styles.topBar}>
           <View style={styles.topBarSlot}>
-            {onBack ? (
-              <Pressable
-                accessibilityLabel={backLabel}
-                hitSlop={10}
-                onPress={onBack}
-                style={styles.backButton}
-              >
-                <BackIcon color={theme.colors.textPrimary} />
-              </Pressable>
-            ) : null}
-          </View>
-          <View
-            accessibilityLabel="Tema de la aplicación"
-            accessibilityRole="tablist"
-            style={styles.themeControl}
-          >
-            {(['dark', 'light'] as const).map(option => {
-              const active = mode === option;
-              return (
+            {topActions ??
+              (onBack ? (
                 <Pressable
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: active }}
-                  key={option}
-                  onPress={() => setPreferredMode(option)}
-                  style={[
-                    styles.themeOption,
-                    active ? styles.themeOptionActive : null,
-                  ]}
+                  accessibilityLabel={backLabel}
+                  hitSlop={10}
+                  onPress={onBack}
+                  style={styles.backButton}
                 >
-                  <Text
-                    style={[
-                      styles.themeOptionText,
-                      active ? styles.themeOptionTextActive : null,
-                    ]}
-                  >
-                    {option === 'dark' ? 'Oscuro' : 'Claro'}
-                  </Text>
+                  <BackIcon color={theme.colors.textPrimary} />
                 </Pressable>
-              );
-            })}
+              ) : null)}
           </View>
         </View>
         <ScrollView
@@ -118,11 +90,9 @@ function createStyles(theme: Theme) {
       height: 56,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
       paddingHorizontal: theme.spacing.md,
     },
     topBarSlot: {
-      width: 44,
       height: 44,
       justifyContent: 'center',
     },
@@ -132,36 +102,6 @@ function createStyles(theme: Theme) {
       borderRadius: theme.radii.pill,
       alignItems: 'center',
       justifyContent: 'center',
-    },
-    themeControl: {
-      minHeight: 34,
-      borderRadius: theme.radii.pill,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surfaceMuted,
-      flexDirection: 'row',
-      padding: 3,
-    },
-    themeOption: {
-      minWidth: 62,
-      minHeight: 28,
-      borderRadius: theme.radii.pill,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: theme.spacing.sm,
-    },
-    themeOptionActive: {
-      backgroundColor: theme.colors.accent,
-    },
-    themeOptionText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.medium,
-    },
-    themeOptionTextActive: {
-      color: theme.colors.accentContrast,
-      fontWeight: theme.typography.weights.semibold,
     },
     scroll: {
       flex: 1,

@@ -5,6 +5,7 @@ import {
   deactivateNutritionPlan,
   fetchNutritionPlanScreenData,
   upsertTodayNutritionLog,
+  type NutritionPlanScreenData,
   type NutritionLogInput,
 } from '@app/services/supabase/nutrition';
 
@@ -26,12 +27,17 @@ export function useNutritionPlan() {
 
       await deactivateNutritionPlan(profile.id);
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       if (!profile?.id) {
         return;
       }
 
-      await invalidateNutritionPlanQueries(queryClient, profile.id);
+      invalidateNutritionPlanQueries(queryClient, profile.id).catch(error => {
+        console.warn(
+          '[nutrition-plan] No se pudieron refrescar todas las superficies.',
+          error,
+        );
+      });
     },
   });
 
@@ -43,12 +49,27 @@ export function useNutritionPlan() {
 
       return upsertTodayNutritionLog(profile.id, input);
     },
-    onSuccess: async () => {
+    onSuccess: log => {
       if (!profile?.id) {
         return;
       }
 
-      await invalidateNutritionPlanQueries(queryClient, profile.id);
+      queryClient.setQueryData<NutritionPlanScreenData>(
+        ['nutrition', 'plan', profile.id],
+        current => (current ? {...current, todayLog: log} : current),
+      );
+      queryClient.setQueryData(
+        ['home', 'overview', profile.id],
+        (current: any) =>
+          current ? {...current, todayNutritionLog: log} : current,
+      );
+
+      invalidateNutritionPlanQueries(queryClient, profile.id).catch(error => {
+        console.warn(
+          '[nutrition-log] No se pudieron refrescar todas las superficies.',
+          error,
+        );
+      });
     },
   });
 

@@ -18,9 +18,9 @@ export type LibraryExercise = {
     secondary: string[];
   };
   recommendations: {
-    strength: {sets: string; reps: string};
-    hypertrophy: {sets: string; reps: string};
-    endurance: {sets: string; reps: string};
+    strength: { sets: string; reps: string };
+    hypertrophy: { sets: string; reps: string };
+    endurance: { sets: string; reps: string };
   };
   usedInRoutines: string[];
   category: string;
@@ -31,7 +31,7 @@ const muscleGroupToBodyPart: Record<string, string> = {
   back: 'back',
   legs: 'legs',
   calves: 'legs',
-  glutes: 'legs',
+  glutes: 'glutes',
   shoulders: 'shoulders',
   traps: 'shoulders',
   biceps: 'arms',
@@ -77,6 +77,7 @@ export const bodyPartLabels: Record<string, string> = {
   shoulders: 'Hombros',
   arms: 'Brazos',
   core: 'Core',
+  glutes: 'Glúteos',
   fullbody: 'Cuerpo completo',
   mobility: 'Movilidad',
   cardio: 'Cardio',
@@ -91,16 +92,16 @@ export const levelLabels: Record<string, string> = {
 function parseRecommendations(recJson: Json | null) {
   const parseEntry = (value?: string) => {
     if (!value) {
-      return {sets: '-', reps: '-'};
+      return { sets: '-', reps: '-' };
     }
 
     const match = value.match(/^(\d+)x(.+)$/);
 
     if (match) {
-      return {sets: match[1], reps: match[2]};
+      return { sets: match[1], reps: match[2] };
     }
 
-    return {sets: '-', reps: value};
+    return { sets: '-', reps: value };
   };
 
   const record =
@@ -128,8 +129,7 @@ export function mapDbExerciseRow(row: any): LibraryExercise {
       'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=200&q=80',
     videoUrl: row.video_url || null,
     orientation:
-      (row.video_orientation as 'portrait' | 'landscape' | null) ||
-      'landscape',
+      (row.video_orientation as 'portrait' | 'landscape' | null) || 'landscape',
     howToPerform: row.how_to_steps || [],
     coachingCues: row.technique_cues || [],
     commonMistakes: row.common_mistakes || [],

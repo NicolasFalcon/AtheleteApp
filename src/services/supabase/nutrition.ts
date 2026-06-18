@@ -1,8 +1,8 @@
-import type {DailyNutritionLog, NutritionPlan} from '@app/shared';
-import {getLocalDateKey} from '@app/lib/date';
-import {getSupabaseClient} from '@app/services/supabase/client';
-import {awardGamificationEvent} from '@app/services/supabase/gamification';
-import type {Database} from '@app/types/supabase';
+import type { DailyNutritionLog, NutritionPlan } from '@app/shared';
+import { getLocalDateKey } from '@app/lib/date';
+import { getSupabaseClient } from '@app/services/supabase/client';
+import { awardGamificationEventBestEffort } from '@app/services/supabase/gamification';
+import type { Database } from '@app/types/supabase';
 
 type NutritionPlanRow = Database['public']['Tables']['nutrition_plans']['Row'];
 type DailyNutritionLogRow =
@@ -35,6 +35,19 @@ function getClient() {
   }
 
   return client;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
+  }
+
+  return fallback;
 }
 
 function mapNutritionPlan(row: NutritionPlanRow): NutritionPlanDetails {
@@ -77,7 +90,7 @@ export async function fetchNutritionPlanScreenData(
       .select('*')
       .eq('user_id', userId)
       .eq('is_active', true)
-      .order('created_at', {ascending: false})
+      .order('created_at', { ascending: false })
       .limit(1),
     client
       .from('daily_nutrition_logs')
@@ -107,11 +120,10 @@ export async function fetchNutritionPlanScreenData(
 
 export async function deactivateNutritionPlan(userId: string): Promise<void> {
   const client = getClient();
-  const {error} = await ((client
-    .from('nutrition_plans') as any)
-    .update({is_active: false} as any)
+  const { error } = await (client.from('nutrition_plans') as any)
+    .update({ is_active: false } as any)
     .eq('user_id', userId)
-    .eq('is_active', true));
+    .eq('is_active', true);
 
   if (error) {
     throw error;
@@ -134,7 +146,7 @@ export async function upsertTodayNutritionLog(
       adherence: input.adherence ?? null,
     };
 
-  const {data: existing, error: fetchError} = await client
+  const { data: existing, error: fetchError } = await client
     .from('daily_nutrition_logs')
     .select('*')
     .eq('user_id', userId)
@@ -142,14 +154,15 @@ export async function upsertTodayNutritionLog(
     .maybeSingle();
 
   if (fetchError) {
-    throw fetchError;
+    throw new Error(
+      getErrorMessage(fetchError, 'No pudimos consultar tu nutrición actual.'),
+    );
   }
 
   const existingLog = (existing as DailyNutritionLogRow | null) || null;
 
   if (existingLog) {
-    const {data, error} = await (client
-      .from('daily_nutrition_logs') as any)
+    const { data, error } = await (client.from('daily_nutrition_logs') as any)
       .update(payload)
       .eq('id', existingLog.id)
       .eq('user_id', userId)
@@ -161,10 +174,10 @@ export async function upsertTodayNutritionLog(
     }
 
     const log = mapDailyNutritionLog(data as DailyNutritionLogRow);
-    await awardGamificationEvent({
-      userId,
-      eventKey: `nutrition_logged:${today}`,
+    await awardGamificationEventBestEffort({
+      source: 'nutrition-log-update',
       eventType: 'nutrition_logged',
+      referenceId: today,
       points: 10,
       metadata: {
         date: today,
@@ -188,8 +201,7 @@ export async function upsertTodayNutritionLog(
       adherence: input.adherence ?? null,
     };
 
-  const {data, error} = await (client
-    .from('daily_nutrition_logs') as any)
+  const { data, error } = await (client.from('daily_nutrition_logs') as any)
     .insert(insertPayload)
     .select('*')
     .single();
@@ -199,10 +211,10 @@ export async function upsertTodayNutritionLog(
   }
 
   const log = mapDailyNutritionLog(data as DailyNutritionLogRow);
-  await awardGamificationEvent({
-    userId,
-    eventKey: `nutrition_logged:${today}`,
+  await awardGamificationEventBestEffort({
+    source: 'nutrition-log-insert',
     eventType: 'nutrition_logged',
+    referenceId: today,
     points: 10,
     metadata: {
       date: today,

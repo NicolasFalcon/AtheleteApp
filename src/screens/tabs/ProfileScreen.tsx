@@ -23,6 +23,7 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useProfilePreferences } from '@app/hooks/useProfilePreferences';
+import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import type { ProfileStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileRoot'>;
@@ -57,6 +58,7 @@ function calculateAge(birthDate: string | null): string {
 
 export function ProfileScreen({ navigation }: Props) {
   const { theme, preferredMode, setPreferredMode } = useAppTheme();
+  const tabBarMotion = useTabBarMotion();
   const { profile, signOut } = useAuth();
   const overviewQuery = useProfileOverview();
   const preferences = useProfilePreferences();
@@ -159,10 +161,14 @@ export function ProfileScreen({ navigation }: Props) {
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
+        onScroll={tabBarMotion.onScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <ProfileHeroCard
+          avatarKey={profile.avatarKey}
+          profilePhotoUrl={profile.profilePhotoUrl}
           name={profile.name || 'Usuario'}
           email={profile.email}
           goalLabel={goalLabel}

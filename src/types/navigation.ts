@@ -1,8 +1,5 @@
 import type { NavigatorScreenParams } from '@react-navigation/native';
-import type {
-  LibraryExercise,
-  Workout,
-} from '@app/shared';
+import type { LibraryExercise, Workout } from '@app/shared';
 import type {
   QuizQuestionRouteParams,
   QuizResultRouteParams,
@@ -17,9 +14,14 @@ export type AuthStackParamList = {
 
 export type OnboardingStackParamList = {
   Welcome: undefined;
-  GoalSelection: undefined;
-  BodyData: undefined;
+  Avatar: undefined;
+  BirthDate: undefined;
+  Gender: undefined;
+  Weight: undefined;
+  Height: undefined;
   TrainingFrequency: undefined;
+  GoalSelection: undefined;
+  Complete: undefined;
 };
 
 export type WorkoutDetailRouteParams = {
@@ -107,7 +109,7 @@ export type ProgressStackParamList = {
   ProgressChallenge: undefined;
   NutritionPlan: NutritionPlanRouteParams | undefined;
   BodyScience: undefined;
-  BodyScienceArticle: {articleId: string};
+  BodyScienceArticle: { articleId: string };
 };
 
 export type ProfileStackParamList = {

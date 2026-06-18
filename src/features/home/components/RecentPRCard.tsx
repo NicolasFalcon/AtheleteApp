@@ -1,4 +1,4 @@
-import { ChevronRight, Plus, Trophy } from 'lucide-react-native';
+import { ArrowRight, Plus, Trophy } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { formatPRValue, type PersonalRecord } from '@app/shared';
@@ -44,8 +44,9 @@ export function RecentPRCard({
 
   const styles = StyleSheet.create({
     shell: {
+      flex: 1,
+      minHeight: 164,
       borderRadius: theme.radii.md,
-      overflow: 'hidden',
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
@@ -53,33 +54,29 @@ export function RecentPRCard({
       ...theme.elevations.card,
     },
     topRow: {
-      padding: 14,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.sm,
+      flex: 1,
+      padding: theme.spacing.sm,
+      gap: theme.spacing.xs,
     },
     iconBox: {
-      width: 46,
-      height: 46,
-      borderRadius: 14,
+      width: 38,
+      height: 38,
+      borderRadius: 12,
       backgroundColor: theme.colors.surfaceMuted,
       alignItems: 'center',
       justifyContent: 'center',
     },
     content: {
       flex: 1,
-      gap: 2,
+      gap: 4,
     },
     titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-      gap: theme.spacing.xs,
+      gap: 2,
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: theme.typography.weights.semibold,
       flexShrink: 1,
     },
@@ -89,27 +86,38 @@ export function RecentPRCard({
       fontSize: 12,
       lineHeight: 16,
     },
-    divider: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: theme.colors.border,
-    },
     footerButton: {
-      paddingVertical: 10,
-      alignItems: 'center',
-      justifyContent: 'center',
+      marginHorizontal: theme.spacing.sm,
+      marginBottom: theme.spacing.sm,
+      paddingVertical: 7,
+      paddingHorizontal: 9,
+      borderRadius: theme.radii.pill,
+      backgroundColor: theme.colors.surfaceMuted,
+      alignSelf: 'flex-start',
       flexDirection: 'row',
       gap: 6,
     },
     footerLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
+      fontSize: 11,
       fontWeight: theme.typography.weights.semibold,
     },
     timeLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 12,
+    },
+    openHint: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    openHintLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
+      fontWeight: theme.typography.weights.medium,
     },
   });
 
@@ -125,7 +133,7 @@ export function RecentPRCard({
         <View style={styles.iconBox}>
           <Trophy
             color={theme.colors.textPrimary}
-            size={22}
+            size={19}
             strokeWidth={2.1}
           />
         </View>
@@ -134,7 +142,7 @@ export function RecentPRCard({
             <>
               <View style={styles.titleRow}>
                 <Text numberOfLines={1} style={styles.title}>
-                  🏆 {exerciseName || 'Récord personal'}
+                  {exerciseName || 'Récord personal'}
                 </Text>
                 <Text style={styles.timeLabel}>
                   {formatRelativeTime(record.recordedAt)}
@@ -144,19 +152,25 @@ export function RecentPRCard({
                 {formatPRValue(record)}
                 {record.notes ? ` · ${record.notes}` : ''}
               </Text>
+              <View style={styles.openHint}>
+                <Text style={styles.openHintLabel}>Ver progreso</Text>
+                <ArrowRight color={theme.colors.textSecondary} size={12} />
+              </View>
             </>
           ) : (
             <>
               <Text style={styles.title}>Récords personales</Text>
               <Text numberOfLines={2} style={styles.subtitle}>
-                Registra tu primer PR y empieza a trackear tu progreso.
+                Guarda tu mejor marca y úsala como referencia.
               </Text>
+              <View style={styles.openHint}>
+                <Text style={styles.openHintLabel}>Ver historial</Text>
+                <ArrowRight color={theme.colors.textSecondary} size={12} />
+              </View>
             </>
           )}
         </View>
-        <ChevronRight color={theme.colors.textSecondary} size={18} />
       </Pressable>
-      <View style={styles.divider} />
       <Pressable
         onPress={onRegister}
         style={({ pressed }) => [
@@ -164,8 +178,8 @@ export function RecentPRCard({
           pressed ? { opacity: 0.88 } : null,
         ]}
       >
-        <Plus color={theme.colors.textPrimary} size={20} strokeWidth={2.2} />
-        <Text style={styles.footerLabel}>Registrar nuevo PR</Text>
+        <Plus color={theme.colors.textPrimary} size={16} strokeWidth={2.2} />
+        <Text style={styles.footerLabel}>Registrar PR</Text>
       </Pressable>
     </View>
   );

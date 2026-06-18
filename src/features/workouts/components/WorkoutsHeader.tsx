@@ -12,46 +12,57 @@ export function WorkoutsHeader({ onCreate }: WorkoutsHeaderProps) {
   const styles = StyleSheet.create({
     row: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-end',
       justifyContent: 'space-between',
       gap: theme.spacing.md,
+    },
+    copy: {
+      flex: 1,
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 20,
+      fontSize: 25,
       fontWeight: theme.typography.weights.bold,
+      letterSpacing: -0.8,
+    },
+    subtitle: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      lineHeight: 18,
+      marginTop: 3,
     },
     button: {
-      minHeight: 40,
-      borderRadius: theme.radii.pill,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: theme.colors.accent,
-      paddingHorizontal: 15,
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
-    },
-    buttonLabel: {
-      color: theme.colors.accentContrast,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
-      fontWeight: theme.typography.weights.semibold,
+      marginBottom: 2,
     },
   });
 
   return (
     <View style={styles.row}>
-      <Text style={styles.title}>Entrenos</Text>
+      <View style={styles.copy}>
+        {/* <Text style={styles.eyebrow}>Explorar</Text> */}
+        <Text style={styles.title}>Entrenos</Text>
+        <Text style={styles.subtitle}>
+          Encuentra tu próxima sesión o crea una propia.
+        </Text>
+      </View>
       <Pressable
+        accessibilityLabel="Crear rutina"
+        accessibilityRole="button"
         onPress={onCreate}
         style={({ pressed }) => [
           styles.button,
           pressed ? { transform: [{ scale: 0.99 }] } : null,
         ]}
       >
-        <Plus color={theme.colors.accentContrast} size={16} strokeWidth={2.4} />
-        <Text style={styles.buttonLabel}>Crear</Text>
+        <Plus color={theme.colors.accentContrast} size={19} strokeWidth={2.4} />
       </Pressable>
     </View>
   );

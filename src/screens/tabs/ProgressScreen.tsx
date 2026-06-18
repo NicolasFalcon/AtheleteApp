@@ -17,6 +17,7 @@ import { ProgressSegmentedControl } from '@app/features/progress/components/Prog
 import { TrainingProgressCard } from '@app/features/progress/components/TrainingProgressCard';
 import { useProgressData } from '@app/hooks/useProgressData';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import type { ProgressStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<ProgressStackParamList, 'ProgressRoot'>;
@@ -25,6 +26,7 @@ type ProgressRange = 'week' | 'month';
 
 export function ProgressScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
+  const tabBarMotion = useTabBarMotion();
   const tabBarHeight = useBottomTabBarHeight();
   const progress = useProgressData();
   const [section, setSection] = useState<ProgressSection>('dashboard');
@@ -92,6 +94,8 @@ export function ProgressScreen({ navigation }: Props) {
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.content}
+        onScroll={tabBarMotion.onScroll}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Progreso</Text>

@@ -1,10 +1,10 @@
-import {useMemo} from 'react';
-import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
-import {useAuth} from '@app/hooks/useAuth';
-import {invalidatePersonalRecordQueries} from '@app/lib/queryInvalidation';
-import {awardGamificationEvent} from '@app/services/supabase/gamification';
-import {getSupabaseClient} from '@app/services/supabase/client';
-import type {PRInsert, PersonalRecord} from '@app/shared';
+import { useMemo } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@app/hooks/useAuth';
+import { invalidatePersonalRecordQueries } from '@app/lib/queryInvalidation';
+import { awardGamificationEvent } from '@app/services/supabase/gamification';
+import { getSupabaseClient } from '@app/services/supabase/client';
+import type { PRInsert, PersonalRecord } from '@app/shared';
 
 function mapPersonalRecordRow(row: any): PersonalRecord {
   return {
@@ -24,7 +24,7 @@ function mapPersonalRecordRow(row: any): PersonalRecord {
 }
 
 export function usePersonalRecords(exerciseId?: string) {
-  const {profile} = useAuth();
+  const { profile } = useAuth();
   const userId = profile?.id;
   const queryClient = useQueryClient();
 
@@ -42,13 +42,13 @@ export function usePersonalRecords(exerciseId?: string) {
         .from('personal_records')
         .select('*')
         .eq('user_id', userId)
-        .order('recorded_at', {ascending: false});
+        .order('recorded_at', { ascending: false });
 
       if (exerciseId) {
         builder = builder.eq('exercise_id', exerciseId);
       }
 
-      const {data, error} = await builder;
+      const { data, error } = await builder;
 
       if (error) {
         throw error;
@@ -71,19 +71,19 @@ export function usePersonalRecords(exerciseId?: string) {
         throw new Error('No hay una sesión activa para registrar PRs.');
       }
 
-      const {data, error} = await (client as any)
+      const { data, error } = await (client as any)
         .from('personal_records')
         .insert({
-        user_id: userId,
-        exercise_id: pr.exerciseId,
-        pr_type: pr.prType,
-        value_weight: pr.valueWeight ?? null,
-        value_reps: pr.valueReps ?? null,
-        value_duration_sec: pr.valueDurationSec ?? null,
-        value_distance_m: pr.valueDistanceM ?? null,
-        unit: pr.unit ?? 'kg',
-        notes: pr.notes ?? null,
-        recorded_at: pr.recordedAt ?? new Date().toISOString(),
+          user_id: userId,
+          exercise_id: pr.exerciseId,
+          pr_type: pr.prType,
+          value_weight: pr.valueWeight ?? null,
+          value_reps: pr.valueReps ?? null,
+          value_duration_sec: pr.valueDurationSec ?? null,
+          value_distance_m: pr.valueDistanceM ?? null,
+          unit: pr.unit ?? 'kg',
+          notes: pr.notes ?? null,
+          recorded_at: pr.recordedAt ?? new Date().toISOString(),
         })
         .select('id, exercise_id, pr_type')
         .single();
@@ -94,9 +94,8 @@ export function usePersonalRecords(exerciseId?: string) {
 
       if (data?.id) {
         await awardGamificationEvent({
-          userId,
-          eventKey: `personal_record:${data.id}`,
           eventType: 'personal_record_created',
+          referenceId: String(data.id),
           points: 25,
           badgeIds: ['first_pr'],
           metadata: {
@@ -122,7 +121,7 @@ export function usePersonalRecords(exerciseId?: string) {
         throw new Error('No hay una sesión activa para editar PRs.');
       }
 
-      const {error} = await (client as any)
+      const { error } = await (client as any)
         .from('personal_records')
         .delete()
         .eq('id', recordId)

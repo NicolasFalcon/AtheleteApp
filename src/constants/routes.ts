@@ -13,9 +13,14 @@ export const AUTH_ROUTES = {
 
 export const ONBOARDING_ROUTES = {
   Welcome: 'Welcome',
-  GoalSelection: 'GoalSelection',
-  BodyData: 'BodyData',
+  Avatar: 'Avatar',
+  BirthDate: 'BirthDate',
+  Gender: 'Gender',
+  Weight: 'Weight',
+  Height: 'Height',
   TrainingFrequency: 'TrainingFrequency',
+  GoalSelection: 'GoalSelection',
+  Complete: 'Complete',
 } as const;
 
 export const TAB_ROUTES = {

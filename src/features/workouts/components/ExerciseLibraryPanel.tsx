@@ -1,64 +1,46 @@
+import { useState } from 'react';
 import {
-  Dumbbell,
-  Gauge,
-  SlidersHorizontal,
-  Target,
-} from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
+  ActivityIndicator,
+  FlatList,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { EmptyState, Loader } from '@app/components/ui';
-import { ExerciseFilterGroup } from '@app/features/workouts/components/ExerciseFilterGroup';
+import { ExerciseFiltersModal } from '@app/features/workouts/components/ExerciseFiltersModal';
 import { ExerciseLibraryHeader } from '@app/features/workouts/components/ExerciseLibraryHeader';
 import { ExerciseListItem } from '@app/features/workouts/components/ExerciseListItem';
 import { useAppTheme } from '@app/hooks/useAppTheme';
-import {
-  bodyPartLabels,
-  equipmentLabels,
-  levelLabels,
-  type LibraryExercise,
-} from '@app/shared';
+import type { LibraryExercise } from '@app/shared';
 
-const equipmentFilterKeys = [
-  'all',
-  'bodyweight',
-  'dumbbells',
-  'barbell',
-  'machines',
-  'cable',
-  'bands',
-  'kettlebells',
-  'trx',
-] as const;
+function ListSeparator() {
+  return <View style={separatorStyle.item} />;
+}
 
-const bodyPartFilterKeys = [
-  'all',
-  'chest',
-  'back',
-  'legs',
-  'shoulders',
-  'arms',
-  'core',
-  'fullbody',
-  'mobility',
-  'cardio',
-] as const;
-
-const levelFilterKeys = [
-  'all',
-  'beginner',
-  'intermediate',
-  'advanced',
-] as const;
+const separatorStyle = StyleSheet.create({
+  item: {
+    height: 10,
+  },
+});
 
 type ExerciseLibraryPanelProps = {
   exercises: LibraryExercise[];
   totalExercisesCount: number;
   favoriteExerciseIds: string[];
   loading: boolean;
+  loadingMore: boolean;
+  hasNextPage: boolean;
+  bottomInset: number;
   viewMode: 'all' | 'favorites';
   searchQuery: string;
   equipmentFilter: string;
   bodyPartFilter: string;
   levelFilter: string;
+  resultTitle: string;
+  resultSubtitle: string;
+  onBack: () => void;
   onViewModeChange: (value: 'all' | 'favorites') => void;
   onSearchChange: (value: string) => void;
   onEquipmentChange: (value: string) => void;
@@ -66,6 +48,8 @@ type ExerciseLibraryPanelProps = {
   onLevelChange: (value: string) => void;
   onToggleFavorite: (exerciseId: string) => void;
   onSelectExercise: (exerciseId: string) => void;
+  onLoadMore: () => void;
+  onScroll: (event: NativeSyntheticEvent<NativeScrollEvent>) => void;
 };
 
 export function ExerciseLibraryPanel({
@@ -73,11 +57,17 @@ export function ExerciseLibraryPanel({
   totalExercisesCount,
   favoriteExerciseIds,
   loading,
+  loadingMore,
+  hasNextPage,
+  bottomInset,
   viewMode,
   searchQuery,
   equipmentFilter,
   bodyPartFilter,
   levelFilter,
+  resultTitle,
+  resultSubtitle,
+  onBack,
   onViewModeChange,
   onSearchChange,
   onEquipmentChange,
@@ -85,133 +75,144 @@ export function ExerciseLibraryPanel({
   onLevelChange,
   onToggleFavorite,
   onSelectExercise,
+  onLoadMore,
+  onScroll,
 }: ExerciseLibraryPanelProps) {
   const { theme } = useAppTheme();
+  const [filtersVisible, setFiltersVisible] = useState(false);
   const activeFiltersCount = [
     equipmentFilter,
     bodyPartFilter,
     levelFilter,
   ].filter(value => value !== 'all').length;
-
   const styles = StyleSheet.create({
-    container: {
-      gap: theme.spacing.md,
+    header: {
+      gap: 20,
+      marginBottom: theme.spacing.md,
     },
-    helperRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      paddingHorizontal: 2,
+    content: {
+      paddingHorizontal: theme.spacing.md,
+      paddingBottom: bottomInset + theme.spacing.md,
     },
-    helperLabel: {
+    listHeading: {
+      gap: 2,
+      paddingTop: 2,
+    },
+    listTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 18,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    listSubtitle: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 0,
-      textTransform: 'uppercase',
+      fontSize: 12,
     },
-    list: {
-      gap: theme.spacing.sm,
+    footer: {
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
 
-  return (
-    <View style={styles.container}>
+  const header = (
+    <View style={styles.header}>
       <ExerciseLibraryHeader
         totalCount={totalExercisesCount}
         visibleCount={exercises.length}
         viewMode={viewMode}
         activeFiltersCount={activeFiltersCount}
         searchQuery={searchQuery}
-        onViewModeChange={onViewModeChange}
+        title={resultTitle}
+        subtitle={resultSubtitle}
+        onBack={onBack}
         onSearchChange={onSearchChange}
+        onOpenFilters={() => setFiltersVisible(true)}
       />
 
-      {viewMode === 'all' ? (
-        <>
-          <View style={styles.helperRow}>
-            <SlidersHorizontal color={theme.colors.textSecondary} size={14} />
-            <Text style={styles.helperLabel}>Filtra tu búsqueda</Text>
-          </View>
-
-          <ExerciseFilterGroup
-            title="Equipamiento"
-            subtitle={
-              equipmentFilter === 'all'
-                ? 'Todas las opciones'
-                : equipmentLabels[equipmentFilter] || equipmentFilter
-            }
-            icon={Dumbbell}
-            activeKey={equipmentFilter}
-            filters={equipmentFilterKeys.map(key => ({
-              key,
-              label: key === 'all' ? 'Todos' : equipmentLabels[key] || key,
-            }))}
-            onChange={onEquipmentChange}
-          />
-
-          <ExerciseFilterGroup
-            title="Zona del cuerpo"
-            subtitle={
-              bodyPartFilter === 'all'
-                ? 'Todas las opciones'
-                : bodyPartLabels[bodyPartFilter] || bodyPartFilter
-            }
-            icon={Target}
-            activeKey={bodyPartFilter}
-            filters={bodyPartFilterKeys.map(key => ({
-              key,
-              label: key === 'all' ? 'Todos' : bodyPartLabels[key] || key,
-            }))}
-            onChange={onBodyPartChange}
-          />
-
-          <ExerciseFilterGroup
-            title="Nivel"
-            subtitle={
-              levelFilter === 'all'
-                ? 'Todas las opciones'
-                : levelLabels[levelFilter] || levelFilter
-            }
-            icon={Gauge}
-            activeKey={levelFilter}
-            filters={levelFilterKeys.map(key => ({
-              key,
-              label: key === 'all' ? 'Todos' : levelLabels[key] || key,
-            }))}
-            onChange={onLevelChange}
-          />
-        </>
-      ) : null}
+      <View style={styles.listHeading}>
+        <Text style={styles.listTitle}>
+          {viewMode === 'favorites'
+            ? 'Tus favoritos'
+            : searchQuery.trim()
+            ? 'Resultados'
+            : 'Todos los ejercicios'}
+        </Text>
+        <Text style={styles.listSubtitle}>
+          {loading
+            ? 'Actualizando biblioteca...'
+            : `${exercises.length} cargados de ${totalExercisesCount}`}
+        </Text>
+      </View>
 
       {loading ? <Loader label="Cargando ejercicios..." /> : null}
-
-      {!loading ? (
-        exercises.length > 0 ? (
-          <View style={styles.list}>
-            {exercises.map(exercise => (
-              <ExerciseListItem
-                key={exercise.id}
-                exercise={exercise}
-                isFavorite={favoriteExerciseIds.includes(exercise.id)}
-                onToggleFavorite={() => onToggleFavorite(exercise.id)}
-                onPress={() => onSelectExercise(exercise.id)}
-              />
-            ))}
-          </View>
-        ) : viewMode === 'favorites' ? (
-          <EmptyState
-            title="Sin ejercicios favoritos aún"
-            description="Explora la biblioteca y guarda ejercicios para verlos aquí."
-          />
-        ) : (
-          <EmptyState
-            title="No se encontraron ejercicios"
-            description="Prueba con otra búsqueda o cambia los filtros activos."
-          />
-        )
-      ) : null}
     </View>
+  );
+
+  return (
+    <>
+      <FlatList
+        data={loading ? [] : exercises}
+        contentContainerStyle={styles.content}
+        keyExtractor={exercise => exercise.id}
+        ListHeaderComponent={header}
+        renderItem={({ item }) => (
+          <ExerciseListItem
+            exercise={item}
+            isFavorite={favoriteExerciseIds.includes(item.id)}
+            onToggleFavorite={() => onToggleFavorite(item.id)}
+            onPress={() => onSelectExercise(item.id)}
+          />
+        )}
+        ItemSeparatorComponent={ListSeparator}
+        ListEmptyComponent={
+          !loading && viewMode === 'favorites' ? (
+            <EmptyState
+              title="Sin ejercicios favoritos aún"
+              description="Explora la biblioteca y guarda ejercicios para verlos aquí."
+            />
+          ) : !loading ? (
+            <EmptyState
+              title="No se encontraron ejercicios"
+              description="Prueba con otra búsqueda o cambia los filtros activos."
+            />
+          ) : null
+        }
+        ListFooterComponent={
+          <View style={styles.footer}>
+            {loadingMore ? (
+              <ActivityIndicator color={theme.colors.textSecondary} />
+            ) : null}
+          </View>
+        }
+        onEndReached={() => {
+          if (hasNextPage && !loadingMore) {
+            onLoadMore();
+          }
+        }}
+        onEndReachedThreshold={0.45}
+        keyboardShouldPersistTaps="handled"
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+      />
+
+      <ExerciseFiltersModal
+        visible={filtersVisible}
+        viewMode={viewMode}
+        equipment={equipmentFilter}
+        bodyPart={bodyPartFilter}
+        level={levelFilter}
+        onClose={() => setFiltersVisible(false)}
+        onApply={filters => {
+          onViewModeChange(filters.viewMode);
+          onEquipmentChange(filters.equipment);
+          onBodyPartChange(filters.bodyPart);
+          onLevelChange(filters.level);
+          setFiltersVisible(false);
+        }}
+      />
+    </>
   );
 }

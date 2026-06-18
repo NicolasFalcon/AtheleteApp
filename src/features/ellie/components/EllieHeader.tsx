@@ -30,17 +30,17 @@ export function EllieHeader({ onBack }: EllieHeaderProps) {
       flex: 1,
     },
     avatar: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 40,
+      height: 40,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.accent,
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 18,
+      fontSize: 20,
       fontWeight: theme.typography.weights.bold,
     },
     subtitle: {
@@ -71,8 +71,8 @@ export function EllieHeader({ onBack }: EllieHeaderProps) {
       <View style={styles.brandWrap}>
         <View style={styles.avatar}>
           <Sparkles
-            color={theme.colors.textPrimary}
-            size={18}
+            color={theme.colors.accentContrast}
+            size={19}
             strokeWidth={2.1}
           />
         </View>

@@ -1,105 +1,153 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer } from '@app/components/ScreenContainer';
-import { GoalOptionCard } from '@app/components/onboarding/GoalOptionCard';
-import { OnboardingProgress } from '@app/components/onboarding/OnboardingProgress';
+import { ProfileSetupLayout } from '@app/components/onboarding/ProfileSetupLayout';
 import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import type { OnboardingGoal } from '@app/types/auth';
 import type { OnboardingStackParamList } from '@app/types/navigation';
-import { Button } from '@app/components/ui';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'GoalSelection'>;
 
-const GOALS: Array<{ value: OnboardingGoal; label: string; emoji: string }> = [
-  { value: 'lose_weight', label: 'Perder peso', emoji: '🔥' },
-  { value: 'gain_muscle', label: 'Ganar músculo', emoji: '💪' },
-  { value: 'maintain', label: 'Mantenerme', emoji: '⚖️' },
-  { value: 'improve_health', label: 'Mejorar salud', emoji: '❤️' },
+const GOALS: Array<{
+  value: OnboardingGoal;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'gain_muscle',
+    label: 'Ganar músculo',
+    description: 'Aumentar masa muscular y tamaño.',
+  },
+  {
+    value: 'lose_weight',
+    label: 'Perder grasa',
+    description: 'Mejorar composición corporal.',
+  },
+  {
+    value: 'improve_health',
+    label: 'Mejorar condición física',
+    description: 'Subir energía, resistencia y movilidad.',
+  },
+  {
+    value: 'maintain',
+    label: 'Mantenerme activo',
+    description: 'Sostener hábitos y sentirme bien.',
+  },
 ];
 
 export function GoalSelectionScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
   const { onboardingDraft, updateOnboardingDraft } = useAuth();
+  const styles = createStyles(theme);
 
-  const styles = StyleSheet.create({
-    content: {
-      gap: theme.spacing.xxl,
-    },
-    heading: {
-      gap: theme.spacing.xs,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.title,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.6,
-    },
-    subtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 20,
-    },
+  return (
+    <ProfileSetupLayout
+      continueDisabled={!onboardingDraft.goal}
+      continueLabel="Guardar perfil"
+      onBack={() => navigation.goBack()}
+      onContinue={() => navigation.navigate(ONBOARDING_ROUTES.Complete)}
+      step={6}
+      subtitle="Selecciona el objetivo principal que guiará tus recomendaciones."
+      title="¿Cuál es tu objetivo fitness?"
+    >
+      <View style={styles.list}>
+        {GOALS.map(goal => {
+          const selected = onboardingDraft.goal === goal.value;
+          return (
+            <Pressable
+              key={goal.value}
+              onPress={() => updateOnboardingDraft({ goal: goal.value })}
+              style={[styles.option, selected ? styles.selected : null]}
+            >
+              <View style={styles.copy}>
+                <Text
+                  style={[styles.label, selected ? styles.labelSelected : null]}
+                >
+                  {goal.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.description,
+                    selected ? styles.descriptionSelected : null,
+                  ]}
+                >
+                  {goal.description}
+                </Text>
+              </View>
+              <View
+                style={[styles.radio, selected ? styles.radioSelected : null]}
+              >
+                {selected ? <View style={styles.radioDot} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+    </ProfileSetupLayout>
+  );
+}
+
+type Theme = ReturnType<typeof useAppTheme>['theme'];
+
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
     list: {
-      gap: theme.spacing.md,
+      gap: theme.spacing.sm,
     },
-    footer: {
+    option: {
+      minHeight: 72,
+      borderRadius: theme.radii.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
       flexDirection: 'row',
-      gap: theme.spacing.md,
+      alignItems: 'center',
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm,
     },
-    backButton: {
-      minWidth: 56,
+    selected: {
+      borderColor: theme.colors.textPrimary,
+      backgroundColor: theme.colors.surfaceMuted,
     },
-    continueButton: {
+    copy: {
       flex: 1,
+      gap: 3,
     },
-    backText: {
-      color: theme.colors.accentContrast,
+    label: {
+      color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.body,
       fontWeight: theme.typography.weights.semibold,
     },
+    labelSelected: {
+      fontWeight: theme.typography.weights.bold,
+    },
+    description: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.caption,
+    },
+    descriptionSelected: {
+      color: theme.colors.textPrimary,
+    },
+    radio: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    radioSelected: {
+      borderColor: theme.colors.textPrimary,
+    },
+    radioDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: theme.colors.textPrimary,
+    },
   });
-
-  return (
-    <ScreenContainer scrollable contentContainerStyle={styles.content}>
-      <OnboardingProgress step={1} />
-      <View style={styles.heading}>
-        <Text style={styles.title}>¿Cuál es tu objetivo principal?</Text>
-        <Text style={styles.subtitle}>
-          Elige el que más te importa ahora.
-        </Text>
-      </View>
-      <View style={styles.list}>
-        {GOALS.map(goal => (
-          <GoalOptionCard
-            emoji={goal.emoji}
-            key={goal.value}
-            label={goal.label}
-            onPress={() => updateOnboardingDraft({ goal: goal.value })}
-            selected={onboardingDraft.goal === goal.value}
-          />
-        ))}
-      </View>
-      <View style={styles.footer}>
-        <Button
-          fullWidth={false}
-          label="←"
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          variant="outline"
-        />
-        <Button
-          accessoryRight={<Text style={styles.backText}>→</Text>}
-          disabled={!onboardingDraft.goal}
-          label="Continuar"
-          onPress={() => navigation.navigate(ONBOARDING_ROUTES.BodyData)}
-          style={styles.continueButton}
-        />
-      </View>
-    </ScreenContainer>
-  );
 }

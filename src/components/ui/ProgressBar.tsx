@@ -5,9 +5,15 @@ type ProgressBarProps = {
   value: number;
   max: number;
   color?: string;
+  trackColor?: string;
 };
 
-export function ProgressBar({value, max, color}: ProgressBarProps) {
+export function ProgressBar({
+  value,
+  max,
+  color,
+  trackColor,
+}: ProgressBarProps) {
   const {theme} = useAppTheme();
   const progress = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
 
@@ -16,7 +22,7 @@ export function ProgressBar({value, max, color}: ProgressBarProps) {
       height: 7,
       borderRadius: 999,
       overflow: 'hidden',
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: trackColor || theme.colors.surfaceMuted,
     },
     fill: {
       height: '100%',

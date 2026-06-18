@@ -1,8 +1,8 @@
-import {Calendar} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {EllieWeeklySummary} from '@app/shared';
+import { Calendar } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { EllieWeeklySummary } from '@app/shared';
 
 type EllieWeeklySummaryCardProps = {
   summary: EllieWeeklySummary;
@@ -13,12 +13,12 @@ export function EllieWeeklySummaryCard({
   summary,
   onOpenChat,
 }: EllieWeeklySummaryCardProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     card: {
       padding: 15,
-      borderRadius: 28,
+      borderRadius: theme.radii.md,
       gap: 12,
     },
     header: {
@@ -33,36 +33,36 @@ export function EllieWeeklySummaryCard({
       fontWeight: theme.typography.weights.bold,
       letterSpacing: -0.3,
     },
+    interpretation: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 14,
+      lineHeight: 20,
+      fontWeight: theme.typography.weights.semibold,
+    },
     metricsGrid: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
-    },
-    metricCard: {
-      width: '47%',
-      borderRadius: 16,
+      borderRadius: theme.radii.sm,
       backgroundColor: theme.colors.background,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      paddingHorizontal: 12,
       paddingVertical: 11,
-      gap: 6,
     },
-    row: {
-      flexDirection: 'row',
+    metricCard: {
+      flex: 1,
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 16,
+      justifyContent: 'center',
+      paddingHorizontal: 5,
     },
     label: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 10,
     },
     value: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: theme.typography.weights.semibold,
     },
     divider: {
@@ -83,7 +83,7 @@ export function EllieWeeklySummaryCard({
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.surface,
-      marginTop: 2,
+      marginTop: 1,
     },
     ctaLabel: {
       color: theme.colors.textPrimary,
@@ -100,6 +100,7 @@ export function EllieWeeklySummaryCard({
         <Text style={styles.title}>Resumen semanal</Text>
       </View>
 
+      <Text style={styles.interpretation}>{summary.suggestion}</Text>
       <View style={styles.metricsGrid}>
         <View style={styles.metricCard}>
           <Text style={styles.label}>Entrenos</Text>
@@ -122,11 +123,13 @@ export function EllieWeeklySummaryCard({
           <Text style={styles.value}>{summary.pointsEarned}</Text>
         </View>
       </View>
-      <View style={styles.divider} />
-      <Text style={styles.suggestion}>{summary.suggestion}</Text>
       <Pressable
         onPress={onOpenChat}
-        style={({pressed}) => [styles.cta, pressed ? {opacity: 0.86} : null]}>
+        style={({ pressed }) => [
+          styles.cta,
+          pressed ? { opacity: 0.86 } : null,
+        ]}
+      >
         <Text style={styles.ctaLabel}>Ver lectura semanal en chat</Text>
       </Pressable>
     </Card>

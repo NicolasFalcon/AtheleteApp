@@ -32,6 +32,9 @@ export async function invalidateWorkoutQueries(
       queryKey: ['workouts', 'library', userId],
     }),
     queryClient.invalidateQueries({
+      queryKey: ['workouts', 'browse'],
+    }),
+    queryClient.invalidateQueries({
       queryKey: ['workouts', 'editable', userId],
     }),
     queryClient.invalidateQueries({

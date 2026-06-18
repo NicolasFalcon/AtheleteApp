@@ -1,11 +1,8 @@
 import {ImageBackground, Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import {ArrowRight, X} from 'lucide-react-native';
+import {atheleteWearEditorial} from '@app/assets/images';
 import {Button} from '@app/components/ui';
 import {useAppTheme} from '@app/hooks/useAppTheme';
-
-const wearPreviewImage = {
-  uri: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=1200&q=80',
-};
 
 type WearPreviewModalProps = {
   visible: boolean;
@@ -34,7 +31,7 @@ export function WearPreviewModal({visible, onClose}: WearPreviewModalProps) {
     },
     heroOverlay: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: 'rgba(0,0,0,0.48)',
+      backgroundColor: 'rgba(0,0,0,0.56)',
     },
     closeButton: {
       alignSelf: 'flex-end',
@@ -88,7 +85,7 @@ export function WearPreviewModal({visible, onClose}: WearPreviewModalProps) {
       onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <ImageBackground source={wearPreviewImage} style={styles.hero}>
+          <ImageBackground source={atheleteWearEditorial} style={styles.hero}>
             <View style={styles.heroOverlay} />
             <Pressable onPress={onClose} style={styles.closeButton}>
               <X color="#FFFFFF" size={18} strokeWidth={2.2} />

@@ -1,8 +1,7 @@
-import {SlidersHorizontal} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {WorkoutSearchBar} from '@app/features/workouts/components/WorkoutSearchBar';
-import {WorkoutSegmentedControl} from '@app/features/workouts/components/WorkoutSegmentedControl';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { ArrowLeft, SlidersHorizontal } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { WorkoutSearchBar } from '@app/features/workouts/components/WorkoutSearchBar';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type ExerciseLibraryHeaderProps = {
   totalCount: number;
@@ -10,122 +9,127 @@ type ExerciseLibraryHeaderProps = {
   viewMode: 'all' | 'favorites';
   activeFiltersCount: number;
   searchQuery: string;
-  onViewModeChange: (value: 'all' | 'favorites') => void;
+  title: string;
+  subtitle: string;
+  onBack: () => void;
   onSearchChange: (value: string) => void;
+  onOpenFilters: () => void;
 };
 
 export function ExerciseLibraryHeader({
-  totalCount,
   visibleCount,
   viewMode,
   activeFiltersCount,
   searchQuery,
-  onViewModeChange,
+  title,
+  subtitle,
+  onBack,
   onSearchChange,
+  onOpenFilters,
 }: ExerciseLibraryHeaderProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
-    card: {
-      borderRadius: 28,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
-      padding: 16,
-      gap: 14,
-      shadowColor: '#000000',
-      ...theme.elevations.card,
+    container: {
+      gap: 11,
+    },
+    backButton: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      paddingVertical: 2,
+    },
+    backLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      fontWeight: theme.typography.weights.semibold,
     },
     topRow: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
+    },
+    titleWrap: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: theme.typography.weights.bold,
       letterSpacing: -0.6,
     },
     subtitle: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
-      lineHeight: 19,
-      marginTop: 6,
-      maxWidth: 210,
+      fontSize: 12,
+      marginTop: 1,
     },
-    badge: {
-      borderRadius: theme.radii.pill,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
-      paddingHorizontal: 14,
-      paddingVertical: 10,
-      minWidth: 92,
-    },
-    badgeTop: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.monoFamily,
-      fontSize: 11,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 2,
-      textAlign: 'center',
-    },
-    badgeBottom: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 10,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 2.4,
-      textAlign: 'center',
-      textTransform: 'uppercase',
-      marginTop: 2,
-    },
-    helperRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.sm,
-    },
-    helperLeft: {
+    controls: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
     },
-    helperLabel: {
+    filterButton: {
+      minHeight: 40,
+      borderRadius: theme.radii.pill,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      paddingHorizontal: 13,
+      backgroundColor: theme.colors.accent,
+    },
+    filterLabel: {
+      color: theme.colors.accentContrast,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    filterCount: {
+      minWidth: 19,
+      height: 19,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(255,255,255,0.16)',
+    },
+    filterCountLabel: {
+      color: theme.colors.accentContrast,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 10,
+      fontWeight: theme.typography.weights.bold,
+    },
+    status: {
+      flex: 1,
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 12,
+      textAlign: 'right',
     },
   });
 
+  const appliedCount = activeFiltersCount + (viewMode === 'favorites' ? 1 : 0);
+
   return (
-    <View style={styles.card}>
+    <View style={styles.container}>
+      <Pressable onPress={onBack} style={styles.backButton}>
+        <ArrowLeft color={theme.colors.textSecondary} size={16} />
+        <Text style={styles.backLabel}>Volver a explorar</Text>
+      </Pressable>
       <View style={styles.topRow}>
-        <View>
-          <Text style={styles.title}>Biblioteca de ejercicios</Text>
-          <Text style={styles.subtitle}>
-            Explora por equipo, zona y nivel para encontrar el ejercicio preciso.
-          </Text>
-        </View>
-        <View style={styles.badge}>
-          <Text style={styles.badgeTop}>{visibleCount}</Text>
-          <Text style={styles.badgeBottom}>Ejercicios</Text>
+        <View style={styles.titleWrap}>
+          <View>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
+          </View>
         </View>
       </View>
-
-      <WorkoutSegmentedControl
-        value={viewMode}
-        highlighted
-        options={[
-          {key: 'all', label: `Todos (${totalCount})`},
-          {key: 'favorites', label: 'Favoritos'},
-        ]}
-        onChange={onViewModeChange}
-      />
 
       <WorkoutSearchBar
         value={searchQuery}
@@ -133,25 +137,26 @@ export function ExerciseLibraryHeader({
         placeholder="Buscar ejercicios..."
       />
 
-      <View style={styles.helperRow}>
-        <View style={styles.helperLeft}>
+      <View style={styles.controls}>
+        <Pressable onPress={onOpenFilters} style={styles.filterButton}>
           <SlidersHorizontal
-            color={theme.colors.textSecondary}
-            size={14}
+            color={theme.colors.accentContrast}
+            size={15}
             strokeWidth={2}
           />
-          <Text style={styles.helperLabel}>
-            {viewMode === 'favorites'
-              ? 'Tus ejercicios guardados'
-              : activeFiltersCount > 0
-                ? `${activeFiltersCount} filtro${activeFiltersCount === 1 ? '' : 's'} activo${activeFiltersCount === 1 ? '' : 's'}`
-                : 'Sin filtros activos'}
-          </Text>
-        </View>
-        <Text style={styles.helperLabel}>
-          {viewMode === 'favorites'
-            ? `${visibleCount} favoritos`
-            : `${visibleCount} ejercicios`}
+          <Text style={styles.filterLabel}>Filtros</Text>
+          {appliedCount > 0 ? (
+            <View style={styles.filterCount}>
+              <Text style={styles.filterCountLabel}>{appliedCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
+        <Text style={styles.status}>
+          {appliedCount > 0
+            ? `${appliedCount} filtro${
+                appliedCount === 1 ? '' : 's'
+              } · ${visibleCount} cargados`
+            : `${visibleCount} cargados`}
         </Text>
       </View>
     </View>

@@ -1,7 +1,15 @@
-import {Star} from 'lucide-react-native';
-import {StyleSheet, Text, View} from 'react-native';
-import {Chip, HorizontalItemRail} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import {
+  Activity,
+  Dumbbell,
+  LayoutGrid,
+  Move,
+  Star,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Chip, HorizontalItemRail } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type WorkoutQuickFilterChipsProps = {
   favoritesOnly: boolean;
@@ -11,6 +19,15 @@ type WorkoutQuickFilterChipsProps = {
   onSelectFilter: (value: string) => void;
 };
 
+const filterIcons: Record<string, LucideIcon> = {
+  Todos: LayoutGrid,
+  Fuerza: Dumbbell,
+  Cardio: Activity,
+  'Full body': Move,
+  HIIT: Zap,
+  Movilidad: Move,
+};
+
 export function WorkoutQuickFilterChips({
   favoritesOnly,
   onToggleFavorites,
@@ -18,7 +35,7 @@ export function WorkoutQuickFilterChips({
   activeFilter,
   onSelectFilter,
 }: WorkoutQuickFilterChipsProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     row: {
@@ -26,8 +43,8 @@ export function WorkoutQuickFilterChips({
       paddingRight: theme.spacing.sm,
     },
     chip: {
-      minHeight: 32,
-      paddingHorizontal: 14,
+      minHeight: 38,
+      paddingHorizontal: 13,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
     },
@@ -49,6 +66,11 @@ export function WorkoutQuickFilterChips({
       alignItems: 'center',
       gap: 6,
     },
+    filterContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+    },
   });
 
   return (
@@ -56,11 +78,14 @@ export function WorkoutQuickFilterChips({
       <Chip
         selected={favoritesOnly}
         onPress={onToggleFavorites}
-        style={[styles.chip, favoritesOnly ? styles.chipSelected : null]}>
+        style={[styles.chip, favoritesOnly ? styles.chipSelected : null]}
+      >
         <View style={styles.favoriteContent}>
           <Star
             color={
-              favoritesOnly ? theme.colors.accentContrast : theme.colors.textSecondary
+              favoritesOnly
+                ? theme.colors.accentContrast
+                : theme.colors.textSecondary
             }
             size={12}
             strokeWidth={2}
@@ -69,29 +94,45 @@ export function WorkoutQuickFilterChips({
             style={[
               styles.chipLabel,
               favoritesOnly ? styles.chipLabelSelected : null,
-            ]}>
+            ]}
+          >
             Solo favoritos
           </Text>
         </View>
       </Chip>
-      {options.map(option => (
-        <Chip
-          key={option}
-          selected={activeFilter === option}
-          onPress={() => onSelectFilter(option)}
-          style={[
-            styles.chip,
-            activeFilter === option ? styles.chipSelected : null,
-          ]}>
-          <Text
-            style={[
-              styles.chipLabel,
-              activeFilter === option ? styles.chipLabelSelected : null,
-            ]}>
-            {option}
-          </Text>
-        </Chip>
-      ))}
+      {options.map(option => {
+        const Icon = filterIcons[option] || LayoutGrid;
+        const selected = activeFilter === option;
+
+        return (
+          <Chip
+            key={option}
+            selected={selected}
+            onPress={() => onSelectFilter(option)}
+            style={[styles.chip, selected ? styles.chipSelected : null]}
+          >
+            <View style={styles.filterContent}>
+              <Icon
+                color={
+                  selected
+                    ? theme.colors.accentContrast
+                    : theme.colors.textSecondary
+                }
+                size={13}
+                strokeWidth={2}
+              />
+              <Text
+                style={[
+                  styles.chipLabel,
+                  selected ? styles.chipLabelSelected : null,
+                ]}
+              >
+                {option}
+              </Text>
+            </View>
+          </Chip>
+        );
+      })}
     </HorizontalItemRail>
   );
 }

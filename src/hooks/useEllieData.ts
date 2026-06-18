@@ -1,9 +1,9 @@
-import {useMemo} from 'react';
-import {useQuery} from '@tanstack/react-query';
-import {useAuth} from '@app/hooks/useAuth';
-import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
-import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
-import {fetchEllieOverview} from '@app/services/supabase/ellie';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@app/hooks/useAuth';
+import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
+import { fetchEllieOverview } from '@app/services/supabase/ellie';
 import {
   buildEllieContext,
   ellieQuickChips,
@@ -19,12 +19,7 @@ import {
 
 export type ElliePromptCard = {
   id: string;
-  icon:
-    | 'dumbbell'
-    | 'utensils'
-    | 'target'
-    | 'droplets'
-    | 'trending-up';
+  icon: 'dumbbell' | 'utensils' | 'target' | 'droplets' | 'trending-up';
   title: string;
   subtitle: string;
   prompt: string;
@@ -86,10 +81,9 @@ function buildPromptCards(ctx: EllieFullContext): ElliePromptCard[] {
   ];
 }
 
-function getPromptMode(prompt: string):
-  | 'generate_workout'
-  | 'generate_nutrition'
-  | undefined {
+function getPromptMode(
+  prompt: string,
+): 'generate_workout' | 'generate_nutrition' | undefined {
   const normalized = prompt.toLowerCase();
 
   if (
@@ -112,7 +106,7 @@ function getPromptMode(prompt: string):
 }
 
 export function useEllieData() {
-  const {profile} = useAuth();
+  const { profile } = useAuth();
   const personalRecordsQuery = usePersonalRecords();
   const exercisesQuery = useExerciseLibrary();
 
@@ -146,6 +140,7 @@ export function useEllieData() {
         id: profile.id,
         name: profile.name,
         birthDate: profile.birthDate,
+        gender: profile.gender,
         weight: profile.weight || 0,
         height: profile.height || 0,
         goal: profile.goal || 'maintain',
@@ -154,7 +149,8 @@ export function useEllieData() {
         availableEquipment: profile.availableEquipment,
         restrictionsNotes: overviewQuery.data.profileExtras.restrictionsNotes,
         injuryNotes: overviewQuery.data.profileExtras.injuryNotes,
-        exercisePreferences: overviewQuery.data.profileExtras.exercisePreferences,
+        exercisePreferences:
+          overviewQuery.data.profileExtras.exercisePreferences,
         exerciseAvoidances: overviewQuery.data.profileExtras.exerciseAvoidances,
         dietPreferences: overviewQuery.data.profileExtras.dietPreferences,
         foodAvoidances: overviewQuery.data.profileExtras.foodAvoidances,
@@ -250,8 +246,11 @@ export function useEllieData() {
     }
 
     const exerciseName =
-      exerciseNameMap[personalRecordsQuery.latestRecord.exerciseId] || 'Ejercicio';
-    return `${exerciseName}: ${formatPRValue(personalRecordsQuery.latestRecord)}`;
+      exerciseNameMap[personalRecordsQuery.latestRecord.exerciseId] ||
+      'Ejercicio';
+    return `${exerciseName}: ${formatPRValue(
+      personalRecordsQuery.latestRecord,
+    )}`;
   }, [exerciseNameMap, personalRecordsQuery.latestRecord]);
 
   const serializedContext = useMemo(
@@ -261,13 +260,12 @@ export function useEllieData() {
 
   const suggestedModes = useMemo(
     () =>
-      promptCards.reduce<Record<string, 'generate_workout' | 'generate_nutrition' | undefined>>(
-        (accumulator, card) => {
-          accumulator[card.prompt] = getPromptMode(card.prompt);
-          return accumulator;
-        },
-        {},
-      ),
+      promptCards.reduce<
+        Record<string, 'generate_workout' | 'generate_nutrition' | undefined>
+      >((accumulator, card) => {
+        accumulator[card.prompt] = getPromptMode(card.prompt);
+        return accumulator;
+      }, {}),
     [promptCards],
   );
 
@@ -291,7 +289,7 @@ export function useEllieData() {
     secondaryInsights: insights.slice(1, 4),
     nudges,
     priorityNudges: nudges.filter(
-      (nudge): nudge is EllieNudge & {action: EllieActionType} =>
+      (nudge): nudge is EllieNudge & { action: EllieActionType } =>
         Boolean(nudge.action && nudge.actionLabel),
     ),
     promptCards,

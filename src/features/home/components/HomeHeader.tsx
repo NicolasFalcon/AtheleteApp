@@ -1,17 +1,9 @@
-import {StyleSheet, Text, View} from 'react-native';
-import {NotificationBadgeButton} from '@app/features/notifications/components/NotificationBadgeButton';
-import {useAuth} from '@app/hooks/useAuth';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {getGreeting} from '@app/lib/date';
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map(part => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
+import { StyleSheet, Text, View } from 'react-native';
+import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
+import { NotificationBadgeButton } from '@app/features/notifications/components/NotificationBadgeButton';
+import { useAuth } from '@app/hooks/useAuth';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { getGreeting } from '@app/lib/date';
 
 type HomeHeaderProps = {
   onOpenNotifications?: () => void;
@@ -22,8 +14,8 @@ export function HomeHeader({
   onOpenNotifications,
   notificationsCount = 0,
 }: HomeHeaderProps) {
-  const {profile} = useAuth();
-  const {theme} = useAppTheme();
+  const { profile } = useAuth();
+  const { theme } = useAppTheme();
   const displayName = profile?.name?.trim() || 'Athelete';
 
   const styles = StyleSheet.create({
@@ -32,30 +24,22 @@ export function HomeHeader({
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: theme.spacing.md,
+      minHeight: 44,
     },
     userRow: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: theme.spacing.sm,
+      gap: 10,
     },
-    avatar: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.accent,
-    },
-    avatarLabel: {
-      color: theme.colors.accentContrast,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      fontWeight: theme.typography.weights.bold,
+    copy: {
+      flex: 1,
+      gap: 1,
     },
     eyebrow: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
+      fontSize: 11,
     },
     title: {
       color: theme.colors.textPrimary,
@@ -68,12 +52,16 @@ export function HomeHeader({
   return (
     <View style={styles.container}>
       <View style={styles.userRow}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarLabel}>{getInitials(displayName)}</Text>
-        </View>
-        <View>
+        <ProfileAvatar
+          avatarKey={profile?.avatarKey}
+          profilePhotoUrl={profile?.profilePhotoUrl}
+          size={40}
+        />
+        <View style={styles.copy}>
           <Text style={styles.eyebrow}>{getGreeting()},</Text>
-          <Text style={styles.title}>{displayName}</Text>
+          <Text numberOfLines={1} style={styles.title}>
+            {displayName}
+          </Text>
         </View>
       </View>
       <NotificationBadgeButton

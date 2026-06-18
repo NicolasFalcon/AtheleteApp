@@ -49,10 +49,28 @@ export const typography = {
 } as const;
 
 export const elevations = {
+  subtle: {
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.045,
+    shadowRadius: 18,
+    elevation: 1,
+  },
   card: {
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.055,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 28,
     elevation: 2,
+  },
+  prominent: {
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.1,
+    shadowRadius: 34,
+    elevation: 3,
+  },
+  floating: {
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.14,
+    shadowRadius: 42,
+    elevation: 8,
   },
 } as const;

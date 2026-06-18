@@ -1,5 +1,5 @@
-import {getLocalDateKey} from '@app/lib/date';
-import {awardGamificationEvent} from '@app/services/supabase/gamification';
+import { getLocalDateKey } from '@app/lib/date';
+import { awardGamificationEventBestEffort } from '@app/services/supabase/gamification';
 import {
   calculateHydrationStreak,
   dedupeFeaturedTemplates,
@@ -18,8 +18,8 @@ import {
   type WorkoutExercise,
   type WorkoutSession,
 } from '@app/shared';
-import {getSupabaseClient} from '@app/services/supabase/client';
-import type {Database, Json} from '@app/types/supabase';
+import { getSupabaseClient } from '@app/services/supabase/client';
+import type { Database, Json } from '@app/types/supabase';
 
 type ChallengeParticipationRow =
   Database['public']['Tables']['challenge_participations']['Row'];
@@ -37,16 +37,49 @@ type WorkoutSessionRow =
 type WorkoutTemplateRow =
   Database['public']['Tables']['workout_templates']['Row'];
 
+const WORKOUT_LIBRARY_PAGE_SIZE = 10;
+const EXERCISE_LIBRARY_PAGE_SIZE = 12;
+
+export type WorkoutLibrarySource = 'library' | 'ellie' | 'mine';
+
+export type WorkoutLibraryPageParams = {
+  userId?: string;
+  source: WorkoutLibrarySource;
+  search: string;
+  type: string;
+  favoriteIds: string[] | null;
+  page: number;
+  pageSize?: number;
+};
+
+export type ExerciseLibraryPageParams = {
+  search: string;
+  equipment: string;
+  bodyPart: string;
+  level: string;
+  favoriteIds: string[] | null;
+  page: number;
+  pageSize?: number;
+};
+
+export type PaginatedResult<T> = {
+  items: T[];
+  total: number;
+  nextPage: number | undefined;
+};
+
 type HomeOverview = {
   todaySession: WorkoutSession | null;
-  challenge: (HabitChallenge & {
-    challengeDay: number;
-    completedDays: number;
-    streak: number;
-    completedToday: number;
-    totalHabits: number;
-    progressPct: number;
-  }) | null;
+  challenge:
+    | (HabitChallenge & {
+        challengeDay: number;
+        completedDays: number;
+        streak: number;
+        completedToday: number;
+        totalHabits: number;
+        progressPct: number;
+      })
+    | null;
   nutritionPlan: NutritionPlan | null;
   todayNutritionLog: DailyNutritionLog | null;
   hydration: {
@@ -67,6 +100,19 @@ function getClient() {
   }
 
   return client;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    error &&
+    typeof error === 'object' &&
+    'message' in error &&
+    typeof error.message === 'string'
+  ) {
+    return error.message;
+  }
+
+  return fallback;
 }
 
 function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
@@ -103,8 +149,7 @@ async function cancelWorkoutSessionsByIds(ids: string[]): Promise<void> {
   }
 
   const client = getClient();
-  const {error} = await (client
-    .from('workout_sessions') as any)
+  const { error } = await (client.from('workout_sessions') as any)
     .update({
       status: 'canceled',
       completed: false,
@@ -122,8 +167,10 @@ function isResumableSession(row: WorkoutSessionRow): boolean {
     ? row.completed_exercises.filter(item => typeof item === 'string')
     : [];
 
-  return row.status === 'canceled'
-    && (completedExercises.length > 0 || (row.duration || 0) > 0);
+  return (
+    row.status === 'canceled' &&
+    (completedExercises.length > 0 || (row.duration || 0) > 0)
+  );
 }
 
 function calculateSessionDurationMinutes(
@@ -157,8 +204,8 @@ async function getCompletedWorkoutCountThisWeek(userId: string) {
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   const weekStartKey = getLocalDateKey(weekStart);
 
-  const {count, error} = await (client.from('workout_sessions') as any)
-    .select('id', {count: 'exact', head: true})
+  const { count, error } = await (client.from('workout_sessions') as any)
+    .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('completed', true)
     .gte('date', weekStartKey);
@@ -210,7 +257,9 @@ function parseChallengeHabits(
 
     return {
       id:
-        typeof item.id === 'string' ? item.id : `habit-${participation.id}-${index}`,
+        typeof item.id === 'string'
+          ? item.id
+          : `habit-${participation.id}-${index}`,
       challengeId: participation.id,
       category:
         item.category === 'training' ||
@@ -231,7 +280,7 @@ function buildHabitLogMap(
 
   logs.forEach(log => {
     if (!map[log.date]) {
-      map[log.date] = Array.from({length: totalHabits}, () => false);
+      map[log.date] = Array.from({ length: totalHabits }, () => false);
     }
 
     if (log.habit_index >= 0 && log.habit_index < totalHabits) {
@@ -247,13 +296,13 @@ export async function fetchWorkoutLibrary(userId?: string): Promise<Workout[]> {
   let builder = client
     .from('workout_templates')
     .select('*')
-    .order('created_at', {ascending: false});
+    .order('created_at', { ascending: false });
 
   builder = userId
     ? builder.or(`created_by.eq.${userId},is_public.eq.true,created_by.is.null`)
     : builder.or('is_public.eq.true,created_by.is.null');
 
-  const {data: templates, error: templateError} = await builder;
+  const { data: templates, error: templateError } = await builder;
 
   if (templateError) {
     throw templateError;
@@ -266,7 +315,7 @@ export async function fetchWorkoutLibrary(userId?: string): Promise<Workout[]> {
   }
 
   const templateIds = templateRows.map(template => template.id);
-  const {data: exerciseRows, error: exerciseError} = await client
+  const { data: exerciseRows, error: exerciseError } = await client
     .from('template_exercises')
     .select('*')
     .in('template_id', templateIds)
@@ -297,18 +346,83 @@ export async function fetchWorkoutLibrary(userId?: string): Promise<Workout[]> {
   );
 }
 
+export async function fetchWorkoutLibraryPage(
+  params: WorkoutLibraryPageParams,
+): Promise<PaginatedResult<Workout>> {
+  if (params.favoriteIds?.length === 0) {
+    return { items: [], total: 0, nextPage: undefined };
+  }
+
+  const client = getClient();
+  const pageSize = params.pageSize || WORKOUT_LIBRARY_PAGE_SIZE;
+  const from = params.page * pageSize;
+  const to = from + pageSize - 1;
+  let builder = client
+    .from('workout_templates')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to);
+
+  if (params.source === 'library') {
+    builder = builder.or('created_by.is.null,is_public.eq.true');
+  } else {
+    if (!params.userId) {
+      return { items: [], total: 0, nextPage: undefined };
+    }
+
+    builder = builder.eq('created_by', params.userId).eq('is_public', false);
+    builder =
+      params.source === 'ellie'
+        ? builder.or('created_by_ai.eq.true,source.eq.ellie')
+        : builder
+            .or('created_by_ai.eq.false,created_by_ai.is.null')
+            .or('source.neq.ellie,source.is.null');
+  }
+
+  const normalizedSearch = params.search.trim();
+
+  if (normalizedSearch) {
+    builder = builder.ilike('title', `%${normalizedSearch}%`);
+  }
+
+  if (params.type !== 'all') {
+    builder = builder.eq('type', params.type);
+  }
+
+  if (params.favoriteIds && params.favoriteIds.length > 0) {
+    builder = builder.in('id', params.favoriteIds);
+  }
+
+  const { data, error, count } = await builder;
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data || []) as WorkoutTemplateRow[];
+  const items = dedupeFeaturedTemplates(rows).map(row =>
+    mapTemplateRowToWorkout(row, {}),
+  );
+
+  return {
+    items,
+    total: count || 0,
+    nextPage: rows.length === pageSize ? params.page + 1 : undefined,
+  };
+}
+
 export async function fetchEffectiveWorkoutSession(
   userId: string,
 ): Promise<WorkoutSession | null> {
   const client = getClient();
   const today = getLocalDateKey();
 
-  const {data: inProgressRows, error: inProgressError} = await client
+  const { data: inProgressRows, error: inProgressError } = await client
     .from('workout_sessions')
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'in_progress')
-    .order('created_at', {ascending: false});
+    .order('created_at', { ascending: false });
 
   if (inProgressError) {
     throw inProgressError;
@@ -326,19 +440,21 @@ export async function fetchEffectiveWorkoutSession(
   const todayInProgress = inProgress.filter(row => row.date === today);
 
   if (todayInProgress.length > 1) {
-    await cancelWorkoutSessionsByIds(todayInProgress.slice(1).map(row => row.id));
+    await cancelWorkoutSessionsByIds(
+      todayInProgress.slice(1).map(row => row.id),
+    );
   }
 
   if (todayInProgress[0]) {
     return mapWorkoutSession(todayInProgress[0]);
   }
 
-  const {data: recentRows, error: recentError} = await client
+  const { data: recentRows, error: recentError } = await client
     .from('workout_sessions')
     .select('*')
     .eq('user_id', userId)
     .eq('date', today)
-    .order('created_at', {ascending: false})
+    .order('created_at', { ascending: false })
     .limit(20);
 
   if (recentError) {
@@ -367,12 +483,12 @@ export async function startWorkoutSession(params: {
   const client = getClient();
   const today = getLocalDateKey();
   const now = new Date().toISOString();
-  const {data: inProgressRows, error: inProgressError} = await client
+  const { data: inProgressRows, error: inProgressError } = await client
     .from('workout_sessions')
     .select('*')
     .eq('user_id', params.userId)
     .eq('status', 'in_progress')
-    .order('created_at', {ascending: false});
+    .order('created_at', { ascending: false });
 
   if (inProgressError) {
     throw inProgressError;
@@ -399,8 +515,7 @@ export async function startWorkoutSession(params: {
     await cancelWorkoutSessionsByIds(inProgress.map(row => row.id));
   }
 
-  const {data, error} = await (client
-    .from('workout_sessions') as any)
+  const { data, error } = await (client.from('workout_sessions') as any)
     .insert({
       user_id: params.userId,
       workout_id: params.workout.id,
@@ -429,8 +544,7 @@ export async function persistWorkoutSessionExercises(params: {
   completedExercises: string[];
 }): Promise<WorkoutSession> {
   const client = getClient();
-  const {data, error} = await (client
-    .from('workout_sessions') as any)
+  const { data, error } = await (client.from('workout_sessions') as any)
     .update({
       completed_exercises: params.completedExercises,
     })
@@ -461,8 +575,7 @@ export async function completeWorkoutSession(params: {
     params.completedExercises,
   );
 
-  const {data, error} = await (client
-    .from('workout_sessions') as any)
+  const { data, error } = await (client.from('workout_sessions') as any)
     .update({
       status: 'completed',
       completed: true,
@@ -475,23 +588,34 @@ export async function completeWorkoutSession(params: {
     .select('*')
     .single();
 
-  if (error) {
-    throw error;
+  if (error || !data) {
+    throw new Error(getErrorMessage(error, 'No pudimos finalizar la sesión.'));
   }
 
   const nextSession = mapWorkoutSession(data as WorkoutSessionRow);
-  const completedThisWeek = await getCompletedWorkoutCountThisWeek(
-    params.session.userId,
-  );
+  let completedThisWeek: number | null = null;
 
-  await awardGamificationEvent({
-    userId: params.session.userId,
-    eventKey: `workout_completed:${params.session.id}`,
+  try {
+    completedThisWeek = await getCompletedWorkoutCountThisWeek(
+      params.session.userId,
+    );
+  } catch (countError) {
+    console.warn(
+      '[workout-completion] No se pudo calcular la consistencia semanal.',
+      countError,
+    );
+  }
+
+  await awardGamificationEventBestEffort({
+    source: 'workout-completion',
     eventType: 'workout_completed',
+    referenceId: params.session.id,
     points: 50,
     badgeIds: [
       'first_workout',
-      ...(completedThisWeek >= 3 ? (['week_consistency'] as const) : []),
+      ...(completedThisWeek !== null && completedThisWeek >= 3
+        ? (['week_consistency'] as const)
+        : []),
     ],
     metadata: {
       sessionId: params.session.id,
@@ -521,8 +645,7 @@ export async function cancelWorkoutSession(params: {
     params.completedExercises,
   );
 
-  const {data, error} = await (client
-    .from('workout_sessions') as any)
+  const { data, error } = await (client.from('workout_sessions') as any)
     .update({
       status: 'canceled',
       completed: false,
@@ -551,8 +674,7 @@ export async function resumeWorkoutSession(
       ? new Date(Date.now() - session.duration * 60000).toISOString()
       : session.startedAt || new Date().toISOString();
 
-  const {data, error} = await (client
-    .from('workout_sessions') as any)
+  const { data, error } = await (client.from('workout_sessions') as any)
     .update({
       status: 'in_progress',
       started_at: resumedStartedAt,
@@ -577,7 +699,7 @@ export async function fetchExerciseLibrary(): Promise<LibraryExercise[]> {
   let hasMore = true;
 
   while (hasMore) {
-    const {data, error} = await client
+    const { data, error } = await client
       .from('exercises')
       .select('*')
       .order('name')
@@ -593,6 +715,83 @@ export async function fetchExerciseLibrary(): Promise<LibraryExercise[]> {
   }
 
   return rows.map(mapDbExerciseRow);
+}
+
+const equipmentDbValues: Record<string, string> = {
+  dumbbells: 'dumbbells',
+  machines: 'machine',
+  bands: 'resistance_band',
+  kettlebells: 'kettlebell',
+};
+
+const bodyPartDbValues: Record<string, string[]> = {
+  legs: ['legs', 'calves', 'glutes'],
+  glutes: ['glutes'],
+  shoulders: ['shoulders', 'traps'],
+  arms: ['biceps', 'triceps', 'forearms'],
+  core: ['core', 'lower_back'],
+  fullbody: ['full_body'],
+};
+
+export async function fetchExerciseLibraryPage(
+  params: ExerciseLibraryPageParams,
+): Promise<PaginatedResult<LibraryExercise>> {
+  if (params.favoriteIds?.length === 0) {
+    return { items: [], total: 0, nextPage: undefined };
+  }
+
+  const client = getClient();
+  const pageSize = params.pageSize || EXERCISE_LIBRARY_PAGE_SIZE;
+  const from = params.page * pageSize;
+  const to = from + pageSize - 1;
+  let builder = client
+    .from('exercises')
+    .select('*', { count: 'exact' })
+    .order('name')
+    .range(from, to);
+
+  const normalizedSearch = params.search.trim();
+
+  if (normalizedSearch) {
+    builder = builder.ilike('name', `%${normalizedSearch}%`);
+  }
+
+  if (params.equipment !== 'all') {
+    builder = builder.eq(
+      'equipment',
+      equipmentDbValues[params.equipment] || params.equipment,
+    );
+  }
+
+  if (params.bodyPart !== 'all') {
+    const values = bodyPartDbValues[params.bodyPart] || [params.bodyPart];
+    builder =
+      values.length === 1
+        ? builder.eq('muscle_group', values[0])
+        : builder.in('muscle_group', values);
+  }
+
+  if (params.level !== 'all') {
+    builder = builder.eq('difficulty', params.level);
+  }
+
+  if (params.favoriteIds && params.favoriteIds.length > 0) {
+    builder = builder.in('id', params.favoriteIds);
+  }
+
+  const { data, error, count } = await builder;
+
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data || []) as ExerciseRow[];
+
+  return {
+    items: rows.map(mapDbExerciseRow),
+    total: count || 0,
+    nextPage: rows.length === pageSize ? params.page + 1 : undefined,
+  };
 }
 
 export async function fetchHomeOverview(params: {
@@ -615,21 +814,21 @@ export async function fetchHomeOverview(params: {
       .select('*')
       .eq('user_id', params.userId)
       .eq('date', today)
-      .order('created_at', {ascending: false})
+      .order('created_at', { ascending: false })
       .limit(1),
     client
       .from('challenge_participations')
       .select('*')
       .eq('user_id', params.userId)
       .in('status', ['active', 'completed'])
-      .order('created_at', {ascending: false})
+      .order('created_at', { ascending: false })
       .limit(1),
     client
       .from('nutrition_plans')
       .select('*')
       .eq('user_id', params.userId)
       .eq('is_active', true)
-      .order('created_at', {ascending: false})
+      .order('created_at', { ascending: false })
       .limit(1),
     client
       .from('daily_nutrition_logs')
@@ -647,7 +846,7 @@ export async function fetchHomeOverview(params: {
       .from('daily_hydration_logs')
       .select('*')
       .eq('user_id', params.userId)
-      .order('date', {ascending: false})
+      .order('date', { ascending: false })
       .limit(14),
   ]);
 
@@ -756,16 +955,15 @@ export async function fetchHomeOverview(params: {
 
   const goalGlasses = params.dailyWaterGoal || 14;
   const goalMl = goalGlasses * 250;
-  const todayHydration = (hydrationTodayResult.data?.[0] as DailyHydrationLogRow)
-    || null;
+  const todayHydration =
+    (hydrationTodayResult.data?.[0] as DailyHydrationLogRow) || null;
   const todayMl = todayHydration?.water_ml || 0;
-  const hydrationLogRows = (hydrationRecentResult.data || []) as DailyHydrationLogRow[];
-  const hydrationLogs: HydrationLog[] = hydrationLogRows.map(
-    log => ({
-      date: log.date,
-      waterMl: log.water_ml,
-    }),
-  );
+  const hydrationLogRows = (hydrationRecentResult.data ||
+    []) as DailyHydrationLogRow[];
+  const hydrationLogs: HydrationLog[] = hydrationLogRows.map(log => ({
+    date: log.date,
+    waterMl: log.water_ml,
+  }));
 
   return {
     todaySession,
@@ -790,7 +988,7 @@ export async function addHydrationAmount(params: {
 }): Promise<void> {
   const client = getClient();
   const today = getLocalDateKey();
-  const {data: existing, error: fetchError} = await client
+  const { data: existing, error: fetchError } = await client
     .from('daily_hydration_logs')
     .select('*')
     .eq('user_id', params.userId)
@@ -809,8 +1007,7 @@ export async function addHydrationAmount(params: {
         water_ml: (existingRow.water_ml || 0) + params.amountMl,
         updated_at: new Date().toISOString(),
       };
-    const {error} = await (client
-      .from('daily_hydration_logs') as any)
+    const { error } = await (client.from('daily_hydration_logs') as any)
       .update(updatePayload)
       .eq('id', existingRow.id);
 
@@ -828,7 +1025,7 @@ export async function addHydrationAmount(params: {
       water_ml: params.amountMl,
     };
 
-  const {error} = await (client.from('daily_hydration_logs') as any).insert(
+  const { error } = await (client.from('daily_hydration_logs') as any).insert(
     insertPayload,
   );
 

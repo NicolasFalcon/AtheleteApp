@@ -1,8 +1,9 @@
-import {getLocalDateKey} from '@app/lib/date';
+import { getLocalDateKey } from '@app/lib/date';
 
 export interface EllieProfileContext {
   name: string;
   age: number | null;
+  gender: string | null;
   weight: number;
   height: number;
   goal: string;
@@ -156,7 +157,9 @@ function formatPRValueRaw(record: {
       const seconds = record.valueDurationSec ?? 0;
       const minutes = Math.floor(seconds / 60);
       const remainingSeconds = seconds % 60;
-      return minutes > 0 ? `${minutes}m ${remainingSeconds}s` : `${remainingSeconds}s`;
+      return minutes > 0
+        ? `${minutes}m ${remainingSeconds}s`
+        : `${remainingSeconds}s`;
     }
     case 'distance':
       return `${record.valueDistanceM ?? 0} m`;
@@ -176,6 +179,7 @@ export function buildEllieContext(params: {
     id: string;
     name: string;
     birthDate: string | null;
+    gender?: string | null;
     weight: number;
     height: number;
     goal: string;
@@ -203,14 +207,21 @@ export function buildEllieContext(params: {
     targetCarbs?: number;
     targetFats?: number;
   } | null;
-  todayNutritionLog: {calories: number; protein: number} | null;
-  dailyNutritionLogs: Array<{date: string; adherence?: number; calories: number}>;
-  challenge: {startDate: string; habits: Array<{name: string}>} | null;
+  todayNutritionLog: { calories: number; protein: number } | null;
+  dailyNutritionLogs: Array<{
+    date: string;
+    adherence?: number;
+    calories: number;
+  }>;
+  challenge: { startDate: string; habits: Array<{ name: string }> } | null;
   habitLogs: Record<string, boolean[]>;
   challengeDay: number;
   currentStreak: number;
   completedDays: number;
-  gamification: {points: number; badges: Array<{id: string; earnedAt?: string}>};
+  gamification: {
+    points: number;
+    badges: Array<{ id: string; earnedAt?: string }>;
+  };
   personalRecords?: {
     records: Array<{
       exerciseId: string;
@@ -241,7 +252,9 @@ export function buildEllieContext(params: {
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const thirtyDaysAgoKey = getLocalDateKey(thirtyDaysAgo);
 
-  const completedSessions = params.workoutSessions.filter(session => session.completed);
+  const completedSessions = params.workoutSessions.filter(
+    session => session.completed,
+  );
   const workoutsThisWeek = completedSessions.filter(
     session => session.date >= weekStartKey,
   ).length;
@@ -251,7 +264,9 @@ export function buildEllieContext(params: {
   const workoutsLast30Days = completedSessions.filter(
     session => session.date >= thirtyDaysAgoKey,
   ).length;
-  const todayWorkout = completedSessions.find(session => session.date === today);
+  const todayWorkout = completedSessions.find(
+    session => session.date === today,
+  );
   const sortedSessions = [...completedSessions].sort((left, right) =>
     right.date.localeCompare(left.date),
   );
@@ -264,7 +279,9 @@ export function buildEllieContext(params: {
       ? Math.round((workoutsThisWeek / params.user.trainingDaysPerWeek) * 100)
       : 0;
 
-  const weekLogs = params.dailyNutritionLogs.filter(log => log.date >= weekStartKey);
+  const weekLogs = params.dailyNutritionLogs.filter(
+    log => log.date >= weekStartKey,
+  );
   const recentAdherence =
     weekLogs.length > 0
       ? Math.round(
@@ -311,7 +328,9 @@ export function buildEllieContext(params: {
   if (params.personalRecords && params.personalRecords.records.length > 0) {
     const records = params.personalRecords.records;
     prContext.totalPRs = records.length;
-    prContext.exercisesWithPRs = new Set(records.map(record => record.exerciseId)).size;
+    prContext.exercisesWithPRs = new Set(
+      records.map(record => record.exerciseId),
+    ).size;
 
     const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
     const recentPRs = records
@@ -352,7 +371,9 @@ export function buildEllieContext(params: {
         return;
       }
 
-      const percentChange = Math.round(((newValue - oldValue) / oldValue) * 100);
+      const percentChange = Math.round(
+        ((newValue - oldValue) / oldValue) * 100,
+      );
       const periodDays = Math.round(
         (new Date(newest.recordedAt).getTime() -
           new Date(oldest.recordedAt).getTime()) /
@@ -374,6 +395,7 @@ export function buildEllieContext(params: {
     profile: {
       name: params.user.name,
       age: computeAge(params.user.birthDate),
+      gender: params.user.gender || null,
       weight: params.user.weight,
       height: params.user.height,
       goal: params.user.goal,
@@ -450,8 +472,15 @@ export function buildEllieContext(params: {
 }
 
 export function serializeEllieContext(ctx: EllieFullContext): string {
-  const {profile, training, nutrition, challenge, achievements, personalRecords, hydration} =
-    ctx;
+  const {
+    profile,
+    training,
+    nutrition,
+    challenge,
+    achievements,
+    personalRecords,
+    hydration,
+  } = ctx;
 
   const goalMap: Record<string, string> = {
     lose_weight: 'Perder peso',
@@ -461,7 +490,16 @@ export function serializeEllieContext(ctx: EllieFullContext): string {
   };
 
   let serialized = `ESTADO ACTUAL DEL USUARIO:
-— Perfil: ${profile.name}${profile.age ? `, ${profile.age} años` : ''}, ${profile.weight}kg, ${profile.height}cm
+— Perfil: ${profile.name}${profile.age ? `, ${profile.age} años` : ''}, ${
+    profile.weight
+  }kg, ${profile.height}cm
+— Género declarado: ${
+    profile.gender === 'male'
+      ? 'Masculino'
+      : profile.gender === 'female'
+      ? 'Femenino'
+      : 'No indicado'
+  }
 — Objetivo: ${goalMap[profile.goal] || profile.goal}
 — Plan: ${profile.trainingDaysPerWeek} días/semana
 — Cuenta: ${profile.isPremium ? 'Premium' : 'Gratis'}
@@ -477,22 +515,32 @@ export function serializeEllieContext(ctx: EllieFullContext): string {
     serialized += `\n— Lesiones/molestias: ${profile.injuryNotes}`;
   }
   if (profile.exercisePreferences.length > 0) {
-    serialized += `\n— Ejercicios preferidos: ${profile.exercisePreferences.join(', ')}`;
+    serialized += `\n— Ejercicios preferidos: ${profile.exercisePreferences.join(
+      ', ',
+    )}`;
   }
   if (profile.exerciseAvoidances.length > 0) {
-    serialized += `\n— Ejercicios a evitar: ${profile.exerciseAvoidances.join(', ')}`;
+    serialized += `\n— Ejercicios a evitar: ${profile.exerciseAvoidances.join(
+      ', ',
+    )}`;
   }
   if (profile.dietPreferences.length > 0) {
-    serialized += `\n— Preferencias alimentarias: ${profile.dietPreferences.join(', ')}`;
+    serialized += `\n— Preferencias alimentarias: ${profile.dietPreferences.join(
+      ', ',
+    )}`;
   }
   if (profile.foodAvoidances.length > 0) {
-    serialized += `\n— Alimentos a evitar: ${profile.foodAvoidances.join(', ')}`;
+    serialized += `\n— Alimentos a evitar: ${profile.foodAvoidances.join(
+      ', ',
+    )}`;
   }
 
   serialized += `\n\nENTRENAMIENTO:
 — Hoy entrenado: ${training.todayWorkoutDone ? 'Sí ✓' : 'No'}
 — Esta semana: ${training.workoutsThisWeek} entrenos
-— Últimos 14 días: ${training.workoutsLast14Days} | 30 días: ${training.workoutsLast30Days}
+— Últimos 14 días: ${training.workoutsLast14Days} | 30 días: ${
+    training.workoutsLast30Days
+  }
 — Racha: ${training.currentStreak} días
 — Adherencia semanal: ${training.weeklyAdherence}%
 — Último entreno: ${training.lastWorkoutDate || 'Sin registro'}`;
@@ -510,7 +558,11 @@ export function serializeEllieContext(ctx: EllieFullContext): string {
     serialized += `\n— Objetivos: ${nutrition.targetCalories} kcal, ${nutrition.targetProtein}g prot, ${nutrition.targetCarbs}g carbs, ${nutrition.targetFats}g grasas`;
   }
 
-  serialized += `\n— Registrado hoy: ${nutrition.loggedToday ? `Sí (${nutrition.todayCalories} kcal, ${nutrition.todayProtein}g prot)` : 'No'}
+  serialized += `\n— Registrado hoy: ${
+    nutrition.loggedToday
+      ? `Sí (${nutrition.todayCalories} kcal, ${nutrition.todayProtein}g prot)`
+      : 'No'
+  }
 — Adherencia reciente: ${nutrition.recentAdherence}%`;
 
   if (challenge.active) {
@@ -527,7 +579,9 @@ export function serializeEllieContext(ctx: EllieFullContext): string {
 — Insignias: ${achievements.unlockedBadgeIds.length}/6`;
 
   if (achievements.nearestUnlocked.length > 0) {
-    serialized += `\n— Próximas a desbloquear: ${achievements.nearestUnlocked.join(', ')}`;
+    serialized += `\n— Próximas a desbloquear: ${achievements.nearestUnlocked.join(
+      ', ',
+    )}`;
   }
 
   if (personalRecords.totalPRs > 0) {

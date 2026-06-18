@@ -140,6 +140,117 @@ export function BackIcon({
   );
 }
 
+export function SunIcon({
+  color = '#BDBDBD',
+  width = 20,
+  height = 20,
+  ...props
+}: IconProps) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 24 24" {...props}>
+      <Circle
+        cx="12"
+        cy="12"
+        r="3.5"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.8}
+      />
+      <Path
+        d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+export function MoonIcon({
+  color = '#BDBDBD',
+  width = 20,
+  height = 20,
+  ...props
+}: IconProps) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 24 24" {...props}>
+      <Path
+        d="M20.2 15.2A8.5 8.5 0 0 1 8.8 3.8 8.5 8.5 0 1 0 20.2 15.2Z"
+        fill="none"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function MaleIcon({
+  color = '#BDBDBD',
+  width = 52,
+  height = 52,
+  ...props
+}: IconProps) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 80 80" {...props}>
+      <Path
+        d="M45 10v5h16.465L42.245 34.223a20.1 20.1 0 1 0 3.535 3.535L65 18.535V35h5V10H45ZM30 65a15 15 0 1 1 0-30 15 15 0 0 1 0 30Z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
+export function FemaleIcon({
+  color = '#BDBDBD',
+  width = 52,
+  height = 52,
+  ...props
+}: IconProps) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 80 80" {...props}>
+      <Path
+        d="M42.5 49.843A20 20 0 1 0 37.5 49.843v5.175H25v5h12.5v10h5v-10H55v-5H42.5v-5.175ZM25 30.018a15 15 0 1 1 30 0 15 15 0 0 1-30 0Z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
+export function WeightIcon({
+  color = '#BDBDBD',
+  width = 24,
+  height = 24,
+  ...props
+}: IconProps) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 24 24" {...props}>
+      <Path
+        d="M18.436 0H5.564C2.76 0 .572 2.425.862 5.211l1.514 14.554A4.73 4.73 0 0 0 7.078 24h9.844a4.73 4.73 0 0 0 4.702-4.235l1.514-14.554C23.428 2.425 21.24 0 18.436 0Zm1.54 7.696-3.831 4.4a.7.7 0 0 1-.53.241h-7.23a.7.7 0 0 1-.53-.241l-3.831-4.4a.7.7 0 0 1 0-.922C6.148 4.335 8.981 2.991 12 2.991s5.852 1.344 7.976 3.783a.7.7 0 0 1 0 .922Z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
+export function HeightIcon({
+  color = '#BDBDBD',
+  width = 24,
+  height = 24,
+  ...props
+}: IconProps) {
+  return (
+    <Svg width={width} height={height} viewBox="0 0 24 24" {...props}>
+      <Path
+        d="M12 1.2v2.4h4.8V6H12v2.4h2.4v2.4H12v2.4h4.8v2.4H12V18h2.4v2.4H12v2.4c0 .662.538 1.2 1.2 1.2h7.2c.662 0 1.2-.538 1.2-1.2V1.2c0-.662-.538-1.2-1.2-1.2h-7.2c-.662 0-1.2.538-1.2 1.2ZM3.505 4.8c-.43 0-.66-.507-.375-.83l2.495-2.84a.5.5 0 0 1 .751 0l2.495 2.84c.284.323.054.83-.376.83H7.2v18.7a.5.5 0 0 1-.5.5H5.3a.5.5 0 0 1-.5-.5V4.8H3.505Z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
 export function SuccessIcon({
   color = '#F6F4EE',
   width = 88,

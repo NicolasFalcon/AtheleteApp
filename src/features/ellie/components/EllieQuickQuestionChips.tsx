@@ -1,9 +1,9 @@
-import {StyleSheet, Text, View} from 'react-native';
-import {Chip, HorizontalItemRail} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { StyleSheet, Text, View } from 'react-native';
+import { Chip, HorizontalItemRail } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 
 type EllieQuickQuestionChipsProps = {
-  chips: Array<{label: string; prompt: string}>;
+  chips: Array<{ label: string; prompt: string }>;
   onSelect: (prompt: string) => void;
 };
 
@@ -11,13 +11,13 @@ export function EllieQuickQuestionChips({
   chips,
   onSelect,
 }: EllieQuickQuestionChipsProps) {
-  const {theme} = useAppTheme();
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 17,
+      fontSize: 15,
       fontWeight: theme.typography.weights.bold,
       letterSpacing: -0.3,
     },
@@ -27,7 +27,7 @@ export function EllieQuickQuestionChips({
       fontSize: 11,
       lineHeight: 16,
       marginTop: 4,
-      marginBottom: 10,
+      marginBottom: 8,
     },
     chip: {
       minHeight: 34,
@@ -45,16 +45,17 @@ export function EllieQuickQuestionChips({
 
   return (
     <View>
-      <Text style={styles.title}>Empieza con una pregunta útil</Text>
+      <Text style={styles.title}>Preguntas útiles</Text>
       <Text style={styles.subtitle}>
-        ELLIE la dejará escrita en el chat para que la revises antes de enviar.
+        Abre la conversación correcta sin empezar desde cero.
       </Text>
       <HorizontalItemRail>
         {chips.map(chip => (
           <Chip
             key={chip.label}
             onPress={() => onSelect(chip.prompt)}
-            style={styles.chip}>
+            style={styles.chip}
+          >
             <Text style={styles.label}>{chip.label}</Text>
           </Chip>
         ))}

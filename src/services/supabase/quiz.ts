@@ -1,5 +1,5 @@
-import {getSupabaseClient} from '@app/services/supabase/client';
-import {awardGamificationEvent} from '@app/services/supabase/gamification';
+import { getSupabaseClient } from '@app/services/supabase/client';
+import { awardGamificationEvent } from '@app/services/supabase/gamification';
 import type {
   QuizAttempt,
   QuizCategoryPreview,
@@ -29,7 +29,8 @@ function mapQuestion(row: any): QuizQuestion {
     correctAnswer: row.correct_answer,
     explanation: row.explanation ?? null,
     difficulty: row.difficulty ?? 'medium',
-    pointsReward: typeof row.points_reward === 'number' ? row.points_reward : 10,
+    pointsReward:
+      typeof row.points_reward === 'number' ? row.points_reward : 10,
     sortOrder: typeof row.sort_order === 'number' ? row.sort_order : 0,
   };
 }
@@ -39,7 +40,7 @@ export async function fetchQuizCategories(
 ): Promise<QuizCategoryPreview[]> {
   const client = getClient();
 
-  const {data: categories, error: categoryError} = await (client as any)
+  const { data: categories, error: categoryError } = await (client as any)
     .from('quiz_categories')
     .select('*')
     .eq('is_active', true)
@@ -49,7 +50,7 @@ export async function fetchQuizCategories(
     throw categoryError;
   }
 
-  const {data: questions, error: questionError} = await (client as any)
+  const { data: questions, error: questionError } = await (client as any)
     .from('quiz_questions')
     .select('id, category_id')
     .eq('is_active', true);
@@ -61,7 +62,7 @@ export async function fetchQuizCategories(
   let attempts: any[] = [];
 
   if (userId) {
-    const {data: rawAttempts, error: attemptError} = await (client as any)
+    const { data: rawAttempts, error: attemptError } = await (client as any)
       .from('quiz_attempts')
       .select('*')
       .eq('user_id', userId);
@@ -100,7 +101,7 @@ export async function fetchQuizQuestions(
   categoryId: string,
 ): Promise<QuizQuestion[]> {
   const client = getClient();
-  const {data, error} = await (client as any)
+  const { data, error } = await (client as any)
     .from('quiz_questions')
     .select('*')
     .eq('category_id', categoryId)
@@ -150,15 +151,15 @@ export async function fetchQuizQuestions(
 
 async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
   const client = getClient();
-  const [{data: attempts, error: attemptsError}, {data: categories, error: catsError}] =
-    await Promise.all([
-      (client.from('quiz_attempts') as any)
-        .select('category_id, score')
-        .eq('user_id', userId),
-      (client.from('quiz_categories') as any)
-        .select('id')
-        .eq('is_active', true),
-    ]);
+  const [
+    { data: attempts, error: attemptsError },
+    { data: categories, error: catsError },
+  ] = await Promise.all([
+    (client.from('quiz_attempts') as any)
+      .select('category_id, score')
+      .eq('user_id', userId),
+    (client.from('quiz_categories') as any).select('id').eq('is_active', true),
+  ]);
 
   if (attemptsError) {
     throw attemptsError;
@@ -168,22 +169,24 @@ async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
     throw catsError;
   }
 
-  const allCategoryIds = ((categories || []) as Array<{id: string}>).map(
+  const allCategoryIds = ((categories || []) as Array<{ id: string }>).map(
     item => item.id,
   );
   const perfectCategories = new Set(
-    ((attempts || []) as Array<{category_id: string; score: number}>)
+    ((attempts || []) as Array<{ category_id: string; score: number }>)
       .filter(item => item.score === 100)
       .map(item => item.category_id),
   );
 
   perfectCategories.add(categoryId);
 
-  if (allCategoryIds.length > 0 && allCategoryIds.every(id => perfectCategories.has(id))) {
+  if (
+    allCategoryIds.length > 0 &&
+    allCategoryIds.every(id => perfectCategories.has(id))
+  ) {
     const awardResult = await awardGamificationEvent({
-      userId,
-      eventKey: 'quiz_master',
       eventType: 'quiz_completed',
+      referenceId: 'quiz_master',
       badgeIds: ['quiz_master'],
       metadata: {
         categoryId,
@@ -210,7 +213,7 @@ export async function submitQuizAttempt(params: {
   const client = getClient();
   const score = Math.round((params.correctCount / params.totalQuestions) * 100);
 
-  const {data, error} = await (client.from('quiz_attempts') as any)
+  const { data, error } = await (client.from('quiz_attempts') as any)
     .insert({
       user_id: params.userId,
       category_id: params.categoryId,
@@ -228,9 +231,8 @@ export async function submitQuizAttempt(params: {
 
   const unlockedBadges: string[] = [];
   const attemptAward = await awardGamificationEvent({
-    userId: params.userId,
-    eventKey: `quiz_attempt:${data.id}`,
     eventType: 'quiz_completed',
+    referenceId: String(data.id),
     points: params.pointsEarned,
     badgeIds: ['first_quiz'],
     metadata: {

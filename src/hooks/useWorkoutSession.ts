@@ -1,7 +1,8 @@
 import {useMemo} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
-import type {Workout} from '@app/shared';
+import type {Workout, WorkoutSession} from '@app/shared';
 import {useAuth} from '@app/hooks/useAuth';
+import {invalidateWorkoutQueries} from '@app/lib/queryInvalidation';
 import {
   cancelWorkoutSession,
   completeWorkoutSession,
@@ -26,14 +27,22 @@ export function useWorkoutSession(workout: Workout | null) {
     queryFn: async () => fetchEffectiveWorkoutSession(userId!),
   });
 
-  const invalidateSurfaceQueries = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({queryKey: ['home', 'overview', userId]}),
-      queryClient.invalidateQueries({queryKey: buildSessionKey(userId)}),
-      queryClient.invalidateQueries({queryKey: ['profile', 'overview', userId]}),
-      queryClient.invalidateQueries({queryKey: ['ellie', 'overview', userId]}),
-      queryClient.invalidateQueries({queryKey: ['progress', 'overview', userId]}),
-    ]);
+  const syncSessionSurfaces = (nextSession: WorkoutSession) => {
+    queryClient.setQueryData(buildSessionKey(userId), nextSession);
+    queryClient.setQueryData(
+      ['home', 'overview', userId],
+      (current: any) =>
+        current ? {...current, todaySession: nextSession} : current,
+    );
+
+    if (userId) {
+      invalidateWorkoutQueries(queryClient, userId).catch(error => {
+        console.warn(
+          '[workout-session] No se pudieron refrescar todas las superficies.',
+          error,
+        );
+      });
+    }
   };
 
   const startMutation = useMutation({
@@ -47,9 +56,8 @@ export function useWorkoutSession(workout: Workout | null) {
         workout,
       });
     },
-    onSuccess: async nextSession => {
-      queryClient.setQueryData(buildSessionKey(userId), nextSession);
-      await invalidateSurfaceQueries();
+    onSuccess: nextSession => {
+      syncSessionSurfaces(nextSession);
     },
   });
 
@@ -85,9 +93,8 @@ export function useWorkoutSession(workout: Workout | null) {
         completedExercises,
       });
     },
-    onSuccess: async nextSession => {
-      queryClient.setQueryData(buildSessionKey(userId), nextSession);
-      await invalidateSurfaceQueries();
+    onSuccess: nextSession => {
+      syncSessionSurfaces(nextSession);
     },
   });
 
@@ -105,9 +112,8 @@ export function useWorkoutSession(workout: Workout | null) {
         completedExercises,
       });
     },
-    onSuccess: async nextSession => {
-      queryClient.setQueryData(buildSessionKey(userId), nextSession);
-      await invalidateSurfaceQueries();
+    onSuccess: nextSession => {
+      syncSessionSurfaces(nextSession);
     },
   });
 
@@ -121,9 +127,8 @@ export function useWorkoutSession(workout: Workout | null) {
 
       return resumeWorkoutSession(session);
     },
-    onSuccess: async nextSession => {
-      queryClient.setQueryData(buildSessionKey(userId), nextSession);
-      await invalidateSurfaceQueries();
+    onSuccess: nextSession => {
+      syncSessionSurfaces(nextSession);
     },
   });
 

@@ -1,4 +1,4 @@
-import { Brain, ChevronRight } from 'lucide-react-native';
+import { ArrowRight, Brain } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 
@@ -11,11 +11,12 @@ export function QuizPromoCard({ onPress }: QuizPromoCardProps) {
 
   const styles = StyleSheet.create({
     card: {
-      borderRadius: theme.radii.md,
-      backgroundColor: theme.colors.surface,
+      minHeight: 104,
+      borderRadius: theme.radii.lg,
+      backgroundColor: theme.colors.textPrimary,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      padding: 14,
+      borderColor: theme.colors.textPrimary,
+      padding: theme.spacing.md,
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing.sm,
@@ -23,10 +24,10 @@ export function QuizPromoCard({ onPress }: QuizPromoCardProps) {
       ...theme.elevations.card,
     },
     iconBox: {
-      width: 46,
-      height: 46,
-      borderRadius: 14,
-      backgroundColor: theme.colors.surfaceMuted,
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.12)',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -41,28 +42,41 @@ export function QuizPromoCard({ onPress }: QuizPromoCardProps) {
       gap: theme.spacing.xs,
     },
     title: {
-      color: theme.colors.textPrimary,
+      color: theme.colors.background,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: theme.typography.weights.semibold,
     },
     badge: {
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderRadius: theme.radii.pill,
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.background,
     },
     badgeLabel: {
-      color: theme.colors.textSecondary,
+      color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 10,
       fontWeight: theme.typography.weights.medium,
     },
     subtitle: {
-      color: theme.colors.textSecondary,
+      color: theme.colors.background,
+      opacity: 0.7,
       fontFamily: theme.typography.fontFamily,
       fontSize: 12,
       lineHeight: 16,
+    },
+    cta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 4,
+    },
+    ctaLabel: {
+      color: theme.colors.background,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
+      fontWeight: theme.typography.weights.bold,
     },
   });
 
@@ -75,7 +89,7 @@ export function QuizPromoCard({ onPress }: QuizPromoCardProps) {
       ]}
     >
       <View style={styles.iconBox}>
-        <Brain color={theme.colors.textPrimary} size={22} strokeWidth={2.1} />
+        <Brain color={theme.colors.background} size={19} strokeWidth={2.1} />
       </View>
       <View style={styles.content}>
         <View style={styles.titleRow}>
@@ -85,11 +99,13 @@ export function QuizPromoCard({ onPress }: QuizPromoCardProps) {
           </View>
         </View>
         <Text numberOfLines={2} style={styles.subtitle}>
-          Pon a prueba tus conocimientos sobre entrenamiento, nutrición y
-          fitness.
+          Responde un quiz breve, aprende algo útil y suma puntos.
         </Text>
+        <View style={styles.cta}>
+          <Text style={styles.ctaLabel}>Jugar ahora</Text>
+          <ArrowRight color={theme.colors.background} size={13} />
+        </View>
       </View>
-      <ChevronRight color={theme.colors.textSecondary} size={18} />
     </Pressable>
   );
 }

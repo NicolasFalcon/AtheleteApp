@@ -17,10 +17,10 @@ export function EllieMessageBubble({ message }: EllieMessageBubbleProps) {
       alignItems: isAssistant ? 'flex-start' : 'flex-end',
     },
     bubble: {
-      maxWidth: isAssistant ? '88%' : '82%',
-      borderRadius: 18,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
+      maxWidth: isAssistant ? '92%' : '78%',
+      borderRadius: isAssistant ? 22 : 18,
+      paddingHorizontal: isAssistant ? 16 : 14,
+      paddingVertical: isAssistant ? 15 : 11,
       backgroundColor: isAssistant ? theme.colors.surface : theme.colors.accent,
       borderWidth: isAssistant ? StyleSheet.hairlineWidth : 0,
       borderColor: theme.colors.border,
@@ -33,7 +33,7 @@ export function EllieMessageBubble({ message }: EllieMessageBubbleProps) {
       elevation: isAssistant ? 1 : 0,
     },
     bubbleAssistant: {
-      borderBottomLeftRadius: 6,
+      borderTopLeftRadius: 8,
     },
     bubbleUser: {
       borderBottomRightRadius: 6,
@@ -43,13 +43,17 @@ export function EllieMessageBubble({ message }: EllieMessageBubbleProps) {
       alignItems: 'center',
       gap: 6,
       marginBottom: 8,
+      paddingBottom: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
     },
     brandLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 11,
       fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 0,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
     },
   });
 

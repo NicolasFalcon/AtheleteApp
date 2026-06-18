@@ -25,14 +25,14 @@ export type AppTheme = {
 };
 
 const lightColors: ThemeColors = {
-  background: '#F3F2EE',
+  background: '#FCFCFB',
   surface: '#FFFFFF',
-  surfaceMuted: '#ECEBE6',
+  surfaceMuted: '#F7F7F5',
   textPrimary: '#111111',
   textSecondary: '#66635B',
-  border: '#D9D7D0',
+  border: 'rgba(17,17,17,0.06)',
   accent: '#111111',
-  accentContrast: '#F8F7F3',
+  accentContrast: '#FFFFFF',
   danger: '#A73A3A',
   success: '#2E6B4C',
 };

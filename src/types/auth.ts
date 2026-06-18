@@ -1,3 +1,5 @@
+import type { AvatarKey } from '@app/types/profileIdentity';
+
 export type AppFlow = 'auth' | 'onboarding' | 'app';
 
 export type OnboardingGoal =
@@ -6,9 +8,14 @@ export type OnboardingGoal =
   | 'maintain'
   | 'improve_health';
 
+export type ProfileGender = 'male' | 'female';
+
 export type OnboardingData = {
+  avatarKey: AvatarKey | null;
+  profilePhotoUrl: string | null;
   goal: OnboardingGoal;
   birthDate: string;
+  gender: ProfileGender;
   weight: number;
   height: number;
   trainingDaysPerWeek: number;
@@ -19,8 +26,11 @@ export type ProfileRecord = {
   name: string;
   email: string;
   onboardingCompleted: boolean;
+  avatarKey: AvatarKey | null;
+  profilePhotoUrl: string | null;
   goal: OnboardingGoal | null;
   birthDate: string | null;
+  gender: ProfileGender | null;
   weight: number | null;
   height: number | null;
   trainingDaysPerWeek: number | null;

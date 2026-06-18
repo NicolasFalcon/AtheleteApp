@@ -19,6 +19,7 @@ export function Card({ children, style }: CardProps) {
       borderColor: theme.colors.border,
       shadowColor: '#000000',
       ...theme.elevations.card,
+      ...(theme.mode === 'light' ? theme.elevations.prominent : null),
     },
   });
 

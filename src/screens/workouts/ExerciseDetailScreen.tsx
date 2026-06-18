@@ -1,32 +1,30 @@
-import {useMemo, useState} from 'react';
-import {Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import { useMemo } from 'react';
 import {
-  ArrowLeft,
-  BookOpen,
-  ChevronRight,
-  Heart,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import {
+  CheckCircle2,
+  ClipboardList,
+  Dumbbell,
   Plus,
+  XCircle,
 } from 'lucide-react-native';
-import {Button, Chip, EmptyState, Loader} from '@app/components/ui';
-import {
-  HOME_ROUTES,
-  PROGRESS_ROUTES,
-  TAB_ROUTES,
-  WORKOUTS_ROUTES,
-} from '@app/constants/routes';
-import {ExercisePrSummaryCard} from '@app/features/pr/components/ExercisePrSummaryCard';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
-import {useFavoriteExercises} from '@app/hooks/useFavoriteExercises';
-import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
-import {useWorkoutLibrary} from '@app/hooks/useWorkoutLibrary';
-import {
-  bodyPartLabels,
-  equipmentLabels,
-  levelLabels,
-} from '@app/shared';
+import { Button, Chip, EmptyState, Loader } from '@app/components/ui';
+import { HOME_ROUTES, WORKOUTS_ROUTES } from '@app/constants/routes';
+import { ExerciseMediaHero } from '@app/features/workouts/components/ExerciseMediaHero';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
+import { bodyPartLabels, equipmentLabels, levelLabels } from '@app/shared';
 import type {
   HomeStackParamList,
   WorkoutsStackParamList,
@@ -36,48 +34,72 @@ type Props =
   | NativeStackScreenProps<HomeStackParamList, 'ExerciseDetail'>
   | NativeStackScreenProps<WorkoutsStackParamList, 'ExerciseDetail'>;
 
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  const {theme} = useAppTheme();
+type ExerciseDetailHeaderProps = {
+  name: string;
+  equipmentLabel: string;
+  bodyPartLabel: string;
+  levelLabel: string;
+  summary: string;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function ExerciseDetailHeader({
+  name,
+  equipmentLabel,
+  bodyPartLabel,
+  levelLabel,
+  summary,
+}: ExerciseDetailHeaderProps) {
+  const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
-    card: {
-      borderRadius: theme.radii.lg,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
-      padding: theme.spacing.lg,
-      gap: theme.spacing.md,
+    header: {
+      gap: 10,
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
+      fontSize: 26,
       fontWeight: theme.typography.weights.semibold,
+      letterSpacing: 0,
+      lineHeight: 31,
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.xs,
+    },
+    summary: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.bodySm,
+      lineHeight: 21,
+      maxWidth: 320,
     },
   });
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>{title}</Text>
-      {children}
+    <View style={styles.header}>
+      <Text style={styles.title}>{name}</Text>
+      <View style={styles.chips}>
+        <Chip>{equipmentLabel}</Chip>
+        <Chip>{bodyPartLabel}</Chip>
+        <Chip>{levelLabel}</Chip>
+      </View>
+      <Text style={styles.summary}>{summary}</Text>
     </View>
   );
 }
 
-export function ExerciseDetailScreen({navigation, route}: Props) {
-  const {theme} = useAppTheme();
+export function ExerciseDetailScreen({ navigation, route }: Props) {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const [imageFailed, setImageFailed] = useState(false);
+  const { height: screenHeight } = useWindowDimensions();
   const exercisesQuery = useExerciseLibrary();
   const exerciseFavorites = useFavoriteExercises();
-  const personalRecordsQuery = usePersonalRecords(route.params.exerciseId);
-  const workoutsQuery = useWorkoutLibrary();
   const exercise = useMemo(
     () =>
       (exercisesQuery.data || []).find(
@@ -85,181 +107,126 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
       ) || null,
     [exercisesQuery.data, route.params.exerciseId],
   );
-
-  const relatedWorkouts = useMemo(() => {
-    if (!exercise) {
-      return [];
-    }
-
-    return (workoutsQuery.data || []).filter(workout =>
-      workout.exercises.some(item =>
-        item.name.toLowerCase().includes(exercise.name.toLowerCase()) ||
-        exercise.name.toLowerCase().includes(item.name.toLowerCase()),
-      ),
-    );
-  }, [exercise, workoutsQuery.data]);
+  const heroHeight = clamp(Math.round(screenHeight * 0.34), 270, 320);
+  const bottomInset = Math.max(insets.bottom, theme.spacing.lg);
+  const bottomBarHeight = 58 + theme.spacing.md + bottomInset;
+  const sheetOverlap = theme.spacing.xl;
 
   const styles = StyleSheet.create({
     safeArea: {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    hero: {
-      height: 272,
-      backgroundColor: theme.colors.surfaceMuted,
+    scrollContent: {
+      paddingBottom: '13%'
     },
-    heroImage: {
-      width: '100%',
-      height: '100%',
-    },
-    heroFallback: {
+    scroll: {
       flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surfaceMuted,
+      marginTop: -sheetOverlap,
     },
-    heroFallbackLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-    },
-    floatingButtonBase: {
-      position: 'absolute',
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: 'rgba(255,255,255,0.82)',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-    },
-    floatingBackButton: {
-      left: theme.spacing.lg,
-    },
-    floatingFavoriteButton: {
-      right: theme.spacing.lg,
-    },
-    content: {
+    sheet: {
+      marginTop: 0,
+      borderTopLeftRadius: theme.radii.xl,
+      borderTopRightRadius: theme.radii.xl,
+      backgroundColor: theme.colors.surface,
       paddingHorizontal: theme.spacing.lg,
-      paddingBottom: 136,
+      paddingTop: theme.spacing.lg,
+      paddingBottom: theme.spacing.xxl,
+      gap: theme.spacing.lg,
+      shadowColor: '#000000',
+      ...theme.elevations.prominent,
+    },
+    technicalBody: {
       gap: theme.spacing.lg,
     },
-    summaryCard: {
-      marginTop: -28,
-      borderRadius: theme.radii.xl,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
+    technicalCard: {
+      borderRadius: theme.radii.lg,
       backgroundColor: theme.colors.surface,
-      padding: theme.spacing.lg,
+      padding: theme.spacing.md,
+      flexDirection: 'row',
       gap: theme.spacing.md,
       shadowColor: '#000000',
-      ...theme.elevations.card,
+      ...theme.elevations.subtle,
     },
-    title: {
+    cardTitle: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.title,
+      fontSize: theme.typography.sizes.body,
       fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.8,
+      letterSpacing: 0,
+      lineHeight: 22,
+    },
+    iconShell: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceMuted,
+      flexShrink: 0,
+    },
+    cardContent: {
+      flex: 1,
+      gap: theme.spacing.xs,
+    },
+    bodyText: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    compactStack: {
+      gap: theme.spacing.xs,
+    },
+    stepRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: theme.spacing.sm,
+    },
+    stepIndex: {
+      width: 23,
+      height: 23,
+      borderRadius: 11.5,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceMuted,
+      flexShrink: 0,
+    },
+    stepIndexText: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.caption,
+      fontWeight: theme.typography.weights.bold,
+    },
+    stepText: {
+      flex: 1,
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      lineHeight: 19,
+    },
+    bulletRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: theme.spacing.sm,
+    },
+    bulletDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      marginTop: 7,
+      backgroundColor: theme.colors.textPrimary,
+      opacity: 0.45,
+      flexShrink: 0,
     },
     chipsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: theme.spacing.xs,
     },
-    bodyText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 21,
-    },
-    rowItem: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: theme.spacing.sm,
-    },
-    rowBullet: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
+    muscleChip: {
       backgroundColor: theme.colors.surfaceMuted,
-    },
-    rowBulletLabel: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.bold,
-    },
-    rowContent: {
-      flex: 1,
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 21,
-    },
-    recommendationRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.md,
-      paddingVertical: theme.spacing.sm,
-    },
-    recommendationLabel: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      fontWeight: theme.typography.weights.medium,
-    },
-    recommendationValue: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-    },
-    articleLink: {
-      marginTop: theme.spacing.sm,
-      borderRadius: theme.radii.md,
-      backgroundColor: theme.colors.surfaceMuted,
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.sm,
-    },
-    articleLinkCopy: {
-      flex: 1,
-      gap: 2,
-    },
-    articleLinkTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      fontWeight: theme.typography.weights.semibold,
-    },
-    articleLinkSubtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-    },
-    workoutLink: {
-      borderRadius: theme.radii.md,
-      backgroundColor: theme.colors.surfaceMuted,
-      paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.sm,
-    },
-    workoutLinkLabel: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      fontWeight: theme.typography.weights.medium,
-      flex: 1,
+      borderColor: 'transparent',
     },
     bottomBar: {
       position: 'absolute',
@@ -267,19 +234,17 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
       right: 0,
       bottom: 0,
       paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
-      backgroundColor: theme.colors.background,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
+      paddingTop: theme.spacing.sm,
+      paddingBottom: bottomInset,
+      backgroundColor: 'rgba(255,255,255,0.96)',
+    },
+    ctaButton: {
+      minHeight: 58,
+      borderRadius: theme.radii.md,
     },
   });
 
-  if (
-    exercisesQuery.isLoading ||
-    workoutsQuery.isLoading ||
-    !exerciseFavorites.loaded ||
-    personalRecordsQuery.isLoading
-  ) {
+  if (exercisesQuery.isLoading || !exerciseFavorites.loaded) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Loader label="Cargando ejercicio..." />
@@ -289,31 +254,16 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
 
   const stackNavigation = navigation as any;
   const routeNames = navigation.getState().routeNames as string[];
-  const personalRecordsRoute = routeNames.includes(WORKOUTS_ROUTES.PersonalRecords)
-    ? WORKOUTS_ROUTES.PersonalRecords
-    : HOME_ROUTES.PersonalRecords;
-  const registerPrRoute = routeNames.includes(WORKOUTS_ROUTES.RegisterPr)
-    ? WORKOUTS_ROUTES.RegisterPr
-    : HOME_ROUTES.RegisterPr;
   const addExerciseToRoutineRoute = routeNames.includes(
     WORKOUTS_ROUTES.AddExerciseToRoutine,
   )
     ? WORKOUTS_ROUTES.AddExerciseToRoutine
     : HOME_ROUTES.AddExerciseToRoutine;
 
-  const openProgressiveOverloadArticle = () => {
-    const parentNavigation = navigation.getParent() as any;
-
-    parentNavigation?.navigate(TAB_ROUTES.Progress, {
-      screen: PROGRESS_ROUTES.BodyScienceArticle,
-      params: {articleId: 'progressive-overload'},
-    });
-  };
-
   if (!exercise) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
+        <View style={styles.sheet}>
           <EmptyState
             title="Ejercicio no encontrado"
             description="No pudimos encontrar este ejercicio dentro de la biblioteca actual."
@@ -324,214 +274,173 @@ export function ExerciseDetailScreen({navigation, route}: Props) {
     );
   }
 
+  const equipmentLabel =
+    equipmentLabels[exercise.equipment] || exercise.equipment;
+  const bodyPartLabel = bodyPartLabels[exercise.bodyPart] || exercise.bodyPart;
+  const levelLabel = levelLabels[exercise.level] || exercise.level;
+  const summaryLine = `${bodyPartLabel} con ${equipmentLabel.toLowerCase()} · ${levelLabel}`;
+  const workedMuscles = Array.from(
+    new Set([
+      ...exercise.musclesWorked.primary,
+      ...exercise.musclesWorked.secondary,
+    ]),
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.hero}>
-        {!imageFailed && exercise.thumbnailUrl ? (
-          <Image
-            source={{uri: exercise.thumbnailUrl}}
-            style={styles.heroImage}
-            resizeMode="cover"
-            onError={() => setImageFailed(true)}
-          />
-        ) : (
-          <View style={styles.heroFallback}>
-            <Text style={styles.heroFallbackLabel}>Imagen no disponible</Text>
-          </View>
-        )}
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={[
-            styles.floatingButtonBase,
-            styles.floatingBackButton,
-            {top: insets.top + 10},
-          ]}>
-          <ArrowLeft color={theme.colors.textPrimary} size={18} strokeWidth={2.2} />
-        </Pressable>
-        {exercise ? (
-          <Pressable
-            onPress={() => {
-              exerciseFavorites.toggleExerciseFavorite(exercise.id).catch(() => {});
-            }}
-            style={[
-              styles.floatingButtonBase,
-              styles.floatingFavoriteButton,
-              {top: insets.top + 10},
-            ]}>
-            <Heart
-              color={theme.colors.textPrimary}
-              fill={
-                exerciseFavorites.isExerciseFavorite(exercise.id)
-                  ? theme.colors.textPrimary
-                  : 'transparent'
-              }
-              size={18}
-              strokeWidth={2.2}
-            />
-          </Pressable>
-        ) : null}
-      </View>
+      <ExerciseMediaHero
+        videoUrl={exercise.videoUrl}
+        thumbnailUrl={exercise.thumbnailUrl}
+        imageUrl={exercise.thumbnailUrl}
+        title={exercise.name}
+        height={heroHeight}
+        isFavorite={exerciseFavorites.isExerciseFavorite(exercise.id)}
+        topInset={insets.top}
+        onBack={() => navigation.goBack()}
+        onToggleFavorite={() => {
+          exerciseFavorites.toggleExerciseFavorite(exercise.id).catch(() => {});
+        }}
+      />
 
       <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.title}>{exercise.name}</Text>
-          <View style={styles.chipsRow}>
-            <Chip>{equipmentLabels[exercise.equipment] || exercise.equipment}</Chip>
-            <Chip>{bodyPartLabels[exercise.bodyPart] || exercise.bodyPart}</Chip>
-            <Chip>{levelLabels[exercise.level] || exercise.level}</Chip>
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.sheet}>
+          <ExerciseDetailHeader
+            name={exercise.name}
+            equipmentLabel={equipmentLabel}
+            bodyPartLabel={bodyPartLabel}
+            levelLabel={levelLabel}
+            summary={summaryLine}
+          />
+
+          <View style={styles.technicalBody}>
+            <View style={styles.technicalCard}>
+              <View style={styles.iconShell}>
+                <ClipboardList
+                  color={theme.colors.textPrimary}
+                  size={22}
+                  strokeWidth={2}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Cómo realizarlo</Text>
+                <View style={styles.compactStack}>
+                  {exercise.howToPerform.length > 0 ? (
+                    exercise.howToPerform.map((step, index) => (
+                      <View key={`${step}-${index}`} style={styles.stepRow}>
+                        <View style={styles.stepIndex}>
+                          <Text style={styles.stepIndexText}>{index + 1}</Text>
+                        </View>
+                        <Text style={styles.stepText}>{step}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.bodyText}>
+                      La técnica detallada llegará en una siguiente iteración.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.technicalCard}>
+              <View style={styles.iconShell}>
+                <CheckCircle2
+                  color={theme.colors.textPrimary}
+                  size={22}
+                  strokeWidth={2}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Puntos clave</Text>
+                <View style={styles.compactStack}>
+                  {exercise.coachingCues.length > 0 ? (
+                    exercise.coachingCues.map(cue => (
+                      <View key={cue} style={styles.bulletRow}>
+                        <View style={styles.bulletDot} />
+                        <Text style={styles.stepText}>{cue}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.bodyText}>
+                      Sin puntos clave registrados.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.technicalCard}>
+              <View style={styles.iconShell}>
+                <XCircle
+                  color={theme.colors.textPrimary}
+                  size={22}
+                  strokeWidth={2}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Errores comunes</Text>
+                <View style={styles.compactStack}>
+                  {exercise.commonMistakes.length > 0 ? (
+                    exercise.commonMistakes.map(mistake => (
+                      <View key={mistake} style={styles.bulletRow}>
+                        <View style={styles.bulletDot} />
+                        <Text style={styles.stepText}>{mistake}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.bodyText}>
+                      Sin errores comunes registrados.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.technicalCard}>
+              <View style={styles.iconShell}>
+                <Dumbbell
+                  color={theme.colors.textPrimary}
+                  size={22}
+                  strokeWidth={2}
+                />
+              </View>
+              <View style={styles.cardContent}>
+                <Text style={styles.cardTitle}>Músculos trabajados</Text>
+                {workedMuscles.length > 0 ? (
+                  <View style={styles.chipsRow}>
+                    {workedMuscles.map(muscle => (
+                      <Chip key={muscle} style={styles.muscleChip}>
+                        {muscle}
+                      </Chip>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.bodyText}>
+                    Sin músculos registrados.
+                  </Text>
+                )}
+              </View>
+            </View>
           </View>
         </View>
-
-        <ExercisePrSummaryCard
-          records={personalRecordsQuery.records}
-          onRegisterPr={() =>
-            stackNavigation.navigate(registerPrRoute as never, {
-              exerciseId: exercise.id,
-              exerciseName: exercise.name,
-              showExercisePicker: false,
-            } as never)
-          }
-          onViewHistory={() =>
-            stackNavigation.navigate(personalRecordsRoute as never, {
-              exerciseId: exercise.id,
-              exerciseName: exercise.name,
-            } as never)
-          }
-        />
-
-        <SectionCard title="Cómo realizarlo">
-          {exercise.howToPerform.length > 0 ? (
-            exercise.howToPerform.map((step, index) => (
-              <View key={`${step}-${index}`} style={styles.rowItem}>
-                <View style={styles.rowBullet}>
-                  <Text style={styles.rowBulletLabel}>{index + 1}</Text>
-                </View>
-                <Text style={styles.rowContent}>{step}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.bodyText}>
-              La técnica detallada llegará en una siguiente iteración.
-            </Text>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Puntos clave de técnica">
-          {exercise.coachingCues.length > 0 ? (
-            exercise.coachingCues.map(cue => (
-              <Text key={cue} style={styles.bodyText}>
-                • {cue}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.bodyText}>Sin puntos clave registrados.</Text>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Errores comunes">
-          {exercise.commonMistakes.length > 0 ? (
-            exercise.commonMistakes.map(mistake => (
-              <Text key={mistake} style={styles.bodyText}>
-                • {mistake}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.bodyText}>Sin errores comunes registrados.</Text>
-          )}
-        </SectionCard>
-
-        <SectionCard title="Músculos trabajados">
-          <View style={styles.chipsRow}>
-            {exercise.musclesWorked.primary.map(muscle => (
-              <Chip key={`primary-${muscle}`}>{muscle}</Chip>
-            ))}
-            {exercise.musclesWorked.secondary.map(muscle => (
-              <Chip key={`secondary-${muscle}`}>{muscle}</Chip>
-            ))}
-          </View>
-        </SectionCard>
-
-        <SectionCard title="Series y repeticiones recomendadas">
-          <View style={styles.recommendationRow}>
-            <Text style={styles.recommendationLabel}>Fuerza</Text>
-            <Text style={styles.recommendationValue}>
-              {exercise.recommendations.strength.sets} series ×{' '}
-              {exercise.recommendations.strength.reps}
-            </Text>
-          </View>
-          <View style={styles.recommendationRow}>
-            <Text style={styles.recommendationLabel}>Hipertrofia</Text>
-            <Text style={styles.recommendationValue}>
-              {exercise.recommendations.hypertrophy.sets} series ×{' '}
-              {exercise.recommendations.hypertrophy.reps}
-            </Text>
-          </View>
-          <View style={styles.recommendationRow}>
-            <Text style={styles.recommendationLabel}>Resistencia</Text>
-            <Text style={styles.recommendationValue}>
-              {exercise.recommendations.endurance.sets} series ×{' '}
-              {exercise.recommendations.endurance.reps}
-            </Text>
-          </View>
-          <Pressable
-            onPress={openProgressiveOverloadArticle}
-            style={({pressed}) => [
-              styles.articleLink,
-              pressed ? {opacity: 0.88} : null,
-            ]}>
-            <BookOpen
-              color={theme.colors.textPrimary}
-              size={18}
-              strokeWidth={2.1}
-            />
-            <View style={styles.articleLinkCopy}>
-              <Text style={styles.articleLinkTitle}>
-                Aprende sobre sobrecarga progresiva
-              </Text>
-              <Text style={styles.articleLinkSubtitle}>
-                Ciencia del cuerpo · 4 min de lectura
-              </Text>
-            </View>
-            <ChevronRight color={theme.colors.textSecondary} size={18} />
-          </Pressable>
-        </SectionCard>
-
-        {relatedWorkouts.length > 0 ? (
-          <SectionCard title="Usado en estas rutinas">
-            {relatedWorkouts.slice(0, 6).map(workout => (
-              <Pressable
-                key={workout.id}
-                onPress={() =>
-                  stackNavigation.navigate(
-                    'WorkoutDetail' as never,
-                    {workoutId: workout.id} as never,
-                  )
-                }
-                style={styles.workoutLink}>
-                <Text numberOfLines={2} style={styles.workoutLinkLabel}>
-                  {workout.title}
-                </Text>
-                <ChevronRight color={theme.colors.textSecondary} size={18} />
-              </Pressable>
-            ))}
-          </SectionCard>
-        ) : null}
       </ScrollView>
 
-      <View
-        style={[
-          styles.bottomBar,
-          {paddingBottom: Math.max(insets.bottom, theme.spacing.lg)},
-        ]}>
+      <View style={styles.bottomBar}>
         <Button
           label="Agregar a rutina"
+          style={styles.ctaButton}
           onPress={() =>
-            stackNavigation.navigate(addExerciseToRoutineRoute as never, {
-              exerciseId: exercise.id,
-              exerciseName: exercise.name,
-            } as never)
+            stackNavigation.navigate(
+              addExerciseToRoutineRoute as never,
+              {
+                exerciseId: exercise.id,
+                exerciseName: exercise.name,
+              } as never,
+            )
           }
           accessoryRight={
             <Plus

@@ -28,11 +28,9 @@ export function EllieChatInputBar({
 
   const styles = StyleSheet.create({
     container: {
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
       backgroundColor: theme.colors.background,
       paddingHorizontal: 16,
-      paddingTop: 8,
+      paddingTop: 10,
       paddingBottom: Math.max(insets.bottom, 10),
       gap: 8,
     },
@@ -77,17 +75,21 @@ export function EllieChatInputBar({
     composerRow: {
       flexDirection: 'row',
       alignItems: 'flex-end',
-      gap: 8,
+      gap: 9,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      padding: 5,
+      ...theme.elevations.card,
     },
     inputWrap: {
       flex: 1,
       minHeight: 48,
-      borderRadius: 18,
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
+      borderRadius: 19,
+      backgroundColor: 'transparent',
+      paddingHorizontal: 11,
+      paddingVertical: 8,
       justifyContent: 'center',
     },
     input: {
@@ -101,9 +103,9 @@ export function EllieChatInputBar({
       textAlignVertical: 'top',
     },
     sendButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: canSend

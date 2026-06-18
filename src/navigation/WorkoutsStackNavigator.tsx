@@ -1,21 +1,37 @@
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {WORKOUTS_ROUTES} from '@app/constants/routes';
-import {PersonalRecordsScreen} from '@app/screens/home/PersonalRecordsScreen';
-import {RegisterPrScreen} from '@app/screens/pr/RegisterPrScreen';
-import {AddExerciseToRoutineScreen} from '@app/screens/workouts/AddExerciseToRoutineScreen';
-import {CreateRoutineScreen} from '@app/screens/workouts/CreateRoutineScreen';
-import {ExerciseDetailScreen} from '@app/screens/workouts/ExerciseDetailScreen';
-import {WorkoutDetailScreen} from '@app/screens/workouts/WorkoutDetailScreen';
-import {WorkoutSessionScreen} from '@app/screens/workouts/WorkoutSessionScreen';
-import {WorkoutsScreen} from '@app/screens/tabs/WorkoutsScreen';
-import type {WorkoutsStackParamList} from '@app/types/navigation';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { WORKOUTS_ROUTES } from '@app/constants/routes';
+import { PersonalRecordsScreen } from '@app/screens/home/PersonalRecordsScreen';
+import { RegisterPrScreen } from '@app/screens/pr/RegisterPrScreen';
+import { AddExerciseToRoutineScreen } from '@app/screens/workouts/AddExerciseToRoutineScreen';
+import { CreateRoutineScreen } from '@app/screens/workouts/CreateRoutineScreen';
+import { ExerciseDetailScreen } from '@app/screens/workouts/ExerciseDetailScreen';
+import { WorkoutDetailScreen } from '@app/screens/workouts/WorkoutDetailScreen';
+import { WorkoutSessionScreen } from '@app/screens/workouts/WorkoutSessionScreen';
+import { WorkoutsScreen } from '@app/screens/tabs/WorkoutsScreen';
+import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import type { WorkoutsStackParamList } from '@app/types/navigation';
 
 const Stack = createNativeStackNavigator<WorkoutsStackParamList>();
 
 export function WorkoutsStackNavigator() {
+  const { setTabBarVisible } = useTabBarMotion();
+
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
-      <Stack.Screen name={WORKOUTS_ROUTES.Workouts} component={WorkoutsScreen} />
+    <Stack.Navigator
+      screenListeners={{
+        state: event => {
+          const state = event.data.state;
+          const activeRoute = state.routes[state.index];
+
+          setTabBarVisible(activeRoute.name === WORKOUTS_ROUTES.Workouts);
+        },
+      }}
+      screenOptions={{ headerShown: false }}
+    >
+      <Stack.Screen
+        name={WORKOUTS_ROUTES.Workouts}
+        component={WorkoutsScreen}
+      />
       <Stack.Screen
         name={WORKOUTS_ROUTES.CreateRoutine}
         component={CreateRoutineScreen}

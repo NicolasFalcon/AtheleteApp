@@ -1,20 +1,36 @@
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {PROGRESS_ROUTES} from '@app/constants/routes';
-import {PersonalRecordsScreen} from '@app/screens/home/PersonalRecordsScreen';
-import {NutritionPlanScreen} from '@app/screens/nutrition/NutritionPlanScreen';
-import {BodyScienceArticleDetailScreen} from '@app/screens/progress/BodyScienceArticleDetailScreen';
-import {BodyScienceScreen} from '@app/screens/progress/BodyScienceScreen';
-import {ChallengeScreen} from '@app/screens/progress/ChallengeScreen';
-import {RegisterPrScreen} from '@app/screens/pr/RegisterPrScreen';
-import {ProgressScreen} from '@app/screens/tabs/ProgressScreen';
-import type {ProgressStackParamList} from '@app/types/navigation';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { PROGRESS_ROUTES } from '@app/constants/routes';
+import { PersonalRecordsScreen } from '@app/screens/home/PersonalRecordsScreen';
+import { NutritionPlanScreen } from '@app/screens/nutrition/NutritionPlanScreen';
+import { BodyScienceArticleDetailScreen } from '@app/screens/progress/BodyScienceArticleDetailScreen';
+import { BodyScienceScreen } from '@app/screens/progress/BodyScienceScreen';
+import { ChallengeScreen } from '@app/screens/progress/ChallengeScreen';
+import { RegisterPrScreen } from '@app/screens/pr/RegisterPrScreen';
+import { ProgressScreen } from '@app/screens/tabs/ProgressScreen';
+import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import type { ProgressStackParamList } from '@app/types/navigation';
 
 const Stack = createNativeStackNavigator<ProgressStackParamList>();
 
 export function ProgressStackNavigator() {
+  const { setTabBarVisible } = useTabBarMotion();
+
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
-      <Stack.Screen name={PROGRESS_ROUTES.Progress} component={ProgressScreen} />
+    <Stack.Navigator
+      screenListeners={{
+        state: event => {
+          const state = event.data.state;
+          const activeRoute = state.routes[state.index];
+
+          setTabBarVisible(activeRoute.name === PROGRESS_ROUTES.Progress);
+        },
+      }}
+      screenOptions={{ headerShown: false }}
+    >
+      <Stack.Screen
+        name={PROGRESS_ROUTES.Progress}
+        component={ProgressScreen}
+      />
       <Stack.Screen
         name={PROGRESS_ROUTES.PersonalRecords}
         component={PersonalRecordsScreen}

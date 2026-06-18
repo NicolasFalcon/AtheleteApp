@@ -1,90 +1,81 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ScreenContainer } from '@app/components/ScreenContainer';
+import { visualOnboardingReachGoals } from '@app/assets/images';
+import { Button } from '@app/components/ui';
 import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import type { OnboardingStackParamList } from '@app/types/navigation';
-import { Button } from '@app/components/ui';
-import { OnboardingProgress } from '@app/components/onboarding/OnboardingProgress';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Welcome'>;
 
 export function WelcomeScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
+  const styles = createStyles(theme);
 
-  const styles = StyleSheet.create({
-    content: {
+  return (
+    <ImageBackground source={visualOnboardingReachGoals} style={styles.screen}>
+      <View style={styles.overlay} />
+      <View style={styles.content}>
+        <View style={styles.copy}>
+          <Text style={styles.title}>Bienvenido</Text>
+          <Text style={styles.subtitle}>
+            Antes de empezar, completa tu perfil para personalizar tus rutinas,
+            tu progreso y las sugerencias de ELLIE.
+          </Text>
+        </View>
+        <Button
+          label="Completar mi perfil"
+          onPress={() => navigation.navigate(ONBOARDING_ROUTES.Avatar)}
+          style={styles.button}
+          textStyle={styles.buttonText}
+        />
+      </View>
+    </ImageBackground>
+  );
+}
+
+type Theme = ReturnType<typeof useAppTheme>['theme'];
+
+function createStyles(theme: Theme) {
+  return StyleSheet.create({
+    screen: {
       flex: 1,
-      justifyContent: 'center',
+      justifyContent: 'flex-end',
+    },
+    overlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(0,0,0,0.48)',
+    },
+    content: {
+      gap: theme.spacing.xxl,
       paddingHorizontal: theme.spacing.xl,
       paddingBottom: theme.spacing.xxxl,
-      gap: theme.spacing.xxl,
-    },
-    hero: {
-      alignItems: 'center',
-      gap: theme.spacing.xl,
-    },
-    iconBox: {
-      width: 80,
-      height: 80,
-      borderRadius: theme.radii.xl,
-      backgroundColor: theme.colors.surfaceMuted,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    iconText: {
-      fontSize: 34,
-      color: theme.colors.textPrimary,
     },
     copy: {
       alignItems: 'center',
       gap: theme.spacing.sm,
     },
     title: {
-      color: theme.colors.textPrimary,
+      color: '#FFFFFF',
       fontFamily: theme.typography.fontFamily,
-      fontSize: 32,
-      lineHeight: 36,
+      fontSize: theme.typography.sizes.display,
       fontWeight: theme.typography.weights.bold,
       textAlign: 'center',
-      letterSpacing: -0.8,
     },
     subtitle: {
-      color: theme.colors.textSecondary,
+      maxWidth: 340,
+      color: 'rgba(255,255,255,0.78)',
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.body,
       lineHeight: 24,
       textAlign: 'center',
-      maxWidth: 300,
     },
-    buttonArrow: {
-      color: theme.colors.accentContrast,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.semibold,
+    button: {
+      backgroundColor: '#FFFFFF',
+      borderColor: 'rgba(255,255,255,0.5)',
+    },
+    buttonText: {
+      color: '#111111',
     },
   });
-
-  return (
-    <ScreenContainer contentContainerStyle={styles.content}>
-      <OnboardingProgress step={0} />
-      <View style={styles.hero}>
-        <View style={styles.iconBox}>
-          <Text style={styles.iconText}>◎</Text>
-        </View>
-        <View style={styles.copy}>
-          <Text style={styles.title}>Configuremos tu perfil</Text>
-          <Text style={styles.subtitle}>
-            Esto nos ayuda a personalizar tu experiencia de entrenamiento y
-            nutrición.
-          </Text>
-        </View>
-      </View>
-      <Button
-        accessoryRight={<Text style={styles.buttonArrow}>→</Text>}
-        label="Comenzar"
-        onPress={() => navigation.navigate(ONBOARDING_ROUTES.GoalSelection)}
-      />
-    </ScreenContainer>
-  );
 }

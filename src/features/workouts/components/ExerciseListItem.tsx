@@ -37,15 +37,15 @@ export function ExerciseListItem({
       borderColor: theme.colors.border,
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 12,
-      gap: 12,
+      padding: 10,
+      gap: 10,
       overflow: 'hidden',
       shadowColor: '#000000',
       ...theme.elevations.card,
     },
     imageWrap: {
-      width: 80,
-      height: 86,
+      width: 76,
+      height: 82,
       flexShrink: 0,
       alignSelf: 'flex-start',
       borderRadius: theme.radii.sm,
@@ -67,12 +67,29 @@ export function ExerciseListItem({
     content: {
       flex: 1,
       minWidth: 0,
-      gap: 6,
+      gap: 4,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+    },
+    titleCopy: {
+      flex: 1,
+      minWidth: 0,
+    },
+    levelBadge: {
+      alignSelf: 'flex-start',
+      borderRadius: theme.radii.pill,
+      backgroundColor: theme.colors.surfaceMuted,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      marginBottom: 2,
     },
     levelLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
+      fontSize: 9,
       fontWeight: theme.typography.weights.semibold,
       letterSpacing: 0,
       textTransform: 'uppercase',
@@ -80,49 +97,49 @@ export function ExerciseListItem({
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: theme.typography.weights.semibold,
+      lineHeight: 19,
     },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
       flexWrap: 'wrap',
-      gap: 10,
+      gap: 8,
     },
     metaItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 4,
+      borderRadius: theme.radii.pill,
+      backgroundColor: theme.colors.surfaceMuted,
+      paddingHorizontal: 7,
+      paddingVertical: 4,
     },
     metaLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 11,
     },
     footer: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginTop: 4,
+      marginTop: 1,
     },
     footerLabel: {
-      color: theme.colors.textSecondary,
+      color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
-      fontWeight: theme.typography.weights.medium,
+      fontSize: 11,
+      fontWeight: theme.typography.weights.semibold,
     },
     favoriteButton: {
-      position: 'absolute',
-      top: 12,
-      right: 12,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.background,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceMuted,
     },
   });
 
@@ -147,13 +164,35 @@ export function ExerciseListItem({
         )}
       </View>
       <View style={styles.content}>
-        <View>
-          <Text style={styles.levelLabel}>
-            {levelLabels[exercise.level] || exercise.level}
-          </Text>
-          <Text numberOfLines={2} style={styles.title}>
-            {exercise.name}
-          </Text>
+        <View style={styles.titleRow}>
+          <View style={styles.titleCopy}>
+            <View style={styles.levelBadge}>
+              <Text style={styles.levelLabel}>
+                {levelLabels[exercise.level] || exercise.level}
+              </Text>
+            </View>
+            <Text numberOfLines={2} style={styles.title}>
+              {exercise.name}
+            </Text>
+          </View>
+          <Pressable
+            onPress={event => {
+              event.stopPropagation();
+              onToggleFavorite();
+            }}
+            style={styles.favoriteButton}
+          >
+            <Heart
+              color={
+                isFavorite
+                  ? theme.colors.textPrimary
+                  : theme.colors.textSecondary
+              }
+              fill={isFavorite ? theme.colors.textPrimary : 'transparent'}
+              size={16}
+              strokeWidth={2}
+            />
+          </Pressable>
         </View>
         <View style={styles.metaRow}>
           <View style={styles.metaItem}>
@@ -178,26 +217,10 @@ export function ExerciseListItem({
           </View>
         </View>
         <View style={styles.footer}>
-          <Text style={styles.footerLabel}>Ver técnica y detalles</Text>
-          <ChevronRight color={theme.colors.textSecondary} size={18} />
+          <Text style={styles.footerLabel}>Ver técnica</Text>
+          <ChevronRight color={theme.colors.textSecondary} size={16} />
         </View>
       </View>
-      <Pressable
-        onPress={event => {
-          event.stopPropagation();
-          onToggleFavorite();
-        }}
-        style={styles.favoriteButton}
-      >
-        <Heart
-          color={
-            isFavorite ? theme.colors.textPrimary : theme.colors.textSecondary
-          }
-          fill={isFavorite ? theme.colors.textPrimary : 'transparent'}
-          size={18}
-          strokeWidth={2}
-        />
-      </Pressable>
     </Pressable>
   );
 }

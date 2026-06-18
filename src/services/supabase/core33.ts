@@ -1,4 +1,4 @@
-import {getLocalDateKey} from '@app/lib/date';
+import { getLocalDateKey } from '@app/lib/date';
 import {
   getChallengeDay,
   getCompletedChallengeDays,
@@ -7,9 +7,9 @@ import {
   type HabitChallenge,
   type HabitCategory,
 } from '@app/shared';
-import {getSupabaseClient} from '@app/services/supabase/client';
-import {awardGamificationEvent} from '@app/services/supabase/gamification';
-import type {Database, Json} from '@app/types/supabase';
+import { getSupabaseClient } from '@app/services/supabase/client';
+import { awardGamificationEvent } from '@app/services/supabase/gamification';
+import type { Database, Json } from '@app/types/supabase';
 
 type ChallengeParticipationRow =
   Database['public']['Tables']['challenge_participations']['Row'];
@@ -30,16 +30,18 @@ export type Core33TimelineDay = {
 };
 
 export type Core33State = {
-  challenge: (HabitChallenge & {
-    challengeDay: number;
-    completedDays: number;
-    completedToday: number;
-    currentStreak: number;
-    longestStreak: number;
-    progressPct: number;
-    overallPct: number;
-    totalHabits: number;
-  }) | null;
+  challenge:
+    | (HabitChallenge & {
+        challengeDay: number;
+        completedDays: number;
+        completedToday: number;
+        currentStreak: number;
+        longestStreak: number;
+        progressPct: number;
+        overallPct: number;
+        totalHabits: number;
+      })
+    | null;
   habitLogs: Record<string, boolean[]>;
   today: string;
   todayLogs: boolean[];
@@ -131,7 +133,7 @@ function buildHabitLogMap(
 
   logs.forEach(log => {
     if (!map[log.date]) {
-      map[log.date] = Array.from({length: totalHabits}, () => false);
+      map[log.date] = Array.from({ length: totalHabits }, () => false);
     }
 
     if (log.habit_index >= 0 && log.habit_index < totalHabits) {
@@ -175,7 +177,7 @@ function buildCore33State(
     (sum, dayLogs) => sum + dayLogs.filter(Boolean).length,
     0,
   );
-  const timeline = Array.from({length: 33}, (_, index) => {
+  const timeline = Array.from({ length: 33 }, (_, index) => {
     const date = new Date(`${challenge.startDate}T00:00:00`);
     date.setDate(date.getDate() + index);
     const dateKey = getLocalDateKey(date);
@@ -190,8 +192,8 @@ function buildCore33State(
         completedCount === totalHabits
           ? 'full'
           : completedCount > 0
-            ? 'partial'
-            : 'empty',
+          ? 'partial'
+          : 'empty',
       isCurrent: index + 1 === challengeDay,
     } satisfies Core33TimelineDay;
   });
@@ -213,7 +215,8 @@ function buildCore33State(
     },
     habitLogs,
     today,
-    todayLogs: habitLogs[today] || Array.from({length: totalHabits}, () => false),
+    todayLogs:
+      habitLogs[today] || Array.from({ length: totalHabits }, () => false),
     timeline,
   };
 }
@@ -224,12 +227,12 @@ export function getCore33HabitPresets() {
 
 export async function fetchCore33State(userId: string): Promise<Core33State> {
   const client = getClient();
-  const {data, error} = await client
+  const { data, error } = await client
     .from('challenge_participations')
     .select('*')
     .eq('user_id', userId)
     .in('status', ['active', 'completed'])
-    .order('created_at', {ascending: false})
+    .order('created_at', { ascending: false })
     .limit(1);
 
   if (error) {
@@ -242,7 +245,7 @@ export async function fetchCore33State(userId: string): Promise<Core33State> {
     return buildCore33State(undefined, []);
   }
 
-  const {data: logs, error: logsError} = await client
+  const { data: logs, error: logsError } = await client
     .from('habit_logs')
     .select('*')
     .eq('participation_id', participation.id);
@@ -262,7 +265,7 @@ export async function startCore33Challenge(params: {
   const today = getLocalDateKey();
 
   await (client.from('challenge_participations') as any)
-    .update({status: 'abandoned'})
+    .update({ status: 'abandoned' })
     .eq('user_id', params.userId)
     .eq('status', 'active');
 
@@ -272,7 +275,9 @@ export async function startCore33Challenge(params: {
     name: params.habits[pillar.key],
   }));
 
-  const {error} = await (client.from('challenge_participations') as any).insert({
+  const { error } = await (
+    client.from('challenge_participations') as any
+  ).insert({
     user_id: params.userId,
     status: 'active',
     start_date: today,
@@ -289,8 +294,8 @@ export async function restartCore33Challenge(params: {
   challengeId: string;
 }): Promise<void> {
   const client = getClient();
-  const {error} = await (client.from('challenge_participations') as any)
-    .update({status: 'abandoned'})
+  const { error } = await (client.from('challenge_participations') as any)
+    .update({ status: 'abandoned' })
     .eq('id', params.challengeId)
     .eq('user_id', params.userId);
 
@@ -315,7 +320,7 @@ export async function toggleCore33Habit(params: {
   const totalHabits = params.challenge.totalHabits || 3;
   const currentDayLogs =
     params.habitLogs[params.date] ||
-    Array.from({length: totalHabits}, () => false);
+    Array.from({ length: totalHabits }, () => false);
   const previousDayCompleted =
     currentDayLogs.length > 0 && currentDayLogs.every(Boolean);
   const nextValue = !currentDayLogs[params.habitIndex];
@@ -327,7 +332,7 @@ export async function toggleCore33Habit(params: {
   };
   const nextDayCompleted = nextDayLogs.every(Boolean);
 
-  const {error} = await (client.from('habit_logs') as any).upsert(
+  const { error } = await (client.from('habit_logs') as any).upsert(
     {
       participation_id: params.challenge.id,
       user_id: params.userId,
@@ -335,7 +340,7 @@ export async function toggleCore33Habit(params: {
       habit_index: params.habitIndex,
       completed: nextValue,
     },
-    {onConflict: 'participation_id,date,habit_index'},
+    { onConflict: 'participation_id,date,habit_index' },
   );
 
   if (error) {
@@ -344,9 +349,8 @@ export async function toggleCore33Habit(params: {
 
   if (!previousDayCompleted && nextDayCompleted) {
     await awardGamificationEvent({
-      userId: params.userId,
-      eventKey: `core33_day:${params.challenge.id}:${params.date}`,
       eventType: 'core33_day_completed',
+      referenceId: `${params.challenge.id}:${params.date}`,
       points: CORE33_DAY_COMPLETED_POINTS,
       metadata: {
         challengeId: params.challenge.id,
@@ -358,9 +362,8 @@ export async function toggleCore33Habit(params: {
     const streak = getCurrentChallengeStreak(params.challenge, nextHabitLogs);
     if (streak >= 7) {
       await awardGamificationEvent({
-        userId: params.userId,
-        eventKey: `core33_streak_7:${params.challenge.id}`,
         eventType: 'core33_day_completed',
+        referenceId: `${params.challenge.id}:streak_7`,
         badgeIds: ['streak_7_days'],
         metadata: {
           challengeId: params.challenge.id,
@@ -373,9 +376,10 @@ export async function toggleCore33Habit(params: {
     const challengeDay = getChallengeDay(params.challenge);
 
     if (completedDays >= 33 && challengeDay >= 33) {
-      const {error: updateError} = await (client
-        .from('challenge_participations') as any)
-        .update({status: 'completed'})
+      const { error: updateError } = await (
+        client.from('challenge_participations') as any
+      )
+        .update({ status: 'completed' })
         .eq('id', params.challenge.id)
         .eq('user_id', params.userId);
 
@@ -384,9 +388,8 @@ export async function toggleCore33Habit(params: {
       }
 
       await awardGamificationEvent({
-        userId: params.userId,
-        eventKey: `core33_completed:${params.challenge.id}`,
         eventType: 'core33_completed',
+        referenceId: params.challenge.id,
         points: CORE33_COMPLETED_POINTS,
         badgeIds: ['core33_finisher'],
         metadata: {

@@ -1,5 +1,12 @@
 import { Clock3, Flame, Sparkles } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import type { Workout } from '@app/shared';
 import { WorkoutThumbnail } from '@app/features/workouts/components/WorkoutThumbnail';
@@ -18,6 +25,8 @@ export function WorkoutCarousel({
   onSelectWorkout,
 }: WorkoutCarouselProps) {
   const { theme } = useAppTheme();
+  const { width: windowWidth } = useWindowDimensions();
+  const cardWidth = Math.min(292, Math.max(248, windowWidth - 88));
 
   const styles = StyleSheet.create({
     headerRow: {
@@ -40,63 +49,65 @@ export function WorkoutCarousel({
       fontSize: 12,
     },
     listContent: {
-      gap: theme.spacing.sm,
-      paddingTop: theme.spacing.xs,
-      paddingBottom: 2,
+      gap: theme.spacing.md,
+      paddingTop: theme.spacing.sm,
+      paddingRight: theme.spacing.md,
+      paddingBottom: theme.spacing.lg,
     },
     card: {
-      width: 158,
-      borderRadius: theme.radii.md,
-      overflow: 'hidden',
+      width: cardWidth,
+      minHeight: 250,
+      borderRadius: theme.radii.lg,
       backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
       shadowColor: '#000000',
-      ...theme.elevations.card,
+      ...(theme.mode === 'light'
+        ? theme.elevations.prominent
+        : theme.elevations.card),
+    },
+    cardClip: {
+      overflow: 'hidden',
+      borderRadius: theme.radii.lg,
+      backgroundColor: theme.colors.surface,
     },
     image: {
       width: '100%',
-      height: 106,
-    },
-    overlay: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      padding: 10,
-      backgroundColor: 'rgba(17,17,17,0.38)',
+      height: 174,
     },
     badge: {
       position: 'absolute',
-      top: 8,
-      left: 8,
+      top: 12,
+      left: 12,
       borderRadius: theme.radii.pill,
       backgroundColor: 'rgba(255,255,255,0.92)',
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
     },
     badgeLabel: {
       color: '#111111',
       fontFamily: theme.typography.fontFamily,
-      fontSize: 10,
+      fontSize: 11,
       fontWeight: theme.typography.weights.bold,
     },
+    body: {
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 14,
+      gap: 10,
+    },
     cardTitle: {
-      color: '#FFFFFF',
+      color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 17,
+      lineHeight: 22,
       fontWeight: theme.typography.weights.semibold,
     },
     metaRow: {
-      paddingHorizontal: 10,
-      paddingTop: 6,
-      paddingBottom: 8,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: theme.spacing.sm,
+      gap: theme.spacing.md,
     },
     metaItem: {
       flexDirection: 'row',
@@ -106,7 +117,7 @@ export function WorkoutCarousel({
     metaLabel: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
+      fontSize: 12,
     },
   });
 
@@ -139,28 +150,32 @@ export function WorkoutCarousel({
               pressed ? { transform: [{ scale: 0.98 }] } : null,
             ]}
           >
-            <View>
-              <WorkoutThumbnail workout={workout} style={styles.image} />
-              {workout.createdByAi || workout.sourceType === 'ellie' ? (
-                <View style={styles.badge}>
-                  <Sparkles color="#111111" size={10} strokeWidth={2.1} />
-                  <Text style={styles.badgeLabel}>ELLIE</Text>
-                </View>
-              ) : null}
-              <View style={styles.overlay}>
-                <Text numberOfLines={1} style={styles.cardTitle}>
+            <View style={styles.cardClip}>
+              <View>
+                <WorkoutThumbnail workout={workout} style={styles.image} />
+                {workout.createdByAi || workout.sourceType === 'ellie' ? (
+                  <View style={styles.badge}>
+                    <Sparkles color="#111111" size={10} strokeWidth={2.1} />
+                    <Text style={styles.badgeLabel}>ELLIE</Text>
+                  </View>
+                ) : null}
+              </View>
+              <View style={styles.body}>
+                <Text numberOfLines={2} style={styles.cardTitle}>
                   {workout.title}
                 </Text>
-              </View>
-            </View>
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <Clock3 color={theme.colors.textSecondary} size={12} />
-                <Text style={styles.metaLabel}>{workout.duration} min</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <Flame color={theme.colors.textSecondary} size={12} />
-                <Text style={styles.metaLabel}>{workout.calories} kcal</Text>
+                <View style={styles.metaRow}>
+                  <View style={styles.metaItem}>
+                    <Clock3 color={theme.colors.textSecondary} size={14} />
+                    <Text style={styles.metaLabel}>{workout.duration} min</Text>
+                  </View>
+                  <View style={styles.metaItem}>
+                    <Flame color={theme.colors.textSecondary} size={14} />
+                    <Text style={styles.metaLabel}>
+                      {workout.calories} kcal
+                    </Text>
+                  </View>
+                </View>
               </View>
             </View>
           </Pressable>

@@ -6,6 +6,7 @@ import { AuthButton } from '@app/components/auth/AuthButton';
 import { BrandHeader } from '@app/components/auth/BrandHeader';
 import { AuthScreenLayout } from '@app/components/auth/AuthScreenLayout';
 import { AuthTextField } from '@app/components/auth/AuthTextField';
+import { AuthThemeToggle } from '@app/components/auth/AuthTopActions';
 import { FormMessage } from '@app/components/auth/FormMessage';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
@@ -93,6 +94,7 @@ export function LoginScreen({ navigation }: Props) {
           title="Qué bueno verte de nuevo"
         />
       }
+      topActions={<AuthThemeToggle />}
     >
       {error ? (
         <FormMessage appearance="dark" message={error} tone="error" />

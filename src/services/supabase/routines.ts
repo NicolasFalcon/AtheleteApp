@@ -1,7 +1,7 @@
-import {getSupabaseClient} from '@app/services/supabase/client';
-import {awardGamificationEvent} from '@app/services/supabase/gamification';
-import type {Workout} from '@app/shared';
-import {getWorkoutAccess} from '@app/shared';
+import { getSupabaseClient } from '@app/services/supabase/client';
+import { awardGamificationEvent } from '@app/services/supabase/gamification';
+import type { Workout } from '@app/shared';
+import { getWorkoutAccess } from '@app/shared';
 import {
   dedupeFeaturedTemplates,
   mapTemplateExerciseRowToExercise,
@@ -61,9 +61,11 @@ function buildExercisePayload(templateId: string, workout: RoutineDraft) {
   }));
 }
 
-export async function fetchRoutineById(workoutId: string): Promise<Workout | null> {
+export async function fetchRoutineById(
+  workoutId: string,
+): Promise<Workout | null> {
   const client = getClient();
-  const {data: template, error: templateError} = await client
+  const { data: template, error: templateError } = await client
     .from('workout_templates')
     .select('*')
     .eq('id', workoutId)
@@ -73,7 +75,7 @@ export async function fetchRoutineById(workoutId: string): Promise<Workout | nul
     return null;
   }
 
-  const {data: exerciseRows, error: exerciseError} = await client
+  const { data: exerciseRows, error: exerciseError } = await client
     .from('template_exercises')
     .select('*')
     .eq('template_id', workoutId)
@@ -88,14 +90,16 @@ export async function fetchRoutineById(workoutId: string): Promise<Workout | nul
   });
 }
 
-export async function fetchEditableWorkouts(userId: string): Promise<Workout[]> {
+export async function fetchEditableWorkouts(
+  userId: string,
+): Promise<Workout[]> {
   const client = getClient();
-  const {data: templates, error: templateError} = await client
+  const { data: templates, error: templateError } = await client
     .from('workout_templates')
     .select('*')
     .eq('created_by', userId)
     .eq('is_public', false)
-    .order('created_at', {ascending: false});
+    .order('created_at', { ascending: false });
 
   if (templateError) {
     throw templateError;
@@ -108,7 +112,7 @@ export async function fetchEditableWorkouts(userId: string): Promise<Workout[]> 
   }
 
   const templateIds = templateRows.map(template => template.id);
-  const {data: exerciseRows, error: exerciseError} = await client
+  const { data: exerciseRows, error: exerciseError } = await client
     .from('template_exercises')
     .select('*')
     .in('template_id', templateIds)
@@ -144,22 +148,21 @@ export async function createRoutine(
   workout: RoutineDraft,
 ): Promise<Workout> {
   const client = getClient();
-  const {data: template, error: templateError} = await (client
-    .from('workout_templates') as any)
+  const { data: template, error: templateError } = await (
+    client.from('workout_templates') as any
+  )
     .insert(buildTemplatePayload(userId, workout, 'create'))
     .select()
     .single();
 
   if (templateError || !template) {
-    throw new Error(
-      templateError?.message || 'No pudimos guardar la rutina.',
-    );
+    throw new Error(templateError?.message || 'No pudimos guardar la rutina.');
   }
 
   if (workout.exercises.length > 0) {
-    const {error: exerciseError} = await (client
-      .from('template_exercises') as any)
-      .insert(buildExercisePayload(template.id, workout));
+    const { error: exerciseError } = await (
+      client.from('template_exercises') as any
+    ).insert(buildExercisePayload(template.id, workout));
 
     if (exerciseError) {
       await client.from('workout_templates').delete().eq('id', template.id);
@@ -168,9 +171,8 @@ export async function createRoutine(
   }
 
   await awardGamificationEvent({
-    userId,
-    eventKey: `custom_workout_created:${template.id}`,
     eventType: 'custom_workout_created',
+    referenceId: String(template.id),
     points: 150,
     badgeIds: ['first_custom_workout'],
     metadata: {
@@ -200,8 +202,9 @@ export async function updateRoutine(
   }
 
   const client = getClient();
-  const {data: updatedTemplate, error: updateError} = await (client
-    .from('workout_templates') as any)
+  const { data: updatedTemplate, error: updateError } = await (
+    client.from('workout_templates') as any
+  )
     .update(buildTemplatePayload(userId, workout, 'update'))
     .eq('id', workoutId)
     .eq('created_by', userId)
@@ -209,12 +212,10 @@ export async function updateRoutine(
     .single();
 
   if (updateError || !updatedTemplate) {
-    throw new Error(
-      updateError?.message || 'No pudimos guardar los cambios.',
-    );
+    throw new Error(updateError?.message || 'No pudimos guardar los cambios.');
   }
 
-  const {error: deleteExercisesError} = await client
+  const { error: deleteExercisesError } = await client
     .from('template_exercises')
     .delete()
     .eq('template_id', workoutId);
@@ -224,9 +225,9 @@ export async function updateRoutine(
   }
 
   if (workout.exercises.length > 0) {
-    const {error: exerciseError} = await (client
-      .from('template_exercises') as any)
-      .insert(buildExercisePayload(workoutId, workout));
+    const { error: exerciseError } = await (
+      client.from('template_exercises') as any
+    ).insert(buildExercisePayload(workoutId, workout));
 
     if (exerciseError) {
       throw new Error(exerciseError.message);
@@ -252,7 +253,7 @@ export async function deleteRoutine(
   }
 
   const client = getClient();
-  const {error: sessionError} = await (client as any)
+  const { error: sessionError } = await (client as any)
     .from('workout_sessions')
     .update({
       workout_id: null,
@@ -265,7 +266,7 @@ export async function deleteRoutine(
     throw sessionError;
   }
 
-  const {error: deleteExercisesError} = await client
+  const { error: deleteExercisesError } = await client
     .from('template_exercises')
     .delete()
     .eq('template_id', workoutId);
@@ -274,7 +275,7 @@ export async function deleteRoutine(
     throw deleteExercisesError;
   }
 
-  const {error: deleteTemplateError} = await client
+  const { error: deleteTemplateError } = await client
     .from('workout_templates')
     .delete()
     .eq('id', workoutId)
@@ -302,7 +303,7 @@ export async function appendExerciseToRoutine(params: {
 
   const client = getClient();
   const nextOrder = currentWorkout.exercises.length;
-  const {error} = await (client.from('template_exercises') as any).insert({
+  const { error } = await (client.from('template_exercises') as any).insert({
     template_id: params.workoutId,
     exercise_id: params.exerciseId,
     name: params.exerciseName,

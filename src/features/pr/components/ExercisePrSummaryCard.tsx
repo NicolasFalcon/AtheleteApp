@@ -1,7 +1,7 @@
-import {ChevronRight, Trophy} from 'lucide-react-native';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {Button, Card} from '@app/components/ui';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { ChevronRight, Trophy } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Button, Card } from '@app/components/ui';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 import {
   formatPRValue,
   getBestPR,
@@ -21,16 +21,18 @@ export function ExercisePrSummaryCard({
   onRegisterPr,
   onViewHistory,
 }: ExercisePrSummaryCardProps) {
-  const {theme} = useAppTheme();
-  const recordTypes = [...new Set(records.map(record => record.prType))] as PRType[];
+  const { theme } = useAppTheme();
+  const recordTypes = [
+    ...new Set(records.map(record => record.prType)),
+  ] as PRType[];
   const bests = recordTypes
     .map(type => getBestPR(records, type))
     .filter(Boolean) as PersonalRecord[];
 
   const styles = StyleSheet.create({
     card: {
-      gap: theme.spacing.md,
-      padding: theme.spacing.lg,
+      gap: theme.spacing.sm,
+      padding: theme.spacing.md,
       borderRadius: theme.radii.lg,
     },
     header: {
@@ -65,17 +67,40 @@ export function ExercisePrSummaryCard({
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 21,
+      lineHeight: 20,
     },
-    bestRow: {
-      paddingVertical: theme.spacing.sm,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-      gap: 4,
+    emptyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: theme.spacing.md,
     },
-    bestRowLast: {
-      paddingBottom: 0,
-      borderBottomWidth: 0,
+    emptyCopy: {
+      flex: 1,
+      gap: 2,
+    },
+    compactButton: {
+      minHeight: 40,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.radii.pill,
+      width: undefined,
+      flexShrink: 0,
+    },
+    compactButtonLabel: {
+      fontSize: theme.typography.sizes.bodySm,
+    },
+    bestPanel: {
+      marginTop: theme.spacing.xs,
+      borderRadius: theme.radii.md,
+      backgroundColor: theme.colors.surfaceMuted,
+      padding: theme.spacing.md,
+      gap: theme.spacing.xs,
+    },
+    bestHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: theme.spacing.md,
     },
     bestLabel: {
       color: theme.colors.textSecondary,
@@ -85,13 +110,21 @@ export function ExercisePrSummaryCard({
     bestValue: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.semibold,
+      fontSize: theme.typography.sizes.titleSm,
+      fontWeight: theme.typography.weights.bold,
+      letterSpacing: -0.3,
     },
     bestDate: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       fontSize: theme.typography.sizes.caption,
+    },
+    extraCount: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.caption,
+      fontWeight: theme.typography.weights.medium,
+      textAlign: 'right',
     },
   });
 
@@ -105,10 +138,11 @@ export function ExercisePrSummaryCard({
         {records.length > 0 ? (
           <Pressable
             onPress={onViewHistory}
-            style={({pressed}) => [
+            style={({ pressed }) => [
               styles.historyButton,
-              pressed ? {opacity: 0.85} : null,
-            ]}>
+              pressed ? { opacity: 0.85 } : null,
+            ]}
+          >
             <Text style={styles.historyButtonLabel}>Ver progreso</Text>
             <ChevronRight
               color={theme.colors.textSecondary}
@@ -120,41 +154,52 @@ export function ExercisePrSummaryCard({
       </View>
 
       {bests.length === 0 ? (
-        <>
-          <Text style={styles.emptyText}>
-            Aún no tienes PRs para este ejercicio. Registra tu primera marca para empezar a seguir tu progreso.
-          </Text>
+        <View style={styles.emptyRow}>
+          <View style={styles.emptyCopy}>
+            <Text style={styles.emptyText}>
+              Aún no tienes PRs para este ejercicio.
+            </Text>
+            <Text style={styles.bestDate}>Registra tu primera marca.</Text>
+          </View>
           <Button
             label="Registrar PR"
             variant="outline"
             onPress={onRegisterPr}
+            fullWidth={false}
+            style={styles.compactButton}
+            textStyle={styles.compactButtonLabel}
           />
-        </>
+        </View>
       ) : (
         <>
-          <View>
-            {bests.map((record, index) => {
-              const isLast = index === bests.length - 1;
-              return (
-                <View
-                  key={record.id}
-                  style={[styles.bestRow, isLast ? styles.bestRowLast : null]}>
-                  <Text style={styles.bestLabel}>{prTypeLabels[record.prType]}</Text>
-                  <Text style={styles.bestValue}>{formatPRValue(record)}</Text>
-                  <Text style={styles.bestDate}>
-                    {new Date(record.recordedAt).toLocaleDateString('es-CL', {
-                      day: 'numeric',
-                      month: 'short',
-                    })}
-                  </Text>
-                </View>
-              );
-            })}
+          <View style={styles.bestPanel}>
+            <View style={styles.bestHeader}>
+              <View>
+                <Text style={styles.bestLabel}>
+                  {prTypeLabels[bests[0].prType]}
+                </Text>
+                <Text style={styles.bestValue}>{formatPRValue(bests[0])}</Text>
+                <Text style={styles.bestDate}>
+                  {new Date(bests[0].recordedAt).toLocaleDateString('es-CL', {
+                    day: 'numeric',
+                    month: 'short',
+                  })}
+                </Text>
+              </View>
+              {bests.length > 1 ? (
+                <Text style={styles.extraCount}>
+                  +{bests.length - 1} marcas
+                </Text>
+              ) : null}
+            </View>
           </View>
           <Button
             label="Nuevo PR"
             variant="outline"
             onPress={onRegisterPr}
+            fullWidth={false}
+            style={styles.compactButton}
+            textStyle={styles.compactButtonLabel}
           />
         </>
       )}

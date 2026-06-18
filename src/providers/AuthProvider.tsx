@@ -25,12 +25,8 @@ import {
   fetchProfile,
   updateOnboardingProfile,
 } from '@app/services/supabase/profile';
-import {parsePasswordRecoveryUrl} from '@app/lib/auth/passwordRecoveryUrl';
-import type {
-  AppFlow,
-  OnboardingData,
-  ProfileRecord,
-} from '@app/types/auth';
+import { parsePasswordRecoveryUrl } from '@app/lib/auth/passwordRecoveryUrl';
+import type { AppFlow, OnboardingData, ProfileRecord } from '@app/types/auth';
 
 type AuthContextValue = {
   flow: AppFlow;
@@ -56,7 +52,10 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-function getFlow(session: Session | null, profile: ProfileRecord | null): AppFlow {
+function getFlow(
+  session: Session | null,
+  profile: ProfileRecord | null,
+): AppFlow {
   if (!session) {
     return 'auth';
   }
@@ -74,8 +73,11 @@ function buildDraft(profile: ProfileRecord | null): Partial<OnboardingData> {
   }
 
   return {
+    avatarKey: profile.avatarKey ?? undefined,
+    profilePhotoUrl: profile.profilePhotoUrl ?? undefined,
     goal: profile.goal ?? undefined,
     birthDate: profile.birthDate ?? undefined,
+    gender: profile.gender ?? undefined,
     weight: profile.weight ?? undefined,
     height: profile.height ?? undefined,
     trainingDaysPerWeek: profile.trainingDaysPerWeek ?? undefined,
@@ -85,12 +87,13 @@ function buildDraft(profile: ProfileRecord | null): Partial<OnboardingData> {
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<ProfileRecord | null>(null);
-  const [onboardingDraft, setOnboardingDraft] = useState<Partial<OnboardingData>>(
-    {},
-  );
+  const [onboardingDraft, setOnboardingDraft] = useState<
+    Partial<OnboardingData>
+  >({});
   const [flow, setFlow] = useState<AppFlow>('auth');
   const [isHydrating, setIsHydrating] = useState(true);
-  const [isPasswordRecoveryActive, setIsPasswordRecoveryActive] = useState(false);
+  const [isPasswordRecoveryActive, setIsPasswordRecoveryActive] =
+    useState(false);
   const [passwordRecoveryError, setPasswordRecoveryError] = useState('');
   const handledRecoveryUrls = useRef(new Set<string>());
   const passwordRecoveryInFlight = useRef(false);
@@ -123,21 +126,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setPasswordRecoveryError('');
   }, []);
 
-  const hydrateProfile = useCallback(
-    async (nextSession: Session) => {
-      const nextProfile = await fetchProfile(
-        nextSession.user.id,
-        nextSession.user.email ?? '',
-        (nextSession.user.user_metadata?.name as string | undefined) ?? '',
-      );
+  const hydrateProfile = useCallback(async (nextSession: Session) => {
+    const nextProfile = await fetchProfile(
+      nextSession.user.id,
+      nextSession.user.email ?? '',
+      (nextSession.user.user_metadata?.name as string | undefined) ?? '',
+    );
 
-      setSession(nextSession);
-      setProfile(nextProfile);
-      setOnboardingDraft(buildDraft(nextProfile));
-      setFlow(getFlow(nextSession, nextProfile));
-    },
-    [],
-  );
+    setSession(nextSession);
+    setProfile(nextProfile);
+    setOnboardingDraft(buildDraft(nextProfile));
+    setFlow(getFlow(nextSession, nextProfile));
+  }, []);
 
   const syncSessionState = useCallback(
     (nextSession: Session | null) => {
@@ -183,7 +183,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
       try {
         if (recoveryUrl.credentials?.type === 'tokens') {
-          const {data, error} = await client.auth.setSession({
+          const { data, error } = await client.auth.setSession({
             access_token: recoveryUrl.credentials.accessToken,
             refresh_token: recoveryUrl.credentials.refreshToken,
           });
@@ -197,7 +197,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         }
 
         if (recoveryUrl.credentials?.type === 'code') {
-          const {data, error} = await client.auth.exchangeCodeForSession(
+          const { data, error } = await client.auth.exchangeCodeForSession(
             recoveryUrl.credentials.code,
           );
 
@@ -389,7 +389,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         );
       }
 
-      const {error} = await updatePassword(password);
+      const { error } = await updatePassword(password);
 
       if (error) {
         throw error;
@@ -399,7 +399,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
 
   const finishPasswordRecovery = useCallback(async () => {
-    const {error} = await signOutService();
+    const { error } = await signOutService();
 
     if (error) {
       throw error;

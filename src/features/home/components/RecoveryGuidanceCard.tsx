@@ -1,4 +1,4 @@
-import { Heart, Sparkles } from 'lucide-react-native';
+import { ArrowRight, Heart } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 
@@ -11,21 +11,21 @@ export function RecoveryGuidanceCard({ onPress }: RecoveryGuidanceCardProps) {
 
   const styles = StyleSheet.create({
     card: {
+      flex: 1,
+      minHeight: 164,
       borderRadius: theme.radii.md,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      padding: 14,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.sm,
+      padding: theme.spacing.sm,
+      gap: theme.spacing.xs,
       shadowColor: '#000000',
       ...theme.elevations.card,
     },
     iconBox: {
-      width: 40,
-      height: 40,
-      borderRadius: 12,
+      width: 38,
+      height: 38,
+      borderRadius: 11,
       backgroundColor: theme.colors.surfaceMuted,
       alignItems: 'center',
       justifyContent: 'center',
@@ -46,13 +46,16 @@ export function RecoveryGuidanceCard({ onPress }: RecoveryGuidanceCardProps) {
       fontSize: 12,
       lineHeight: 17,
     },
-    actionBox: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
-      backgroundColor: theme.colors.surfaceMuted,
+    cta: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 4,
+    },
+    ctaLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
+      fontWeight: theme.typography.weights.medium,
     },
   });
 
@@ -65,20 +68,17 @@ export function RecoveryGuidanceCard({ onPress }: RecoveryGuidanceCardProps) {
       ]}
     >
       <View style={styles.iconBox}>
-        <Heart color={theme.colors.textPrimary} size={20} strokeWidth={2.1} />
+        <Heart color={theme.colors.textPrimary} size={18} strokeWidth={2.1} />
       </View>
       <View style={styles.content}>
         <Text style={styles.title}>Guía de recuperación</Text>
         <Text numberOfLines={2} style={styles.subtitle}>
-          ELLIE puede guiarte con recomendaciones orientadas a la recuperación.
+          Ajusta descanso, movilidad y recuperación con ELLIE.
         </Text>
       </View>
-      <View style={styles.actionBox}>
-        <Sparkles
-          color={theme.colors.textPrimary}
-          size={15}
-          strokeWidth={2.2}
-        />
+      <View style={styles.cta}>
+        <Text style={styles.ctaLabel}>Consultar guía</Text>
+        <ArrowRight color={theme.colors.textSecondary} size={12} />
       </View>
     </Pressable>
   );

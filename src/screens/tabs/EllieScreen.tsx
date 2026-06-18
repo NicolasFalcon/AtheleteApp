@@ -7,7 +7,6 @@ import {
   RefreshCw,
   Sparkles,
   Target,
-  TrendingUp,
   UtensilsCrossed,
 } from 'lucide-react-native';
 import {
@@ -21,10 +20,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loader } from '@app/components/ui';
 import { ELLIE_ROUTES, TAB_ROUTES } from '@app/constants/routes';
-import { EllieActionPromptCard } from '@app/features/ellie/components/EllieActionPromptCard';
 import { EllieBriefingCard } from '@app/features/ellie/components/EllieBriefingCard';
 import { EllieChatContextChips } from '@app/features/ellie/components/EllieChatContextChips';
 import { EllieChatInputBar } from '@app/features/ellie/components/EllieChatInputBar';
+import {
+  EllieDailyFocusGrid,
+  type EllieDailyFocus,
+} from '@app/features/ellie/components/EllieDailyFocusGrid';
 import { EllieHeader } from '@app/features/ellie/components/EllieHeader';
 import { EllieMessageRenderer } from '@app/features/ellie/components/EllieMessageRenderer';
 import { ElliePriorityCard } from '@app/features/ellie/components/ElliePriorityCard';
@@ -35,6 +37,7 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useEllieChat } from '@app/hooks/useEllieChat';
 import { useEllieData } from '@app/hooks/useEllieData';
+import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import type { EllieActionType } from '@app/shared';
 import type { EllieStackParamList } from '@app/types/navigation';
 
@@ -43,26 +46,6 @@ type Props = NativeStackScreenProps<
   typeof ELLIE_ROUTES.Ellie
 >;
 type EllieSection = 'analysis' | 'chat';
-
-function getActionIcon(
-  action: 'dumbbell' | 'utensils' | 'target' | 'droplets' | 'trending-up',
-  color: string,
-) {
-  if (action === 'dumbbell') {
-    return <Dumbbell color={color} size={18} strokeWidth={2.1} />;
-  }
-  if (action === 'utensils') {
-    return <UtensilsCrossed color={color} size={18} strokeWidth={2.1} />;
-  }
-  if (action === 'target') {
-    return <Target color={color} size={18} strokeWidth={2.1} />;
-  }
-  if (action === 'droplets') {
-    return <Droplets color={color} size={18} strokeWidth={2.1} />;
-  }
-
-  return <TrendingUp color={color} size={18} strokeWidth={2.1} />;
-}
 
 function getNudgeIcon(action: EllieActionType | null, color: string) {
   switch (action) {
@@ -83,6 +66,7 @@ function getNudgeIcon(action: EllieActionType | null, color: string) {
 
 export function EllieScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
+  const tabBarMotion = useTabBarMotion();
   const { profile } = useAuth();
   const tabBarHeight = useBottomTabBarHeight();
   const ellieData = useEllieData();
@@ -132,28 +116,27 @@ export function EllieScreen({ navigation }: Props) {
       gap: theme.spacing.sm,
       marginTop: 6,
     },
-    promptList: {
-      gap: theme.spacing.sm,
-      marginTop: 6,
-    },
     chatShell: {
       flex: 1,
       marginTop: -2,
     },
     chatHeaderWrap: {
-      gap: 4,
-      marginBottom: 8,
+      gap: 3,
+      marginBottom: 6,
+      paddingHorizontal: 2,
     },
     chatHeaderEyebrow: {
-      color: theme.colors.textPrimary,
+      color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 10,
       fontWeight: theme.typography.weights.semibold,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
     },
     chatHeaderTitle: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: theme.typography.weights.bold,
     },
     chatHeaderHint: {
@@ -263,6 +246,104 @@ export function EllieScreen({ navigation }: Props) {
     [navigation],
   );
 
+  const dailyFocuses = useMemo<EllieDailyFocus[]>(() => {
+    const context = ellieData.context;
+
+    if (!context) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'training',
+        label: 'Entreno',
+        status: context.training.todayWorkoutDone
+          ? 'Sesión de hoy completa'
+          : `${context.training.workoutsThisWeek}/${context.profile.trainingDaysPerWeek} esta semana`,
+        action: context.training.todayWorkoutDone
+          ? 'Preparar la siguiente'
+          : 'Resolver el entreno de hoy',
+        attention: context.training.todayWorkoutDone ? 'low' : 'high',
+        icon: (
+          <Dumbbell
+            color={theme.colors.textPrimary}
+            size={16}
+            strokeWidth={2}
+          />
+        ),
+        onPress: () =>
+          openChatWithPrompt(
+            '¿Qué debería entrenar hoy según mi progreso actual?',
+          ),
+      },
+      {
+        id: 'nutrition',
+        label: 'Nutrición',
+        status: context.nutrition.loggedToday
+          ? 'Registro cargado hoy'
+          : 'Aún sin registrar',
+        action: context.nutrition.loggedToday
+          ? 'Revisar adherencia'
+          : 'Definir el siguiente paso',
+        attention: context.nutrition.loggedToday ? 'low' : 'high',
+        icon: (
+          <UtensilsCrossed
+            color={theme.colors.textPrimary}
+            size={16}
+            strokeWidth={2}
+          />
+        ),
+        onPress: () => handlePriorityAction('log_nutrition'),
+      },
+      {
+        id: 'hydration',
+        label: 'Agua',
+        status: `${context.hydration.todayPercentage}% de la meta`,
+        action:
+          context.hydration.todayPercentage >= 80
+            ? 'Cerrar bien el día'
+            : 'Recuperar hidratación',
+        attention:
+          context.hydration.todayPercentage >= 80
+            ? 'low'
+            : context.hydration.todayPercentage >= 40
+            ? 'medium'
+            : 'high',
+        icon: (
+          <Droplets
+            color={theme.colors.textPrimary}
+            size={16}
+            strokeWidth={2}
+          />
+        ),
+        onPress: () => handlePriorityAction('log_hydration'),
+      },
+      {
+        id: 'core33',
+        label: 'Core 33',
+        status: context.challenge.active
+          ? `Día ${context.challenge.currentDay} · ${context.challenge.completionRate}%`
+          : 'Sin reto activo',
+        action: context.challenge.active
+          ? 'Revisar lo recuperable'
+          : 'Conocer el reto',
+        attention:
+          context.challenge.active && !context.challenge.todayCompleted
+            ? 'medium'
+            : 'low',
+        icon: (
+          <Target color={theme.colors.textPrimary} size={16} strokeWidth={2} />
+        ),
+        onPress: () => handlePriorityAction('view_challenge'),
+      },
+    ];
+  }, [
+    ellieData.context,
+    handlePriorityAction,
+    openChatWithPrompt,
+    theme.colors.textPrimary,
+  ]);
+
   const handleSend = () => {
     const mode =
       ellieData.suggestedModes[ellieChat.draft] ||
@@ -338,6 +419,8 @@ export function EllieScreen({ navigation }: Props) {
           {section === 'analysis' ? (
             <ScrollView
               contentContainerStyle={styles.analysisContent}
+              onScroll={tabBarMotion.onScroll}
+              scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
             >
               <EllieBriefingCard
@@ -346,17 +429,28 @@ export function EllieScreen({ navigation }: Props) {
                   'ELLIE ya revisó tus datos y tiene prioridades claras para hoy.'
                 }
                 insights={briefingInsights}
-                actionsCount={ellieData.promptCards.length}
+                onPrimaryAction={() =>
+                  openChatWithPrompt(
+                    ellieData.promptCards[0]?.prompt ||
+                      'Dime cuál debería ser mi prioridad ahora.',
+                  )
+                }
               />
 
-              <EllieQuickQuestionChips
-                chips={ellieData.quickQuestionChips}
-                onSelect={openChatWithPrompt}
-              />
+              <View style={styles.analysisSection}>
+                <Text style={styles.sectionTitle}>Focos de hoy</Text>
+                <Text style={styles.sectionSubtitle}>
+                  Situación, nivel de atención y siguiente movimiento.
+                </Text>
+                <EllieDailyFocusGrid items={dailyFocuses} />
+              </View>
 
               {ellieData.priorityNudges.length > 0 ? (
                 <View style={styles.analysisSection}>
-                  <Text style={styles.sectionTitle}>Prioridades ahora</Text>
+                  <Text style={styles.sectionTitle}>Acciones recomendadas</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    ELLIE priorizó estas decisiones por impacto inmediato.
+                  </Text>
                   <View style={styles.priorityList}>
                     {ellieData.priorityNudges.slice(0, 3).map(nudge => (
                       <ElliePriorityCard
@@ -374,26 +468,10 @@ export function EllieScreen({ navigation }: Props) {
                 </View>
               ) : null}
 
-              <View style={styles.analysisSection}>
-                <Text style={styles.sectionTitle}>
-                  Pídele a ELLIE que actúe
-                </Text>
-                <Text style={styles.sectionSubtitle}>
-                  Sugerencias directas y limpias para abrir la conversación
-                  correcta.
-                </Text>
-                <View style={styles.promptList}>
-                  {ellieData.promptCards.slice(0, 4).map(card => (
-                    <EllieActionPromptCard
-                      key={card.id}
-                      icon={getActionIcon(card.icon, theme.colors.textPrimary)}
-                      title={card.title}
-                      subtitle={card.subtitle}
-                      onPress={() => openChatWithPrompt(card.prompt)}
-                    />
-                  ))}
-                </View>
-              </View>
+              <EllieQuickQuestionChips
+                chips={ellieData.quickQuestionChips}
+                onSelect={openChatWithPrompt}
+              />
 
               {ellieData.weeklySummary ? (
                 <EllieWeeklySummaryCard
@@ -409,15 +487,16 @@ export function EllieScreen({ navigation }: Props) {
           ) : (
             <View style={styles.chatShell}>
               <View style={styles.chatHeaderWrap}>
-                <Text style={styles.chatHeaderEyebrow}>Habla con ELLIE</Text>
-                <Text style={styles.chatHeaderTitle}>Conversación guiada</Text>
+                <Text style={styles.chatHeaderEyebrow}>Coach IA</Text>
+                <Text style={styles.chatHeaderTitle}>
+                  ¿En qué quieres que te ayude hoy?
+                </Text>
                 <Text style={styles.chatHeaderHint}>
-                  Haz preguntas directas o usa un acceso rápido para dejar el
-                  prompt listo.
+                  Elige una intención o cuéntame exactamente qué necesitas.
                 </Text>
               </View>
               <EllieChatContextChips
-                chips={ellieData.quickChatChips.slice(0, 4)}
+                chips={ellieData.quickChatChips.slice(0, 6)}
                 hasHistory={ellieChat.hasHistory}
                 isClearing={ellieChat.isClearing}
                 onSelectPrompt={ellieChat.prefillDraft}
@@ -433,6 +512,8 @@ export function EllieScreen({ navigation }: Props) {
                   <ScrollView
                     ref={messagesRef}
                     contentContainerStyle={styles.messageScrollContent}
+                    onScroll={tabBarMotion.onScroll}
+                    scrollEventThrottle={16}
                     showsVerticalScrollIndicator={false}
                     keyboardDismissMode="interactive"
                     keyboardShouldPersistTaps="handled"

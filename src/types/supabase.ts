@@ -3,7 +3,7 @@ export type Json =
   | number
   | boolean
   | null
-  | {[key: string]: Json | undefined}
+  | { [key: string]: Json | undefined }
   | Json[];
 
 export type Database = {
@@ -231,10 +231,13 @@ export type Database = {
       profiles: {
         Row: {
           available_equipment: string[] | null;
+          avatar_key: string | null;
+          profile_photo_url: string | null;
           id: string;
           name: string;
           goal: string | null;
           birth_date: string | null;
+          gender: string | null;
           weight: number | null;
           height: number | null;
           training_days_per_week: number | null;
@@ -250,10 +253,13 @@ export type Database = {
         };
         Insert: {
           available_equipment?: string[] | null;
+          avatar_key?: string | null;
+          profile_photo_url?: string | null;
           id: string;
           name?: string;
           goal?: string | null;
           birth_date?: string | null;
+          gender?: string | null;
           weight?: number | null;
           height?: number | null;
           training_days_per_week?: number | null;
@@ -269,10 +275,13 @@ export type Database = {
         };
         Update: {
           available_equipment?: string[] | null;
+          avatar_key?: string | null;
+          profile_photo_url?: string | null;
           id?: string;
           name?: string;
           goal?: string | null;
           birth_date?: string | null;
+          gender?: string | null;
           weight?: number | null;
           height?: number | null;
           training_days_per_week?: number | null;
@@ -433,7 +442,18 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      award_gamification_event: {
+        Args: {
+          _badge_ids?: string[];
+          _event_type: string;
+          _metadata?: Json;
+          _points?: number;
+          _reference_id: string;
+        };
+        Returns: Json;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

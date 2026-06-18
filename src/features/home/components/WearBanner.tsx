@@ -6,11 +6,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import { atheleteWearEditorial } from '@app/assets/images';
 import { useAppTheme } from '@app/hooks/useAppTheme';
-
-const wearBannerImage = {
-  uri: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=1200&q=80',
-};
 
 type WearBannerProps = {
   onPress: () => void;
@@ -22,9 +19,12 @@ export function WearBanner({ onPress }: WearBannerProps) {
   const styles = StyleSheet.create({
     shell: {
       borderRadius: theme.radii.md,
-      overflow: 'hidden',
       shadowColor: '#000000',
-      ...theme.elevations.card,
+      ...theme.elevations.prominent,
+    },
+    clip: {
+      borderRadius: theme.radii.md,
+      overflow: 'hidden',
     },
     background: {
       minHeight: 92,
@@ -32,7 +32,7 @@ export function WearBanner({ onPress }: WearBannerProps) {
     },
     overlay: {
       ...StyleSheet.absoluteFill,
-      backgroundColor: 'rgba(0,0,0,0.46)',
+      backgroundColor: 'rgba(0,0,0,0.58)',
     },
     content: {
       paddingHorizontal: theme.spacing.md,
@@ -79,24 +79,26 @@ export function WearBanner({ onPress }: WearBannerProps) {
   });
 
   return (
-    <ImageBackground
-      source={wearBannerImage}
-      imageStyle={styles.shell}
-      style={styles.shell}
-    >
-      <View style={styles.overlay} />
-      <View style={styles.content}>
-        <View style={styles.textWrap}>
-          <Text style={styles.label}>ATHELETE WEAR</Text>
-          <Text style={styles.title}>
-            Diseñado para entrenar. Hecho para durar.
-          </Text>
+    <View style={styles.shell}>
+      <ImageBackground
+        source={atheleteWearEditorial}
+        imageStyle={styles.clip}
+        style={styles.clip}
+      >
+        <View style={styles.overlay} />
+        <View style={styles.content}>
+          <View style={styles.textWrap}>
+            <Text style={styles.label}>ATHELETE WEAR</Text>
+            <Text style={styles.title}>
+              Diseñado para entrenar. Hecho para durar.
+            </Text>
+          </View>
+          <Pressable onPress={onPress} style={styles.cta}>
+            <Text style={styles.ctaLabel}>Ver colección</Text>
+            <ArrowRight color="#FFFFFF" size={14} strokeWidth={2.2} />
+          </Pressable>
         </View>
-        <Pressable onPress={onPress} style={styles.cta}>
-          <Text style={styles.ctaLabel}>Ver colección</Text>
-          <ArrowRight color="#FFFFFF" size={14} strokeWidth={2.2} />
-        </Pressable>
-      </View>
-    </ImageBackground>
+      </ImageBackground>
+    </View>
   );
 }

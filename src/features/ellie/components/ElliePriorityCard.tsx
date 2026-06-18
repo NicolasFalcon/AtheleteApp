@@ -30,12 +30,12 @@ export function ElliePriorityCard({
       alignItems: 'center',
       gap: 12,
       paddingHorizontal: 12,
-      paddingVertical: 11,
+      paddingVertical: 10,
     },
     iconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 34,
+      height: 34,
+      borderRadius: 12,
       backgroundColor: theme.colors.surfaceMuted,
       alignItems: 'center',
       justifyContent: 'center',
@@ -47,8 +47,8 @@ export function ElliePriorityCard({
     text: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize: 12,
+      lineHeight: 17,
     },
     hint: {
       color: theme.colors.textSecondary,
@@ -81,7 +81,7 @@ export function ElliePriorityCard({
         <View style={styles.iconWrap}>{icon}</View>
         <View style={styles.content}>
           <Text style={styles.text}>{text}</Text>
-          <Text style={styles.hint}>Acción rápida</Text>
+          <Text style={styles.hint}>ELLIE recomienda actuar ahora</Text>
         </View>
         <View style={styles.action}>
           <Text style={styles.actionLabel}>{actionLabel}</Text>

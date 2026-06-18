@@ -17,6 +17,18 @@ const difficultyLabels = {
   advanced: 'Avanzado',
 } as const;
 
+function getOriginLabel(workout: Workout) {
+  if (workout.sourceType === 'user') {
+    return 'Tuya';
+  }
+
+  if (workout.sourceType === 'ellie' || workout.createdByAi) {
+    return 'ELLIE';
+  }
+
+  return 'Biblioteca';
+}
+
 export function WorkoutListItem({
   workout,
   isFavorite,
@@ -33,38 +45,56 @@ export function WorkoutListItem({
       borderColor: theme.colors.border,
       flexDirection: 'row',
       alignItems: 'center',
-      padding: 12,
-      gap: 12,
+      padding: 10,
+      gap: 11,
       shadowColor: '#000000',
       ...theme.elevations.card,
     },
     image: {
-      width: 82,
-      height: 82,
+      width: 78,
+      height: 78,
       borderRadius: theme.radii.sm,
     },
     content: {
       flex: 1,
-      gap: 4,
+      gap: 3,
+      minWidth: 0,
+    },
+    badge: {
+      alignSelf: 'flex-start',
+      borderRadius: theme.radii.pill,
+      backgroundColor: theme.colors.surfaceMuted,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      marginBottom: 1,
+    },
+    badgeLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 9,
+      fontWeight: theme.typography.weights.semibold,
+      letterSpacing: 1.1,
+      textTransform: 'uppercase',
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: theme.typography.weights.semibold,
+      lineHeight: 19,
     },
     subtitle: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: 12,
+      lineHeight: 16,
     },
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: theme.spacing.sm,
       flexWrap: 'wrap',
-      marginTop: 4,
+      marginTop: 2,
     },
     metaItem: {
       flexDirection: 'row',
@@ -77,14 +107,12 @@ export function WorkoutListItem({
       fontSize: 12,
     },
     favoriteButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.background,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceMuted,
     },
   });
 
@@ -98,6 +126,9 @@ export function WorkoutListItem({
     >
       <WorkoutThumbnail workout={workout} style={styles.image} />
       <View style={styles.content}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeLabel}>{getOriginLabel(workout)}</Text>
+        </View>
         <Text numberOfLines={2} style={styles.title}>
           {workout.title}
         </Text>

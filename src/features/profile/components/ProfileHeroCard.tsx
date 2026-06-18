@@ -1,8 +1,12 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { Chip } from '@app/components/ui';
+import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { AvatarKey } from '@app/types/profileIdentity';
 
 type ProfileHeroCardProps = {
+  avatarKey?: AvatarKey | null;
+  profilePhotoUrl?: string | null;
   name: string;
   email: string;
   goalLabel: string;
@@ -67,6 +71,8 @@ function StatCard({
 }
 
 export function ProfileHeroCard({
+  avatarKey,
+  profilePhotoUrl,
   name,
   email,
   goalLabel,
@@ -95,25 +101,6 @@ export function ProfileHeroCard({
       flexDirection: 'row',
       alignItems: 'center',
       gap: 14,
-    },
-    avatar: {
-      width: 58,
-      height: 58,
-      borderRadius: 18,
-      backgroundColor: theme.colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: '#000000',
-      shadowOpacity: 0.1,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 3,
-    },
-    avatarLabel: {
-      color: theme.colors.accentContrast,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 24,
-      fontWeight: theme.typography.weights.semibold,
     },
     textBlock: {
       flex: 1,
@@ -165,11 +152,12 @@ export function ProfileHeroCard({
     <View style={styles.container}>
       <View style={styles.identityCard}>
         <View style={styles.identityRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarLabel}>
-              {(name || 'U').charAt(0).toUpperCase()}
-            </Text>
-          </View>
+          <ProfileAvatar
+            avatarKey={avatarKey}
+            profilePhotoUrl={profilePhotoUrl}
+            borderRadius={18}
+            size={58}
+          />
 
           <View style={styles.textBlock}>
             <Text numberOfLines={1} style={styles.name}>

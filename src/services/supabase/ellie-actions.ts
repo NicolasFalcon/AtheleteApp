@@ -1,5 +1,5 @@
-import {getSupabaseClient} from '@app/services/supabase/client';
-import {awardGamificationEvent} from '@app/services/supabase/gamification';
+import { getSupabaseClient } from '@app/services/supabase/client';
+import { awardGamificationEvent } from '@app/services/supabase/gamification';
 
 export type EllieGeneratedExercise = {
   name: string;
@@ -44,11 +44,12 @@ function getClient() {
 export async function saveEllieWorkout(
   userId: string,
   workout: EllieGeneratedWorkout,
-): Promise<{success: boolean; workoutId?: string; error?: string}> {
+): Promise<{ success: boolean; workoutId?: string; error?: string }> {
   try {
     const client = getClient();
-    const {data: template, error: templateError} = await (client
-      .from('workout_templates') as any)
+    const { data: template, error: templateError } = await (
+      client.from('workout_templates') as any
+    )
       .insert({
         title: workout.title,
         description: workout.description || null,
@@ -75,21 +76,21 @@ export async function saveEllieWorkout(
     }
 
     if (workout.exercises.length > 0) {
-      const {error: exerciseError} = await (client
-        .from('template_exercises') as any)
-        .insert(
-          workout.exercises.map((exercise, index) => ({
-            template_id: template.id,
-            name: exercise.name,
-            exercise_id: exercise.exerciseId || null,
-            sets: exercise.sets || null,
-            reps: exercise.reps || null,
-            duration: exercise.duration || null,
-            rest_time: exercise.restTime || 60,
-            notes: exercise.notes || null,
-            sort_order: index,
-          })),
-        );
+      const { error: exerciseError } = await (
+        client.from('template_exercises') as any
+      ).insert(
+        workout.exercises.map((exercise, index) => ({
+          template_id: template.id,
+          name: exercise.name,
+          exercise_id: exercise.exerciseId || null,
+          sets: exercise.sets || null,
+          reps: exercise.reps || null,
+          duration: exercise.duration || null,
+          rest_time: exercise.restTime || 60,
+          notes: exercise.notes || null,
+          sort_order: index,
+        })),
+      );
 
       if (exerciseError) {
         await client.from('workout_templates').delete().eq('id', template.id);
@@ -108,7 +109,9 @@ export async function saveEllieWorkout(
     return {
       success: false,
       error:
-        error instanceof Error ? error.message : 'No pudimos guardar la rutina.',
+        error instanceof Error
+          ? error.message
+          : 'No pudimos guardar la rutina.',
     };
   }
 }
@@ -116,18 +119,16 @@ export async function saveEllieWorkout(
 export async function saveEllieNutritionPlan(
   userId: string,
   plan: EllieGeneratedNutritionPlan,
-): Promise<{success: boolean; planId?: string; error?: string}> {
+): Promise<{ success: boolean; planId?: string; error?: string }> {
   try {
     const client = getClient();
 
-    await (client
-      .from('nutrition_plans') as any)
-      .update({is_active: false})
+    await (client.from('nutrition_plans') as any)
+      .update({ is_active: false })
       .eq('user_id', userId)
       .eq('is_active', true);
 
-    const {data, error} = await (client
-      .from('nutrition_plans') as any)
+    const { data, error } = await (client.from('nutrition_plans') as any)
       .insert({
         user_id: userId,
         target_calories: plan.targetCalories,
@@ -149,7 +150,7 @@ export async function saveEllieNutritionPlan(
       };
     }
 
-    await awardEllieNutritionPlanActivation(userId, String(data.id));
+    await awardEllieNutritionPlanActivation(String(data.id));
 
     return {
       success: true,
@@ -166,14 +167,10 @@ export async function saveEllieNutritionPlan(
   }
 }
 
-export async function awardEllieNutritionPlanActivation(
-  userId: string,
-  planId: string,
-) {
+export async function awardEllieNutritionPlanActivation(planId: string) {
   await awardGamificationEvent({
-    userId,
-    eventKey: `nutrition_plan_activated:${planId}`,
-    eventType: 'nutrition_plan_activated',
+    eventType: 'nutrition_activated',
+    referenceId: planId,
     points: 40,
     badgeIds: ['nutrition_started'],
     metadata: {
