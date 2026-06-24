@@ -9,7 +9,6 @@ type EllieMessageRendererProps = {
   busyAction?: 'save' | 'activate' | 'regenerate' | null;
   onSaveWorkout: (messageId: string) => void;
   onActivatePlan: (messageId: string) => void;
-  onDiscard: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
   onOpenNutritionPlan?: () => void;
 };
@@ -20,7 +19,6 @@ export function EllieMessageRenderer({
   busyAction,
   onSaveWorkout,
   onActivatePlan,
-  onDiscard,
   onRegenerate,
   onOpenNutritionPlan,
 }: EllieMessageRendererProps) {
@@ -45,8 +43,8 @@ export function EllieMessageRenderer({
         isSaving={busyMessageId === message.id && busyAction === 'save'}
         isRegenerating={busyMessageId === message.id && busyAction === 'regenerate'}
         onSave={() => onSaveWorkout(message.id)}
-        onDiscard={() => onDiscard(message.id)}
         onRegenerate={() => onRegenerate(message.id)}
+        onAdjust={() => onRegenerate(message.id)}
       />
     );
   }
@@ -72,8 +70,8 @@ export function EllieMessageRenderer({
         isSaving={busyMessageId === message.id && busyAction === 'activate'}
         isRegenerating={busyMessageId === message.id && busyAction === 'regenerate'}
         onSave={() => onActivatePlan(message.id)}
-        onDiscard={() => onDiscard(message.id)}
         onRegenerate={() => onRegenerate(message.id)}
+        onAdjust={() => onRegenerate(message.id)}
         onOpenPlan={message.saved ? onOpenNutritionPlan : undefined}
       />
     );

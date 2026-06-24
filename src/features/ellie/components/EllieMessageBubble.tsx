@@ -17,23 +17,18 @@ export function EllieMessageBubble({ message }: EllieMessageBubbleProps) {
       alignItems: isAssistant ? 'flex-start' : 'flex-end',
     },
     bubble: {
-      maxWidth: isAssistant ? '92%' : '78%',
-      borderRadius: isAssistant ? 22 : 18,
-      paddingHorizontal: isAssistant ? 16 : 14,
-      paddingVertical: isAssistant ? 15 : 11,
-      backgroundColor: isAssistant ? theme.colors.surface : theme.colors.accent,
+      maxWidth: isAssistant ? '90%' : '76%',
+      borderRadius: isAssistant ? 18 : 18,
+      paddingHorizontal: isAssistant ? 14 : 13,
+      paddingVertical: isAssistant ? 13 : 10,
+      backgroundColor: isAssistant
+        ? theme.colors.surfaceMuted
+        : theme.colors.accent,
       borderWidth: isAssistant ? StyleSheet.hairlineWidth : 0,
       borderColor: theme.colors.border,
-      shadowColor: isAssistant ? '#000000' : 'transparent',
-      shadowOpacity: isAssistant ? 0.04 : 0,
-      shadowRadius: isAssistant ? 12 : 0,
-      shadowOffset: isAssistant
-        ? { width: 0, height: 6 }
-        : { width: 0, height: 0 },
-      elevation: isAssistant ? 1 : 0,
     },
     bubbleAssistant: {
-      borderTopLeftRadius: 8,
+      borderTopLeftRadius: 6,
     },
     bubbleUser: {
       borderBottomRightRadius: 6,
@@ -42,17 +37,14 @@ export function EllieMessageBubble({ message }: EllieMessageBubbleProps) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      marginBottom: 8,
-      paddingBottom: 8,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      marginBottom: 7,
     },
     brandLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1,
+      fontSize: 10,
+      fontWeight: theme.typography.weights.medium,
+      letterSpacing: 0.8,
       textTransform: 'uppercase',
     },
   });

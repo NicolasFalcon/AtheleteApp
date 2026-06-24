@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { ChevronRight, Trophy } from 'lucide-react-native';
+import { ChevronRight, Medal, Trophy } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@app/components/ui';
 import { useAppTheme } from '@app/hooks/useAppTheme';
-import { formatPRValue, type PersonalRecord } from '@app/shared';
+import { formatPRValue, prTypeLabels, type PersonalRecord } from '@app/shared';
 
 type PersonalRecordsCardProps = {
   records: Array<PersonalRecord & { exerciseName: string }>;
@@ -47,13 +47,29 @@ export function PersonalRecordsCard({
       .slice(0, 4);
   }, [records]);
 
+  const totalPrs = records.length;
+
+  function formatDate(date: string) {
+    return new Date(date).toLocaleDateString('es-CL', {
+      day: 'numeric',
+      month: 'short',
+    });
+  }
+
   const styles = StyleSheet.create({
     card: {
       padding: 16,
       borderRadius: theme.radii.md,
-      gap: 12,
+      gap: 14,
     },
     header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    titleRow: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
@@ -64,68 +80,167 @@ export function PersonalRecordsCard({
       fontSize: 15,
       fontWeight: theme.typography.weights.bold,
     },
+    summaryPill: {
+      minHeight: 28,
+      borderRadius: theme.radii.pill,
+      backgroundColor: theme.colors.background,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    summaryPillText: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
+      fontWeight: theme.typography.weights.medium,
+      lineHeight: 14,
+    },
     list: {
-      gap: 2,
+      gap: 8,
+    },
+    empty: {
+      minHeight: 126,
+      borderRadius: theme.radii.sm,
+      backgroundColor: theme.colors.background,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 16,
+      justifyContent: 'center',
+      gap: 10,
+    },
+    emptyIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
     },
     emptyText: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      lineHeight: 20,
+      fontSize: 12,
+      lineHeight: 17,
+    },
+    emptyTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 14,
+      fontWeight: theme.typography.weights.semibold,
+      lineHeight: 18,
     },
     row: {
-      paddingVertical: 12,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
+      minHeight: 76,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+      borderRadius: theme.radii.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
     },
     rowLast: {
-      borderBottomWidth: 0,
-      paddingBottom: 4,
+      marginBottom: 0,
     },
     textGroup: {
       flex: 1,
-      gap: 3,
+      gap: 6,
     },
     exerciseName: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 15,
-      fontWeight: theme.typography.weights.medium,
+      fontWeight: theme.typography.weights.semibold,
+      lineHeight: 19,
     },
-    value: {
+    metaRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 6,
+    },
+    badge: {
+      borderRadius: theme.radii.pill,
+      backgroundColor: theme.colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    badgeText: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
-      lineHeight: 18,
+      fontSize: 10,
+      fontWeight: theme.typography.weights.medium,
+      lineHeight: 12,
+    },
+    dateText: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
+      lineHeight: 14,
     },
     rightMeta: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 8,
+    },
+    valueStack: {
+      alignItems: 'flex-end',
+      gap: 3,
+    },
+    value: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 15,
+      fontWeight: theme.typography.weights.bold,
+      lineHeight: 19,
     },
     count: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 11,
+      lineHeight: 14,
     },
   });
 
   return (
     <Card style={styles.card}>
       <View style={styles.header}>
-        <Trophy color={theme.colors.textPrimary} size={16} strokeWidth={2} />
-        <Text style={styles.title}>Récords personales</Text>
+        <View style={styles.titleRow}>
+          <Trophy color={theme.colors.textPrimary} size={16} strokeWidth={2} />
+          <Text style={styles.title}>Récords personales</Text>
+        </View>
+        {totalPrs > 0 ? (
+          <View style={styles.summaryPill}>
+            <Text style={styles.summaryPillText}>
+              {totalPrs} PR{totalPrs === 1 ? '' : 's'}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {summaries.length === 0 ? (
-        <Text style={styles.emptyText}>
-          Cuando registres tus primeros PRs, aparecerán aquí con sus mejores
-          marcas y accesos rápidos al historial.
-        </Text>
+        <View style={styles.empty}>
+          <View style={styles.emptyIcon}>
+            <Medal color={theme.colors.textSecondary} size={18} strokeWidth={2} />
+          </View>
+          <View>
+            <Text style={styles.emptyTitle}>Aún no hay récords guardados</Text>
+            <Text style={styles.emptyText}>
+              Tus mejores marcas aparecerán aquí cuando registres tus primeros
+              PRs.
+            </Text>
+          </View>
+        </View>
       ) : (
         <View style={styles.list}>
           {summaries.map((summary, index) => {
@@ -144,14 +259,26 @@ export function PersonalRecordsCard({
                   <Text style={styles.exerciseName}>
                     {summary.exerciseName}
                   </Text>
-                  <Text style={styles.value}>
-                    {formatPRValue(summary.latest)}
-                  </Text>
+                  <View style={styles.metaRow}>
+                    <View style={styles.badge}>
+                      <Text style={styles.badgeText}>
+                        {prTypeLabels[summary.latest.prType]}
+                      </Text>
+                    </View>
+                    <Text style={styles.dateText}>
+                      {formatDate(summary.latest.recordedAt)}
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.rightMeta}>
-                  <Text style={styles.count}>
-                    {summary.total} PR{summary.total === 1 ? '' : 's'}
-                  </Text>
+                  <View style={styles.valueStack}>
+                    <Text style={styles.value}>
+                      {formatPRValue(summary.latest)}
+                    </Text>
+                    <Text style={styles.count}>
+                      {summary.total} PR{summary.total === 1 ? '' : 's'}
+                    </Text>
+                  </View>
                   <ChevronRight
                     color={theme.colors.textSecondary}
                     size={16}

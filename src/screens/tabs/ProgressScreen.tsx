@@ -8,7 +8,6 @@ import { EmptyState, Loader } from '@app/components/ui';
 import { PROGRESS_ROUTES } from '@app/constants/routes';
 import { ActiveChallengeCard } from '@app/features/progress/components/ActiveChallengeCard';
 import { AiAnalysisCard } from '@app/features/progress/components/AiAnalysisCard';
-import { BodyScienceProgressCard } from '@app/features/progress/components/BodyScienceProgressCard';
 import { HydrationProgressCard } from '@app/features/progress/components/HydrationProgressCard';
 import { NutritionProgressCard } from '@app/features/progress/components/NutritionProgressCard';
 import { PersonalRecordsCard } from '@app/features/progress/components/PersonalRecordsCard';
@@ -40,7 +39,7 @@ export function ProgressScreen({ navigation }: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: tabBarHeight + theme.spacing.md,
+      paddingBottom: tabBarHeight + theme.spacing.jumbo,
       gap: theme.spacing.md,
     },
     title: {
@@ -114,16 +113,6 @@ export function ProgressScreen({ navigation }: Props) {
           <>
             <ProgressRangeSwitch value={range} onChange={setRange} />
             <AiAnalysisCard insights={progress.insights} />
-            <BodyScienceProgressCard
-              onOpenLibrary={() =>
-                navigation.navigate(PROGRESS_ROUTES.BodyScience)
-              }
-              onOpenArticle={articleId =>
-                navigation.navigate(PROGRESS_ROUTES.BodyScienceArticle, {
-                  articleId,
-                })
-              }
-            />
             <TrainingProgressCard
               sessions={overview.workoutSessions}
               range={range}

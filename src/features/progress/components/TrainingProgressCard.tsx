@@ -1,10 +1,13 @@
 import { useMemo } from 'react';
 import { Dumbbell } from 'lucide-react-native';
-import { StyleSheet, Text, View } from 'react-native';
-import { Card } from '@app/components/ui';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { getLocalDateKey } from '@app/lib/date';
-import { ProgressBarChart } from '@app/features/progress/components/ProgressBarChart';
+import { ProgressChartCard } from '@app/features/progress/components/ProgressChartCard';
+import {
+  buildProgressDateRange,
+  formatProgressDayLabel,
+  formatProgressTooltipLabel,
+} from '@app/features/progress/progressDateRanges';
 import type { WorkoutSession } from '@app/shared';
 
 type ProgressRange = 'week' | 'month';
@@ -13,19 +16,6 @@ type TrainingProgressCardProps = {
   sessions: WorkoutSession[];
   range: ProgressRange;
 };
-
-function getRangeDays(range: ProgressRange) {
-  return range === 'month' ? 30 : 7;
-}
-
-function buildDateRange(range: ProgressRange): Date[] {
-  const days = getRangeDays(range);
-  return Array.from({ length: days }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - (days - 1 - index));
-    return date;
-  });
-}
 
 function formatDuration(minutes: number): string {
   const rounded = Math.max(0, Math.round(minutes));
@@ -38,19 +28,11 @@ function formatDuration(minutes: number): string {
   return remaining > 0 ? `${hours} h ${remaining} min` : `${hours} h`;
 }
 
-function formatFullLabel(date: Date): string {
-  return date.toLocaleDateString('es-CL', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-}
-
 type ChartPoint = {
   id: string;
   label: string;
-  tooltipTitle: string;
-  tooltipLines: string[];
+  tooltipLabel: string;
+  tooltipValue: string;
   primaryValue: number;
   sessions: number;
   calories: number;
@@ -81,27 +63,15 @@ export function TrainingProgressCard({
       return accumulator;
     }, {});
 
-    return buildDateRange(range).map(date => {
+    return buildProgressDateRange(range).map(date => {
       const key = getLocalDateKey(date);
       const totals = byDate[key] || { minutes: 0, sessions: 0, calories: 0 };
 
       return {
         id: key,
-        label:
-          range === 'week'
-            ? date
-                .toLocaleDateString('es-CL', { weekday: 'short' })
-                .replace('.', '')
-                .slice(0, 3)
-            : String(date.getDate()),
-        tooltipTitle: totals.sessions
-          ? `${totals.sessions} ${
-              totals.sessions === 1 ? 'sesión' : 'sesiones'
-            }`
-          : formatFullLabel(date),
-        tooltipLines: totals.sessions
-          ? [formatDuration(totals.minutes), `${totals.calories} kcal`]
-          : ['Sin entreno'],
+        label: formatProgressDayLabel(date, range),
+        tooltipLabel: formatProgressTooltipLabel(date),
+        tooltipValue: formatDuration(totals.minutes),
         primaryValue: totals.minutes,
         sessions: totals.sessions,
         calories: totals.calories,
@@ -117,131 +87,40 @@ export function TrainingProgressCard({
   const activeDays = chartData.filter(item => item.sessions > 0).length;
   const averageMinutes =
     totalSessions > 0 ? Math.round(totalMinutes / totalSessions) : 0;
-
-  const styles = StyleSheet.create({
-    card: {
-      padding: 16,
-      borderRadius: theme.radii.md,
-      gap: 12,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-    },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
-      fontWeight: theme.typography.weights.bold,
-    },
-    summary: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-    },
-    legend: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    bullet: {
-      width: 8,
-      height: 8,
-      borderRadius: 999,
-      backgroundColor: theme.colors.accent,
-    },
-    legendLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-    },
-    footer: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-      paddingTop: 4,
-    },
-    metric: {
-      width: '48%',
-      gap: 3,
-      borderRadius: theme.radii.sm,
-      backgroundColor: theme.colors.background,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-    },
-    metricLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-    },
-    metricValue: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      fontWeight: theme.typography.weights.semibold,
-    },
-  });
+  const hasData = totalSessions > 0;
 
   return (
-    <Card style={styles.card}>
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <Dumbbell
-            color={theme.colors.textPrimary}
-            size={16}
-            strokeWidth={2}
-          />
-          <Text style={styles.title}>
-            Entreno — {range === 'week' ? '7 días' : 'Mes'}
-          </Text>
-        </View>
-        <Text style={styles.summary}>
-          {totalSessions} {totalSessions === 1 ? 'sesión' : 'sesiones'}
-        </Text>
-      </View>
-
-      <View style={styles.legend}>
-        <View style={styles.bullet} />
-        <Text style={styles.legendLabel}>Minutos</Text>
-      </View>
-
-      <ProgressBarChart
-        points={chartData}
-        primaryColor={theme.colors.accent}
-        labelInterval={range === 'month' ? 5 : 1}
-      />
-
-      <View style={styles.footer}>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Total</Text>
-          <Text style={styles.metricValue}>
-            {totalSessions} {totalSessions === 1 ? 'sesión' : 'sesiones'}
-          </Text>
-        </View>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Tiempo</Text>
-          <Text style={styles.metricValue}>{formatDuration(totalMinutes)}</Text>
-        </View>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Prom</Text>
-          <Text style={styles.metricValue}>
-            {formatDuration(averageMinutes)}/sesión
-          </Text>
-        </View>
-        <View style={styles.metric}>
-          <Text style={styles.metricLabel}>Activos</Text>
-          <Text style={styles.metricValue}>
-            {activeDays} día{activeDays === 1 ? '' : 's'}
-          </Text>
-        </View>
-      </View>
-    </Card>
+    <ProgressChartCard
+      icon={
+        <Dumbbell color={theme.colors.textPrimary} size={16} strokeWidth={2} />
+      }
+      title={`Entreno — ${range === 'week' ? '7 días' : 'Mes'}`}
+      summary={`${totalSessions} ${
+        totalSessions === 1 ? 'sesión' : 'sesiones'
+      }`}
+      range={range}
+      points={chartData.map(point => ({
+        id: point.id,
+        label: point.label,
+        value: point.primaryValue,
+        tooltipLabel: point.tooltipLabel,
+        tooltipValue: point.tooltipValue,
+      }))}
+      primaryColor={theme.colors.accent}
+      legendItems={[{ label: 'Minutos', color: theme.colors.accent }]}
+      hasData={hasData}
+      emptyMessage="Sin entrenos registrados en este periodo."
+      metrics={[
+        {
+          label: 'Total',
+          value: `${totalSessions} ${
+            totalSessions === 1 ? 'sesión' : 'sesiones'
+          }`,
+        },
+        { label: 'Tiempo', value: formatDuration(totalMinutes) },
+        { label: 'Prom', value: `${formatDuration(averageMinutes)}/sesión` },
+        { label: 'Activos', value: `${activeDays} día${activeDays === 1 ? '' : 's'}` },
+      ]}
+    />
   );
 }

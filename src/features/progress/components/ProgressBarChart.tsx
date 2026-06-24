@@ -19,10 +19,16 @@ type ProgressBarChartProps = {
   targetValue?: number;
   maxValue?: number;
   labelInterval?: number;
+  compactEmpty?: boolean;
 };
 
 const TOOLTIP_HEIGHT = 52;
-const BAR_AREA_HEIGHT = 86;
+const TOOLTIP_LANE_HEIGHT = 18;
+const BAR_AREA_HEIGHT = 128;
+const COMPACT_BAR_AREA_HEIGHT = 42;
+const LABEL_ROW_HEIGHT = 18;
+const DOMAIN_HEADROOM = 1.18;
+const TARGET_DOMAIN_THRESHOLD = 1.35;
 
 export function ProgressBarChart({
   points,
@@ -31,9 +37,12 @@ export function ProgressBarChart({
   targetValue,
   maxValue,
   labelInterval = 1,
+  compactEmpty = false,
 }: ProgressBarChartProps) {
   const {theme} = useAppTheme();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const tooltipHeight = compactEmpty ? 0 : TOOLTIP_LANE_HEIGHT;
+  const barAreaHeight = compactEmpty ? COMPACT_BAR_AREA_HEIGHT : BAR_AREA_HEIGHT;
 
   const resolvedMax = useMemo(() => {
     const pointMax = Math.max(
@@ -42,21 +51,32 @@ export function ProgressBarChart({
         Math.max(point.primaryValue, point.secondaryValue || 0),
       ),
     );
+    const explicitMax = Math.max(maxValue || 0, 0);
+    const dataMax = Math.max(pointMax, explicitMax);
 
-    return Math.max(pointMax, targetValue || 0, maxValue || 0, 1);
+    if (dataMax <= 0) {
+      return Math.max(targetValue || 0, 1);
+    }
+
+    const targetFitsDomain =
+      targetValue && targetValue <= dataMax * TARGET_DOMAIN_THRESHOLD;
+    const domainMax = Math.max(dataMax, targetFitsDomain ? targetValue : 0);
+
+    return Math.max(domainMax * DOMAIN_HEADROOM, 1);
   }, [maxValue, points, targetValue]);
   const compact = points.length > 10;
-  const primaryWidth = secondaryColor ? (compact ? 6 : 11) : compact ? 8 : 16;
-  const secondaryWidth = compact ? 4 : 11;
-  const barGap = compact ? 2 : 5;
+  const primaryWidth = secondaryColor ? (compact ? 5 : 13) : compact ? 7 : 18;
+  const secondaryWidth = compact ? 4 : 12;
+  const barGap = compact ? 1 : 5;
 
   const styles = StyleSheet.create({
     container: {
-      gap: 10,
+      gap: 6,
     },
     plotArea: {
-      height: TOOLTIP_HEIGHT + BAR_AREA_HEIGHT,
+      height: tooltipHeight + barAreaHeight,
       position: 'relative',
+      overflow: 'visible',
     },
     targetLine: {
       position: 'absolute',
@@ -70,7 +90,7 @@ export function ProgressBarChart({
     row: {
       flexDirection: 'row',
       alignItems: 'flex-end',
-      gap: 4,
+      gap: compact ? 2 : 4,
       height: '100%',
     },
     group: {
@@ -81,22 +101,30 @@ export function ProgressBarChart({
       gap: 6,
     },
     tooltipSpacer: {
-      height: TOOLTIP_HEIGHT,
+      height: tooltipHeight,
       justifyContent: 'flex-start',
       alignItems: 'center',
     },
     barStage: {
-      height: BAR_AREA_HEIGHT,
+      height: barAreaHeight,
       width: '100%',
       alignItems: 'center',
       justifyContent: 'flex-end',
       flexDirection: 'row',
       gap: barGap,
     },
+    tooltipLayer: {
+      position: 'absolute',
+      top: -TOOLTIP_HEIGHT + tooltipHeight,
+      left: -44,
+      right: -44,
+      zIndex: 2,
+      alignItems: 'center',
+    },
     barPressable: {
       alignSelf: 'flex-end',
-      borderTopLeftRadius: 6,
-      borderTopRightRadius: 6,
+      borderTopLeftRadius: compact ? 4 : 7,
+      borderTopRightRadius: compact ? 4 : 7,
     },
     primaryBar: {
       width: primaryWidth,
@@ -110,13 +138,28 @@ export function ProgressBarChart({
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
       fontSize: 10,
+      lineHeight: 12,
       textTransform: 'lowercase',
+      textAlign: 'center',
+      includeFontPadding: false,
+      minWidth: 0,
+    },
+    labelsRow: {
+      minHeight: LABEL_ROW_HEIGHT,
+      position: 'relative',
+    },
+    labelWrap: {
+      position: 'absolute',
+      top: 0,
+      width: 32,
+      alignItems: 'center',
     },
   });
 
   const targetBottom =
     targetValue && targetValue > 0
-      ? TOOLTIP_HEIGHT + (targetValue / resolvedMax) * BAR_AREA_HEIGHT
+      ? tooltipHeight +
+        Math.min(targetValue / resolvedMax, 1) * barAreaHeight
       : null;
 
   return (
@@ -127,33 +170,30 @@ export function ProgressBarChart({
         ) : null}
 
         <View style={styles.row}>
-          {points.map((point, index) => {
+          {points.map(point => {
             const selected = selectedId === point.id;
             const primaryHeight = Math.max(
               point.primaryValue > 0
-                ? (point.primaryValue / resolvedMax) * BAR_AREA_HEIGHT
+                ? (point.primaryValue / resolvedMax) * barAreaHeight
                 : 2,
               2,
             );
             const secondaryHeight = point.secondaryValue
               ? Math.max(
-                  (point.secondaryValue / resolvedMax) * BAR_AREA_HEIGHT,
+                  (point.secondaryValue / resolvedMax) * barAreaHeight,
                   2,
                 )
               : 0;
-            const showLabel =
-              labelInterval <= 1 ||
-              index === points.length - 1 ||
-              index % labelInterval === 0;
-
             return (
               <View key={point.id} style={styles.group}>
                 <View style={styles.tooltipSpacer}>
                   {selected ? (
-                    <ProgressChartTooltip
-                      title={point.tooltipTitle}
-                      lines={point.tooltipLines}
-                    />
+                    <View style={styles.tooltipLayer}>
+                      <ProgressChartTooltip
+                        title={point.tooltipTitle}
+                        lines={point.tooltipLines}
+                      />
+                    </View>
                   ) : null}
                 </View>
 
@@ -188,11 +228,36 @@ export function ProgressBarChart({
                   />
                 </View>
 
-                <Text style={styles.label}>{showLabel ? point.label : ''}</Text>
               </View>
             );
           })}
         </View>
+      </View>
+      <View style={styles.labelsRow}>
+        {points.map((point, index) => {
+          const showLabel =
+            labelInterval <= 1 ||
+            index === points.length - 1 ||
+            index % labelInterval === 0;
+          const labelPosition =
+            points.length > 1 ? (index / (points.length - 1)) * 100 : 0;
+          const labelOffset =
+            index === 0 ? 0 : index === points.length - 1 ? -32 : -16;
+
+          return showLabel ? (
+            <View
+              key={point.id}
+              style={[
+                styles.labelWrap,
+                {left: `${labelPosition}%`, marginLeft: labelOffset},
+              ]}
+            >
+              <Text numberOfLines={1} style={styles.label}>
+                {point.label}
+              </Text>
+            </View>
+          ) : null;
+        })}
       </View>
     </View>
   );

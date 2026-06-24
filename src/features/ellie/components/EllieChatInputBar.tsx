@@ -6,6 +6,7 @@ import { useAppTheme } from '@app/hooks/useAppTheme';
 type EllieChatInputBarProps = {
   draft: string;
   savedDraft: string | null;
+  placeholder?: string;
   disabled?: boolean;
   onChangeDraft: (value: string) => void;
   onSend: () => void;
@@ -16,6 +17,7 @@ type EllieChatInputBarProps = {
 export function EllieChatInputBar({
   draft,
   savedDraft,
+  placeholder = 'Pregúntale a ELLIE...',
   disabled = false,
   onChangeDraft,
   onSend,
@@ -30,9 +32,9 @@ export function EllieChatInputBar({
     container: {
       backgroundColor: theme.colors.background,
       paddingHorizontal: 16,
-      paddingTop: 10,
-      paddingBottom: Math.max(insets.bottom, 10),
-      gap: 8,
+      paddingTop: 8,
+      paddingBottom: Math.max(insets.bottom, 8),
+      gap: 7,
     },
     draftCard: {
       flexDirection: 'row',
@@ -75,37 +77,37 @@ export function EllieChatInputBar({
     composerRow: {
       flexDirection: 'row',
       alignItems: 'flex-end',
-      gap: 9,
-      borderRadius: 24,
+      gap: 8,
+      borderRadius: 22,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      padding: 5,
-      ...theme.elevations.card,
+      padding: 4,
+      ...theme.elevations.subtle,
     },
     inputWrap: {
       flex: 1,
-      minHeight: 48,
-      borderRadius: 19,
+      minHeight: 42,
+      borderRadius: 18,
       backgroundColor: 'transparent',
-      paddingHorizontal: 11,
-      paddingVertical: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
       justifyContent: 'center',
     },
     input: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
-      lineHeight: 21,
-      minHeight: 22,
-      maxHeight: 96,
+      fontSize: 14,
+      lineHeight: 20,
+      minHeight: 20,
+      maxHeight: 84,
       paddingVertical: 0,
       textAlignVertical: 'top',
     },
     sendButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: 38,
+      height: 38,
+      borderRadius: 19,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: canSend
@@ -145,7 +147,7 @@ export function EllieChatInputBar({
           <TextInput
             value={draft}
             onChangeText={onChangeDraft}
-            placeholder="Pregúntale a ELLIE..."
+            placeholder={placeholder}
             placeholderTextColor={theme.colors.textSecondary}
             style={styles.input}
             editable={!disabled}
@@ -168,7 +170,7 @@ export function EllieChatInputBar({
             color={
               canSend ? theme.colors.accentContrast : theme.colors.textSecondary
             }
-            size={18}
+            size={17}
             strokeWidth={2}
           />
         </Pressable>

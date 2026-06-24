@@ -33,26 +33,26 @@ export function EllieRichTextMessage({
 
   const styles = StyleSheet.create({
     group: {
-      gap: 10,
+      gap: 8,
     },
     paragraph: {
       color: textColor,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
-      lineHeight: 24,
+      fontSize: 14,
+      lineHeight: 22,
     },
     heading: {
       color: textColor,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      lineHeight: 18,
+      fontSize: 12,
+      lineHeight: 17,
       fontWeight: theme.typography.weights.semibold,
       letterSpacing: 0.4,
       textTransform: 'uppercase',
       marginTop: 2,
     },
     listWrap: {
-      gap: 8,
+      gap: 7,
     },
     listRow: {
       flexDirection: 'row',
@@ -65,14 +65,14 @@ export function EllieRichTextMessage({
       height: 5,
       borderRadius: 2.5,
       backgroundColor: subtleColor,
-      marginTop: 10,
+      marginTop: 9,
     },
     listText: {
       flex: 1,
       color: textColor,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
-      lineHeight: 24,
+      fontSize: 14,
+      lineHeight: 22,
     },
   });
 

@@ -1,9 +1,22 @@
-import {Image, StyleSheet, Text, View} from 'react-native';
-import {Sparkles} from 'lucide-react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {
+  Bookmark,
+  Check,
+  ChevronRight,
+  RefreshCw,
+  SlidersHorizontal,
+  Sparkles,
+} from 'lucide-react-native';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {getWorkoutThumbnail} from '@app/lib/workoutThumbnails';
 import type {EllieGeneratedWorkout} from '@app/services/supabase/ellie-actions';
-import {EllieCardActions} from '@app/features/ellie/components/EllieCardActions';
 
 type EllieGeneratedWorkoutCardProps = {
   workout: EllieGeneratedWorkout;
@@ -11,11 +24,13 @@ type EllieGeneratedWorkoutCardProps = {
   isSaving?: boolean;
   isRegenerating?: boolean;
   onSave: () => void;
-  onDiscard: () => void;
   onRegenerate: () => void;
+  onAdjust: () => void;
 };
 
-function formatExerciseLine(exercise: EllieGeneratedWorkout['exercises'][number]) {
+function formatExerciseLine(
+  exercise: EllieGeneratedWorkout['exercises'][number],
+) {
   const parts: string[] = [];
 
   if (exercise.sets && exercise.reps) {
@@ -31,144 +46,147 @@ function formatExerciseLine(exercise: EllieGeneratedWorkout['exercises'][number]
   return parts.join(' · ');
 }
 
+function formatDifficulty(value: EllieGeneratedWorkout['difficulty']) {
+  const labels: Record<EllieGeneratedWorkout['difficulty'], string> = {
+    beginner: 'principiante',
+    intermediate: 'intermedio',
+    advanced: 'avanzado',
+  };
+
+  return labels[value];
+}
+
 export function EllieGeneratedWorkoutCard({
   workout,
   saved = false,
   isSaving = false,
   isRegenerating = false,
   onSave,
-  onDiscard,
   onRegenerate,
+  onAdjust,
 }: EllieGeneratedWorkoutCardProps) {
   const {theme} = useAppTheme();
   const heroSource = workout.imageUrl
     ? {uri: workout.imageUrl}
     : getWorkoutThumbnail(workout.type, workout.targetMuscles, workout.title);
+  const previewExercises = workout.exercises.slice(0, 4);
+  const metadata = [
+    workout.type,
+    formatDifficulty(workout.difficulty),
+    `${workout.duration} min`,
+    `~${workout.calories} kcal`,
+  ];
 
   const styles = StyleSheet.create({
     card: {
-      width: '92%',
-      alignSelf: 'flex-start',
-      overflow: 'hidden',
+      width: '100%',
+      alignSelf: 'center',
       borderRadius: 24,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
+      borderColor: 'rgba(17,17,17,0.08)',
+      padding: 12,
+      shadowColor: '#000000',
+      shadowOpacity: 0.06,
+      shadowRadius: 26,
+      shadowOffset: {width: 0, height: 12},
+      elevation: 2,
     },
-    heroWrap: {
-      height: 126,
-      position: 'relative',
-      justifyContent: 'flex-end',
-    },
-    heroImage: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-    },
-    heroOverlay: {
-      position: 'absolute',
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      backgroundColor: 'rgba(10, 10, 10, 0.32)',
-    },
-    heroFade: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      height: 48,
-      backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    },
-    heroLabel: {
+    sourceRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 14,
+      gap: 8,
+      paddingHorizontal: 2,
       paddingBottom: 10,
-      zIndex: 1,
     },
-    heroLabelText: {
+    sourceText: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 10,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 0.6,
+      fontSize: 12,
+      fontWeight: theme.typography.weights.medium,
     },
-    body: {
-      paddingHorizontal: 14,
+    heroImage: {
+      width: '100%',
+      height: 142,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    content: {
+      paddingHorizontal: 10,
       paddingTop: 14,
-      paddingBottom: 14,
-      gap: 12,
+      paddingBottom: 8,
     },
     title: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 21,
+      fontSize: 20,
       fontWeight: theme.typography.weights.bold,
-      lineHeight: 28,
-      letterSpacing: -0.5,
+      lineHeight: 26,
     },
     description: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
-      lineHeight: 18,
-      marginTop: 4,
+      fontSize: 13,
+      lineHeight: 20,
+      marginTop: 8,
     },
     chipsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 6,
+      gap: 8,
+      marginTop: 16,
     },
     chip: {
+      minHeight: 30,
       borderRadius: theme.radii.pill,
-      backgroundColor: theme.colors.surfaceMuted,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: 'rgba(17,17,17,0.1)',
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     chipLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 10,
+      fontSize: 12,
       textTransform: 'lowercase',
     },
-    exercisesTitle: {
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.colors.border,
+      marginTop: 18,
+      marginBottom: 14,
+    },
+    sectionTitle: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
+      fontSize: 15,
       fontWeight: theme.typography.weights.semibold,
-    },
-    exercisesWrap: {
-      gap: 10,
+      marginBottom: 8,
     },
     exerciseRow: {
       flexDirection: 'row',
-      gap: 10,
-      paddingBottom: 10,
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 10,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: theme.colors.border,
     },
-    exerciseRowLast: {
-      borderBottomWidth: 0,
-      paddingBottom: 0,
-    },
     exerciseIndex: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.surfaceMuted,
-      marginTop: 1,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
     },
     exerciseIndexLabel: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 10,
+      fontSize: 13,
       fontWeight: theme.typography.weights.semibold,
     },
     exerciseContent: {
@@ -177,86 +195,220 @@ export function EllieGeneratedWorkoutCard({
     exerciseName: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: theme.typography.weights.medium,
+      lineHeight: 19,
     },
     exerciseMeta: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-      marginTop: 3,
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: 2,
+    },
+    fullRoutineButton: {
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingTop: 14,
+      paddingBottom: 16,
+    },
+    fullRoutineText: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      fontWeight: theme.typography.weights.medium,
+      textDecorationLine: 'underline',
+    },
+    primaryButton: {
+      minHeight: 48,
+      borderRadius: 14,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 10,
+    },
+    primaryLabel: {
+      color: theme.colors.accentContrast,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 15,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    secondaryRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 12,
+    },
+    secondaryButton: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: 'rgba(17,17,17,0.12)',
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 8,
+    },
+    secondaryLabel: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      fontWeight: theme.typography.weights.medium,
+    },
+    savedRow: {
+      minHeight: 46,
+      borderRadius: 14,
+      backgroundColor: 'rgba(46,107,76,0.08)',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    savedText: {
+      color: theme.colors.success,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 13,
+      fontWeight: theme.typography.weights.medium,
     },
   });
 
   return (
     <View style={styles.card}>
-      <View style={styles.heroWrap}>
-        <Image resizeMode="cover" source={heroSource} style={styles.heroImage} />
-        <View style={styles.heroOverlay} />
-        <View style={styles.heroFade} />
-        <View style={styles.heroLabel}>
-          <Sparkles color={theme.colors.textPrimary} size={12} strokeWidth={2} />
-          <Text style={styles.heroLabelText}>GENERADO POR ELLIE</Text>
-        </View>
+      <View style={styles.sourceRow}>
+        <Sparkles color={theme.colors.textPrimary} size={15} strokeWidth={2} />
+        <Text style={styles.sourceText}>Generado por ELLIE</Text>
       </View>
 
-      <View style={styles.body}>
-        <View>
-          <Text style={styles.title}>{workout.title}</Text>
-          {workout.description ? (
-            <Text style={styles.description}>{workout.description}</Text>
-          ) : null}
-        </View>
+      <Image resizeMode="cover" source={heroSource} style={styles.heroImage} />
+
+      <View style={styles.content}>
+        <Text style={styles.title}>{workout.title}</Text>
+        {workout.description ? (
+          <Text style={styles.description}>{workout.description}</Text>
+        ) : null}
 
         <View style={styles.chipsRow}>
-          {[
-            workout.type,
-            workout.difficulty,
-            `${workout.duration} min`,
-            `~${workout.calories} kcal`,
-          ].map(item => (
+          {metadata.map(item => (
             <View key={item} style={styles.chip}>
               <Text style={styles.chipLabel}>{item}</Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.exercisesWrap}>
-          <Text style={styles.exercisesTitle}>
-            Ejercicios ({workout.exercises.length})
-          </Text>
-          {workout.exercises.slice(0, 5).map((exercise, index, array) => (
-            <View
-              key={`${exercise.name}-${index}`}
-              style={[
-                styles.exerciseRow,
-                index === array.length - 1 ? styles.exerciseRowLast : null,
-              ]}>
-              <View style={styles.exerciseIndex}>
-                <Text style={styles.exerciseIndexLabel}>{index + 1}</Text>
-              </View>
-              <View style={styles.exerciseContent}>
-                <Text style={styles.exerciseName}>{exercise.name}</Text>
-                {formatExerciseLine(exercise) ? (
-                  <Text style={styles.exerciseMeta}>
-                    {formatExerciseLine(exercise)}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ))}
-        </View>
+        <View style={styles.divider} />
 
-        <EllieCardActions
-          saved={saved}
-          savedLabel="Guardada en tus entrenos"
-          primaryLabel="Guardar rutina"
-          onPrimary={onSave}
-          onDiscard={onDiscard}
-          onRegenerate={onRegenerate}
-          isPrimaryBusy={isSaving}
-          isRegenerating={isRegenerating}
-        />
+        <Text style={styles.sectionTitle}>Ejercicios</Text>
+        {previewExercises.map((exercise, index) => (
+          <View key={`${exercise.name}-${index}`} style={styles.exerciseRow}>
+            <View style={styles.exerciseIndex}>
+              <Text style={styles.exerciseIndexLabel}>{index + 1}</Text>
+            </View>
+            <View style={styles.exerciseContent}>
+              <Text numberOfLines={1} style={styles.exerciseName}>
+                {exercise.name}
+              </Text>
+              {formatExerciseLine(exercise) ? (
+                <Text style={styles.exerciseMeta}>
+                  {formatExerciseLine(exercise)}
+                </Text>
+              ) : null}
+            </View>
+            <ChevronRight
+              color={theme.colors.textPrimary}
+              size={18}
+              strokeWidth={2}
+            />
+          </View>
+        ))}
+
+        {workout.exercises.length > previewExercises.length ? (
+          <Pressable style={styles.fullRoutineButton}>
+            <Text style={styles.fullRoutineText}>Ver rutina completa</Text>
+            <ChevronRight
+              color={theme.colors.textPrimary}
+              size={15}
+              strokeWidth={2}
+            />
+          </Pressable>
+        ) : null}
+
+        {saved ? (
+          <View style={styles.savedRow}>
+            <Check color={theme.colors.success} size={16} strokeWidth={2.2} />
+            <Text style={styles.savedText}>Guardada en tus entrenos</Text>
+          </View>
+        ) : (
+          <>
+            <Pressable
+              disabled={isSaving || isRegenerating}
+              onPress={onSave}
+              style={({pressed}) => [
+                styles.primaryButton,
+                pressed && !isSaving && !isRegenerating ? {opacity: 0.92} : null,
+                isSaving || isRegenerating ? {opacity: 0.7} : null,
+              ]}>
+              {isSaving ? (
+                <ActivityIndicator color={theme.colors.accentContrast} />
+              ) : (
+                <>
+                  <Bookmark
+                    color={theme.colors.accentContrast}
+                    size={18}
+                    strokeWidth={2}
+                  />
+                  <Text style={styles.primaryLabel}>Guardar rutina</Text>
+                </>
+              )}
+            </Pressable>
+
+            <View style={styles.secondaryRow}>
+              <Pressable
+                disabled={isSaving || isRegenerating}
+                onPress={onRegenerate}
+                style={({pressed}) => [
+                  styles.secondaryButton,
+                  pressed && !isSaving && !isRegenerating
+                    ? {opacity: 0.84}
+                    : null,
+                ]}>
+                {isRegenerating ? (
+                  <ActivityIndicator color={theme.colors.textPrimary} />
+                ) : (
+                  <>
+                    <RefreshCw
+                      color={theme.colors.textPrimary}
+                      size={15}
+                      strokeWidth={2}
+                    />
+                    <Text style={styles.secondaryLabel}>Otra versión</Text>
+                  </>
+                )}
+              </Pressable>
+
+              <Pressable
+                disabled={isSaving || isRegenerating}
+                onPress={onAdjust}
+                style={({pressed}) => [
+                  styles.secondaryButton,
+                  pressed && !isSaving && !isRegenerating
+                    ? {opacity: 0.84}
+                    : null,
+                ]}>
+                <SlidersHorizontal
+                  color={theme.colors.textPrimary}
+                  size={15}
+                  strokeWidth={2}
+                />
+                <Text style={styles.secondaryLabel}>Ajustar</Text>
+              </Pressable>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
