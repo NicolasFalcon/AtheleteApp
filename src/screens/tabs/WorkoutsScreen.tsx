@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
 import {
   ActivityIndicator,
@@ -28,6 +27,7 @@ import { usePaginatedExerciseLibrary } from '@app/hooks/usePaginatedExerciseLibr
 import { usePaginatedWorkoutLibrary } from '@app/hooks/usePaginatedWorkoutLibrary';
 import { useWorkoutDiscovery } from '@app/hooks/useWorkoutDiscovery';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import {
   bodyPartLabels,
   equipmentLabels,
@@ -91,7 +91,7 @@ const separatorStyle = StyleSheet.create({
 export function WorkoutsScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
   const tabBarMotion = useTabBarMotion();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { bottomClearance } = useTabBarMetrics();
   const workoutFavorites = useFavoriteWorkouts();
   const exerciseFavorites = useFavoriteExercises();
   const [browseMode, setBrowseMode] = useState<BrowseMode>('routines');
@@ -162,7 +162,7 @@ export function WorkoutsScreen({ navigation }: Props) {
     },
     content: {
       paddingHorizontal: theme.spacing.md,
-      paddingBottom: tabBarHeight + theme.spacing.md,
+      paddingBottom: bottomClearance + theme.spacing.md,
     },
     resultsHeader: {
       gap: 12,
@@ -281,7 +281,7 @@ export function WorkoutsScreen({ navigation }: Props) {
         <SafeAreaView edges={['top']} style={styles.safeArea}>
           <ExerciseDiscoveryHub
             modeControl={modeControl}
-            bottomInset={tabBarHeight}
+            bottomInset={bottomClearance}
             viewMode={exerciseViewMode}
             equipmentFilter={equipmentFilter}
             bodyPartFilter={bodyPartFilter}
@@ -352,7 +352,7 @@ export function WorkoutsScreen({ navigation }: Props) {
             loading={exercisesQuery.isPending}
             loadingMore={exercisesQuery.isFetchingNextPage}
             hasNextPage={exercisesQuery.hasNextPage}
-            bottomInset={tabBarHeight}
+            bottomInset={bottomClearance}
             viewMode={exerciseViewMode}
             searchQuery={exerciseSearchQuery}
             equipmentFilter={equipmentFilter}
@@ -390,7 +390,7 @@ export function WorkoutsScreen({ navigation }: Props) {
           data={discoveryQuery.data}
           loading={discoveryQuery.isPending}
           error={Boolean(discoveryQuery.error)}
-          bottomInset={tabBarHeight}
+          bottomInset={bottomClearance}
           searchQuery={searchQuery}
           filterOptions={filterOptions}
           favoriteWorkoutIds={workoutFavorites.favoriteWorkoutIds}

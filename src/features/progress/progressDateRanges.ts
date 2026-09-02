@@ -2,10 +2,13 @@ export type ProgressRange = 'week' | 'month';
 
 export function buildProgressDateRange(range: ProgressRange): Date[] {
   if (range === 'month') {
-    return Array.from({ length: 30 }, (_, index) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (29 - index));
-      return date;
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    return Array.from({ length: daysInMonth }, (_, index) => {
+      return new Date(year, month, index + 1);
     });
   }
 

@@ -27,11 +27,16 @@ export function ScreenContainer({
       backgroundColor: theme.colors.background,
     },
     content: {
-      flex: 1,
-      flexGrow: 1,
       paddingHorizontal: theme.spacing.md,
-      paddingVertical: theme.spacing.md,
+      paddingTop: theme.spacing.md,
+      paddingBottom: theme.spacing.lg,
       gap: theme.spacing.md,
+    },
+    scrollContent: {
+      flexGrow: 1,
+    },
+    staticContent: {
+      flex: 1,
     },
   });
 
@@ -39,7 +44,11 @@ export function ScreenContainer({
     return (
       <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
         <ScrollView
-          contentContainerStyle={[styles.content, contentContainerStyle]}
+          contentContainerStyle={[
+            styles.content,
+            styles.scrollContent,
+            contentContainerStyle,
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -51,7 +60,11 @@ export function ScreenContainer({
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      <View style={[styles.content, contentContainerStyle]}>{children}</View>
+      <View
+        style={[styles.content, styles.staticContent, contentContainerStyle]}
+      >
+        {children}
+      </View>
     </SafeAreaView>
   );
 }

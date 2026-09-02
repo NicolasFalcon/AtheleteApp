@@ -10,6 +10,7 @@ import { FormMessage } from '@app/components/auth/FormMessage';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type { AuthStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
@@ -58,7 +59,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
         footer={
           <AuthButton
             label="Volver a iniciar sesión"
-            onPress={() => navigation.navigate(AUTH_ROUTES.Login)}
+            onPress={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
             variant="secondary"
           />
         }
@@ -69,7 +70,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
             title="Revisa tu bandeja de entrada"
           />
         }
-        onBack={() => navigation.navigate(AUTH_ROUTES.Login)}
+        onBack={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
       >
         <View style={styles.successBody}>
           <SuccessIcon color={theme.colors.textPrimary} />
@@ -93,7 +94,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
           title="¿Olvidaste tu contraseña?"
         />
       }
-      onBack={() => navigation.goBack()}
+      onBack={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
     >
       {error ? (
         <FormMessage appearance="dark" message={error} tone="error" />

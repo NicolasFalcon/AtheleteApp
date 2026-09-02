@@ -4,12 +4,13 @@ import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {ArrowLeft, Clock3, Flame, Play, Save, Sparkles} from 'lucide-react-native';
 import {Button, Card, EmptyState, Loader, ProgressBar} from '@app/components/ui';
-import {TAB_ROUTES} from '@app/constants/routes';
+import {HOME_ROUTES, TAB_ROUTES, WORKOUTS_ROUTES} from '@app/constants/routes';
 import {WorkoutSessionExerciseRow} from '@app/features/workouts/components/WorkoutSessionExerciseRow';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
 import {useWorkoutLibrary} from '@app/hooks/useWorkoutLibrary';
 import {useWorkoutSession} from '@app/hooks/useWorkoutSession';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import {findExerciseByName} from '@app/shared';
 import type {
   HomeStackParamList,
@@ -34,6 +35,8 @@ function formatTimer(totalSeconds: number) {
 }
 
 export function WorkoutSessionScreen({navigation, route}: Props) {
+  const handleSafeBack = () =>
+    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
   const {theme} = useAppTheme();
   const insets = useSafeAreaInsets();
   const workoutsQuery = useWorkoutLibrary();
@@ -68,6 +71,10 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
   const completedCount = completedExerciseIds.length;
   const progressPct =
     totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
+  const bottomBarClearance =
+    (status === 'in_progress' ? 96 + theme.spacing.sm : 48) +
+    theme.spacing.lg +
+    Math.max(insets.bottom, theme.spacing.lg);
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -116,7 +123,7 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
     content: {
       paddingHorizontal: theme.spacing.lg,
       paddingTop: theme.spacing.lg,
-      paddingBottom: 160,
+      paddingBottom: bottomBarClearance + theme.spacing.lg,
       gap: theme.spacing.lg,
     },
     helperCard: {
@@ -282,7 +289,7 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
     try {
       await flushPendingExercises(completedExerciseIds);
       await saveSessionForLater(completedExerciseIds);
-      navigation.goBack();
+      handleSafeBack();
     } catch (error) {
       Alert.alert(
         'No pudimos guardar la sesión',
@@ -320,7 +327,7 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
 
   const handleBack = () => {
     if (status !== 'in_progress') {
-      navigation.goBack();
+      handleSafeBack();
       return;
     }
 
@@ -347,8 +354,14 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
   };
 
   const goHome = () => {
-    navigation.getParent()?.navigate(TAB_ROUTES.Home as never);
-    navigation.goBack();
+    const tabNavigation = navigation.getParent();
+
+    if (tabNavigation) {
+      tabNavigation.navigate(TAB_ROUTES.Home as never);
+      return;
+    }
+
+    handleSafeBack();
   };
 
   if (isLoading || workoutsQuery.isLoading || exercisesQuery.isLoading) {
@@ -367,7 +380,7 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
             title="Rutina no encontrada"
             description="No pudimos abrir la rutina asociada a esta sesión."
           />
-          <Button label="Volver" onPress={() => navigation.goBack()} />
+          <Button label="Volver" onPress={handleSafeBack} />
         </View>
       </SafeAreaView>
     );
@@ -541,14 +554,14 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
                 />
               }
             />
-            <Button label="Volver" variant="outline" onPress={() => navigation.goBack()} />
+            <Button label="Volver" variant="outline" onPress={handleSafeBack} />
           </>
         ) : null}
 
         {status === 'completed' ? (
           <>
             <Button label="Volver al inicio" onPress={goHome} />
-            <Button label="Volver" variant="outline" onPress={() => navigation.goBack()} />
+            <Button label="Volver" variant="outline" onPress={handleSafeBack} />
           </>
         ) : null}
       </View>

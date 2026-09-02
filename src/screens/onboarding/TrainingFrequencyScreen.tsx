@@ -4,6 +4,7 @@ import { ProfileSetupLayout } from '@app/components/onboarding/ProfileSetupLayou
 import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type { OnboardingStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<
@@ -19,7 +20,7 @@ export function TrainingFrequencyScreen({ navigation }: Props) {
   return (
     <ProfileSetupLayout
       continueDisabled={!onboardingDraft.trainingDaysPerWeek}
-      onBack={() => navigation.goBack()}
+      onBack={() => safeGoBack(navigation, [ONBOARDING_ROUTES.Height])}
       onContinue={() => navigation.navigate(ONBOARDING_ROUTES.GoalSelection)}
       step={5}
       subtitle="Elige un ritmo realista. Podrás cambiarlo más adelante."

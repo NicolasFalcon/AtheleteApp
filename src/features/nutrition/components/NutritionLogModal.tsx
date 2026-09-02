@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {Button, Card, ProgressBar} from '@app/components/ui';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import {getLocalDateKey} from '@app/lib/date';
@@ -84,6 +85,7 @@ export function NutritionLogModal({
   onSave,
 }: NutritionLogModalProps) {
   const {theme} = useAppTheme();
+  const insets = useSafeAreaInsets();
   const [values, setValues] = useState<Record<FieldKey, string>>({
     calories: '',
     protein: '',
@@ -151,7 +153,7 @@ export function NutritionLogModal({
     },
     content: {
       paddingHorizontal: theme.spacing.md,
-      paddingBottom: theme.spacing.lg,
+      paddingBottom: insets.bottom + theme.spacing.lg,
       gap: theme.spacing.md,
     },
     header: {

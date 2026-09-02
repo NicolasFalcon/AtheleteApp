@@ -56,7 +56,7 @@ export function QuizLandingScreen({navigation}: Props) {
       <AppHeader
         showBackButton
         title="Aprende y gana"
-        subtitle="Responde preguntas sobre entrenamiento, nutrición y ciencia del cuerpo. Gana puntos con cada quiz completado."
+        backFallbacks={[HOME_ROUTES.Home]}
       />
 
       <View style={styles.introCard}>

@@ -48,9 +48,11 @@ type ProgressChartCardProps = {
   metrics?: ProgressMetricItem[];
   footer?: ReactNode;
   targetValue?: number;
+  chartHeightOverride?: number;
 };
 
 const CHART_HEIGHT = 132;
+const MONTH_CHART_HEIGHT = 124;
 const EMPTY_CHART_HEIGHT = 44;
 const LABEL_AREA_HEIGHT = 24;
 const DOMAIN_HEADROOM = 1.16;
@@ -68,11 +70,14 @@ export function ProgressChartCard({
   metrics,
   footer,
   targetValue,
+  chartHeightOverride,
 }: ProgressChartCardProps) {
   const { theme } = useAppTheme();
   const { width } = useWindowDimensions();
   const isMonth = range === 'month';
   const chartWidth = Math.max(280, width - theme.spacing.md * 2 - 32);
+  const chartHeight =
+    chartHeightOverride || (isMonth ? MONTH_CHART_HEIGHT : CHART_HEIGHT);
   const slotWidth = chartWidth / Math.max(points.length, 1);
   const barWidth = Math.max(
     isMonth ? 5 : 18,
@@ -95,21 +100,31 @@ export function ProgressChartCard({
   const chartData = useMemo<barDataItem[]>(
     () =>
       points.map(point => ({
-          value: point.value,
-          label: '',
-          frontColor: primaryColor,
-          onPress: () =>
-            setSelectedId(current => (current === point.id ? null : point.id)),
-        })),
+        value: point.value,
+        label: '',
+        frontColor: primaryColor,
+        onPress: () =>
+          setSelectedId(current => (current === point.id ? null : point.id)),
+      })),
     [points, primaryColor],
   );
 
-  const shouldShowLabel = (index: number) =>
-    !isMonth || index === 0 || index === points.length - 1 || index % 5 === 0;
+  const getAxisLabel = (point: ProgressChartPoint, index: number) => {
+    if (!isMonth) {
+      return point.label;
+    }
+
+    const day = Number(point.label);
+    const isLastDay = index === points.length - 1;
+    const shouldShowDay =
+      day === 1 || day === 5 || day % 5 === 0 || isLastDay;
+
+    return shouldShowDay ? point.label : '';
+  };
 
   const targetPosition =
     hasData && targetValue && targetValue > 0
-      ? Math.min(targetValue / maxValue, 1) * CHART_HEIGHT
+      ? Math.min(targetValue / maxValue, 1) * chartHeight
       : null;
 
   const styles = StyleSheet.create({
@@ -149,6 +164,9 @@ export function ProgressChartCard({
       columnGap: 14,
       rowGap: 6,
     },
+    monthLegend: {
+      marginBottom: 2,
+    },
     legendItem: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -185,6 +203,9 @@ export function ProgressChartCard({
       overflow: 'hidden',
       position: 'relative',
     },
+    monthChartShell: {
+      paddingTop: 2,
+    },
     selectedInfo: {
       alignSelf: 'flex-start',
       minHeight: 30,
@@ -215,11 +236,14 @@ export function ProgressChartCard({
       position: 'absolute',
       left: 0,
       right: 0,
-      borderTopWidth: 1,
+      borderTopWidth: StyleSheet.hairlineWidth,
       borderStyle: 'dashed',
       borderColor: theme.colors.textSecondary,
-      opacity: 0.45,
+      opacity: 0.34,
       zIndex: 1,
+    },
+    monthTargetLine: {
+      opacity: 0.26,
     },
     emptyShell: {
       height: EMPTY_CHART_HEIGHT,
@@ -248,6 +272,9 @@ export function ProgressChartCard({
       alignItems: 'center',
       minWidth: 0,
     },
+    monthLabelCell: {
+      overflow: 'visible',
+    },
     label: {
       width: '100%',
       color: theme.colors.textSecondary,
@@ -257,6 +284,12 @@ export function ProgressChartCard({
       textAlign: 'center',
       includeFontPadding: false,
       textTransform: 'lowercase',
+    },
+    monthLabel: {
+      width: 26,
+    },
+    monthFirstLabel: {
+      transform: [{ translateX: 8 }],
     },
     emptyNote: {
       color: theme.colors.textSecondary,
@@ -271,6 +304,9 @@ export function ProgressChartCard({
       columnGap: 8,
       rowGap: 8,
       paddingTop: hasData ? 4 : 2,
+    },
+    monthMetrics: {
+      paddingTop: hasData ? 8 : 2,
     },
     metric: {
       width: '48%',
@@ -309,7 +345,7 @@ export function ProgressChartCard({
         {summary ? <Text style={styles.summary}>{summary}</Text> : null}
       </View>
 
-      <View style={styles.legend}>
+      <View style={[styles.legend, isMonth ? styles.monthLegend : null]}>
         {legendItems.map(item => (
           <Pressable
             key={item.label}
@@ -345,20 +381,23 @@ export function ProgressChartCard({
         </View>
       ) : null}
 
-      <View style={styles.chartShell}>
+      <View
+        style={[styles.chartShell, isMonth ? styles.monthChartShell : null]}
+      >
         {hasData ? (
           <>
             {typeof targetPosition === 'number' ? (
               <View
                 style={[
                   styles.targetLine,
+                  isMonth ? styles.monthTargetLine : null,
                   { bottom: LABEL_AREA_HEIGHT + targetPosition },
                 ]}
               />
             ) : null}
             <BarChart
               data={chartData}
-              height={CHART_HEIGHT}
+              height={chartHeight}
               width={chartWidth}
               maxValue={maxValue}
               noOfSections={3}
@@ -387,9 +426,22 @@ export function ProgressChartCard({
             />
             <View style={styles.labelRow}>
               {points.map((point, index) => (
-                <View key={point.id} style={styles.labelCell}>
-                  <Text numberOfLines={1} style={styles.label}>
-                    {shouldShowLabel(index) ? point.label : ''}
+                <View
+                  key={point.id}
+                  style={[
+                    styles.labelCell,
+                    isMonth ? styles.monthLabelCell : null,
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.label,
+                      isMonth ? styles.monthLabel : null,
+                      isMonth && index === 0 ? styles.monthFirstLabel : null,
+                    ]}
+                  >
+                    {getAxisLabel(point, index)}
                   </Text>
                 </View>
               ))}
@@ -406,9 +458,22 @@ export function ProgressChartCard({
             </View>
             <View style={styles.labelRow}>
               {points.map((point, index) => (
-                <View key={point.id} style={styles.labelCell}>
-                  <Text numberOfLines={1} style={styles.label}>
-                    {shouldShowLabel(index) ? point.label : ''}
+                <View
+                  key={point.id}
+                  style={[
+                    styles.labelCell,
+                    isMonth ? styles.monthLabelCell : null,
+                  ]}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.label,
+                      isMonth ? styles.monthLabel : null,
+                      isMonth && index === 0 ? styles.monthFirstLabel : null,
+                    ]}
+                  >
+                    {getAxisLabel(point, index)}
                   </Text>
                 </View>
               ))}
@@ -420,7 +485,7 @@ export function ProgressChartCard({
       {!hasData ? <Text style={styles.emptyNote}>{emptyMessage}</Text> : null}
 
       {metrics?.length ? (
-        <View style={styles.metrics}>
+        <View style={[styles.metrics, isMonth ? styles.monthMetrics : null]}>
           {metrics.map(metric => (
             <View key={metric.label} style={styles.metric}>
               <Text style={styles.metricLabel}>{metric.label}</Text>

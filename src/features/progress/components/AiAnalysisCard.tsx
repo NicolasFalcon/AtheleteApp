@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight, Sparkles, X } from 'lucide-react-native';
 import { Card } from '@app/components/ui';
 import { useAppTheme } from '@app/hooks/useAppTheme';
@@ -37,6 +38,7 @@ function splitInsights(insights: string[]) {
 
 export function AiAnalysisCard({ insights }: AiAnalysisCardProps) {
   const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const translateY = useRef(new Animated.Value(420)).current;
   const sections = useMemo(() => splitInsights(insights), [insights]);
@@ -87,7 +89,7 @@ export function AiAnalysisCard({ insights }: AiAnalysisCardProps) {
 
   const styles = StyleSheet.create({
     trigger: {
-      padding: 14,
+      padding: 12,
       borderRadius: theme.radii.md,
       gap: 0,
     },
@@ -97,9 +99,9 @@ export function AiAnalysisCard({ insights }: AiAnalysisCardProps) {
       gap: 12,
     },
     iconWrap: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.background,
@@ -124,9 +126,9 @@ export function AiAnalysisCard({ insights }: AiAnalysisCardProps) {
       lineHeight: 16,
     },
     chevron: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.background,
@@ -154,7 +156,7 @@ export function AiAnalysisCard({ insights }: AiAnalysisCardProps) {
     },
     content: {
       paddingHorizontal: theme.spacing.md,
-      paddingBottom: theme.spacing.xl,
+      paddingBottom: insets.bottom + theme.spacing.lg,
       gap: theme.spacing.md,
     },
     header: {

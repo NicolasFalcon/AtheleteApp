@@ -4,6 +4,7 @@ import { ProfileSetupLayout } from '@app/components/onboarding/ProfileSetupLayou
 import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type { OnboardingGoal } from '@app/types/auth';
 import type { OnboardingStackParamList } from '@app/types/navigation';
 
@@ -45,7 +46,9 @@ export function GoalSelectionScreen({ navigation }: Props) {
     <ProfileSetupLayout
       continueDisabled={!onboardingDraft.goal}
       continueLabel="Guardar perfil"
-      onBack={() => navigation.goBack()}
+      onBack={() =>
+        safeGoBack(navigation, [ONBOARDING_ROUTES.TrainingFrequency])
+      }
       onContinue={() => navigation.navigate(ONBOARDING_ROUTES.Complete)}
       step={6}
       subtitle="Selecciona el objetivo principal que guiará tus recomendaciones."

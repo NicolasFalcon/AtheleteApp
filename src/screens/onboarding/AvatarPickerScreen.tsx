@@ -16,6 +16,7 @@ import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { openProfilePhotoLibrary } from '@app/lib/profilePhotoPicker';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import { uploadProfilePhoto } from '@app/services/supabase/profile-photo';
 import type { OnboardingStackParamList } from '@app/types/navigation';
 
@@ -135,7 +136,7 @@ export function AvatarPickerScreen({ navigation }: Props) {
         uploadingPhoto ||
         (!onboardingDraft.avatarKey && !onboardingDraft.profilePhotoUrl)
       }
-      onBack={() => navigation.goBack()}
+      onBack={() => safeGoBack(navigation, [ONBOARDING_ROUTES.Welcome])}
       onContinue={() => navigation.navigate(ONBOARDING_ROUTES.BirthDate)}
       step={0}
       subtitle="Elige una identidad visual para tu perfil."

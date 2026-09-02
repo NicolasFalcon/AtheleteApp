@@ -24,6 +24,8 @@ type BadgeGridCardProps = {
   previewCount?: number;
   onOpenAll?: () => void;
   embedded?: boolean;
+  points?: number;
+  currentStreak?: number;
 };
 
 function getBadgeIcon(name: string): LucideIcon {
@@ -170,6 +172,8 @@ export function BadgeGridCard({
   previewCount = 4,
   onOpenAll,
   embedded = false,
+  points = 0,
+  currentStreak = 0,
 }: BadgeGridCardProps) {
   const { theme } = useAppTheme();
 
@@ -342,25 +346,214 @@ export function BadgeGridCard({
       fontSize: 12,
       fontWeight: theme.typography.weights.semibold,
     },
+    compactSummary: {
+      borderRadius: theme.radii.md,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 13,
+      paddingVertical: 12,
+      gap: 10,
+      shadowColor: '#000000',
+      ...theme.elevations.card,
+    },
+    compactTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    compactCopy: {
+      flex: 1,
+    },
+    compactTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 14,
+      fontWeight: theme.typography.weights.semibold,
+      lineHeight: 18,
+    },
+    compactDescription: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
+      lineHeight: 16,
+      marginTop: 2,
+    },
+    compactCount: {
+      minWidth: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    compactCountLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 10,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    previewFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.border,
+      paddingTop: 10,
+    },
+    previewRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+    },
+    previewBadge: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    previewMore: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 11,
+      fontWeight: theme.typography.weights.medium,
+    },
+    compactMetrics: {
+      flexDirection: 'row',
+    },
+    compactMetric: {
+      flex: 1,
+      gap: 1,
+    },
+    compactMetricBorder: {
+      borderLeftWidth: StyleSheet.hairlineWidth,
+      borderLeftColor: theme.colors.border,
+      paddingLeft: 12,
+    },
+    compactValue: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 14,
+      fontWeight: theme.typography.weights.semibold,
+      lineHeight: 18,
+    },
+    compactLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 10,
+      lineHeight: 14,
+      textTransform: 'uppercase',
+    },
   });
+
+  if (embedded) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.headerRow}>
+          <Text style={styles.sectionTitle}>Logros</Text>
+          {onOpenAll ? (
+            <Pressable
+              onPress={onOpenAll}
+              style={({ pressed }) => [
+                styles.ghostButton,
+                pressed ? { opacity: 0.8 } : null,
+              ]}
+            >
+              <Text style={styles.ghostLabel}>Ver todos</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <Pressable
+          disabled={!onOpenAll}
+          onPress={onOpenAll}
+          style={({ pressed }) => [
+            styles.compactSummary,
+            pressed ? { opacity: 0.88 } : null,
+          ]}
+        >
+          <View style={styles.compactTop}>
+            <View style={styles.compactCopy}>
+              <Text style={styles.compactTitle}>Tu progreso</Text>
+              <Text style={styles.compactDescription}>
+                {earnedCount} desbloqueados · {lockedCount} pendientes
+              </Text>
+            </View>
+            <View style={styles.compactCount}>
+              <Text style={styles.compactCountLabel}>
+                {earnedCount}/{ALL_BADGES.length}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.compactMetrics}>
+            <View style={styles.compactMetric}>
+              <Text style={styles.compactValue}>
+                {points.toLocaleString('es-CL')}
+              </Text>
+              <Text style={styles.compactLabel}>Puntos</Text>
+            </View>
+            <View style={[styles.compactMetric, styles.compactMetricBorder]}>
+              <Text style={styles.compactValue}>{currentStreak} días</Text>
+              <Text style={styles.compactLabel}>Racha actual</Text>
+            </View>
+            <View style={[styles.compactMetric, styles.compactMetricBorder]}>
+              <Text style={styles.compactValue}>{earnedCount}</Text>
+              <Text style={styles.compactLabel}>Badges</Text>
+            </View>
+          </View>
+
+          <View style={styles.previewFooter}>
+            <View style={styles.previewRow}>
+              {visibleBadges.map(badge => {
+                const earned = Boolean(earnedMap.get(badge.id));
+                const Icon = earned ? getBadgeIcon(badge.icon) : Lock;
+
+                return (
+                  <View
+                    key={badge.id}
+                    style={[
+                      styles.previewBadge,
+                      {
+                        backgroundColor: earned
+                          ? theme.colors.accent
+                          : theme.colors.surfaceMuted,
+                      },
+                    ]}
+                  >
+                    <Icon
+                      color={
+                        earned
+                          ? theme.colors.accentContrast
+                          : theme.colors.textSecondary
+                      }
+                      size={14}
+                      strokeWidth={1.8}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+            {ALL_BADGES.length > visibleBadges.length ? (
+              <Text style={styles.previewMore}>
+                +{ALL_BADGES.length - visibleBadges.length}
+              </Text>
+            ) : null}
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <Card style={styles.card}>
-      {embedded && onOpenAll ? (
-        <View style={styles.headerRow}>
-          <Text style={styles.sectionTitle}>Logros</Text>
-          <Pressable
-            onPress={onOpenAll}
-            style={({ pressed }) => [
-              styles.ghostButton,
-              pressed ? { opacity: 0.8 } : null,
-            ]}
-          >
-            <Text style={styles.ghostLabel}>Ver todos</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
       <View style={styles.inner}>
         <View style={styles.eyebrowRow}>
           <View style={styles.headerCopy}>

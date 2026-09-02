@@ -37,6 +37,7 @@ import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
 import { useRoutineBuilder } from '@app/hooks/useRoutineBuilder';
 import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import { WorkoutThumbnail } from '@app/features/workouts/components/WorkoutThumbnail';
 import { equipmentLabels, bodyPartLabels } from '@app/shared/data/exercises';
 import { findExerciseByName, getWorkoutAccess } from '@app/shared';
@@ -72,6 +73,8 @@ const workoutTypeLabels = {
 } as const;
 
 export function WorkoutDetailScreen({ navigation, route }: Props) {
+  const handleSafeBack = () =>
+    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
   const { theme } = useAppTheme();
   const { profile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -534,7 +537,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
             title="Rutina no encontrada"
             description="No pudimos encontrar esta rutina dentro de la biblioteca actual."
           />
-          <Button label="Volver" onPress={() => navigation.goBack()} />
+          <Button label="Volver" onPress={handleSafeBack} />
         </View>
       </SafeAreaView>
     );
@@ -628,7 +631,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           onPress: async () => {
             try {
               await routineBuilder.deleteRoutine(workout.id);
-              navigation.goBack();
+              handleSafeBack();
             } catch (error) {
               Alert.alert(
                 'No pudimos eliminar la rutina',
@@ -882,7 +885,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           <View style={styles.heroShade} />
           <View style={[styles.heroActions, { top: insets.top + 10 }]}>
             <Pressable
-              onPress={() => navigation.goBack()}
+              onPress={handleSafeBack}
               style={styles.floatingButton}
             >
               <ArrowLeft color="#FFFFFF" size={18} strokeWidth={2.2} />

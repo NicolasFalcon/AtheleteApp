@@ -35,15 +35,15 @@ function SetupItem({
     },
     item: {
       width: '100%',
-      minHeight: 104,
+      minHeight: 98,
       borderRadius: theme.radii.sm,
-      paddingHorizontal: 12,
-      paddingVertical: 12,
+      paddingHorizontal: 11,
+      paddingVertical: 11,
       backgroundColor: theme.colors.background,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       justifyContent: 'space-between',
-      gap: 10,
+      gap: 8,
     },
     topRow: {
       flexDirection: 'row',
@@ -204,7 +204,7 @@ export function CurrentPlanSummaryCard({
             pressed ? { opacity: 0.88 } : null,
           ]}
         >
-          <Text style={styles.editLabel}>Editar</Text>
+          <Text style={styles.editLabel}>Editar plan</Text>
         </Pressable>
       </View>
 

@@ -6,6 +6,12 @@ import {
   View,
 } from 'react-native';
 import {AppHeader, ScreenContainer} from '@app/components';
+import {
+  ELLIE_ROUTES,
+  HOME_ROUTES,
+  PROFILE_ROUTES,
+  PROGRESS_ROUTES,
+} from '@app/constants/routes';
 import {EmptyState, Loader} from '@app/components/ui';
 import {Core33HabitSelectionView} from '@app/features/core33/components/Core33HabitSelectionView';
 import {Core33IntroView} from '@app/features/core33/components/Core33IntroView';
@@ -17,6 +23,13 @@ import {useAppTheme} from '@app/hooks/useAppTheme';
 import type {Core33HabitSelection} from '@app/services/supabase/core33';
 
 type Step = 'intro' | 'habits' | 'summary' | 'tracker';
+
+const BACK_FALLBACKS = [
+  HOME_ROUTES.Home,
+  ELLIE_ROUTES.Ellie,
+  PROGRESS_ROUTES.Progress,
+  PROFILE_ROUTES.Profile,
+];
 
 const EMPTY_SELECTION: Core33HabitSelection = {
   training: '',
@@ -120,7 +133,11 @@ export function ChallengeScreen() {
   if (core33.stateQuery.error || !core33.stateQuery.data) {
     return (
       <ScreenContainer>
-        <AppHeader showBackButton title="Core · 33" />
+        <AppHeader
+          showBackButton
+          title="Core · 33"
+          backFallbacks={BACK_FALLBACKS}
+        />
         <EmptyState
           title="No pudimos cargar Core 33"
           description="Vuelve a intentarlo en unos minutos o revisa la conexión con Supabase."
@@ -131,7 +148,11 @@ export function ChallengeScreen() {
 
   return (
     <ScreenContainer scrollable>
-      <AppHeader showBackButton title={summaryTitle} />
+      <AppHeader
+        showBackButton
+        title={summaryTitle}
+        backFallbacks={BACK_FALLBACKS}
+      />
 
       {step !== 'tracker' ? (
         <View style={styles.topMeta}>

@@ -4,6 +4,7 @@ import {AppHeader, ScreenContainer} from '@app/components';
 import {AppTextInput, Button, Card, Loader} from '@app/components/ui';
 import {useAuth} from '@app/hooks/useAuth';
 import {useAppTheme} from '@app/hooks/useAppTheme';
+import {PROFILE_ROUTES} from '@app/constants/routes';
 import {updateProfileDetails} from '@app/services/supabase/profile';
 import type {OnboardingGoal} from '@app/types/auth';
 
@@ -124,7 +125,7 @@ export function EditProfileScreen() {
       <AppHeader
         showBackButton
         title="Editar perfil"
-        subtitle="Ajusta tu información principal, tu objetivo y tu frecuencia de entrenamiento."
+        backFallbacks={[PROFILE_ROUTES.Profile]}
       />
 
       <Card style={styles.card}>

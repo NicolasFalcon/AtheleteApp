@@ -15,6 +15,7 @@ import { FormMessage } from '@app/components/auth/FormMessage';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type { AuthStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
@@ -93,7 +94,7 @@ export function RegisterScreen({ navigation }: Props) {
         footer={
           <AuthButton
             label="Volver a iniciar sesión"
-            onPress={() => navigation.navigate(AUTH_ROUTES.Login)}
+            onPress={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
             variant="secondary"
           />
         }
@@ -104,7 +105,7 @@ export function RegisterScreen({ navigation }: Props) {
             title="Revisa tu correo"
           />
         }
-        onBack={() => navigation.navigate(AUTH_ROUTES.Login)}
+        onBack={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
       >
         <View style={styles.successBody}>
           <SuccessIcon color={theme.colors.textPrimary} />
@@ -125,7 +126,7 @@ export function RegisterScreen({ navigation }: Props) {
         <Text style={styles.footerText}>
           ¿Ya tienes cuenta?{' '}
           <Text
-            onPress={() => navigation.navigate(AUTH_ROUTES.Login)}
+            onPress={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
             style={styles.footerLink}
           >
             Iniciar sesión
@@ -138,7 +139,7 @@ export function RegisterScreen({ navigation }: Props) {
           title="Crea tu cuenta"
         />
       }
-      onBack={() => navigation.goBack()}
+      onBack={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
     >
       {formError ? (
         <FormMessage appearance="dark" message={formError} tone="error" />

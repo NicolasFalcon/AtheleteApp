@@ -3,9 +3,15 @@ import {Alert} from 'react-native';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {AppHeader, ScreenContainer} from '@app/components';
 import {Card, Loader} from '@app/components/ui';
+import {
+  HOME_ROUTES,
+  PROGRESS_ROUTES,
+  WORKOUTS_ROUTES,
+} from '@app/constants/routes';
 import {PrForm} from '@app/features/pr/components/PrForm';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
 import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type {
   HomeStackParamList,
   ProgressStackParamList,
@@ -45,11 +51,14 @@ export function RegisterPrScreen({navigation, route}: Props) {
       <AppHeader
         showBackButton
         title="Registrar PR"
-        subtitle={
-          selectedExercise
-            ? `Nueva marca para ${selectedExercise.name}`
-            : 'Guarda una nueva mejor marca y sincronízala con tu progreso.'
-        }
+        backFallbacks={[
+          HOME_ROUTES.PersonalRecords,
+          PROGRESS_ROUTES.PersonalRecords,
+          WORKOUTS_ROUTES.PersonalRecords,
+          HOME_ROUTES.Home,
+          PROGRESS_ROUTES.Progress,
+          WORKOUTS_ROUTES.Workouts,
+        ]}
       />
 
       <Card>
@@ -65,7 +74,20 @@ export function RegisterPrScreen({navigation, route}: Props) {
               Alert.alert(
                 'PR registrado',
                 'Tu nueva marca ya quedó guardada y se reflejará en tu progreso.',
-                [{text: 'Continuar', onPress: () => navigation.goBack()}],
+                [
+                  {
+                    text: 'Continuar',
+                    onPress: () =>
+                      safeGoBack(navigation, [
+                        HOME_ROUTES.PersonalRecords,
+                        PROGRESS_ROUTES.PersonalRecords,
+                        WORKOUTS_ROUTES.PersonalRecords,
+                        HOME_ROUTES.Home,
+                        PROGRESS_ROUTES.Progress,
+                        WORKOUTS_ROUTES.Workouts,
+                      ]),
+                  },
+                ],
               );
             } catch (error) {
               Alert.alert(

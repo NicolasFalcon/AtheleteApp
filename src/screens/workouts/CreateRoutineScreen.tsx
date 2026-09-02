@@ -21,6 +21,7 @@ import {useAppTheme} from '@app/hooks/useAppTheme';
 import {useAuth} from '@app/hooks/useAuth';
 import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
 import {useRoutineBuilder} from '@app/hooks/useRoutineBuilder';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import {fetchRoutineById} from '@app/services/supabase/routines';
 import {
   findExerciseByName,
@@ -95,6 +96,8 @@ function getMetricMode(exercise: BuilderExercise): ExerciseMetricMode {
 }
 
 export function CreateRoutineScreen({navigation, route}: Props) {
+  const handleSafeBack = () =>
+    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
   const {theme} = useAppTheme();
   const {profile} = useAuth();
   const exercisesQuery = useExerciseLibrary();
@@ -301,7 +304,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
       return;
     }
 
-    navigation.goBack();
+    handleSafeBack();
   };
 
   const handleSelectExercise = (exercise: LibraryExercise) => {
@@ -478,7 +481,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
             title="Rutina no encontrada"
             description="No pudimos cargar esta rutina para editarla."
           />
-          <Button label="Volver" onPress={() => navigation.goBack()} />
+          <Button label="Volver" onPress={handleSafeBack} />
         </View>
       </SafeAreaView>
     );
@@ -492,7 +495,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
             title="Rutina de solo lectura"
             description="Esta rutina pertenece a la biblioteca global. Puedes usarla como referencia, pero no editarla ni eliminarla."
           />
-          <Button label="Volver al detalle" onPress={() => navigation.goBack()} />
+          <Button label="Volver al detalle" onPress={handleSafeBack} />
         </View>
       </SafeAreaView>
     );

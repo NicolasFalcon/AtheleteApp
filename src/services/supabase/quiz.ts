@@ -2,9 +2,18 @@ import { getSupabaseClient } from '@app/services/supabase/client';
 import { awardGamificationEvent } from '@app/services/supabase/gamification';
 import type {
   QuizAttempt,
+  QuizAttemptAnswer,
   QuizCategoryPreview,
   QuizQuestion,
 } from '@app/types/quiz';
+
+export function createQuizAttemptId() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, token => {
+    const random = Math.floor(Math.random() * 16);
+    const value = token === 'x' ? random : 8 + (random % 4);
+    return value.toString(16);
+  });
+}
 
 function getClient() {
   const client = getSupabaseClient();
@@ -201,61 +210,119 @@ async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
 }
 
 export async function submitQuizAttempt(params: {
+  attemptId: string;
   userId: string;
   categoryId: string;
   correctCount: number;
   totalQuestions: number;
   pointsEarned: number;
+  answers: QuizAttemptAnswer[];
 }): Promise<{
   attempt: QuizAttempt;
   unlockedBadges: string[];
 }> {
   const client = getClient();
-  const score = Math.round((params.correctCount / params.totalQuestions) * 100);
 
-  const { data, error } = await (client.from('quiz_attempts') as any)
-    .insert({
-      user_id: params.userId,
-      category_id: params.categoryId,
-      score,
-      correct_count: params.correctCount,
-      total_questions: params.totalQuestions,
-      points_earned: params.pointsEarned,
-    })
-    .select()
-    .single();
+  if (
+    params.answers.length !== params.totalQuestions ||
+    new Set(params.answers.map(answer => answer.questionId)).size !==
+      params.totalQuestions
+  ) {
+    throw new Error(
+      `El intento está incompleto: ${params.answers.length} de ${params.totalQuestions} respuestas.`,
+    );
+  }
+
+  const score = Math.round((params.correctCount / params.totalQuestions) * 100);
+  const attemptPayload = {
+    id: params.attemptId,
+    user_id: params.userId,
+    category_id: params.categoryId,
+    score,
+    correct_count: params.correctCount,
+    total_questions: params.totalQuestions,
+    points_earned: params.pointsEarned,
+    answers: params.answers,
+  };
+  const insertAttempt = (payload: Record<string, unknown>) =>
+    (client.from('quiz_attempts') as any)
+      .insert(payload)
+      .select()
+      .single();
+  let { data, error } = await insertAttempt(attemptPayload);
+
+  const answersColumnMissing =
+    error?.code === 'PGRST204' &&
+    String(error.message || '').toLowerCase().includes('answers');
+
+  if (answersColumnMissing) {
+    const legacyPayload: Record<string, unknown> = {...attemptPayload};
+    delete legacyPayload.answers;
+    const legacyResult = await insertAttempt(legacyPayload);
+    data = legacyResult.data;
+    error = legacyResult.error;
+  }
+
+  if (error?.code === '23505') {
+    const existingAttempt = await (client.from('quiz_attempts') as any)
+      .select('*')
+      .eq('id', params.attemptId)
+      .eq('user_id', params.userId)
+      .maybeSingle();
+
+    data = existingAttempt.data;
+    error = existingAttempt.error;
+  }
 
   if (error) {
-    throw error;
+    const detail = [error.message, error.details, error.hint]
+      .filter(Boolean)
+      .join(' ');
+    throw new Error(
+      detail
+        ? `No se pudo persistir el intento. ${detail}`
+        : 'No se pudo persistir el intento.',
+    );
+  }
+
+  if (!data?.id) {
+    throw new Error('Supabase no devolvió el intento guardado.');
   }
 
   const unlockedBadges: string[] = [];
-  const attemptAward = await awardGamificationEvent({
-    eventType: 'quiz_completed',
-    referenceId: String(data.id),
-    points: params.pointsEarned,
-    badgeIds: ['first_quiz'],
-    metadata: {
-      categoryId: params.categoryId,
-      score,
-      correctCount: params.correctCount,
-      totalQuestions: params.totalQuestions,
-    },
-  });
+  try {
+    const attemptAward = await awardGamificationEvent({
+      eventType: 'quiz_completed',
+      referenceId: String(data.id),
+      points: params.pointsEarned,
+      badgeIds: ['first_quiz'],
+      metadata: {
+        categoryId: params.categoryId,
+        score,
+        correctCount: params.correctCount,
+        totalQuestions: params.totalQuestions,
+      },
+    });
 
-  if (attemptAward.badgesUnlocked.includes('first_quiz')) {
-    unlockedBadges.push('first_quiz');
-  }
-
-  if (score === 100) {
-    const unlockedQuizMaster = await maybeUnlockQuizMaster(
-      params.userId,
-      params.categoryId,
-    );
-
-    if (unlockedQuizMaster) {
-      unlockedBadges.push('quiz_master');
+    if (attemptAward.badgesUnlocked.includes('first_quiz')) {
+      unlockedBadges.push('first_quiz');
     }
+
+    if (score === 100) {
+      const unlockedQuizMaster = await maybeUnlockQuizMaster(
+        params.userId,
+        params.categoryId,
+      );
+
+      if (unlockedQuizMaster) {
+        unlockedBadges.push('quiz_master');
+      }
+    }
+  } catch (gamificationError) {
+    console.warn(
+      '[quiz-submit] El intento se guardó, pero la recompensa quedó pendiente.',
+      gamificationError,
+    );
   }
 
   return {
@@ -267,6 +334,7 @@ export async function submitQuizAttempt(params: {
       totalQuestions: data.total_questions,
       pointsEarned: data.points_earned,
       completedAt: data.completed_at,
+      answers: Array.isArray(data.answers) ? data.answers : params.answers,
     },
     unlockedBadges,
   };

@@ -29,6 +29,14 @@ export type QuizAttempt = {
   totalQuestions: number;
   pointsEarned: number;
   completedAt: string;
+  answers: QuizAttemptAnswer[];
+};
+
+export type QuizAttemptAnswer = {
+  questionId: string;
+  selectedAnswer: number;
+  isCorrect: boolean;
+  pointsEarned: number;
 };
 
 export type QuizQuestionRouteParams = {

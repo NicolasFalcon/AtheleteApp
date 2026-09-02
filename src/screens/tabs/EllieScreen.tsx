@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowRight,
@@ -37,6 +36,7 @@ import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useEllieChat } from '@app/hooks/useEllieChat';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import type { EllieStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<
@@ -63,7 +63,7 @@ export function EllieScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
   const { onScroll, setTabBarVisible } = useTabBarMotion();
   const { profile } = useAuth();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { height: tabBarHeight, bottomClearance } = useTabBarMetrics();
   const { width } = useWindowDimensions();
   const ellieData = useEllieData();
   const messagesRef = useRef<ScrollView | null>(null);
@@ -193,7 +193,7 @@ export function EllieScreen({ navigation }: Props) {
       flexGrow: 1,
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.md,
-      paddingBottom: tabBarHeight + theme.spacing.jumbo,
+      paddingBottom: bottomClearance + theme.spacing.lg,
     },
     hero: {
       flexDirection: 'row',

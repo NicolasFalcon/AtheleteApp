@@ -1,33 +1,43 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { LogOut, RefreshCw } from 'lucide-react-native';
 import {
-  Bell,
-  RefreshCw,
-  Settings,
-  Sun,
-  Target,
-  Trophy,
-} from 'lucide-react-native';
-import { LayoutChangeEvent, ScrollView, StyleSheet, View } from 'react-native';
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Loader, EmptyState } from '@app/components/ui';
+import { Card, Loader, EmptyState } from '@app/components/ui';
 import { PROFILE_ROUTES } from '@app/constants/routes';
-import { AtheletePointsCard } from '@app/features/profile/components/AtheletePointsCard';
 import { BadgeGridCard } from '@app/features/profile/components/BadgeGridCard';
 import { CurrentPlanSummaryCard } from '@app/features/profile/components/CurrentPlanSummaryCard';
 import { ProfileHeroCard } from '@app/features/profile/components/ProfileHeroCard';
+import { ProfilePersonalInfoCard } from '@app/features/profile/components/ProfilePersonalInfoCard';
 import { ProfilePreferencesCard } from '@app/features/profile/components/ProfilePreferencesCard';
-import { ProfileQuickLinkRow } from '@app/features/profile/components/ProfileQuickLinkRow';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useProfilePreferences } from '@app/hooks/useProfilePreferences';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import type { ProfileStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileRoot'>;
 type ThemePreference = 'light' | 'dark' | 'system';
+type ProfileSection = 'profile' | 'plan' | 'achievements' | 'preferences' | 'account';
+
+const PROFILE_SECTIONS: Array<{ id: ProfileSection; label: string }> = [
+  { id: 'profile', label: 'Perfil' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'achievements', label: 'Logros' },
+  { id: 'preferences', label: 'Preferencias' },
+  { id: 'account', label: 'Cuenta' },
+];
 
 const goalLabels: Record<string, string> = {
   lose_weight: 'Perder peso',
@@ -62,9 +72,17 @@ export function ProfileScreen({ navigation }: Props) {
   const { profile, signOut } = useAuth();
   const overviewQuery = useProfileOverview();
   const preferences = useProfilePreferences();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { bottomClearance } = useTabBarMetrics();
   const scrollRef = useRef<ScrollView>(null);
-  const [preferencesY, setPreferencesY] = useState(0);
+  const sectionOffsets = useRef<Record<ProfileSection, number>>({
+    profile: 0,
+    plan: 0,
+    achievements: 0,
+    preferences: 0,
+    account: 0,
+  });
+  const [activeSection, setActiveSection] =
+    useState<ProfileSection>('profile');
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -74,19 +92,124 @@ export function ProfileScreen({ navigation }: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: tabBarHeight + theme.spacing.md,
+      paddingBottom: bottomClearance + theme.spacing.lg,
       gap: theme.spacing.md,
     },
-    quickLinks: {
-      borderRadius: theme.radii.md,
+    anchorBar: {
+      minHeight: 44,
+      flexDirection: 'row',
+      alignItems: 'center',
       padding: 4,
+      borderRadius: theme.radii.pill,
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       shadowColor: '#000000',
-      ...theme.elevations.card,
+      ...theme.elevations.subtle,
+    },
+    anchorButton: {
+      flex: 1,
+      minHeight: 34,
+      borderRadius: theme.radii.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 4,
+    },
+    anchorButtonActive: {
+      backgroundColor: theme.colors.accent,
+    },
+    anchorLabel: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 10,
+      fontWeight: theme.typography.weights.medium,
+    },
+    anchorLabelActive: {
+      color: theme.colors.accentContrast,
+      fontWeight: theme.typography.weights.semibold,
+    },
+    section: {
+      gap: 10,
+    },
+    sectionTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 17,
+      fontWeight: theme.typography.weights.bold,
+    },
+    accountCard: {
+      borderRadius: theme.radii.md,
+      padding: 16,
+      gap: 10,
+    },
+    accountTitle: {
+      color: theme.colors.textPrimary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 17,
+      fontWeight: theme.typography.weights.bold,
+    },
+    signOutButton: {
+      minHeight: 46,
+      borderRadius: theme.radii.sm,
+      paddingHorizontal: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    signOutLabel: {
+      color: theme.colors.danger,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: 14,
+      fontWeight: theme.typography.weights.medium,
     },
   });
+
+  const recordSectionLayout = useCallback(
+    (section: ProfileSection) => (event: LayoutChangeEvent) => {
+      sectionOffsets.current[section] = event.nativeEvent.layout.y;
+    },
+    [],
+  );
+
+  const scrollToSection = useCallback((section: ProfileSection) => {
+    setActiveSection(section);
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, sectionOffsets.current[section] - 10),
+      animated: true,
+    });
+  }, []);
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      tabBarMotion.onScroll(event);
+
+      const marker = event.nativeEvent.contentOffset.y + 72;
+      let nextSection: ProfileSection = 'profile';
+
+      PROFILE_SECTIONS.forEach(section => {
+        if (marker >= sectionOffsets.current[section.id]) {
+          nextSection = section.id;
+        }
+      });
+
+      const reachedBottom =
+        event.nativeEvent.contentOffset.y +
+          event.nativeEvent.layoutMeasurement.height >=
+        event.nativeEvent.contentSize.height - 24;
+
+      if (reachedBottom) {
+        nextSection = 'account';
+      }
+
+      setActiveSection(current =>
+        current === nextSection ? current : nextSection,
+      );
+    },
+    [tabBarMotion],
+  );
 
   if (!profile || overviewQuery.isLoading || !preferences.hydrated) {
     return (
@@ -132,14 +255,6 @@ export function ProfileScreen({ navigation }: Props) {
       ? 'Completado · 33 días'
       : `Día ${overview.challenge.challengeDay} de 33`
     : 'Sin reto';
-  const challengeMetaLabel = overview?.challenge
-    ? overview.challenge.status === 'completed'
-      ? 'Completado'
-      : `Día ${overview.challenge.challengeDay}`
-    : 'Sin reto';
-  const challengeValue = overview?.challenge
-    ? String(overview.challenge.completedDays)
-    : '—';
   const nutritionSummary = overview?.nutritionPlan
     ? overview.todayNutritionLog &&
       ((overview.todayNutritionLog.calories || 0) > 0 ||
@@ -148,20 +263,12 @@ export function ProfileScreen({ navigation }: Props) {
       : 'Plan activo'
     : 'Sin plan';
 
-  const openPreferences = () => {
-    scrollRef.current?.scrollTo({ y: preferencesY - 24, animated: true });
-  };
-
-  const handlePreferencesLayout = (event: LayoutChangeEvent) => {
-    setPreferencesY(event.nativeEvent.layout.y);
-  };
-
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
-        onScroll={tabBarMotion.onScroll}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -173,78 +280,107 @@ export function ProfileScreen({ navigation }: Props) {
           email={profile.email}
           goalLabel={goalLabel}
           trainingLabel={trainingLabel}
-          ageLabel={calculateAge(profile.birthDate)}
-          weightLabel={profile.weight ? String(profile.weight) : '—'}
-          heightLabel={profile.height ? String(profile.height) : '—'}
-        />
-
-        <AtheletePointsCard
           points={overview?.points || 0}
           currentStreak={overview?.currentStreak || 0}
-          longestStreak={overview?.longestStreak || 0}
-          challengeDayLabel={challengeMetaLabel}
-          challengeValue={challengeValue}
+          badgeCount={overview?.badges.length || 0}
+          onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
         />
 
-        <View style={styles.quickLinks}>
-          <ProfileQuickLinkRow
-            icon={Settings}
-            title="Editar perfil"
-            subtitle="Información personal"
-            onPress={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
-          />
-          <ProfileQuickLinkRow
-            icon={Target}
-            title="Mis objetivos"
-            subtitle="Meta y frecuencia"
-            onPress={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
-          />
-          <ProfileQuickLinkRow
-            icon={Trophy}
-            title="Logros"
-            subtitle="Badges desbloqueados"
-            onPress={() => navigation.navigate(PROFILE_ROUTES.Achievements)}
-          />
-          <ProfileQuickLinkRow
-            icon={Bell}
-            title="Notificaciones"
-            subtitle="Recordatorios activos"
-            onPress={openPreferences}
-          />
-          <ProfileQuickLinkRow
-            icon={Sun}
-            title="Apariencia"
-            subtitle="Tema de la app"
-            onPress={openPreferences}
+        <View style={styles.anchorBar}>
+          {PROFILE_SECTIONS.map(section => {
+            const active = activeSection === section.id;
+
+            return (
+              <Pressable
+                key={section.id}
+                onPress={() => scrollToSection(section.id)}
+                style={({ pressed }) => [
+                  styles.anchorButton,
+                  active ? styles.anchorButtonActive : null,
+                  pressed ? { opacity: 0.78 } : null,
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.anchorLabel,
+                    active ? styles.anchorLabelActive : null,
+                  ]}
+                >
+                  {section.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View
+          onLayout={recordSectionLayout('profile')}
+          style={styles.section}
+        >
+          <Text style={styles.sectionTitle}>Perfil</Text>
+          <ProfilePersonalInfoCard
+            ageLabel={calculateAge(profile.birthDate)}
+            weightLabel={profile.weight ? String(profile.weight) : '—'}
+            heightLabel={profile.height ? String(profile.height) : '—'}
+            onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
           />
         </View>
 
-        <CurrentPlanSummaryCard
-          goalLabel={goalLabel}
-          trainingLabel={trainingLabel}
-          nutritionLabel={nutritionSummary}
-          challengeLabel={challengeSummary}
-          onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
-          onOpenNutrition={() =>
-            navigation.navigate(PROFILE_ROUTES.NutritionPlan)
-          }
-          onOpenChallenge={() => navigation.navigate(PROFILE_ROUTES.Challenge)}
-        />
+        <View onLayout={recordSectionLayout('plan')}>
+          <CurrentPlanSummaryCard
+            goalLabel={goalLabel}
+            trainingLabel={trainingLabel}
+            nutritionLabel={nutritionSummary}
+            challengeLabel={challengeSummary}
+            onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
+            onOpenNutrition={() =>
+              navigation.navigate(PROFILE_ROUTES.NutritionPlan)
+            }
+            onOpenChallenge={() =>
+              navigation.navigate(PROFILE_ROUTES.Challenge)
+            }
+          />
+        </View>
 
-        <BadgeGridCard
-          badges={overview?.badges || []}
-          embedded
-          onOpenAll={() => navigation.navigate(PROFILE_ROUTES.Achievements)}
-        />
+        <View onLayout={recordSectionLayout('achievements')}>
+          <BadgeGridCard
+            badges={overview?.badges || []}
+            embedded
+            previewCount={5}
+            points={overview?.points || 0}
+            currentStreak={overview?.currentStreak || 0}
+            onOpenAll={() => navigation.navigate(PROFILE_ROUTES.Achievements)}
+          />
+        </View>
 
-        <View onLayout={handlePreferencesLayout}>
+        <View onLayout={recordSectionLayout('preferences')}>
           <ProfilePreferencesCard
             preferredMode={preferredMode as ThemePreference}
             onChangeMode={setPreferredMode}
             notifications={preferences.notifications}
             onToggleNotifications={preferences.updateNotifications}
-            onSignOut={signOut}
           />
+        </View>
+
+        <View onLayout={recordSectionLayout('account')}>
+          <Card style={styles.accountCard}>
+            <Text style={styles.accountTitle}>Cuenta</Text>
+            <Pressable
+              onPress={signOut}
+              style={({ pressed }) => [
+                styles.signOutButton,
+                pressed ? { opacity: 0.82 } : null,
+              ]}
+            >
+              <Text style={styles.signOutLabel}>Cerrar sesión</Text>
+              <LogOut
+                color={theme.colors.danger}
+                size={16}
+                strokeWidth={1.8}
+              />
+            </Pressable>
+          </Card>
         </View>
       </ScrollView>
     </SafeAreaView>

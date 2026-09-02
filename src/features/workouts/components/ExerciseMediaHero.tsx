@@ -69,6 +69,7 @@ export function ExerciseMediaHero({
     },
     actionButton: {
       position: 'absolute',
+      top: topInset + theme.spacing.xs,
       width: 50,
       height: 50,
       borderRadius: 25,
@@ -121,7 +122,7 @@ export function ExerciseMediaHero({
 
       <Pressable
         onPress={onBack}
-        style={[styles.actionButton, styles.backButton, { top: 20 }]}
+        style={[styles.actionButton, styles.backButton]}
       >
         <ArrowLeft
           color={theme.colors.textPrimary}
@@ -135,7 +136,6 @@ export function ExerciseMediaHero({
         style={[
           styles.actionButton,
           styles.favoriteButton,
-          { top: 20 },
         ]}
       >
         <Heart

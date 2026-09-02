@@ -6,6 +6,7 @@ import { ProfileSetupLayout } from '@app/components/onboarding/ProfileSetupLayou
 import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type { OnboardingStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'BirthDate'>;
@@ -54,7 +55,7 @@ export function BirthDateScreen({ navigation }: Props) {
   return (
     <ProfileSetupLayout
       continueDisabled={!onboardingDraft.birthDate}
-      onBack={() => navigation.goBack()}
+      onBack={() => safeGoBack(navigation, [ONBOARDING_ROUTES.Avatar])}
       onContinue={() => navigation.navigate(ONBOARDING_ROUTES.Gender)}
       step={1}
       subtitle="Tu fecha se mantiene privada y nos ayuda a calcular recomendaciones más precisas."

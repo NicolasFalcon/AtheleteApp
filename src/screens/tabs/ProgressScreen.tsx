@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { RefreshCw } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +16,7 @@ import { TrainingProgressCard } from '@app/features/progress/components/Training
 import { useProgressData } from '@app/hooks/useProgressData';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import type { ProgressStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<ProgressStackParamList, 'ProgressRoot'>;
@@ -26,7 +26,7 @@ type ProgressRange = 'week' | 'month';
 export function ProgressScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
   const tabBarMotion = useTabBarMotion();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { bottomClearance } = useTabBarMetrics();
   const progress = useProgressData();
   const [section, setSection] = useState<ProgressSection>('dashboard');
   const [range, setRange] = useState<ProgressRange>('week');
@@ -39,7 +39,7 @@ export function ProgressScreen({ navigation }: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: tabBarHeight + theme.spacing.jumbo,
+      paddingBottom: bottomClearance + theme.spacing.lg,
       gap: theme.spacing.md,
     },
     title: {

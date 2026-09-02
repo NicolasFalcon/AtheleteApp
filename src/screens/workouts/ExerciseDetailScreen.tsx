@@ -24,6 +24,7 @@ import { ExerciseMediaHero } from '@app/features/workouts/components/ExerciseMed
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import { bodyPartLabels, equipmentLabels, levelLabels } from '@app/shared';
 import type {
   HomeStackParamList,
@@ -95,6 +96,8 @@ function ExerciseDetailHeader({
 }
 
 export function ExerciseDetailScreen({ navigation, route }: Props) {
+  const handleSafeBack = () =>
+    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
@@ -118,7 +121,7 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
       backgroundColor: theme.colors.background,
     },
     scrollContent: {
-      paddingBottom: '13%'
+      paddingBottom: bottomBarHeight + theme.spacing.md,
     },
     scroll: {
       flex: 1,
@@ -268,7 +271,7 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
             title="Ejercicio no encontrado"
             description="No pudimos encontrar este ejercicio dentro de la biblioteca actual."
           />
-          <Button label="Volver" onPress={() => navigation.goBack()} />
+          <Button label="Volver" onPress={handleSafeBack} />
         </View>
       </SafeAreaView>
     );
@@ -296,7 +299,7 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
         height={heroHeight}
         isFavorite={exerciseFavorites.isExerciseFavorite(exercise.id)}
         topInset={insets.top}
-        onBack={() => navigation.goBack()}
+        onBack={handleSafeBack}
         onToggleFavorite={() => {
           exerciseFavorites.toggleExerciseFavorite(exercise.id).catch(() => {});
         }}

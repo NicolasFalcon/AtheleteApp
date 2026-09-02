@@ -1,8 +1,7 @@
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
-import {ArrowLeft} from 'lucide-react-native';
-import {Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {ScrollView, StyleSheet, Text, View} from 'react-native';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {AppHeader} from '@app/components';
 import {EmptyState, Loader} from '@app/components/ui';
 import {HOME_ROUTES, TAB_ROUTES} from '@app/constants/routes';
 import {NotificationItemRow} from '@app/features/notifications/components/NotificationItemRow';
@@ -19,7 +18,7 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'Notifications'>;
 
 export function NotificationsScreen({navigation}: Props) {
   const {theme} = useAppTheme();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const notificationsOverview = useNotificationsOverview();
 
   const styles = StyleSheet.create({
@@ -30,42 +29,8 @@ export function NotificationsScreen({navigation}: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: tabBarHeight + theme.spacing.md,
+      paddingBottom: insets.bottom + theme.spacing.lg,
       gap: theme.spacing.md,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-    },
-    backButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-    },
-    headerCopy: {
-      flex: 1,
-      gap: 2,
-    },
-    eyebrow: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1.6,
-      textTransform: 'uppercase',
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 22,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.5,
     },
     summaryCard: {
       borderRadius: 26,
@@ -144,17 +109,11 @@ export function NotificationsScreen({navigation}: Props) {
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <Pressable
-        onPress={() => navigation.goBack()}
-        style={({pressed}) => [styles.backButton, pressed ? {opacity: 0.86} : null]}>
-        <ArrowLeft color={theme.colors.textPrimary} size={18} strokeWidth={2.1} />
-      </Pressable>
-      <View style={styles.headerCopy}>
-        <Text style={styles.eyebrow}>Centro de acción</Text>
-        <Text style={styles.title}>Notificaciones</Text>
-      </View>
-    </View>
+    <AppHeader
+      showBackButton
+      title="Notificaciones"
+      backFallbacks={[HOME_ROUTES.Home]}
+    />
   );
 
   if (notificationsOverview.isLoading) {

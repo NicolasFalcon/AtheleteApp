@@ -30,14 +30,23 @@ export function PlaceholderScreen({
     stack: {
       gap: theme.spacing.lg,
     },
+    subtitle: {
+      color: theme.colors.textSecondary,
+      fontFamily: theme.typography.fontFamily,
+      fontSize: theme.typography.sizes.bodySm,
+      lineHeight: 20,
+    },
   });
 
   return (
     <ScreenContainer scrollable>
       <View style={styles.stack}>
         {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-        <AppHeader title={title} subtitle={subtitle} />
-        <Card>{children}</Card>
+        <AppHeader title={title} />
+        <Card>
+          <Text style={styles.subtitle}>{subtitle}</Text>
+          {children}
+        </Card>
       </View>
     </ScreenContainer>
   );

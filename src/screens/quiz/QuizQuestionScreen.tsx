@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useRef, useState} from 'react';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {Alert, StyleSheet, Text, View} from 'react-native';
 import {AppHeader, ScreenContainer} from '@app/components';
@@ -6,9 +6,15 @@ import {Button, Card, EmptyState, Loader} from '@app/components/ui';
 import {HOME_ROUTES} from '@app/constants/routes';
 import {QuizAnswerOption} from '@app/features/quiz/components/QuizAnswerOption';
 import {QuizProgressHeader} from '@app/features/quiz/components/QuizProgressHeader';
+import {
+  randomizeQuizOptions,
+  type AttemptQuizQuestion,
+} from '@app/features/quiz/randomizeQuizOptions';
 import {useQuizQuestions, useQuizSubmit} from '@app/hooks/useQuiz';
+import {createQuizAttemptId} from '@app/services/supabase/quiz';
 import {useAppTheme} from '@app/hooks/useAppTheme';
 import type {HomeStackParamList} from '@app/types/navigation';
+import type {QuizAttemptAnswer} from '@app/types/quiz';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'QuizQuestion'>;
 type AnswerState = 'unanswered' | 'correct' | 'incorrect';
@@ -20,8 +26,13 @@ export function QuizQuestionScreen({navigation, route}: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [answerState, setAnswerState] = useState<AnswerState>('unanswered');
-  const [correctCount, setCorrectCount] = useState(0);
-  const [totalPoints, setTotalPoints] = useState(0);
+  const attemptIdRef = useRef(createQuizAttemptId());
+  const answersRef = useRef<QuizAttemptAnswer[]>([]);
+  const submissionStartedRef = useRef(false);
+  const attemptQuestionsRef = useRef<AttemptQuizQuestion[] | null>(null);
+  const returnToCategories = () => {
+    navigation.popTo(HOME_ROUTES.QuizLanding);
+  };
 
   const styles = StyleSheet.create({
     content: {
@@ -76,16 +87,26 @@ export function QuizQuestionScreen({navigation, route}: Props) {
     );
   }
 
-  const questions = questionsQuery.data || [];
+  if (!attemptQuestionsRef.current && questionsQuery.data) {
+    attemptQuestionsRef.current = randomizeQuizOptions(questionsQuery.data);
+  }
+
+  const questions = attemptQuestionsRef.current || [];
   const currentQuestion = questions[currentIndex];
 
   if (!currentQuestion) {
     return (
       <ScreenContainer>
-        <AppHeader showBackButton title={route.params.categoryName} />
+        <AppHeader
+          showBackButton
+          title={route.params.categoryName}
+          onBack={returnToCategories}
+        />
         <EmptyState
           title="No hay preguntas disponibles"
           description="Esta categoría todavía no tiene suficientes preguntas activas para completar el quiz."
+          actionLabel="Volver a categorías"
+          onAction={returnToCategories}
         />
       </ScreenContainer>
     );
@@ -104,11 +125,20 @@ export function QuizQuestionScreen({navigation, route}: Props) {
     if (answerState === 'unanswered') {
       const correct = selectedAnswer === currentQuestion.correctAnswer;
       setAnswerState(correct ? 'correct' : 'incorrect');
-
-      if (correct) {
-        setCorrectCount(value => value + 1);
-        setTotalPoints(value => value + currentQuestion.pointsReward);
-      }
+      const answer: QuizAttemptAnswer = {
+        questionId: currentQuestion.id,
+        selectedAnswer:
+          currentQuestion.originalOptionIndexes[selectedAnswer] ??
+          selectedAnswer,
+        isCorrect: correct,
+        pointsEarned: correct ? currentQuestion.pointsReward : 0,
+      };
+      answersRef.current = [
+        ...answersRef.current.filter(
+          item => item.questionId !== currentQuestion.id,
+        ),
+        answer,
+      ];
 
       return;
     }
@@ -120,16 +150,42 @@ export function QuizQuestionScreen({navigation, route}: Props) {
       return;
     }
 
+    if (submissionStartedRef.current) {
+      return;
+    }
+
+    const finalAnswers = questions
+      .map(question =>
+        answersRef.current.find(answer => answer.questionId === question.id),
+      )
+      .filter((answer): answer is QuizAttemptAnswer => Boolean(answer));
+
+    if (finalAnswers.length !== questions.length) {
+      Alert.alert(
+        'Falta una respuesta',
+        `Se registraron ${finalAnswers.length} de ${questions.length} respuestas. Vuelve a la pregunta pendiente.`,
+      );
+      return;
+    }
+
+    const correctCount = finalAnswers.filter(answer => answer.isCorrect).length;
+    const basePoints = finalAnswers.reduce(
+      (total, answer) => total + answer.pointsEarned,
+      0,
+    );
     const isPerfect = correctCount === questions.length;
     const perfectBonus = isPerfect ? 25 : 0;
-    const totalEarned = totalPoints + perfectBonus;
+    const totalEarned = basePoints + perfectBonus;
+    submissionStartedRef.current = true;
 
     try {
       const result = await submitMutation.mutateAsync({
+        attemptId: attemptIdRef.current,
         categoryId: route.params.categoryId,
         correctCount,
         totalQuestions: questions.length,
         pointsEarned: totalEarned,
+        answers: finalAnswers,
       });
 
       navigation.replace(HOME_ROUTES.QuizResult, {
@@ -144,9 +200,12 @@ export function QuizQuestionScreen({navigation, route}: Props) {
         unlockedBadges: result.unlockedBadges,
       });
     } catch (error) {
+      submissionStartedRef.current = false;
       Alert.alert(
         'No pudimos guardar tu intento',
-        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+        error instanceof Error
+          ? error.message
+          : 'Supabase devolvió una respuesta inesperada. Inténtalo nuevamente.',
       );
     }
   };
@@ -158,7 +217,7 @@ export function QuizQuestionScreen({navigation, route}: Props) {
         current={currentIndex + 1}
         total={questions.length}
         progressPct={progressPct}
-        onBack={() => navigation.goBack()}
+        onBack={returnToCategories}
       />
 
       <Card style={styles.questionCard}>

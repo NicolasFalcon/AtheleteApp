@@ -5,6 +5,7 @@ import { ProfileSetupLayout } from '@app/components/onboarding/ProfileSetupLayou
 import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type { ProfileGender } from '@app/types/auth';
 import type { OnboardingStackParamList } from '@app/types/navigation';
 
@@ -22,7 +23,7 @@ export function GenderSelectionScreen({ navigation }: Props) {
   return (
     <ProfileSetupLayout
       continueDisabled={!onboardingDraft.gender}
-      onBack={() => navigation.goBack()}
+      onBack={() => safeGoBack(navigation, [ONBOARDING_ROUTES.BirthDate])}
       onContinue={() => navigation.navigate(ONBOARDING_ROUTES.Weight)}
       step={2}
       subtitle="Este dato es privado y se utiliza únicamente para personalizar cálculos y recomendaciones."

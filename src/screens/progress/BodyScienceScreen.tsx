@@ -1,9 +1,8 @@
 import {useMemo} from 'react';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
-import {BookOpen} from 'lucide-react-native';
 import {ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {AppHeader} from '@app/components';
 import {EmptyState} from '@app/components/ui';
 import {PROGRESS_ROUTES} from '@app/constants/routes';
 import {getBodyScienceArticleImage} from '@app/features/body-science/articleImages';
@@ -23,7 +22,7 @@ const categoryOrder = ['Training', 'Recovery', 'Nutrition', 'Mindset'] as const;
 
 export function BodyScienceScreen({navigation}: Props) {
   const {theme} = useAppTheme();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
 
   const featuredArticle = bodyScienceArticles.find(
     article => article.id === featuredArticleIds[0],
@@ -46,29 +45,8 @@ export function BodyScienceScreen({navigation}: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: tabBarHeight + theme.spacing.md,
+      paddingBottom: insets.bottom + theme.spacing.lg,
       gap: theme.spacing.lg,
-    },
-    header: {
-      gap: 6,
-    },
-    titleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 9,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 24,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.6,
-    },
-    subtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      lineHeight: 19,
     },
     categorySection: {
       gap: 10,
@@ -113,15 +91,11 @@ export function BodyScienceScreen({navigation}: Props) {
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <View style={styles.titleRow}>
-            <BookOpen color={theme.colors.textPrimary} size={22} strokeWidth={2.1} />
-            <Text style={styles.title}>Ciencia del cuerpo</Text>
-          </View>
-          <Text style={styles.subtitle}>
-            Aprende cómo tu entrenamiento, recuperación y nutrición trabajan juntos.
-          </Text>
-        </View>
+        <AppHeader
+          showBackButton
+          title="Ciencia del cuerpo"
+          backFallbacks={[PROGRESS_ROUTES.Progress]}
+        />
 
         <BodyScienceArticleCard
           article={featuredArticle}

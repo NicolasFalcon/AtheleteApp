@@ -60,7 +60,7 @@ export function PersonalRecordsCard({
     card: {
       padding: 16,
       borderRadius: theme.radii.md,
-      gap: 14,
+      gap: 13,
     },
     header: {
       flexDirection: 'row',
@@ -81,21 +81,21 @@ export function PersonalRecordsCard({
       fontWeight: theme.typography.weights.bold,
     },
     summaryPill: {
-      minHeight: 28,
+      minHeight: 24,
       borderRadius: theme.radii.pill,
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      paddingHorizontal: 10,
+      paddingHorizontal: 8,
       alignItems: 'center',
       justifyContent: 'center',
     },
     summaryPillText: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: theme.typography.weights.medium,
-      lineHeight: 14,
+      lineHeight: 12,
     },
     list: {
       gap: 8,
@@ -136,8 +136,8 @@ export function PersonalRecordsCard({
     },
     row: {
       minHeight: 76,
-      paddingHorizontal: 12,
-      paddingVertical: 11,
+      paddingHorizontal: 13,
+      paddingVertical: 12,
       borderRadius: theme.radii.sm,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
@@ -152,14 +152,14 @@ export function PersonalRecordsCard({
     },
     textGroup: {
       flex: 1,
-      gap: 6,
+      gap: 5,
     },
     exerciseName: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: theme.typography.weights.semibold,
-      lineHeight: 19,
+      lineHeight: 18,
     },
     metaRow: {
       flexDirection: 'row',
@@ -172,8 +172,8 @@ export function PersonalRecordsCard({
       backgroundColor: theme.colors.surface,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
     },
     badgeText: {
       color: theme.colors.textSecondary,
@@ -191,7 +191,7 @@ export function PersonalRecordsCard({
     rightMeta: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 7,
     },
     valueStack: {
       alignItems: 'flex-end',
@@ -200,15 +200,15 @@ export function PersonalRecordsCard({
     value: {
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: theme.typography.weights.bold,
-      lineHeight: 19,
+      lineHeight: 20,
     },
     count: {
       color: theme.colors.textSecondary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-      lineHeight: 14,
+      fontSize: 10,
+      lineHeight: 13,
     },
   });
 

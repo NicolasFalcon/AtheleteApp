@@ -1,18 +1,23 @@
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {useBottomTabBarHeight} from '@react-navigation/bottom-tabs';
 import {useNavigation} from '@react-navigation/native';
 import {useRoute} from '@react-navigation/native';
 import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
+import {AppHeader} from '@app/components';
 import {Button, Loader} from '@app/components/ui';
-import {TAB_ROUTES} from '@app/constants/routes';
+import {
+  ELLIE_ROUTES,
+  HOME_ROUTES,
+  PROFILE_ROUTES,
+  PROGRESS_ROUTES,
+  TAB_ROUTES,
+} from '@app/constants/routes';
 import {NutritionEmptyState} from '@app/features/nutrition/components/NutritionEmptyState';
 import {NutritionDailySummaryCard} from '@app/features/nutrition/components/NutritionDailySummaryCard';
 import {NutritionGuidelinesCard} from '@app/features/nutrition/components/NutritionGuidelinesCard';
 import {NutritionLogModal} from '@app/features/nutrition/components/NutritionLogModal';
 import {NutritionMacroGrid} from '@app/features/nutrition/components/NutritionMacroGrid';
 import {NutritionPlanActions} from '@app/features/nutrition/components/NutritionPlanActions';
-import {NutritionPlanHeader} from '@app/features/nutrition/components/NutritionPlanHeader';
 import {NutritionPlanSummaryCard} from '@app/features/nutrition/components/NutritionPlanSummaryCard';
 import {NutritionStructureCard} from '@app/features/nutrition/components/NutritionStructureCard';
 import {
@@ -37,7 +42,7 @@ export function NutritionPlanScreen() {
   const route = useRoute();
   const {theme} = useAppTheme();
   const {profile} = useAuth();
-  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
   const nutritionPlan = useNutritionPlan();
   const [logModalVisible, setLogModalVisible] = useState(false);
   const consumedOpenLogParam = useRef(false);
@@ -86,7 +91,7 @@ export function NutritionPlanScreen() {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: tabBarHeight + theme.spacing.md,
+      paddingBottom: insets.bottom + theme.spacing.lg,
       gap: theme.spacing.md,
     },
     caloriesWrap: {
@@ -193,9 +198,15 @@ export function NutritionPlanScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        <NutritionPlanHeader
-          subtitle={`Objetivo: ${goalLabel}`}
-          onBack={() => navigation.goBack()}
+        <AppHeader
+          showBackButton
+          title="Plan de nutrición"
+          backFallbacks={[
+            HOME_ROUTES.Home,
+            ELLIE_ROUTES.Ellie,
+            PROGRESS_ROUTES.Progress,
+            PROFILE_ROUTES.Profile,
+          ]}
         />
 
         {nutritionPlan.error ? (

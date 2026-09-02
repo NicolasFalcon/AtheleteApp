@@ -2,7 +2,8 @@ import {useMemo} from 'react';
 import type {NativeStackScreenProps} from '@react-navigation/native-stack';
 import {Alert, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
 import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ArrowLeft, ChevronRight, Plus} from 'lucide-react-native';
+import {ChevronRight, Plus} from 'lucide-react-native';
+import {AppHeader} from '@app/components';
 import {Button, Card, EmptyState, Loader} from '@app/components/ui';
 import {
   HOME_ROUTES,
@@ -42,34 +43,11 @@ export function AddExerciseToRoutineScreen({navigation, route}: Props) {
       flex: 1,
       backgroundColor: theme.colors.background,
     },
-    backButton: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-    },
     content: {
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.md,
+      paddingHorizontal: theme.spacing.md,
+      paddingTop: theme.spacing.sm,
       paddingBottom: Math.max(insets.bottom, theme.spacing.xl),
-      gap: theme.spacing.lg,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.title,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.8,
-    },
-    subtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 20,
+      gap: theme.spacing.md,
     },
     list: {
       gap: theme.spacing.sm,
@@ -140,17 +118,11 @@ export function AddExerciseToRoutineScreen({navigation, route}: Props) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backButton}>
-          <ArrowLeft color={theme.colors.textPrimary} size={18} strokeWidth={2.2} />
-        </Pressable>
-
-        <View>
-          <Text style={styles.title}>Agregar a rutina</Text>
-          <Text style={styles.subtitle}>
-            Elige una rutina editable para agregar {route.params.exerciseName} o
-            crea una nueva con este ejercicio ya incluido.
-          </Text>
-        </View>
+        <AppHeader
+          showBackButton
+          title="Agregar a rutina"
+          backFallbacks={[WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]}
+        />
 
         <Card>
           <Button

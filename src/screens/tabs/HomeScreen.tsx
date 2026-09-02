@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import {
   Dumbbell,
   Droplets,
@@ -31,6 +30,7 @@ import { useHomeFeed } from '@app/hooks/useHomeFeed';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useNotificationsOverview } from '@app/hooks/useNotificationsOverview';
 import { useNutritionPlan } from '@app/hooks/useNutritionPlan';
@@ -48,7 +48,7 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'HomeRoot'>;
 export function HomeScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
   const tabBarMotion = useTabBarMotion();
-  const tabBarHeight = useBottomTabBarHeight();
+  const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const homeQuery = useHomeFeed();
   const notificationsOverview = useNotificationsOverview();
@@ -140,7 +140,7 @@ export function HomeScreen({ navigation }: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: 2,
-      paddingBottom: tabBarHeight + theme.spacing.xxl,
+      paddingBottom: bottomClearance + theme.spacing.lg,
       gap: theme.spacing.lg,
     },
     section: {

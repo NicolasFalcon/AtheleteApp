@@ -6,6 +6,7 @@ import { ProfileSetupValueInput } from '@app/components/onboarding/ProfileSetupV
 import { ONBOARDING_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type { OnboardingStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'Height'>;
@@ -27,7 +28,7 @@ export function HeightInputScreen({ navigation }: Props) {
 
   return (
     <ProfileSetupLayout
-      onBack={() => navigation.goBack()}
+      onBack={() => safeGoBack(navigation, [ONBOARDING_ROUTES.Weight])}
       onContinue={continueFlow}
       step={4}
       subtitle="La altura mejora la precisión de tus métricas corporales."

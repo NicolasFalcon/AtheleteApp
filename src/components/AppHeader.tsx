@@ -2,27 +2,32 @@ import { ArrowLeft } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import {safeGoBack, type BackFallback} from '@app/navigation/safeGoBack';
 
 type AppHeaderProps = {
   title: string;
-  subtitle?: string;
   showBackButton?: boolean;
+  backFallbacks?: readonly BackFallback[];
+  onBack?: () => void;
 };
 
 export function AppHeader({
   title,
-  subtitle,
   showBackButton = false,
+  backFallbacks = [],
+  onBack,
 }: AppHeaderProps) {
   const navigation = useNavigation();
   const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
     container: {
-      gap: theme.spacing.xs,
+      minHeight: 40,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
     },
     backButton: {
-      alignSelf: 'flex-start',
       width: 40,
       height: 40,
       alignItems: 'center',
@@ -31,24 +36,26 @@ export function AppHeader({
       backgroundColor: theme.colors.surfaceMuted,
     },
     title: {
+      flex: 1,
       color: theme.colors.textPrimary,
       fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.title,
-      fontWeight: theme.typography.weights.bold,
+      fontSize: 18,
+      fontWeight: theme.typography.weights.semibold,
+      lineHeight: 22,
+      textAlign: showBackButton ? 'center' : 'left',
     },
-    subtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      lineHeight: 24,
+    spacer: {
+      width: 40,
     },
   });
 
   return (
     <View style={styles.container}>
-      {showBackButton && navigation.canGoBack() ? (
+      {showBackButton ? (
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() =>
+            onBack ? onBack() : safeGoBack(navigation, backFallbacks)
+          }
           style={styles.backButton}
         >
           <ArrowLeft
@@ -58,8 +65,10 @@ export function AppHeader({
           />
         </Pressable>
       ) : null}
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <Text numberOfLines={1} style={styles.title}>
+        {title}
+      </Text>
+      {showBackButton ? <View style={styles.spacer} /> : null}
     </View>
   );
 }

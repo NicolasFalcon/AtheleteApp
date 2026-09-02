@@ -74,6 +74,7 @@ export function HydrationProgressCard({
       hasData={hasData}
       emptyMessage="Sin registros de hidratación en este periodo."
       targetValue={goalGlasses}
+      chartHeightOverride={range === 'month' ? 112 : undefined}
       metrics={[
         {
           label: 'Objetivo',

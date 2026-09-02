@@ -4,6 +4,7 @@ import {ScreenContainer} from '@app/components';
 import {HOME_ROUTES} from '@app/constants/routes';
 import {QuizScoreSummaryCard} from '@app/features/quiz/components/QuizScoreSummaryCard';
 import {useAppTheme} from '@app/hooks/useAppTheme';
+import {safeGoBack} from '@app/navigation/safeGoBack';
 import type {HomeStackParamList} from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'QuizResult'>;
@@ -13,9 +14,8 @@ export function QuizResultScreen({navigation, route}: Props) {
 
   const styles = StyleSheet.create({
     content: {
-      paddingTop: theme.spacing.jumbo,
-      justifyContent: 'center',
-      gap: theme.spacing.lg,
+      paddingTop: theme.spacing.xs,
+      gap: theme.spacing.md,
     },
   });
 
@@ -23,6 +23,7 @@ export function QuizResultScreen({navigation, route}: Props) {
     <ScreenContainer scrollable contentContainerStyle={styles.content}>
       <QuizScoreSummaryCard
         categoryName={route.params.categoryName}
+        categoryIcon={route.params.categoryIcon}
         correctCount={route.params.correctCount}
         totalQuestions={route.params.totalQuestions}
         pointsEarned={route.params.pointsEarned}
@@ -36,7 +37,9 @@ export function QuizResultScreen({navigation, route}: Props) {
             categoryIcon: route.params.categoryIcon,
           })
         }
-        onGoBack={() => navigation.navigate(HOME_ROUTES.QuizLanding)}
+        onGoBack={() =>
+          safeGoBack(navigation, [HOME_ROUTES.QuizLanding, HOME_ROUTES.Home])
+        }
       />
     </ScreenContainer>
   );

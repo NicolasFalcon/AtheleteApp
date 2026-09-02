@@ -31,10 +31,17 @@ export function useQuizSubmit() {
 
   return useMutation({
     mutationFn: async (params: {
+      attemptId: string;
       categoryId: string;
       correctCount: number;
       totalQuestions: number;
       pointsEarned: number;
+      answers: Array<{
+        questionId: string;
+        selectedAnswer: number;
+        isCorrect: boolean;
+        pointsEarned: number;
+      }>;
     }) => {
       if (!profile?.id) {
         throw new Error('No hay una sesión activa.');

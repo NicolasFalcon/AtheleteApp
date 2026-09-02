@@ -278,11 +278,11 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
   if (recordsQuery.records.length === 0) {
     return (
       <ScreenContainer scrollable>
-        <AppHeader
-          showBackButton
-          title="Récords personales"
-          subtitle="Tu historial de marcas aparecerá aquí a medida que registres nuevos PRs."
-        />
+        <AppHeader showBackButton title="Récords personales" backFallbacks={[
+          HOME_ROUTES.Home,
+          PROGRESS_ROUTES.Progress,
+          WORKOUTS_ROUTES.Workouts,
+        ]} />
         <EmptyState
           title="Aún no tienes PRs registrados"
           description="Registra tu primera marca para empezar a seguir progreso por ejercicio, ver mejores marcas y consultar tu historial."
@@ -301,11 +301,11 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
 
     return (
       <ScreenContainer scrollable>
-        <AppHeader
-          showBackButton
-          title="Récords personales"
-          subtitle="Explora tus mejores marcas por ejercicio y sigue tu progreso más reciente."
-        />
+        <AppHeader showBackButton title="Récords personales" backFallbacks={[
+          HOME_ROUTES.Home,
+          PROGRESS_ROUTES.Progress,
+          WORKOUTS_ROUTES.Workouts,
+        ]} />
 
         <Card style={styles.summaryCard}>
           <View style={styles.summaryTopRow}>
@@ -371,11 +371,11 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
 
   return (
     <ScreenContainer scrollable>
-      <AppHeader
-        showBackButton
-        title="Récords personales"
-        subtitle={resolvedExerciseName}
-      />
+      <AppHeader showBackButton title="Récords personales" backFallbacks={[
+        HOME_ROUTES.Home,
+        PROGRESS_ROUTES.Progress,
+        WORKOUTS_ROUTES.Workouts,
+      ]} />
 
       {bestRecord ? (
         <Card style={styles.summaryCard}>

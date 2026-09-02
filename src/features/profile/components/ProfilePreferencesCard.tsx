@@ -1,4 +1,4 @@
-import { Bell, LogOut, Monitor, Moon, Sun } from 'lucide-react-native';
+import { Bell, Monitor, Moon, Sun } from 'lucide-react-native';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Card } from '@app/components/ui';
 import { useAppTheme } from '@app/hooks/useAppTheme';
@@ -15,7 +15,6 @@ type ProfilePreferencesCardProps = {
   onChangeMode: (mode: ThemePreference) => void;
   notifications: NotificationsState;
   onToggleNotifications: (patch: Partial<NotificationsState>) => void;
-  onSignOut: () => Promise<void> | void;
 };
 
 function NotificationRow({
@@ -86,7 +85,6 @@ export function ProfilePreferencesCard({
   onChangeMode,
   notifications,
   onToggleNotifications,
-  onSignOut,
 }: ProfilePreferencesCardProps) {
   const { theme } = useAppTheme();
 
@@ -151,29 +149,6 @@ export function ProfilePreferencesCard({
     },
     notificationsList: {
       gap: 8,
-    },
-    signOutRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      minHeight: 44,
-    },
-    signOutLabel: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
-      fontWeight: theme.typography.weights.medium,
-    },
-    signOutButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: '#F0CFCF',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surface,
     },
   });
 
@@ -259,20 +234,6 @@ export function ProfilePreferencesCard({
         </View>
       </View>
 
-      <View style={styles.divider} />
-
-      <View style={styles.signOutRow}>
-        <Text style={styles.signOutLabel}>Cerrar sesión</Text>
-        <Pressable
-          onPress={onSignOut}
-          style={({ pressed }) => [
-            styles.signOutButton,
-            pressed ? { opacity: 0.82 } : null,
-          ]}
-        >
-          <LogOut color="#D55C5C" size={16} strokeWidth={2} />
-        </Pressable>
-      </View>
     </Card>
   );
 }
