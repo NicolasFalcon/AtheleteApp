@@ -82,6 +82,25 @@ export function useIsInScene(): boolean {
   return useContext(SceneContext);
 }
 
+// Forces theme.v2 to light or dark inside a subtree without touching the
+// user preference (previews such as the dev catalog). Legacy keys unaffected.
+const ThemeV2ModeContext = createContext<ThemeMode | null>(null);
+
+export function ThemeV2ModeScope({
+  mode,
+  children,
+}: PropsWithChildren<{mode: ThemeMode}>) {
+  return (
+    <ThemeV2ModeContext.Provider value={mode}>
+      {children}
+    </ThemeV2ModeContext.Provider>
+  );
+}
+
+export function useForcedThemeV2Mode(): ThemeMode | null {
+  return useContext(ThemeV2ModeContext);
+}
+
 export function useThemeContext(): ThemeContextValue {
   const context = useContext(ThemeContext);
 

@@ -1,6 +1,5 @@
 import type { PropsWithChildren } from 'react';
 import { StyleSheet } from 'react-native';
-import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -10,12 +9,14 @@ import {
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@app/app/queryClient';
+import { ToastProvider } from '@app/components/v2/Toast';
+import { DevCatalogHost } from '@app/dev/DevCatalogHost';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { AuthProvider } from '@app/providers/AuthProvider';
 import { ThemeProvider } from '@app/providers/ThemeProvider';
 
-function AppNavigation({children}: PropsWithChildren) {
-  const {isDark, theme} = useAppTheme();
+function AppNavigation({ children }: PropsWithChildren) {
+  const { isDark, theme } = useAppTheme();
 
   const navigationTheme = {
     ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme),
@@ -32,13 +33,15 @@ function AppNavigation({children}: PropsWithChildren) {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      {/* v2 sheets render here, so they keep theme, auth and navigation context. */}
-      <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
+      <ToastProvider>
+        {children}
+        {__DEV__ ? <DevCatalogHost /> : null}
+      </ToastProvider>
     </NavigationContainer>
   );
 }
 
-export function AppProviders({children}: PropsWithChildren) {
+export function AppProviders({ children }: PropsWithChildren) {
   return (
     <GestureHandlerRootView style={styles.container}>
       <SafeAreaProvider>

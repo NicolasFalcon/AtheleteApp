@@ -1,7 +1,11 @@
 import type { ViewStyle } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { useAppTheme } from '../src/hooks/useAppTheme';
-import { SceneScope, ThemeProvider } from '../src/providers/ThemeProvider';
+import {
+  SceneScope,
+  ThemeProvider,
+  ThemeV2ModeScope,
+} from '../src/providers/ThemeProvider';
 import { createTheme } from '../src/theme/theme';
 import {
   createThemeV2,
@@ -225,5 +229,33 @@ describe('theme v2 · scenes', () => {
     expect(seen.outside.colors).toBe(lightColorsV2);
     expect(seen.inside.mode).toBe('scene');
     expect(seen.inside.colors).toBe(sceneColorsV2);
+  });
+
+  it('forces theme.v2 mode with ThemeV2ModeScope, keeping the legacy theme', async () => {
+    const seen: Record<string, ReturnType<typeof useAppTheme>['theme']> = {};
+
+    function Probe({ id }: { id: string }) {
+      seen[id] = useAppTheme().theme;
+      return null;
+    }
+
+    await ReactTestRenderer.act(async () => {
+      ReactTestRenderer.create(
+        <ThemeProvider>
+          <ThemeV2ModeScope mode="dark">
+            <Probe id="dark" />
+            <SceneScope>
+              <Probe id="darkScene" />
+            </SceneScope>
+          </ThemeV2ModeScope>
+        </ThemeProvider>,
+      );
+    });
+
+    expect(seen.dark.v2.mode).toBe('dark');
+    expect(seen.dark.v2.colors).toBe(darkColorsV2);
+    expect(seen.dark.colors).toEqual(createTheme('light').colors);
+    expect(seen.darkScene.v2.mode).toBe('scene');
+    expect(seen.darkScene.v2.colors).toBe(sceneColorsV2);
   });
 });

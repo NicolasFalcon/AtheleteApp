@@ -7,6 +7,8 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 
 ---
 
+> **Fase 2 (2026-09-30)**: resumen en 2 minutos, decisiones asumidas, problemas y commits propuestos en **§11**.
+
 ## 0. Estado por fase
 
 | Fase | Estado | Cierre |
@@ -14,7 +16,7 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 | 0 · Auditoría | ✅ Cerrada | 2026-09-30 |
 | 0.5 · Prerrequisitos y bugs | ✅ Cerrada (bugs B1/B2 pendientes de backend, §8.2; dependencias movidas a la fase 2) | 2026-09-30 |
 | 1 · Tokens | ✅ Cerrada (iOS; Android pendiente, §8.1) | 2026-09-30 |
-| 2 · Primitivas (incluye instalar las 4 dependencias) | ⏳ | — |
+| 2 · Primitivas (incluye instalar las 4 dependencias) | 🟡 Hecha en iOS, pendiente de revisión y commits (ver §11) | — |
 | 3 · Pilotos (Ajustes, Inicio, Detalle de rutina, Progreso, hoja Registrar récord) | ⏳ | — |
 | 4 · Navegación final | ⏳ | — |
 | 5 · Restyling por módulo | ⏳ | — |
@@ -318,6 +320,8 @@ Criterio: los valores exactos salen de los HTML; cada fila es una desviación do
 | D-30 | Plataforma | `mask-image` (22 usos) | degradados superpuestos | Decisión del usuario |
 | D-31 | Plataforma | `text-wrap: balance/pretty` | Android `textBreakStrategy="balanced"`; iOS sin equivalente | Adaptación |
 | D-32 | Plataforma | iconos SVG | `lucide-react-native`, trazo 2 | Decisión del usuario |
+| D-33 | Profile:switch (y cualquier escena) | Interruptor encendido con pomo blanco siempre (en Dark: blanco sobre marfil; en escena: blanco sobre blanco) | Pomo con el color de contenido invertido al encenderse: blanco sobre negro (Light), `#121212` sobre marfil (Dark) y sobre blanco (escena). Apagado: pomo blanco | Decisión del usuario (contraste); criterio "Selected: relleno con contenido invertido" (handoff §13) |
+| D-34 | Progress (Semana/Mes) | Segmented compacto: indicador blanco con sombra sobre pista muted | Mismo criterio que el Segmented grande en todos los modos: indicador `cta.primary` con texto `cta.primaryText`; `compact` solo cambia tamaño (30 pt) y tipo | Decisión del usuario (contraste en Dark/escena) |
 
 Nota: en QuizDark, la ronda y el resultado son escenas oscuras en ambos modos; esas líneas deben ser idénticas a `Quiz.dc.html`.
 
@@ -592,6 +596,7 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 | 5 · Borrar `PlaceholderScreen` | ✅ | ⏳ Pendiente |
 | Fase 1 · Tokens v2 | ✅ (0 píxeles de diferencia en 5 tabs × Light/Dark) | ⏳ Pendiente |
 | Fase 2 · Dependencias | ✅ `pod install` + build + arranque | ⏳ Pendiente (ver §8.3) |
+| Fase 2 · Primitivas y catálogo | ✅ (catálogo revisado en Light/Dark/Escena; P1 abierto) | ⏳ Pendiente (ver §11.5) |
 
 ### 8.3 Android · a revisar (sin compilar todavía)
 
@@ -613,6 +618,110 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 
 ---
 
+## 11. Fase 2 · Primitivas — resumen para leer en 2 minutos (2026-09-30)
+
+Trabajo autónomo. **Sin commits**: ver §11.6 para hacerlos en orden.
+
+### 11.1 Qué quedó hecho
+
+- **Bloque A (dependencias)**: commit ya hecho por el usuario (`ec5f041`). Reanimated 4.6.0 + worklets 0.12.2, `@gorhom/bottom-sheet` 5.2.14, `react-native-haptic-feedback` 3.0.0, `@react-native-community/blur` 4.4.1.
+- **Primitivas v2** en `src/components/v2/` (solo `theme.v2.*`, responden a Light, Dark y `SceneScope`; toda superficie tocable escala a .97):
+
+| Primitiva | Archivo | Notas |
+|---|---|---|
+| `TextV2`, `Eyebrow` | `TextV2.tsx` | `variant` = `theme.v2.type.*`; `tone` primary/secondary/tertiary/bodySoft/disabled/ember/recovery/inverse |
+| `Button` | `Button.tsx` | primary · secondary · outline · text · commit (Ember) · onScene; lg 56 / md 48 / sm 32; `loading` (etiqueta, sin spinner), `success` (check Ember + texto), `disabled` |
+| `IconButton`, `BackButton` | `IconButton.tsx` | muted · glass (blur real en iOS) · solid; 44/36; `badge` Ember |
+| `Row` | `Row.tsx` | fila plana 56/64 con divisor 1 pt, `value`, `trailing="chevron"`, `destructive` |
+| `SectionHeader` | `SectionHeader.tsx` | título 20/600 o eyebrow, acción "Todo ›" |
+| `Segmented` | `Segmented.tsx` | indicador deslizante con muelle (~320 ms), `badge`, variante `compact` (D-34) |
+| `SwitchV2` | `Switch.tsx` | 51×31 del prototipo |
+| `Sheet` | `Sheet.tsx` | `Modal` + Reanimated + gesture-handler (P1 resuelto) |
+| `ToastProvider` / `useToast()` | `Toast.tsx` | píldora 44 con check Ember, 2,2 s; `withTabBar` → 104 pt (D-27) |
+| `Skeleton`, `SkeletonGroup` | `Skeleton.tsx` | pulso 1,4 s / .45 compartido |
+| `Scrim` | `Scrim.tsx` | recetas `bottom` y `hero` |
+| `GlassSurface`, `GlassHeader` | `GlassSurface.tsx`, `GlassHeader.tsx` | blur iOS; Android relleno al .96 |
+| `MetricTrio` | `MetricTrio.tsx` | tres columnas con divisores 1 pt, `source: 'health'` |
+| `HealthTag` | `HealthTag.tsx` | ♡ Salud 10 pt + 11/500 |
+| `Rings` | `Rings.tsx` | 3 anillos SVG animados (geometría 64/49/34 a 156 pt) |
+| `HexMedal` | `HexMedal.tsx` | conseguida / bloqueada con anillo de progreso Ember |
+| `EllieOrb`, `EllieSurface` | `EllieOrb.tsx`, `EllieSurface.tsx` | respira 3,2 s; pensando 1,2 s; offline sin halo y desaturada; banda de lino |
+| helpers | `PressableScale.tsx`, `haptics.ts`, `useThemeV2.ts`, `index.ts` | |
+
+- **Ajustes tras la revisión (2026-09-30)**:
+  - `StatusBarV2` (`StatusBarV2.tsx`): `style="auto"` pone contenido claro en Dark y dentro de cualquier `SceneScope`, oscuro en Light; `"light"` para heros fotográficos fuera de escena. Se monta una vez por pantalla (pila de `StatusBar` de React Native: el último montado gana y el anterior se restaura al desmontar). Android: `translucent` + fondo transparente.
+  - `Segmented` compacto unificado con el grande (D-34).
+  - `MetricTrio`: la primera columna sin padding izquierdo y la última sin derecho, alineadas con el margen de 20.
+  - `SwitchV2` con pomo invertido (D-33).
+  - Catálogo: foto `images/esfuerzo.jpg` del paquete con el tratamiento del hero horneado (`saturate(.4) contrast(1.08) brightness(.7)`) en `src/assets/v2/photos/esfuerzo.jpg` (PLACEHOLDER).
+  - Verificado en el catálogo en Light, Dark y Escena.
+- `ThemeV2ModeScope` (en `ThemeProvider.tsx`) + `useAppTheme` actualizado: fuerza `theme.v2` a Light/Dark en un subárbol sin tocar la preferencia del usuario ni el tema antiguo. Test añadido (lógica real).
+- `AppProviders.tsx`: `BottomSheetModalProvider` (bloque A), `ToastProvider` y, solo en `__DEV__`, `DevCatalogHost`.
+- **Catálogo de desarrollo**: `src/dev/V2CatalogScreen.tsx` + `src/dev/DevCatalogHost.tsx`.
+- Verificación: `tsc`, lint y `jest` (49/49) en verde. Revisión visual del catálogo en Light, Dark y Escena: correcta salvo P1 y los detalles de §11.3.
+
+### 11.2 Decisiones asumidas (revisar)
+
+| # | Decisión |
+|---|---|
+| DA-01 | Nombres `TextV2` y `SwitchV2` para no chocar con `Text`/`Switch` de React Native; el resto sin sufijo dentro de `components/v2` |
+| DA-02 | En `SceneScope` la CTA primaria ya es blanca; se mantiene además `variant="onScene"` para CTA sobre foto fuera de escena |
+| DA-03 | CTA secundaria dentro de escena: vidrio `glass.onPhoto` (translúcida), por la regla de "tinte translúcido en oscuro" |
+| DA-04 | ~~Pomo blanco siempre~~ → **sustituida por D-33** (pomo invertido al encender) |
+| DA-05 | ~~Indicador `surface.raised` en el compacto~~ → **sustituida por D-34** (mismo criterio que el grande) |
+| DA-06 | Háptica solo en Segmented e interruptor (`selection`); `Button` la activa con `haptic` |
+| DA-07 | `loading` = etiqueta + "…" y opacidad .7, sin spinner (handoff §5) |
+| DA-08 | `BackButton` exige `onPress` (no llama a `navigation.goBack` por su cuenta) para no depender del contexto de navegación |
+| DA-09 | Medalla conseguida: relleno `#2E2B28`, borde Ember 1,5 pt e icono blanco; bloqueada: relleno muted, icono terciario y anillo Ember de progreso |
+| DA-10 | Paradas del degradado de la esfera aproximadas desde §3.4; offline = grises desaturados |
+| DA-11 | Toast con `cta.primary` (negro en Light, marfil en Dark), como el prototipo |
+| DA-12 | El catálogo usa un selector global Light/Dark/Escena en lugar de tres columnas (a 393 pt no caben) |
+| DA-13 | ~~Hojas en portal con tema global~~ → **resuelto**: `Sheet` usa `Modal` de React Native y conserva el contexto (tema, escena, auth, navegación). El toast sigue en `ToastProvider` global |
+| DA-14 | `GlassHeader` de 52 pt + safe area; título `cta` (17/600) |
+| DA-15 | Skeleton dentro de escena: `border.onDarkStrong` (trazos discretos) |
+
+### 11.3 Problemas y bloqueos
+
+| # | Problema | Estado |
+|---|---|---|
+| P1 | **`Sheet` no se presentaba** | ✅ **Resuelto (2026-09-30)**. Diagnóstico: raíz envuelta en `GestureHandlerRootView` (correcto); `@gorhom/bottom-sheet` 5.2.14 es la última 5.x y declara compatibilidad con Reanimated ≥ 4. Con altura fija (`snapPoints`) también fallaba, así que no era la medición dinámica; el fallo estaba en el montaje por portal (`@gorhom/portal`): intermitente (una vez abrió con logs de depuración, lo que apunta a una condición de carrera) en React 19.2 + RN 0.85 Fabric + Reanimated 4.6. **Solución**: `Sheet` reescrita sobre `Modal` de React Native + Reanimated (subida 380 ms `easing.sheet`) + gesture-handler (arrastrar para cerrar), `KeyboardAvoidingView`, cierre con fondo, ✕ o back de Android (`onRequestClose`). Se quitó `BottomSheetModalProvider` de `AppProviders`. Verificado: abrir, cerrar con ✕, reabrir, cerrar tocando el fondo y volver a abrir (11/11). `@gorhom/bottom-sheet` queda instalado pero sin uso (ver §9) |
+| P2 | **`AppDelegate.swift` no reenviaba URLs** | ✅ **Resuelto**. Añadidos `application(_:open:options:)` y `application(_:continue:restorationHandler:)` → `RCTLinkingManager`. Verificado con `xcrun simctl openurl booted athelete://dev/catalog` con la app abierta. Universal links: preparado, pero inactivo hasta tener el entitlement Associated Domains. Debería arreglar también el enlace de recuperación de contraseña con la app abierta (no probado) |
+| P3 | Maestro `scrollUntilVisible` falla dentro del catálogo | Abierto (solo herramienta; se usan swipes fijos) |
+| P4 | Barra de estado oscura sobre fondo oscuro en Dark/escena | ✅ **Resuelto** con `StatusBarV2` (reutilizable, ver §11.1) |
+| P5 | Interruptor en escena blanco sobre blanco | ✅ **Resuelto** (D-33) |
+| P6 | En el catálogo la `EllieSurface` no llega a sangre | Abierto (layout del catálogo, no de la primitiva) |
+
+### 11.4 Cómo abrir el catálogo
+
+- **Menú de desarrollo** de React Native (⌘D en el simulador) → **"Catálogo v2"**.
+- O con `xcrun simctl openurl booted athelete://dev/catalog` (app abierta o cerrada) y aceptar "Open".
+- Arriba: selector Light / Dark / Escena. Botón ✕ o "Cerrar catálogo" para salir.
+- Solo existe en `__DEV__`; no toca navegación ni pantallas.
+
+### 11.5 Pendientes de Android
+
+Además de §8.3: blur de `IconButton` glass y `GlassSurface` → relleno sólido al .96 (ya implementado por `Platform.OS`, sin probar); `boxShadow` en botones Ember, toast, segmented compacto y medallas; animaciones de Reanimated (Segmented, Switch, Rings, EllieOrb, Skeleton, Toast); `@gorhom/bottom-sheet` (además de P1); háptica `selection`; tipografía Roboto tabular en `TextV2`; menú de desarrollo y URL del catálogo. Nuevos: `Sheet` sobre `Modal` (`statusBarTranslucent`, back con `onRequestClose`, teclado sin `KeyboardAvoidingView` en Android); `StatusBarV2` (`translucent`, fondo transparente, iconos claros/oscuros); interruptor con pomo animado.
+
+### 11.6 Commits propuestos (en este orden)
+
+Revisado el 2026-09-30: como la fase 2 aún no estaba commiteada, los arreglos de P1, D-33 y del punto 5 van en commits propios donde el archivo es nuevo (`Sheet.tsx`, `Switch.tsx`, `StatusBarV2.tsx`, `AppDelegate.swift`). `Segmented.tsx` y `MetricTrio.tsx` entran ya corregidos en su primer commit. Por sus imports, cada commit solo depende de los anteriores (`tsc` del conjunto final en verde; no se compiló cada commit por separado).
+
+| # | Mensaje | Archivos |
+|---|---|---|
+| 1 | `feat(ui): add v2 base primitives (text, buttons, rows, segmented)` | `src/components/v2/{haptics.ts,useThemeV2.ts,PressableScale.tsx,TextV2.tsx,Button.tsx,IconButton.tsx,Row.tsx,SectionHeader.tsx,Segmented.tsx}` |
+| 2 | `feat(ui): add v2 surfaces (toast, skeleton, scrim, glass header, metrics)` | `src/components/v2/{HealthTag.tsx,MetricTrio.tsx,Scrim.tsx,Skeleton.tsx,GlassSurface.tsx,GlassHeader.tsx,Toast.tsx}` |
+| 3 | `feat(ui): add v2 identity primitives (rings, medal, ELLIE orb and surface)` | `src/components/v2/{Rings.tsx,HexMedal.tsx,EllieOrb.tsx,EllieSurface.tsx}` |
+| 4 | `feat(ui): add v2 Sheet on React Native Modal` (P1) | `src/components/v2/Sheet.tsx` |
+| 5 | `feat(ui): add v2 switch with contrasting knob (D-33)` | `src/components/v2/Switch.tsx` |
+| 6 | `feat(ui): add StatusBarV2 and v2 components index` | `src/components/v2/StatusBarV2.tsx`, `src/components/v2/index.ts` |
+| 7 | `feat(dev): add v2 primitives catalog and ThemeV2ModeScope` | `src/dev/V2CatalogScreen.tsx`, `src/dev/DevCatalogHost.tsx`, `src/assets/v2/photos/esfuerzo.jpg`, `src/app/AppProviders.tsx`, `src/providers/ThemeProvider.tsx`, `src/hooks/useAppTheme.ts`, `__tests__/themeV2.test.tsx` |
+| 8 | `fix(ios): forward URLs and universal links to React Native Linking` (P2) | `ios/Athelete/AppDelegate.swift` |
+| 9 | `docs: phase 2 primitives summary` | `docs/migration/MIGRATION_PROGRESS.md` |
+
+Todos con `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+
+---
+
 ## 9. Pendiente de decisión
 
 | Tema | Detalle |
@@ -622,6 +731,7 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 | Hidratación (tarjetas propias) | v2 la absorbe en Tu día y Nutrición |
 | RecoveryGuidance | Card de Inicio que abre ELLIE |
 | Premium | Solo flag `is_premium` (siempre `false`); sin UI |
+| `@gorhom/bottom-sheet` | Sin uso tras P1. Propuesta: `npm uninstall @gorhom/bottom-sheet` (solo JS, sin pods) |
 
 ---
 
