@@ -13,7 +13,7 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 |---|---|---|
 | 0 · Auditoría | ✅ Cerrada | 2026-09-30 |
 | 0.5 · Prerrequisitos y bugs | ✅ Cerrada (bugs B1/B2 pendientes de backend, §8.2; dependencias movidas a la fase 2) | 2026-09-30 |
-| 1 · Tokens | 🟡 En planificación | — |
+| 1 · Tokens | ✅ Cerrada (iOS; Android pendiente, §8.1) | 2026-09-30 |
 | 2 · Primitivas (incluye instalar las 4 dependencias) | ⏳ | — |
 | 3 · Pilotos (Ajustes, Inicio, Detalle de rutina, Progreso, hoja Registrar récord) | ⏳ | — |
 | 4 · Navegación final | ⏳ | — |
@@ -325,6 +325,22 @@ Nota: en QuizDark, la ronda y el resultado son escenas oscuras en ambos modos; e
 
 ## 7. Tokens para la fase 1
 
+**Implementado en la fase 1** (`src/theme/v2/`, expuesto como `theme.v2` vía `useAppTheme()`; las claves antiguas `theme.colors/spacing/radii/typography/elevations` no cambian):
+
+| Sección | Código | Acceso |
+|---|---|---|
+| 7.1 Color | `palette.ts` (valores crudos con D-xx), `colors.ts` | `theme.v2.colors` (light/dark) |
+| Escenas (handoff §4) | `scene.ts`; `SceneScope` en `providers/ThemeProvider.tsx` | `theme.v2.scene`; dentro de `<SceneScope>` → `theme.v2.mode === 'scene'` y `theme.v2.colors = sceneColorsV2` |
+| 7.2 Tipografía | `typography.ts` (sin `fontFamily` → SF Pro / Roboto; `fontVariant: ['tabular-nums']`) | `theme.v2.type.*` |
+| 7.3 Espaciado | `spacing.ts` | `theme.v2.space.s2…s36`, `theme.v2.layout.*` |
+| 7.4 Radios | `radii.ts` | `theme.v2.radius.*` |
+| 7.5 Sombras | `shadows.ts` (strings `boxShadow`) | `theme.v2.shadow.*`, `ringV2()` |
+| 7.6 Blur | `blur.ts` | `theme.v2.blur.*` |
+| 7.7 / §5.1 Movimiento | `motion.ts` | `theme.v2.motion.*`, `theme.v2.easing.*` |
+
+Tests: `__tests__/themeV2.test.tsx` (paridad light/dark, tema antiguo congelado, contrastes WCAG, escenas, tipografía tabular sin `fontFamily`, sombras válidas).
+
+
 ### 7.1 Color (Light / Dark)
 
 **Fondos y superficies**
@@ -574,6 +590,7 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 |---|---|---|
 | 1 · Seguimiento + `.gitignore` | n/a (sin código) | n/a |
 | 5 · Borrar `PlaceholderScreen` | ✅ | ⏳ Pendiente |
+| Fase 1 · Tokens v2 | ✅ (0 píxeles de diferencia en 5 tabs × Light/Dark) | ⏳ Pendiente |
 
 ### 8.2 Pendiente backend
 
@@ -619,3 +636,8 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 - B1/B2 y tipos de Supabase: pendientes de backend (§8.2).
 - `PlaceholderScreen` eliminado (`5664fdd`).
 - Dependencias movidas al inicio de la fase 2.
+
+### 2026-09-30 · Fase 1 · Tokens v2
+- Commits: `8cebf32` colores, `1858342` escenas, `ca77c85` tipografía/espaciado/radios, `8226341` sombras/blur/movimiento.
+- Verificación: `tsc`, `jest` (48/48) y lint en verde. Capturas de las 5 tabs en Light y Dark antes y después: 0 píxeles de diferencia fuera de la barra de estado; el bundle servido incluye los tokens nuevos.
+- Android: pendiente.
