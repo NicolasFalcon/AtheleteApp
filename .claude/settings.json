@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./migration-source/*.md)",
+      "Read(./migration-source/packages/**)",
+      "Read(./migration-source/webApp/**)"
+    ]
+  }
+}

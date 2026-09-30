@@ -76,3 +76,7 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# ATHELETE v2 design handoff (local reference only)
+migration-source/ATHELETE Alive Minimalism/
+.claude/settings.local.json
