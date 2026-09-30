@@ -1,4 +1,5 @@
 import { elevations, radii, spacing, typography } from '@app/theme/tokens';
+import { createThemeV2, type ThemeV2 } from '@app/theme/v2';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -22,6 +23,9 @@ export type AppTheme = {
   radii: typeof radii;
   typography: typeof typography;
   elevations: typeof elevations;
+  // ATHELETE v2 · Alive Minimalism tokens. The keys above stay until every
+  // screen is migrated (docs/migration/MIGRATION_PROGRESS.md).
+  v2: ThemeV2;
 };
 
 const lightColors: ThemeColors = {
@@ -58,5 +62,6 @@ export function createTheme(mode: ThemeMode): AppTheme {
     radii,
     typography,
     elevations,
+    v2: createThemeV2(mode),
   };
 }
