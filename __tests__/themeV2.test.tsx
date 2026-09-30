@@ -1,3 +1,4 @@
+import type { ViewStyle } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { useAppTheme } from '../src/hooks/useAppTheme';
 import { SceneScope, ThemeProvider } from '../src/providers/ThemeProvider';
@@ -5,8 +6,11 @@ import { createTheme } from '../src/theme/theme';
 import {
   createThemeV2,
   darkColorsV2,
+  darkShadowsV2,
   em,
   lightColorsV2,
+  lightShadowsV2,
+  ringV2,
   sceneColorsV2,
   sceneTokens,
   toSceneThemeV2,
@@ -152,6 +156,33 @@ describe('theme v2 · typography, spacing and radii', () => {
     expect(radius.tabBar).toBe(34);
     expect(radius.card).toBe(24);
     expect(space.s14).toBe(14);
+  });
+});
+
+describe('theme v2 · shadows, blur and motion', () => {
+  it('defines every shadow in both modes as a valid boxShadow value', () => {
+    expect(Object.keys(darkShadowsV2).sort()).toEqual(
+      Object.keys(lightShadowsV2).sort(),
+    );
+
+    const style: ViewStyle = { boxShadow: lightShadowsV2.subtle };
+    expect(style.boxShadow).toContain('rgba');
+    expect(ringV2('#FF5B1F')).toBe('0 0 0 2px #FF5B1F');
+  });
+
+  it('uses dark elevation inside scenes', () => {
+    expect(toSceneThemeV2(createThemeV2('light')).shadow).toBe(darkShadowsV2);
+  });
+
+  it('keeps the prototype motion values', () => {
+    const { blur, motion, easing } = createThemeV2('light');
+
+    expect(motion.pressScale).toBe(0.97);
+    expect(motion.navigation.duration).toBe(360);
+    expect(motion.skeleton.duration).toBe(1400);
+    expect(easing.navigation).toEqual([0.2, 0.8, 0.2, 1]);
+    expect(blur.glass).toBe(20);
+    expect(blur.tabBar).toBe(24);
   });
 });
 
