@@ -12,9 +12,9 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 | Fase | Estado | Cierre |
 |---|---|---|
 | 0 · Auditoría | ✅ Cerrada | 2026-09-30 |
-| 0.5 · Prerrequisitos, bugs y dependencias | 🟡 En curso (verificación iOS; Android pendiente, ver §8.1) | — |
-| 1 · Tokens | ⏳ | — |
-| 2 · Primitivas | ⏳ | — |
+| 0.5 · Prerrequisitos y bugs | ✅ Cerrada (bugs B1/B2 pendientes de backend, §8.2; dependencias movidas a la fase 2) | 2026-09-30 |
+| 1 · Tokens | 🟡 En planificación | — |
+| 2 · Primitivas (incluye instalar las 4 dependencias) | ⏳ | — |
 | 3 · Pilotos (Ajustes, Inicio, Detalle de rutina, Progreso, hoja Registrar récord) | ⏳ | — |
 | 4 · Navegación final | ⏳ | — |
 | 5 · Restyling por módulo | ⏳ | — |
@@ -512,7 +512,7 @@ Pulsación .97 y las curvas/duraciones de §5.1.
 
 ---
 
-## 8. Plan de la fase 0.5 (en curso)
+## 8. Fase 0.5 (cerrada)
 
 Cada paso termina con `npx tsc --noEmit`, `npm test`, `npm run lint` y build de iOS en el simulador iPhone 17 (iOS 26.2). Android queda pendiente por paso (§8.1).
 
@@ -542,49 +542,45 @@ Cada paso termina con `npx tsc --noEmit`, `npm test`, `npm run lint` y build de 
 | B4 · "Ver todos" en Logros | Probar a mano | Código correcto (`BadgeGridCard` → `PROFILE_ROUTES.Achievements`) |
 | B5 · "Cerrar sesión" | Probar a mano | `ProfileScreen.tsx:370` sin `catch`: si falla, el error se pierde |
 
-Resultado de cada uno (confirmado / no reproducido + evidencia) → este documento.
+Resultado (2026-09-30, iPhone 17 · iOS 26.2, cuenta de desarrollo):
 
-### Paso 3 · Corregir solo los confirmados (un commit cada uno)
-
-- B1: en `saveEllieNutritionPlan`, usar `awardGamificationEventBestEffort` (`gamification.ts:96`) y comprobar el error del `update` previo.
-- Si la causa es el backend: no se toca la base de datos; se propone la migración.
-- B5: `try/catch` con `Alert.alert`.
-- B3/B4: solo si se reproducen a mano.
-
-### Paso 4 · Tipos de Supabase
-
-- `npx supabase gen types typescript --project-id <ref de SUPABASE_URL> > src/types/supabase.ts`.
-- Corregir solo errores de compilación nuevos; los `as any` se quedan. Un commit.
-
-### Paso 5 · Código muerto
-
-- Borrar `src/screens/common/PlaceholderScreen.tsx` (sin imports). Un commit.
-
-### Paso 6 · Dependencias (una por commit; `pod install` + iOS + Android entre cada una)
-
-| Orden | Paquete | Notas |
+| Bug | Resultado | Evidencia y causa |
 |---|---|---|
-| 1 | `react-native-reanimated@4.6.x` + `react-native-worklets@0.12.x` | 4.7 exige RN ≥ 0.86; 4.6 cubre 0.83–0.87. Plugin `react-native-worklets/plugin` al final de `babel.config.js`; `start --reset-cache` |
-| 2 | `@gorhom/bottom-sheet@5` | Requiere Reanimated y gesture-handler ≥ 2.16.1 (hay 2.31). Raíz en `GestureHandlerRootView` |
-| 3 | `react-native-haptic-feedback@3` | Turbo module; RN ≥ 0.71 |
-| 4 | `@react-native-community/blur@4.4` | Verificar Fabric en ambas plataformas; alternativa sólida en Android (D-28) |
+| B1 · Activar plan | ✅ **Confirmado** | La app muestra "No pudimos activar el plan nutricional.", pero el plan **sí se guarda** (fila `49e0f1e2…`, `is_active: true`, source `ellie`). Falla después la RPC `award_gamification_event` con **Postgres `42P10`**: *"there is no unique or exclusion constraint matching the ON CONFLICT specification"*. El `PostgrestError` no es `instanceof Error` y cae al mensaje genérico (`ellie-actions.ts:159-166`) |
+| B2 · Aviso tras el Quiz | ✅ **Confirmado** | `console.warn`: `[quiz-submit] El intento se guardó, pero la recompensa quedó pendiente.` con el mismo `42P10`. El intento se guarda; los puntos y badges no se otorgan. **Misma causa raíz que B1** (backend) |
+| B3 · Pestañas de WorkoutDetail | ❌ No reproducido | Las tres pestañas cambian al tocarlas. En la auditoría previa Maestro, al buscar "Ejercicios" por texto, tocaba la etiqueta de métrica "EJERCICIOS" |
+| B4 · "Ver todos" en Logros | ❌ No reproducido | Navega a Logros (5/12 badges) |
+| B5 · Cerrar sesión | ❌ No reproducido | Vuelve a Login |
 
-### Paso 7 · Cierre
+Consecuencia: la RPC de gamificación falla en quiz y nutrición (comprobado); como todos los eventos usan la misma RPC, lo previsible es que también fallen entrenos, Core 33 y récords (sin comprobar). La definición SQL no está en el repo; leerla requiere `supabase login`. No se ha tocado la base de datos.
 
-- Actualizar este documento: fase 0.5 cerrada, resultado de bugs, commits, estado de Android.
+Método: Maestro 2.10 (JDK portátil) sobre el simulador; los avisos de JS se leen por el inspector de Hermes (CDP), porque Metro 0.84 no los imprime en la terminal. Las credenciales solo se usaron en tiempo de ejecución.
+
+### Pasos 3–7 · Resolución (cambio de prioridad del usuario, 2026-09-30)
+
+| Paso | Resultado |
+|---|---|
+| 3 · Correcciones B1/B2 | ⏸ **Pendiente backend.** No se corrige ni en la app ni en la base de datos. Causa raíz documentada arriba (RPC `award_gamification_event`, Postgres `42P10`). Queda para la fase de backend: leer la definición SQL, añadir la restricción única que el `ON CONFLICT` necesita (o corregir el `ON CONFLICT`) y, en la app, hacer que un fallo de recompensa no invalide un plan ya guardado (`awardGamificationEventBestEffort`, `gamification.ts:96`) |
+| 4 · Tipos de Supabase | ⏸ **Pendiente backend** (requiere `supabase login`; ref `eqbabbaxfwqfhbtrraoz`) |
+| 5 · Borrar `PlaceholderScreen` | ✅ Commit `5664fdd chore: remove unused PlaceholderScreen`. `tsc`, `jest` (34/34) y lint en verde; iOS arranca y navega las 5 tabs |
+| 6 · Dependencias | ↪ **Movidas al inicio de la fase 2**, cuando se usen. Orden y versiones se mantienen: Reanimated 4.6.x + worklets 0.12.x (4.7 exige RN ≥ 0.86) → `@gorhom/bottom-sheet@5` → `react-native-haptic-feedback@3` → `@react-native-community/blur@4.4` |
+| 7 · Cierre | ✅ Este documento |
+
+Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración visual, cada una en su propia rama.
 
 ### 8.1 Verificación Android pendiente
 
 | Paso | iOS | Android |
 |---|---|---|
 | 1 · Seguimiento + `.gitignore` | n/a (sin código) | n/a |
-| 3 · Correcciones de bugs | ⏳ | ⏳ Pendiente |
-| 4 · Tipos de Supabase | ⏳ | ⏳ Pendiente |
-| 5 · Borrar `PlaceholderScreen` | ⏳ | ⏳ Pendiente |
-| 6.1 · Reanimated + worklets | ⏳ | ⏳ Pendiente |
-| 6.2 · Bottom sheet | ⏳ | ⏳ Pendiente |
-| 6.3 · Haptics | ⏳ | ⏳ Pendiente |
-| 6.4 · Blur | ⏳ | ⏳ Pendiente |
+| 5 · Borrar `PlaceholderScreen` | ✅ | ⏳ Pendiente |
+
+### 8.2 Pendiente backend
+
+| ID | Tema | Detalle |
+|---|---|---|
+| BK-01 | RPC `award_gamification_event` falla (`42P10`) | Afecta a quiz y nutrición (comprobado) y previsiblemente al resto de eventos. Puntos y badges no se otorgan. Incluye el arreglo de B1 en la app |
+| BK-02 | Tipos de Supabase desactualizados | Faltan `personal_records`, `chat_messages`, `quiz_*`, `user_badges` |
 
 ---
 
@@ -617,3 +613,9 @@ Resultado de cada uno (confirmado / no reproducido + evidencia) → este documen
 - Documento movido a `docs/migration/` y versionado.
 - `.gitignore`: carpeta del handoff y `.claude/settings.local.json`. `.claude/settings.json` versionado.
 - Commit `chore: migration tracking + gitignore handoff`.
+
+### 2026-09-30 · Cierre de la fase 0.5
+- Bugs reproducidos: B1 y B2 confirmados (misma causa backend, `42P10`); B3, B4 y B5 no reproducidos.
+- B1/B2 y tipos de Supabase: pendientes de backend (§8.2).
+- `PlaceholderScreen` eliminado (`5664fdd`).
+- Dependencias movidas al inicio de la fase 2.
