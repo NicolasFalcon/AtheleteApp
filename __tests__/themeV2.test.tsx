@@ -1,5 +1,21 @@
+import ReactTestRenderer from 'react-test-renderer';
+import { useAppTheme } from '../src/hooks/useAppTheme';
+import { SceneScope, ThemeProvider } from '../src/providers/ThemeProvider';
 import { createTheme } from '../src/theme/theme';
-import { createThemeV2, darkColorsV2, lightColorsV2 } from '../src/theme/v2';
+import {
+  createThemeV2,
+  darkColorsV2,
+  lightColorsV2,
+  sceneColorsV2,
+  sceneTokens,
+  toSceneThemeV2,
+  type ThemeV2,
+} from '../src/theme/v2';
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(() => Promise.resolve(null)),
+  setItem: jest.fn(() => Promise.resolve()),
+}));
 
 function keyPaths(value: unknown, prefix = ''): string[] {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -106,5 +122,47 @@ describe('theme v2 · colors', () => {
         contrast(darkColorsV2.ellie.textSecondary, linen),
       ).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+describe('theme v2 · scenes', () => {
+  it('uses the same scene tokens in light and dark', () => {
+    expect(createThemeV2('light').scene).toBe(createThemeV2('dark').scene);
+    expect(toSceneThemeV2(createThemeV2('light')).colors).toBe(
+      toSceneThemeV2(createThemeV2('dark')).colors,
+    );
+  });
+
+  it('keeps text on scenes readable and the primary CTA white', () => {
+    for (const text of Object.values(sceneTokens.onDark)) {
+      expect(contrast(text, sceneTokens.plate)).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(sceneColorsV2.cta.primary).toBe('#FFFFFF');
+    expect(sceneColorsV2.cta.primaryText).toBe('#121212');
+  });
+
+  it('switches useAppTheme to scene colours only inside SceneScope', async () => {
+    const seen: Record<string, ThemeV2> = {};
+
+    function Probe({ id }: { id: string }) {
+      seen[id] = useAppTheme().theme.v2;
+      return null;
+    }
+
+    await ReactTestRenderer.act(async () => {
+      ReactTestRenderer.create(
+        <ThemeProvider>
+          <Probe id="outside" />
+          <SceneScope>
+            <Probe id="inside" />
+          </SceneScope>
+        </ThemeProvider>,
+      );
+    });
+
+    expect(seen.outside.mode).toBe('light');
+    expect(seen.outside.colors).toBe(lightColorsV2);
+    expect(seen.inside.mode).toBe('scene');
+    expect(seen.inside.colors).toBe(sceneColorsV2);
   });
 });

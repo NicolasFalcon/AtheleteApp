@@ -67,6 +67,21 @@ export function ThemeProvider({children}: PropsWithChildren) {
   );
 }
 
+// Marks a subtree as a dark scene (heroes, session, Core 33, celebrations…).
+// Inside it, useAppTheme() returns theme.v2 with the scene colours, which are
+// the same in light and dark mode. Legacy theme keys are not affected.
+const SceneContext = createContext(false);
+
+export function SceneScope({children}: PropsWithChildren) {
+  return (
+    <SceneContext.Provider value={true}>{children}</SceneContext.Provider>
+  );
+}
+
+export function useIsInScene(): boolean {
+  return useContext(SceneContext);
+}
+
 export function useThemeContext(): ThemeContextValue {
   const context = useContext(ThemeContext);
 
