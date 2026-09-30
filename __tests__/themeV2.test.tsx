@@ -5,10 +5,12 @@ import { createTheme } from '../src/theme/theme';
 import {
   createThemeV2,
   darkColorsV2,
+  em,
   lightColorsV2,
   sceneColorsV2,
   sceneTokens,
   toSceneThemeV2,
+  typeV2,
   type ThemeV2,
 } from '../src/theme/v2';
 
@@ -122,6 +124,34 @@ describe('theme v2 · colors', () => {
         contrast(darkColorsV2.ellie.textSecondary, linen),
       ).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+describe('theme v2 · typography, spacing and radii', () => {
+  it('uses the system font with tabular figures in every text style', () => {
+    for (const textStyle of Object.values(typeV2)) {
+      expect(textStyle).not.toHaveProperty('fontFamily');
+      expect(textStyle.fontVariant).toEqual(['tabular-nums']);
+      expect(textStyle.lineHeight).toBeGreaterThan(0);
+    }
+  });
+
+  it('converts em tracking from the prototype to points', () => {
+    expect(em(0.08, 11)).toBe(0.88);
+    expect(typeV2.eyebrow.letterSpacing).toBe(0.88);
+    expect(typeV2.eyebrow.textTransform).toBe('uppercase');
+    expect(typeV2.displayL.letterSpacing).toBe(-6.16);
+  });
+
+  it('keeps the key layout constants of the handoff', () => {
+    const { layout, radius, space } = createThemeV2('light');
+
+    expect(layout.gutter).toBe(20);
+    expect(layout.sectionGap).toBe(32);
+    expect(layout.tabBarHeight).toBe(68);
+    expect(radius.tabBar).toBe(34);
+    expect(radius.card).toBe(24);
+    expect(space.s14).toBe(14);
   });
 });
 
