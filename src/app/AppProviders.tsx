@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from 'react';
 import { StyleSheet } from 'react-native';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -31,7 +32,8 @@ function AppNavigation({children}: PropsWithChildren) {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      {children}
+      {/* v2 sheets render here, so they keep theme, auth and navigation context. */}
+      <BottomSheetModalProvider>{children}</BottomSheetModalProvider>
     </NavigationContainer>
   );
 }

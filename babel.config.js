@@ -24,6 +24,8 @@ module.exports = api => {
           },
         },
       ],
+      // Must stay last (Reanimated 4 / worklets).
+      'react-native-worklets/plugin',
     ].filter(Boolean),
   };
 };

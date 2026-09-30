@@ -591,6 +591,18 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 | 1 · Seguimiento + `.gitignore` | n/a (sin código) | n/a |
 | 5 · Borrar `PlaceholderScreen` | ✅ | ⏳ Pendiente |
 | Fase 1 · Tokens v2 | ✅ (0 píxeles de diferencia en 5 tabs × Light/Dark) | ⏳ Pendiente |
+| Fase 2 · Dependencias | ✅ `pod install` + build + arranque | ⏳ Pendiente (ver §8.3) |
+
+### 8.3 Android · a revisar (sin compilar todavía)
+
+| Tema | Qué revisar |
+|---|---|
+| Reanimated 4.6 + worklets 0.12 | Build con nueva arquitectura (`newArchEnabled=true`); plugin `react-native-worklets/plugin` último en Babel |
+| `@gorhom/bottom-sheet@5` | Gestos y teclado dentro de hojas; `BottomSheetModalProvider` en `AppProviders` |
+| `react-native-haptic-feedback@3` | Permiso `VIBRATE` y equivalencias de tipos de impacto |
+| `@react-native-community/blur@4.4` | **Blur real solo en iOS.** En Android: fondo sólido con `theme.v2.blur.androidFallbackAlpha` (.96) sobre `glass.*` (D-28) |
+| `boxShadow` | Sombras multicapa e `inset` de `theme.v2.shadow` en la nueva arquitectura |
+| Tipografía | Roboto con `fontVariant: ['tabular-nums']` |
 
 ### 8.2 Pendiente backend
 
