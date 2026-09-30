@@ -3,7 +3,23 @@
     "deny": [
       "Read(./migration-source/*.md)",
       "Read(./migration-source/packages/**)",
-      "Read(./migration-source/webApp/**)"
-    ]
+      "Read(./migration-source/webApp/**)",
+        "Bash(git commit:*)",
+  "Bash(git push:*)",
+  "Bash(git reset:*)",
+  "Bash(npx supabase:*)",
+  "Bash(rm -rf:*)"
+    ],
+    "allow": [
+  "Bash(npm install:*)",
+  "Bash(npx tsc:*)",
+  "Bash(npx eslint:*)",
+  "Bash(cd ios && pod install:*)",
+  "Bash(pod install:*)",
+  "Bash(xcodebuild:*)",
+  "Bash(npx react-native:*)",
+  "Bash(xcrun simctl:*)"
+],
+    
   }
 }
