@@ -1,6 +1,6 @@
 # Comunidad · Propuesta de esquema (tablas, RLS y almacenamiento)
 
-Estado: **revisada por producto (2026-09-30)**. Las 16 preguntas están decididas (§12) y aplicadas en todo el documento. No hay migraciones ni código; nada de esto está creado en Supabase.
+Estado: **revisada por producto (2026-09-30 y 2026-10-01)**. Las 16 preguntas y las decisiones derivadas DA-S1 a DA-S7 están decididas (§12) y aplicadas en todo el documento. No hay migraciones ni código; nada de esto está creado en Supabase.
 Fecha: 2026-09-30 · Rama: `feature-migration` · Decisión previa que lo pide: MIGRATION_PROGRESS §1, decisión 7 ("antes de cualquier UI, documento de esquema de tablas y RLS para aprobación").
 
 Fuentes:
@@ -14,14 +14,14 @@ La definición SQL de las tablas actuales, sus políticas RLS y la función `awa
 
 ## 0. Resumen
 
-- **14 tablas nuevas:**
+- **16 tablas nuevas y 1 vista:**
   - privacidad e identidad: `social_settings` (incluye el nombre de usuario);
   - amistad: `friend_requests`, `friendships`, `friend_invites` (enlace de invitación);
   - publicaciones: `social_posts`, `social_post_likes`, `social_post_comments`;
   - actividad breve: `social_activity`;
   - retos: `social_challenges`, `social_challenge_participants`, `social_challenge_contributions`;
   - notificaciones: `social_notifications` (solo dentro de la app);
-  - moderación: `user_blocks`, `content_reports` (requisito de App Store para contenido de usuarios).
+  - moderación: `user_blocks`, `content_reports` (requisito de App Store para contenido de usuarios), más `app_moderators`, `moderation_actions` y la vista `moderation_queue` para el equipo (§4.13).
 - **Cambios en tablas existentes:** 2 columnas en `workout_templates` para las copias de rutinas compartidas, y una política de lectura nueva en el bucket `profile-photos`.
 - **Un bucket privado nuevo**, `social-photos`.
 - **La autorización se centraliza en 4 funciones SQL** (`is_blocked`, `are_friends`, `can_see_category`, `can_view_post`) que reutilizan todas las políticas. Así la regla de visibilidad se escribe una sola vez.
@@ -153,7 +153,7 @@ Helper: `are_friends(a uuid, b uuid) RETURNS boolean`, `STABLE`, que busca por P
 
 ### 4.4 `friend_invites` — enlace de invitación (Q3)
 
-Un enlace que tú generas y compartes fuera de la app (`athelete://amigo/{token}` + enlace universal).
+Un enlace que tú generas y compartes fuera de la app (`athelete://amigo/{token}` + enlace universal). **De un solo uso y válido 7 días** (DA-S1, revisada). Si caduca o ya se usó, el dueño genera otro.
 
 | Columna | Tipo | Notas |
 |---|---|---|
@@ -161,16 +161,20 @@ Un enlace que tú generas y compartes fuera de la app (`athelete://amigo/{token}
 | `inviter_id` | uuid NOT NULL → auth.users | |
 | `token` | text NOT NULL **UNIQUE** | 22 caracteres aleatorios (base64url de 16 bytes); no se deriva del usuario |
 | `expires_at` | timestamptz NOT NULL DEFAULT `now() + interval '7 days'` | |
-| `max_uses` | int NOT NULL DEFAULT 1 CHECK (max_uses BETWEEN 1 AND 20) | |
-| `uses` | int NOT NULL DEFAULT 0 | |
-| `revoked_at` | timestamptz NULL | |
+| `used_at` | timestamptz NULL | Un solo uso: se rellena al canjearlo |
+| `used_by` | uuid NULL → auth.users ON DELETE SET NULL | Quién lo canjeó |
+| `revoked_at` | timestamptz NULL | El dueño puede anularlo antes de que se use |
 | `created_at` | timestamptz | |
 
-- Índice `(inviter_id, created_at DESC)`.
+- `CHECK (used_by IS NULL OR used_by <> inviter_id)` y `CHECK ((used_at IS NULL) = (used_by IS NULL))`.
+- Índices: `(inviter_id, created_at DESC)` y `(inviter_id) WHERE used_at IS NULL AND revoked_at IS NULL` para contar los activos.
+- `create_friend_invite()`: crea un enlace nuevo. Como mucho **5 activos** (sin usar, sin anular y sin caducar) por usuario; si hay 5, hay que anular uno o esperar a que caduque.
 - `redeem_friend_invite(token)`:
-  - comprueba que no ha caducado, no está revocado, le quedan usos, no hay bloqueo y no eres tú;
-  - **crea la amistad directamente** (`ON CONFLICT (user_low, user_high) DO NOTHING`) e incrementa `uses`.
-  - **Decisión asumida, a confirmar:** quien comparte el enlace ya dio su consentimiento, así que no pasa por una solicitud. Por eso funciona aunque el que invita tenga `allow_friend_requests = false`, que es coherente con "tú sí puedes enviar" (Q12).
+  - **marca el uso de forma atómica**: `UPDATE friend_invites SET used_at = now(), used_by = auth.uid() WHERE token = $1 AND used_at IS NULL AND revoked_at IS NULL AND expires_at > now() AND inviter_id <> auth.uid() RETURNING inviter_id`. Si dos personas lo abren a la vez, solo una fila se actualiza y la otra recibe "Este enlace ya se usó o caducó";
+  - comprueba que no hay bloqueo entre los dos. Si lo hay, responde con el mismo mensaje neutro y **no** consume el enlace;
+  - si ya eran amigos, consume el enlace y no cambia nada;
+  - **crea la amistad directamente** (`ON CONFLICT (user_low, user_high) DO NOTHING`, con `invite_id`). Quien comparte el enlace ya dio su consentimiento, así que no pasa por una solicitud y funciona aunque el que invita tenga `allow_friend_requests = false`, coherente con "tú sí puedes enviar" (Q12).
+- Sin job de limpieza obligatorio: los enlaces caducados o usados se quedan como historial (son pocos por usuario). Se pueden purgar a los 90 días.
 - Sin `SELECT` para nadie salvo el que invita (sus propios enlaces). El token solo se valida dentro de la RPC.
 
 ### 4.5 `social_posts` — publicaciones (SOCIAL_01, 02, 03, 13)
@@ -192,7 +196,8 @@ Un enlace que tú generas y compartes fuera de la app (`athelete://amigo/{token}
 | `challenge_id` | uuid NULL → social_challenges ON DELETE SET NULL | origen si `type='challenge'` |
 | `source_key` | text NOT NULL | Clave de idempotencia: `'workout:'||session_id`, `'record:'||pr_id`, `'routine:'||template_id`, `'badge:'||badge_id`, `'challenge:'||challenge_id`, `'core33:'||participation_id`, `'photo:'||id` |
 | `like_count`, `comment_count` | int NOT NULL DEFAULT 0 | triggers |
-| `hidden_at` | timestamptz NULL | Ocultado por moderación (§4.12) |
+| `hidden_at` | timestamptz NULL | Ocultado automáticamente por reportes (§4.12), pendiente de revisión |
+| `removed_at` | timestamptz NULL | Eliminado por moderación (§4.13); el autor no puede deshacerlo |
 | `created_at` | timestamptz | |
 | `edited_at` | timestamptz NULL | solo cambia `body` |
 | `deleted_at` | timestamptz NULL | borrado lógico por el autor |
@@ -201,7 +206,7 @@ Restricciones e índices:
 - **`UNIQUE (author_id, source_key)`**: no se puede publicar dos veces el mismo entreno, récord o logro. `create_post` usa `ON CONFLICT (author_id, source_key) DO NOTHING RETURNING …` y, si ya existía, devuelve el post existente.
 - **Q4 · nunca solo texto**: `CHECK (attachment IS NOT NULL OR photo_path IS NOT NULL)` + `CHECK (type <> 'photo' OR (photo_path IS NOT NULL AND attachment IS NULL))` + `CHECK (photo_path IS NULL OR type IN ('workout','photo'))`.
 - Coherencia del origen por tipo (p. ej. `workout` exige `workout_session_id`): trigger `BEFORE INSERT`, porque las FK `SET NULL` pueden vaciarlo después (Q8).
-- Índice `(author_id, created_at DESC) WHERE deleted_at IS NULL AND hidden_at IS NULL`, que sirve para el feed y para el perfil.
+- Índice `(author_id, created_at DESC) WHERE deleted_at IS NULL AND hidden_at IS NULL AND removed_at IS NULL`, que sirve para el feed y para el perfil.
 - **Sin índice de feed público** (Q2): el contenido `public` solo se lee en el perfil de su autor.
 
 **`attachment`** (lo escribe el servidor a partir del origen; el cliente solo envía el id del origen):
@@ -239,7 +244,8 @@ El cliente **no tiene `INSERT` directo** en `social_posts`. Los posts **siempre 
 | `author_id` | uuid NOT NULL → auth.users | |
 | `body` | text NOT NULL CHECK (char_length(trim(body)) BETWEEN 1 AND 500) | |
 | `created_at` | timestamptz | |
-| `hidden_at` | timestamptz NULL | moderación |
+| `hidden_at` | timestamptz NULL | ocultado por reportes, pendiente de revisión |
+| `removed_at` | timestamptz NULL | eliminado por moderación (§4.13) |
 | `deleted_at` | timestamptz NULL | |
 
 - Sin `parent_id`, así que no hay hilos.
@@ -378,7 +384,7 @@ Lecturas por RPC (no hay `SELECT` libre de participantes ajenos):
 | `id` | uuid PK | |
 | `recipient_id` | uuid NOT NULL → auth.users | |
 | `actor_id` | uuid NULL → auth.users | NULL en avisos del sistema (reto oficial nuevo) |
-| `type` | text NOT NULL CHECK in (`friend_request`,`friend_accepted`,`post_like`,`post_comment`,`challenge_invite`,`challenge_started`,`challenge_completed`,`challenge_ending`) | |
+| `type` | text NOT NULL CHECK in (`friend_request`,`friend_accepted`,`post_like`,`post_comment`,`challenge_invite`,`challenge_started`,`challenge_completed`,`challenge_ending`,`content_removed`) | `content_removed`: aviso al autor (§4.13) |
 | `post_id`, `comment_id`, `challenge_id`, `request_id` | uuid NULL (FK ON DELETE CASCADE) | |
 | `dedupe_key` | text NOT NULL | `'like:'||post_id||':'||actor_id`, `'comment:'||comment_id`, `'invite:'||challenge_id`… |
 | `read_at` | timestamptz NULL | |
@@ -428,9 +434,77 @@ Requisito de App Store (guía 1.2, contenido generado por usuarios): filtrar con
 - **`UNIQUE (reporter_id, target_type, target_id)`**: reportar dos veces no duplica (`ON CONFLICT … DO NOTHING`).
 - Índice `(status, created_at)` para la cola de revisión.
 - Al reportar, **el contenido se oculta para quien reporta** de inmediato (filtro en `can_view_post`).
-- Con **3 reportes distintos**, un trigger pone `hidden_at` en el post o comentario para todos, hasta que el equipo lo revise.
-- La revisión la hace el equipo con service role (panel o SQL). El compromiso de respuesta en 24 h que pide Apple es un proceso, no esquema; queda anotado en §11.
-- RLS: `INSERT` propio; `SELECT` solo de los propios reportes; sin `UPDATE`/`DELETE` para usuarios.
+- Con **3 reportes `open` de personas distintas**, un trigger pone `hidden_at` en el post o comentario para todos y lo envía a la cola de revisión (§4.13). Solo cuentan los reportes `open`: si un moderador restaura el contenido, los reportes anteriores pasan a `dismissed` y no lo vuelven a ocultar. Hacen falta 3 reportes nuevos.
+- Los reportes de tipo `user` no ocultan nada automáticamente; van a la cola.
+- La revisión la hacen moderadores con las RPC de §4.13. El compromiso de respuesta en 24 h que pide Apple es un proceso, no esquema; queda anotado en §11.
+- RLS: `INSERT` propio; `SELECT` de los propios reportes (y todos para moderadores, §4.13); sin `UPDATE`/`DELETE` para usuarios.
+
+### 4.13 Revisión de moderación (administradores)
+
+La revisión se hace **fuera de la app móvil**: Supabase Studio para empezar, o un panel web interno después. El panel inicia sesión con una cuenta de moderador normal (Supabase Auth). **No usa la service role key**, para que cada acción quede atribuida a una persona y pase por RLS.
+
+#### `app_moderators`: quién puede moderar
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `user_id` | uuid **PK** → auth.users ON DELETE CASCADE | |
+| `role` | text NOT NULL CHECK in (`moderator`,`admin`) | `admin` además gestiona moderadores |
+| `created_at` | timestamptz | |
+| `created_by` | uuid NULL → auth.users | |
+
+- Altas y bajas: solo `admin` (RPC `set_moderator(user_id, role | null)`) o service role para el primer admin. `INSERT … ON CONFLICT (user_id) DO UPDATE SET role = …`, respaldado por la PK.
+- Helper `is_moderator()` (`STABLE SECURITY DEFINER`): `EXISTS (SELECT 1 FROM app_moderators WHERE user_id = auth.uid())`. Se evalúa en cada consulta, así que quitar a alguien tiene efecto inmediato (no depende de un JWT emitido antes).
+- RLS: `SELECT` para moderadores; sin `INSERT`/`UPDATE`/`DELETE` directos.
+
+#### Vista `moderation_queue`: la cola
+
+Vista con `security_invoker = true`: hereda las políticas de las tablas base, y solo los moderadores tienen las políticas de lectura amplia (abajo). Para cualquier otro usuario devuelve 0 filas. Una fila por contenido reportado:
+
+| Columna | Origen |
+|---|---|
+| `target_type`, `target_id` | `content_reports` agrupado |
+| `author_id`, `author_username` | autor del post o comentario, o el usuario reportado |
+| `body`, `photo_path`, `post_type`, `post_id` | contenido actual (también si está oculto) |
+| `open_reports`, `reasons` (array), `first_reported_at`, `last_reported_at` | agregados de los reportes `open` |
+| `hidden_at`, `removed_at` | estado actual |
+| `author_prior_removals` | contenido de ese autor eliminado antes (reincidencia) |
+
+Orden por defecto: ocultos primero, luego por `open_reports` y `first_reported_at`.
+
+Políticas extra **solo para moderadores** (`USING (is_moderator())`):
+- `SELECT` en `content_reports`, `social_posts`, `social_post_comments`, `social_settings` (solo `username`, vía la vista) y `moderation_actions`;
+- `SELECT` en `storage.objects` del bucket `social-photos`, para ver la foto reportada aunque esté oculta.
+
+Ninguna política de moderador permite `UPDATE` ni `DELETE` directo: las acciones van por RPC.
+
+#### Acciones: RPC `moderate_content(target_type, target_id, action, note)`
+
+`SECURITY DEFINER`. Comprueba `is_moderator()` y lo hace todo en una transacción.
+
+| Acción | Sobre | Efecto |
+|---|---|---|
+| `restore` (restaurar) | post / comentario | `hidden_at = NULL`; sus reportes `open` → `dismissed` con `resolved_at`. Vuelve a verse para todos (salvo para quien lo reportó, que lo sigue sin ver) |
+| `remove` (eliminar) | post / comentario | `removed_at = now()`; reportes `open` → `actioned`. Deja de verse para todos y el autor no puede restaurarlo. Si es un post: se borran sus fotos del bucket, sus likes y sus notificaciones; los comentarios quedan inaccesibles con el post. Notificación in-app al autor: `content_removed` ("Eliminamos una publicación tuya por incumplir las normas de la comunidad") |
+| `dismiss` (descartar) | usuario | Reportes `open` → `dismissed`, sin más efecto |
+
+- Cada acción inserta una fila en `moderation_actions` (abajo).
+- Lo eliminado **no se borra físicamente** durante 30 días (por si hay que revisar una apelación o un requerimiento legal). Después, un job lo purga con fotos incluidas.
+- **Fuera de v1:** suspender o banear cuentas. Se anota en §11; por ahora el equipo puede deshabilitar la cuenta desde Supabase Auth.
+
+#### `moderation_actions`: registro de auditoría
+
+| Columna | Tipo | Notas |
+|---|---|---|
+| `id` | uuid PK | |
+| `moderator_id` | uuid NOT NULL → auth.users | |
+| `target_type` | text NOT NULL CHECK in (`post`,`comment`,`user`) | |
+| `target_id` | uuid NOT NULL | |
+| `action` | text NOT NULL CHECK in (`restore`,`remove`,`dismiss`) | |
+| `note` | text NULL CHECK (char_length(note) <= 500) | motivo interno |
+| `created_at` | timestamptz | |
+
+- Solo inserta la RPC; nadie edita ni borra. Índices `(target_type, target_id, created_at)` y `(moderator_id, created_at DESC)`.
+- Sin `ON CONFLICT`: cada acción es un hecho nuevo.
 
 ---
 
@@ -542,7 +616,7 @@ Principio (Q5): **la app prepara, el usuario publica**.
 | INSERT | `bucket_id = 'social-photos' AND (storage.foldername(name))[1] = auth.uid()::text` |
 | DELETE | igual que INSERT (el autor borra lo suyo) |
 | UPDATE | no permitido |
-| SELECT | dueño, **o** `can_view_post(((storage.foldername(name))[2])::uuid)` **y** `share_photos` del autor |
+| SELECT | dueño, **o** `can_view_post(((storage.foldername(name))[2])::uuid)` **y** `share_photos` del autor, **o** `is_moderator()` (§4.13) |
 
 Al borrar un post, un trigger o la RPC borra sus objetos. Un job semanal limpia las subidas de `drafts/` de más de 24 h.
 
@@ -560,7 +634,7 @@ Funciones de apoyo (`STABLE SECURITY DEFINER`, `search_path = public`):
 - `is_blocked(a, b)`: existe un bloqueo en cualquier dirección.
 - `are_friends(a, b)`: busca por PK en `friendships`.
 - `can_see_category(owner, category)`: `owner = auth.uid()` **o** (`NOT is_blocked(auth.uid(), owner)` **y** (`are_friends(auth.uid(), owner)` **o** `audience(owner) = 'public'`) **y** el interruptor de esa categoría está activo).
-- `can_view_post(post_id)`: post no borrado ni oculto, no reportado por mí **y** (`author = auth.uid()` **o** ((`are_friends` **o** `post.audience = 'public'`) **y** `can_see_category(author, category_of(type))`)).
+- `can_view_post(post_id)`: post no borrado, ni oculto, ni eliminado por moderación, no reportado por mí **y** (`author = auth.uid()` **o** ((`are_friends` **o** `post.audience = 'public'`) **y** `can_see_category(author, category_of(type))`)).
 
 Las categorías por tipo son: `workout` → workouts, `record` → records, `achievement` / `challenge` → achievements, `routine` → routines y `photo` → photos. Además, cualquier post con `photo_path` exige `share_photos`; con `share_photos = false`, el post de entreno se ve sin foto y el post `photo` no se ve.
 
@@ -571,8 +645,8 @@ La privacidad se evalúa **al leer**: si apago "Récords", mis récords anterior
 | `social_settings` | dueño (`username` de otros solo vía `social_profiles` y `find_user_by_username`) | dueño (RPC `ensure_social_settings`) | dueño (`username` vía `set_username`) | — (cascade con la cuenta) |
 | `friend_requests` | remitente o receptor | **solo RPC** | **solo RPC** | — |
 | `friendships` | si `auth.uid()` es uno de los dos | **solo RPC** (`respond_friend_request`, `redeem_friend_invite`) | — | uno de los dos |
-| `friend_invites` | el que invita | el que invita (RPC `create_friend_invite`, límite 5 activos) | el que invita (solo `revoked_at`) | — |
-| `social_posts` | `can_view_post(id)` | **solo RPC** `create_post` | autor, y solo `body`/`edited_at`/`deleted_at` (trigger que bloquea el resto de columnas) | — (borrado lógico) |
+| `friend_invites` | el que invita | **solo RPC** `create_friend_invite` (máx. 5 activos) | el que invita, solo `revoked_at` y solo si no se ha usado; el uso lo marca `redeem_friend_invite` | — |
+| `social_posts` | `can_view_post(id)`; moderadores: todos | **solo RPC** `create_post` | autor, y solo `body`/`edited_at`/`deleted_at` (trigger que bloquea el resto de columnas) | — (borrado lógico) |
 | `social_post_likes` | si `can_view_post(post_id)` | `user_id = auth.uid()` **y** `can_view_post(post_id)` | — | `user_id = auth.uid()` |
 | `social_post_comments` | `can_view_post(post_id)`, no borrado ni oculto y sin bloqueo con su autor | `author_id = auth.uid()` **y** `can_view_post(post_id)` | autor (solo `body`) | autor del comentario **o** autor del post (borrado lógico) |
 | `social_activity` | `can_see_category(user_id, category)` **y** (`are_friends` o es mía): solo amigos, nunca pública | **nadie** (solo triggers) | nadie | nadie (triggers y job de retención) |
@@ -581,7 +655,10 @@ La privacidad se evalúa **al leer**: si apago "Récords", mis récords anterior
 | `social_challenge_contributions` | las propias | **solo** triggers y RPC `add_manual_contribution` | nadie | propias **manuales** en las últimas 24 h (corregir un error) |
 | `social_notifications` | `recipient_id = auth.uid()` | **nadie** (triggers) | destinatario, solo `read_at` | destinatario |
 | `user_blocks` | `blocker_id = auth.uid()` (mi lista de bloqueados) | **solo RPC** `block_user` | — | `blocker_id = auth.uid()` (desbloquear) |
-| `content_reports` | `reporter_id = auth.uid()` | `reporter_id = auth.uid()` | — | — |
+| `content_reports` | `reporter_id = auth.uid()`; moderadores: todos | `reporter_id = auth.uid()` | **solo RPC** `moderate_content` | — |
+| `app_moderators` | moderadores | **solo RPC** `set_moderator` (admin) | **solo RPC** | **solo RPC** |
+| `moderation_actions` | moderadores | **solo RPC** `moderate_content` | nadie | nadie |
+| `moderation_queue` (vista) | hereda de las tablas base: moderadores ven todo; el resto, 0 filas | — | — | — |
 | `workout_templates` (cambio) | **sin cambios** en sus políticas | la copia la crea la RPC `save_shared_routine` | igual que hoy (la copia es del usuario) | igual que hoy |
 
 "Solo RPC" = sin política de `INSERT`/`UPDATE` para `authenticated`; la escritura la hace la función `SECURITY DEFINER` tras sus comprobaciones.
@@ -596,6 +673,8 @@ La privacidad se evalúa **al leer**: si apago "Récords", mis récords anterior
 | Elegir nombre de usuario | **sin `ON CONFLICT`**; `set_username` captura `unique_violation` y responde "ya está en uso" | `UNIQUE social_settings(username)` |
 | Crear amistad (solicitud o enlace) | `(user_low, user_high) DO NOTHING` | PK `friendships(user_low, user_high)` |
 | Crear enlace de invitación | **sin `ON CONFLICT`** (token aleatorio; si colisiona, se reintenta) | `UNIQUE friend_invites(token)` |
+| Canjear enlace | **sin `ON CONFLICT`**: `UPDATE … WHERE used_at IS NULL … RETURNING` (un solo uso, atómico) | — |
+| Alta / cambio de moderador | `(user_id) DO UPDATE` | PK `app_moderators(user_id)` |
 | Publicar | `(author_id, source_key) DO NOTHING` | `UNIQUE social_posts(author_id, source_key)` |
 | Like | `(post_id, user_id) DO NOTHING` | PK `social_post_likes(post_id, user_id)` |
 | Línea de actividad | `(user_id, kind, ref_key) DO NOTHING` | `UNIQUE social_activity(user_id, kind, ref_key)` |
@@ -618,7 +697,7 @@ Prueba obligatoria antes de dar por buena la migración: un test SQL (pgTAP o sc
 
 1. **Prerrequisitos de backend:** BK-01 (arreglar `award_gamification_event`) y BK-02 (regenerar tipos).
 2. `social_settings` (con `username`), `friend_requests`, `friendships`, `friend_invites`, `user_blocks`, vista `social_profiles` y política de lectura en `profile-photos` → pantallas Amigos, Perfil de amigo y Privacidad.
-3. `social_posts`, likes, comentarios, `content_reports`, bucket `social-photos` y `social_notifications` → Feed, Crear publicación, Publicación y comentarios, Compartir entreno. **Reportar y bloquear tienen que estar en la UI antes de publicar la versión** (Q11).
+3. `social_posts`, likes, comentarios, `content_reports`, bucket `social-photos` y `social_notifications` → Feed, Crear publicación, Publicación y comentarios, Compartir entreno. **Reportar y bloquear tienen que estar en la UI antes de publicar la versión** (Q11), y la cola de moderación (`app_moderators`, `moderation_queue`, `moderate_content`, `moderation_actions`) operativa en Supabase Studio con al menos un moderador dado de alta.
 4. Columnas en `workout_templates` + `save_shared_routine` → Rutina compartida.
 5. `social_activity` y triggers en `workout_sessions` / `personal_records` / `user_badges` / `challenge_participations`.
 6. Retos: tablas, triggers de aportes, `get_challenge_board`, job de cierre y caducidad → Retos, Oficial, Entre amigos, Invitación, Crear reto y Completado.
@@ -631,7 +710,9 @@ Cada paso es una migración aparte, con su prueba de RLS: un usuario A, su amigo
 ## 11. Fuera de alcance de esta propuesta (señalado para no olvidarlo)
 
 - Push notifications (APNs/FCM) y su preferencia por tipo (Q10: v1 solo in-app).
-- **Proceso de moderación**: quién revisa la cola de `content_reports`, el compromiso de respuesta (Apple pide actuar en 24 h) y un contacto de soporte publicado en la ficha de la App Store.
+- **Interfaz de administración**: no es parte de la app móvil. En v1 basta Supabase Studio (consultar `moderation_queue` y llamar a `moderate_content`); un panel web interno, si hace falta, usa las mismas RPC.
+- **Suspender o banear cuentas** desde la moderación (v1: deshabilitar el usuario en Supabase Auth a mano).
+- **Proceso de moderación**: quién revisa la cola, el compromiso de respuesta (Apple pide actuar en 24 h) y un contacto de soporte publicado en la ficha de la App Store.
 - Límites de frecuencia (publicaciones, comentarios y solicitudes por hora) en las RPC.
 - Exportar o borrar datos sociales a petición (GDPR): con `ON DELETE CASCADE` el borrado de cuenta ya los elimina.
 - Enlace universal (`apple-app-site-association`) para el enlace de invitación; con `athelete://` basta para desarrollo.
@@ -662,17 +743,17 @@ Todas decididas el 2026-09-30 y aplicadas en el documento.
 | Q15 | Qué rutinas se pueden compartir | ✅ **Decidida**: **solo las creadas por el usuario** | §4.9 |
 | Q16 | Caducidad de la invitación a un reto | ✅ **Decidida**: caduca **al empezar el reto o a los 7 días** | §4.10 |
 
-Decisiones derivadas que asumí al aplicarlas (confírmalas en la próxima revisión):
+Decisiones derivadas (revisadas el 2026-10-01):
 
-| # | Decisión asumida | Por qué |
-|---|---|---|
-| DA-S1 | El enlace de invitación crea la amistad **directamente** al abrirlo, sin solicitud | Quien lo comparte ya dio su consentimiento; funciona aunque tenga las solicitudes apagadas ("tú sí puedes enviar") |
-| DA-S2 | Las solicitudes ya recibidas antes de apagar "Permitir solicitudes" siguen pendientes y se pueden aceptar | "Los amigos actuales no cambian", extendido a lo que ya estaba en curso |
-| DA-S3 | Las copias guardadas de rutinas ajenas **no** se pueden volver a compartir | "Solo rutinas creadas por el usuario": respeta al autor original |
-| DA-S4 | Fotos permitidas en posts de entreno y en el nuevo tipo `photo`; no en récord, logro, rutina ni reto | Handoff: "fotografías opcionales en publicaciones de entreno"; Q4 abre el post de solo foto |
-| DA-S5 | En la búsqueda por nombre de usuario se ve el avatar predefinido o las iniciales, no la foto real, hasta que haya relación | Privacidad de la foto frente a desconocidos |
-| DA-S6 | Con 3 reportes de personas distintas, el contenido se oculta para todos hasta revisarlo | Protección mientras el equipo responde |
-| DA-S7 | El registro manual del reto oficial: 1–100 por registro y máximo 300 al día | Evita inflar el reto sin impedir sesiones fuera de la app |
+| # | Decisión | Estado | Aplicada en |
+|---|---|---|---|
+| DA-S1 | El enlace de invitación crea la amistad **directamente** al usarse, sin solicitud. **Caduca a los 7 días y es de un solo uso**; el dueño puede generar otro | ✏️ **Aprobada con cambios** (caducidad 7 días y un solo uso) | §4.4, §8, §9 |
+| DA-S2 | Las solicitudes ya recibidas antes de apagar "Permitir solicitudes" siguen pendientes y se pueden aceptar ("Los amigos actuales no cambian", extendido a lo que ya estaba en curso) | ✅ **Aprobada** | §4.2 |
+| DA-S3 | Las copias guardadas de rutinas ajenas **no** se pueden volver a compartir ("Solo rutinas creadas por el usuario": respeta al autor original) | ✅ **Aprobada** | §4.9 |
+| DA-S4 | Fotos permitidas en posts de entreno y en el nuevo tipo `photo`; no en récord, logro, rutina ni reto (Handoff: "fotografías opcionales en publicaciones de entreno"; Q4 abre el post de solo foto) | ✅ **Aprobada** | §4.5 |
+| DA-S5 | En la búsqueda por nombre de usuario se ve el avatar predefinido o las iniciales, no la foto real, hasta que haya relación (Privacidad de la foto frente a desconocidos) | ✅ **Aprobada** | §7.3 |
+| DA-S6 | Con 3 reportes `open` de personas distintas, el contenido se oculta para todos hasta revisarlo. **Revisión por moderadores** (rol en `app_moderators`, RLS) en la vista `moderation_queue`, con las acciones **restaurar** y **eliminar** y registro de auditoría. La interfaz de administración no es parte de la app móvil | ✏️ **Aprobada con cambios** (revisión de moderación añadida) | §4.12, §4.13, §8, §10 |
+| DA-S7 | El registro manual del reto oficial: 1–100 por registro y máximo 300 al día (Evita inflar el reto sin impedir sesiones fuera de la app) | ✅ **Aprobada** | §4.10 |
 
 ---
 
