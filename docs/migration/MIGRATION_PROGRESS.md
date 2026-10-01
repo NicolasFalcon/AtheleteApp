@@ -18,7 +18,7 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 | 1 · Tokens | ✅ Cerrada (iOS; Android pendiente, §8.1) | 2026-09-30 |
 | 2 · Primitivas (incluye instalar las 4 dependencias) | 🟡 Hecha en iOS, pendiente de revisión y commits (ver §11) | — |
 | 3 · Recorrido del usuario: Auth y Onboarding (ver §12) | 🟡 Implementado sin validación visual (sin Xcode); Inicio, Ajustes, Detalle de rutina y Progreso después | — |
-| 4 · Navegación final | ⏳ | — |
+| 4 · Navegación final (ver §13) | 🟡 Implementada sin validación visual (sin Xcode); `tsc` + lint + jest en verde | — |
 | 5 · Restyling por módulo | ⏳ | — |
 | 6 · Estados del sistema | ⏳ | — |
 | 7 · Funcionalidad nueva (Pausa/Descanso → Core 33 → MoveKit → Comunidad → Scan → Apple Health → Wear) | ⏳ | — |
@@ -920,3 +920,91 @@ git commit -m "feat(dev): add 'Recorrer onboarding' walkthrough without saving d
 git add docs/migration/MIGRATION_PROGRESS.md
 git commit -m "docs: phase 3 auth and onboarding progress" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
+
+---
+
+## 13. Fase 4 · Navegación final (2026-09-30, sin Xcode)
+
+Verificación: `tsc` + eslint de los archivos tocados + `jest` (16 suites, 62 tests). Sin build, simulador, Maestro ni capturas. Sin dependencias nuevas.
+
+### 13.1 Qué cambió
+
+- **Estructura**:
+  ```
+  RootStack (native-stack, key={flow})
+  ├─ auth        → AuthFlow (sin cambios)
+  ├─ onboarding  → OnboardingFlow (sin cambios)
+  └─ app
+     ├─ MainTabs (TabBarV2): Home · Workouts · Ellie · Progress · Community
+     └─ pantallas compartidas (encima de los tabs, la barra se oculta sola):
+        Profile, EditProfile, Achievements, Notifications, Core33, WorkoutDetail,
+        WorkoutSession, ExerciseDetail, CreateRoutine, EditRoutine, AddExerciseToRoutine,
+        QuizLanding, QuizQuestion, QuizResult, PersonalRecords, RegisterPr,
+        NutritionPlan, BodyScience, BodyScienceArticle
+  ```
+- **Rutas**: `TAB_ROUTES` (con `Community`, sin `Profile`) + un único `APP_ROUTES` (un nombre por pantalla). Eliminados `HOME_/WORKOUTS_/ELLIE_/PROGRESS_/PROFILE_ROUTES` y los duplicados con prefijo (`WorkoutPersonalRecords`, `ProgressRegisterPr`, `ProgressChallenge`, `Challenge` → `Core33`, `*Root`).
+- **Tipos** (`src/types/navigation.ts`): `MainTabParamList`, `AppStackParamList`, `RootStackParamList`, helpers `AppScreenProps<'X'>`, `TabScreenProps<'X'>`, `RootNavigation`. Todas las pantallas usan props tipadas: `tsc` detecta rutas o parámetros rotos. Sin `as never`, `as any` ni `getState().routeNames` en pantallas (búsqueda limpia; solo `safeGoBack` recorre navegadores, a propósito).
+- **Eliminados**: `src/navigation/{Home,Workouts,Ellie,Progress,Profile}StackNavigator.tsx`.
+- **Barra de pestañas v2** (`src/navigation/TabBarV2.tsx`): píldora de vidrio 68 pt, a 16 de los lados, `bottom = max(24, inset − 10)`, radio 34, `GlassSurface kind="tab"` + `shadow.floatTab`; ítems 62×56 radio 28, Lucide 22 (`House`, `Dumbbell`, `Sparkles`, `TrendingUp`, `Users`) + etiqueta `micro` 10/600; activo relleno `cta.primary` con contenido `cta.primaryText` (fundido 250 ms), inactivo opacidad .72; háptica `selection` al cambiar. Se oculta con el teclado y cuando una pantalla llama a `setTabBarVisible(false)` (chat de ELLIE).
+- **`useTabBarMetrics`**: ya no usa `useBottomTabBarHeight` (lanzaba fuera de los tabs); calcula la geometría v2 (`height` = 68 + separación inferior; `bottomClearance` = máx(120, height + 16)).
+- **Comunidad** (`src/screens/tabs/CommunityScreen.tsx`): v2 puro; avatar 44 → Perfil, título 28 "Comunidad", círculo con `Users`, "Muy pronto" y una frase. Sin CTA.
+- **Perfil**: pantalla apilada. Sin `useTabBarMotion`/`useTabBarMetrics` (lanzaban fuera de los tabs); `BackButton` v2 arriba (también en carga y error); margen inferior por safe area.
+- **TEMP-01 · acceso temporal a Perfil**: el avatar de `HomeHeader` (Inicio v1) es pulsable ("Perfil") → `Profile`. Se sustituye al migrar Inicio (avatar 44 sobre el hero del shell).
+- **Core 33 · entrada única**: `src/features/core33/core33Entry.ts` (`core33EntryState`, `resolveCore33Entry`; estados `intro | explore | ready | active | completed` como punto de extensión) + `useOpenCore33()` + test. Lo usan Inicio, Progreso, Notificaciones y Perfil. Hoy todo resuelve a `Core33` (ChallengeScreen ya decide intro / hábitos / tracker).
+- **Navegaciones que se habrían roto en ejecución y se corrigieron**: `getParent()?.navigate(TAB)` desde pantallas que ahora viven en el stack raíz (Notificaciones, Sesión, Plan nutricional) → `navigate('MainTabs', {screen})`; desde tabs (Inicio) → `navigate('Workouts' | 'Ellie')`; selección de ruta por `routeNames` en Récords, Detalle de rutina, Detalle de ejercicio, Crear rutina y Añadir a rutina → nombres fijos; Perfil fuera de los tabs (hooks de la barra).
+- **`safeGoBack`**: fallbacks tipados (`AnyRouteName` o `{name, params}`) + helper `tabFallback('Workouts')`. Las listas de varios tabs pasan a `MainTabs` (vuelve al tab en el que estaba el usuario).
+- **Enlaces**: sin cambios. `athelete://dev/catalog` y `dev/onboarding` los atiende `DevCatalogHost` con `Linking`, fuera del navegador; la recuperación de contraseña sigue en `AuthProvider` + `AuthStack.ResetPassword`; `NavigationContainer` no tiene `linking`.
+
+### 13.2 Decisiones asumidas
+
+| ID | Decisión |
+|---|---|
+| DA-29 | Se elimina la "compactación" de la barra al hacer scroll (v1). `TabBarMotionProvider` se mantiene por `setTabBarVisible` (ELLIE); los `onScroll` de v1 siguen conectados pero ya nada lee `compactProgress` (se limpian al migrar cada tab) |
+| DA-30 | Los tabs muestran su pantalla raíz sin stack anidado; volver a pulsar el tab activo no hace nada (no hay pila que vaciar) |
+| DA-31 | Fallbacks de "volver sin historial" → `MainTabs` sin pantalla (el último tab activo), salvo donde había un único destino claro (`tabFallback`) |
+| DA-32 | `CreateRoutine` y `EditRoutine` siguen siendo la misma pantalla registrada dos veces (como en v1) |
+| DA-33 | Perfil temporal: se mantiene la pantalla v1 con un `BackButton` v2 encima; su migración visual va en la fase 5 |
+| DA-34 | `backBehavior` por defecto de bottom-tabs (`firstRoute`): back de Android en un tab que no es Inicio vuelve a Inicio; en Inicio sale de la app |
+| DA-35 | Body Science sigue registrada pero sin punto de entrada (igual que antes de la fase 4) |
+
+### 13.3 Android (sin compilar)
+
+- La barra usa el relleno sólido al .96 de `GlassSurface` (D-28) y `boxShadow` (nueva arquitectura); revisar la sombra `floatTab`.
+- Teclado: se oculta en `keyboardDidShow`/`keyboardDidHide` (iOS usa `Will`).
+- Back físico: detalle → atrás; Perfil → tab de origen; tab ≠ Inicio → Inicio; Inicio → sale (DA-34).
+- Safe area inferior con navegación por gestos vs 3 botones: `bottom = max(24, inset − 10)`.
+
+### 13.4 Pendiente de validación visual (flujos a probar en el simulador)
+
+| # | Flujo | Qué comprobar |
+|---|---|---|
+| 1 | Barra de pestañas | 5 tabs, estado activo (relleno + fundido), Light/Dark, vidrio real; oculta con el teclado; oculta en el chat de ELLIE y visible al salir; no aparece en ninguna pantalla de detalle. El contenido de cada tab no queda tapado (clearance 120) |
+| 2 | Inicio → avatar → Perfil | Perfil con `BackButton`; Editar perfil / Logros / Plan nutricional / Core 33 → atrás a Perfil → atrás a Inicio |
+| 3 | Comunidad → avatar → Perfil | Volver deja en Comunidad. Barra de estado correcta al cambiar de tab |
+| 4 | Inicio → tarjeta de rutina → Detalle → Empezar → Sesión | Detalle de ejercicio desde la sesión; salir; terminar la sesión vuelve al tab Inicio |
+| 5 | Entrenos → Rutina → Detalle → Editar → Añadir ejercicio | Atrás a Editar; Crear rutina → al guardar reemplaza por el detalle de la nueva rutina |
+| 6 | Entrenos → Ejercicios → Detalle de ejercicio → Agregar a rutina | Crear nueva / añadir a una existente (reemplaza por Editar) |
+| 7 | Récords desde Inicio (récord reciente), Progreso y Notificaciones | Misma pantalla; Registrar récord → "Continuar" vuelve a Récords; cambiar de ejercicio en el historial |
+| 8 | Core 33 desde Inicio, Progreso, Notificaciones y Perfil | Abre la misma pantalla con el estado correcto (intro / tracker / completado); atrás vuelve al origen |
+| 9 | Notificaciones → cada destino | Entrenos, ELLIE, Progreso, Inicio (hidratación) cambian de tab y cierran Notificaciones; Quiz, Nutrición (con registro), Récords y Core 33 se apilan |
+| 10 | Plan nutricional → "Hablar con ELLIE" | Abre el tab ELLIE (desde Perfil, Progreso y Notificaciones) |
+| 11 | Quiz | Inicio → Quiz → Pregunta → Resultado → "Otra ronda" (reemplaza) / volver a Quiz; salir a mitad de ronda (`popTo` QuizLanding) |
+| 12 | Body Science | Sin punto de entrada hoy (DA-35); nada que probar salvo que se añada uno |
+| 13 | Fin del onboarding | "Hablar con ELLIE" abre el tab ELLIE; "Ir a Inicio" abre Inicio |
+| 14 | Back de Android | En cada detalle y en Perfil; en tabs según DA-34 |
+| 15 | Enlaces | `xcrun simctl openurl booted athelete://dev/catalog` y `…/dev/onboarding` con la app abierta y cerrada; enlace real de recuperación de contraseña |
+
+Dudas sin verificar: composer de ELLIE (`marginBottom` = altura v2 de la barra, ahora 92 pt en iPhone con isla vs ~83 antes); `StatusBarV2` de Comunidad queda montado al cambiar de tab (en `auto` coincide con el tema, igual que v1).
+
+### 13.5 Commits propuestos
+
+Los cambios de código no se pueden separar en commits que compilen por sí solos (`routes.ts`, `types/navigation.ts`, `MainTabNavigator.tsx` y `HomeScreen.tsx` los comparten todos), así que va **un commit de código + uno de documento**. Nota: los archivos v1 tocados conservan su estilo; solo las líneas cambiadas siguen Prettier.
+
+```bash
+git add -A src/navigation src/constants/routes.ts src/types/navigation.ts src/hooks/useTabBarMetrics.ts src/features/core33/core33Entry.ts src/features/core33/useOpenCore33.ts src/features/home/components/HomeHeader.tsx src/screens __tests__/core33Entry.test.ts __tests__/safeGoBack.test.ts
+git commit -m "feat(nav): v2 navigation with shared root stack, floating tab bar and Comunidad tab" -m "Tabs: Inicio, Entrenos, ELLIE, Progreso, Comunidad. Perfil leaves the tab bar and opens from the avatar (temporary entry on Inicio, TEMP-01). Detail and immersive screens live once in the root stack with typed routes; removes the per-tab stacks, duplicated routes and getParent/routeNames hacks. Single Core 33 entry point." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+git add docs/migration/MIGRATION_PROGRESS.md
+git commit -m "docs: phase 4 navigation" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
