@@ -1,6 +1,7 @@
 import {
   awardGamificationEvent,
   awardGamificationEventBestEffort,
+  normalizeAwardResult,
 } from '@app/services/supabase/gamification';
 import {getSupabaseClient} from '@app/services/supabase/client';
 
@@ -14,11 +15,12 @@ describe('awardGamificationEvent', () => {
   test('envía el contrato remoto y normaliza la respuesta', async () => {
     const rpc = jest.fn().mockResolvedValue({
       data: {
-        already_processed: false,
-        points_awarded: 50,
-        badges_unlocked: ['first_workout'],
-        missing_badges: [],
+        awarded: true,
+        event_id: 'event-1',
+        points_added: 50,
         total_points: 275,
+        new_badges: ['first_workout'],
+        reason: null,
       },
       error: null,
     });
@@ -34,10 +36,11 @@ describe('awardGamificationEvent', () => {
         metadata: {workoutId: 'workout-456'},
       }),
     ).resolves.toEqual({
+      awarded: true,
       alreadyProcessed: false,
+      reason: null,
       pointsAwarded: 50,
       badgesUnlocked: ['first_workout'],
-      missingBadges: [],
       totalPoints: 275,
     });
 
@@ -48,6 +51,28 @@ describe('awardGamificationEvent', () => {
       _badge_ids: ['first_workout'],
       _metadata: {workoutId: 'workout-456'},
     });
+  });
+
+  test('envía una referencia vacía en eventos sin referencia', async () => {
+    const rpc = jest.fn().mockResolvedValue({
+      data: {awarded: true, points_added: 0, new_badges: ['quiz_master']},
+      error: null,
+    });
+
+    mockedGetSupabaseClient.mockReturnValue({rpc} as any);
+
+    await awardGamificationEvent({
+      eventType: 'quiz_master_unlocked',
+      badgeIds: ['quiz_master'],
+    });
+
+    expect(rpc).toHaveBeenCalledWith(
+      'award_gamification_event',
+      expect.objectContaining({
+        _event_type: 'quiz_master_unlocked',
+        _reference_id: '',
+      }),
+    );
   });
 
   test('propaga errores de la RPC sin hacer escrituras alternativas', async () => {
@@ -89,5 +114,36 @@ describe('awardGamificationEvent', () => {
       expect.any(Error),
     );
     warn.mockRestore();
+  });
+});
+
+describe('normalizeAwardResult', () => {
+  test('marca los duplicados sin puntos ni badges', () => {
+    const result = normalizeAwardResult({
+      awarded: false,
+      points_added: 0,
+      total_points: 310,
+      new_badges: [],
+      reason: 'duplicate',
+    });
+
+    expect(result.awarded).toBe(false);
+    expect(result.alreadyProcessed).toBe(true);
+    expect(result.pointsAwarded).toBe(0);
+    expect(result.totalPoints).toBe(310);
+  });
+
+  test('tolera respuestas vacías o mal formadas', () => {
+    expect(normalizeAwardResult(null)).toEqual({
+      awarded: false,
+      alreadyProcessed: false,
+      reason: null,
+      pointsAwarded: 0,
+      badgesUnlocked: [],
+      totalPoints: 0,
+    });
+    expect(
+      normalizeAwardResult({new_badges: ['first_pr', 3, null]}).badgesUnlocked,
+    ).toEqual(['first_pr']);
   });
 });

@@ -2,27 +2,38 @@ import { getSupabaseClient } from '@app/services/supabase/client';
 import type { BadgeId } from '@app/shared';
 import type { Database, Json } from '@app/types/supabase';
 
+// Event catalogue of the backend (docs/backend/BACKEND_SUMMARY.md §6). The
+// server decides points and badges from it; in `strict` mode it ignores the
+// points sent by the app.
 export type GamificationEventType =
-  | 'quiz_completed'
-  | 'core33_day_completed'
-  | 'core33_completed'
+  | 'workout_completed'
+  | 'custom_workout_created'
   | 'personal_record_created'
   | 'nutrition_activated'
   | 'nutrition_logged'
-  | 'workout_completed'
-  | 'custom_workout_created';
+  | 'hydration_logged'
+  | 'quiz_completed'
+  | 'quiz_master_unlocked'
+  | 'core33_day_completed'
+  | 'core33_streak_7'
+  | 'core33_completed';
 
 export type GamificationAwardResult = {
+  // false when nothing was granted (duplicate, or rejected in strict mode).
+  awarded: boolean;
   alreadyProcessed: boolean;
+  // `duplicate`, `unknown_event_type`, `invalid_reference`, `daily_limit`…
+  reason: string | null;
   pointsAwarded: number;
   badgesUnlocked: BadgeId[];
-  missingBadges: string[];
   totalPoints: number;
 };
 
 type AwardGamificationEventParams = {
   eventType: GamificationEventType;
-  referenceId: string;
+  // Format per event in BACKEND_SUMMARY §6. Omitted for once-per-user events
+  // (quiz_master_unlocked).
+  referenceId?: string;
   points?: number;
   badgeIds?: BadgeId[];
   metadata?: Json;
@@ -45,25 +56,22 @@ function getClient() {
   return client;
 }
 
-function normalizeResult(data: any): GamificationAwardResult {
-  const alreadyProcessed =
-    data?.already_processed ?? data?.alreadyProcessed ?? false;
-  const pointsAwarded = data?.points_awarded ?? data?.pointsAwarded ?? 0;
-  const badgesUnlocked = data?.badges_unlocked ?? data?.badgesUnlocked ?? [];
-  const missingBadges = data?.missing_badges ?? data?.missingBadges ?? [];
-  const totalPoints = data?.total_points ?? data?.totalPoints ?? 0;
+// RPC response: {awarded, event_id, points_added, total_points, new_badges,
+// reason}.
+export function normalizeAwardResult(data: any): GamificationAwardResult {
+  const reason = typeof data?.reason === 'string' ? data.reason : null;
+  const pointsAwarded = data?.points_added;
+  const badgesUnlocked = data?.new_badges;
+  const totalPoints = data?.total_points;
 
   return {
-    alreadyProcessed: Boolean(alreadyProcessed),
+    awarded: data?.awarded === true,
+    alreadyProcessed: reason === 'duplicate',
+    reason,
     pointsAwarded: typeof pointsAwarded === 'number' ? pointsAwarded : 0,
     badgesUnlocked: Array.isArray(badgesUnlocked)
       ? badgesUnlocked.filter(
           (badgeId: unknown): badgeId is BadgeId => typeof badgeId === 'string',
-        )
-      : [],
-    missingBadges: Array.isArray(missingBadges)
-      ? missingBadges.filter(
-          (badgeId: unknown): badgeId is string => typeof badgeId === 'string',
         )
       : [],
     totalPoints: typeof totalPoints === 'number' ? totalPoints : 0,
@@ -76,7 +84,7 @@ export async function awardGamificationEvent(
   const client = getClient();
   const args: AwardGamificationEventArgs = {
     _event_type: params.eventType,
-    _reference_id: params.referenceId,
+    _reference_id: params.referenceId ?? '',
     _points: params.points ?? 0,
     _badge_ids: params.badgeIds ?? [],
     _metadata: params.metadata ?? {},
@@ -90,7 +98,7 @@ export async function awardGamificationEvent(
     throw error;
   }
 
-  return normalizeResult(data);
+  return normalizeAwardResult(data);
 }
 
 export async function awardGamificationEventBestEffort(

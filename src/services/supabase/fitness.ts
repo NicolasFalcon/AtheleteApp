@@ -1015,6 +1015,7 @@ export async function addHydrationAmount(params: {
       throw error;
     }
 
+    await awardHydrationLogged(today);
     return;
   }
 
@@ -1032,4 +1033,17 @@ export async function addHydrationAmount(params: {
   if (error) {
     throw error;
   }
+
+  await awardHydrationLogged(today);
+}
+
+// One event per day (reference = local date); the server decides the
+// hydration badges. A failure never undoes the saved water.
+async function awardHydrationLogged(date: string) {
+  await awardGamificationEventBestEffort({
+    source: 'hydration-log',
+    eventType: 'hydration_logged',
+    referenceId: date,
+    metadata: { date },
+  });
 }

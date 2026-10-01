@@ -193,7 +193,8 @@ export function QuizQuestionScreen({navigation, route}: Props) {
         categoryIcon: route.params.categoryIcon,
         correctCount,
         totalQuestions: questions.length,
-        pointsEarned: totalEarned,
+        // The server decides the quiz points; fall back to the saved attempt.
+        pointsEarned: result.pointsAwarded ?? result.attempt.pointsEarned,
         score: Math.round((correctCount / questions.length) * 100),
         isPerfect,
         unlockedBadges: result.unlockedBadges,

@@ -106,14 +106,15 @@ describe('submitQuizAttempt', () => {
       {data: createAttemptRow(), error: null},
     ]);
     mockedAwardGamificationEvent.mockResolvedValue({
+      awarded: true,
       alreadyProcessed: false,
-      pointsAwarded: 35,
+      reason: null,
+      pointsAwarded: 40,
       badgesUnlocked: ['first_quiz'],
-      missingBadges: [],
-      totalPoints: 35,
+      totalPoints: 40,
     });
 
-    await submitQuizAttempt({
+    const result = await submitQuizAttempt({
       attemptId: createAttemptRow().id,
       userId: 'user-1',
       categoryId: 'category-1',
@@ -126,6 +127,9 @@ describe('submitQuizAttempt', () => {
     expect(insert).toHaveBeenCalledTimes(2);
     expect(insert.mock.calls[0][0]).toHaveProperty('answers', answers);
     expect(insert.mock.calls[1][0]).not.toHaveProperty('answers');
+    // The server decides the points (40), not what the app sent (35).
+    expect(result.pointsAwarded).toBe(40);
+    expect(result.unlockedBadges).toEqual(['first_quiz']);
     warn.mockRestore();
   });
 

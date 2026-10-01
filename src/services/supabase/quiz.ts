@@ -193,9 +193,9 @@ async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
     allCategoryIds.length > 0 &&
     allCategoryIds.every(id => perfectCategories.has(id))
   ) {
+    // Once per user: no reference (the server enforces it).
     const awardResult = await awardGamificationEvent({
-      eventType: 'quiz_completed',
-      referenceId: 'quiz_master',
+      eventType: 'quiz_master_unlocked',
       badgeIds: ['quiz_master'],
       metadata: {
         categoryId,
@@ -220,6 +220,10 @@ export async function submitQuizAttempt(params: {
 }): Promise<{
   attempt: QuizAttempt;
   unlockedBadges: string[];
+  // Points granted by the server for this attempt (it computes them from the
+  // saved attempt, not from what the app sends). null when nothing was
+  // granted now (duplicate retry or reward failure).
+  pointsAwarded: number | null;
 }> {
   const client = getClient();
 
@@ -290,10 +294,12 @@ export async function submitQuizAttempt(params: {
   }
 
   const unlockedBadges: string[] = [];
+  let pointsAwarded: number | null = null;
   try {
     const attemptAward = await awardGamificationEvent({
       eventType: 'quiz_completed',
       referenceId: String(data.id),
+      // Informative only: the server takes the points from quiz_attempts.
       points: params.pointsEarned,
       badgeIds: ['first_quiz'],
       metadata: {
@@ -303,6 +309,10 @@ export async function submitQuizAttempt(params: {
         totalQuestions: params.totalQuestions,
       },
     });
+
+    if (attemptAward.awarded) {
+      pointsAwarded = attemptAward.pointsAwarded;
+    }
 
     if (attemptAward.badgesUnlocked.includes('first_quiz')) {
       unlockedBadges.push('first_quiz');
@@ -337,5 +347,6 @@ export async function submitQuizAttempt(params: {
       answers: Array.isArray(data.answers) ? data.answers : params.answers,
     },
     unlockedBadges,
+    pointsAwarded,
   };
 }

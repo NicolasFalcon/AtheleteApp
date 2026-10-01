@@ -362,8 +362,8 @@ export async function toggleCore33Habit(params: {
     const streak = getCurrentChallengeStreak(params.challenge, nextHabitLogs);
     if (streak >= 7) {
       await awardGamificationEvent({
-        eventType: 'core33_day_completed',
-        referenceId: `${params.challenge.id}:streak_7`,
+        eventType: 'core33_streak_7',
+        referenceId: params.challenge.id,
         badgeIds: ['streak_7_days'],
         metadata: {
           challengeId: params.challenge.id,
