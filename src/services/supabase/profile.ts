@@ -105,6 +105,8 @@ export async function fetchProfile(
 export async function updateOnboardingProfile(
   userId: string,
   onboarding: OnboardingData,
+  // v2 onboarding asks the name again (prefilled from sign-up).
+  name?: string,
 ): Promise<void> {
   const client = getSupabaseClient();
 
@@ -124,6 +126,10 @@ export async function updateOnboardingProfile(
       weight: onboarding.weight,
       height: onboarding.height,
       training_days_per_week: onboarding.trainingDaysPerWeek,
+      ...(onboarding.availableEquipment
+        ? { available_equipment: onboarding.availableEquipment }
+        : {}),
+      ...(name ? { name } : {}),
       onboarding_completed: true,
       updated_at: new Date().toISOString(),
     } as ProfileUpdate)

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   BottomTabBar,
   createBottomTabNavigator,
@@ -25,6 +26,7 @@ import { WorkoutsStackNavigator } from '@app/navigation/WorkoutsStackNavigator';
 import { TabBarMotionProvider } from '@app/providers/TabBarMotionProvider';
 import type { AppTheme } from '@app/theme/theme';
 import type { MainTabParamList } from '@app/types/navigation';
+import { consumePostOnboardingTab } from '@app/lib/postOnboarding';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -145,6 +147,10 @@ function renderTabIcon(
 }
 
 export function MainTabNavigator() {
+  // Right after the onboarding the user may have chosen "Hablar con ELLIE".
+  const [initialTab] = useState(
+    () => consumePostOnboardingTab() ?? TAB_ROUTES.Home,
+  );
   const { theme } = useAppTheme();
 
   const styles = StyleSheet.create({
@@ -181,6 +187,7 @@ export function MainTabNavigator() {
   return (
     <TabBarMotionProvider>
       <Tab.Navigator
+        initialRouteName={initialTab}
         tabBar={renderFloatingTabBar}
         screenOptions={({ route }) => {
           const tabName = route.name as keyof MainTabParamList;

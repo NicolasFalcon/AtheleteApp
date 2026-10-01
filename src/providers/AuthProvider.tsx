@@ -46,7 +46,10 @@ type AuthContextValue = {
   passwordRecoveryError: string;
   updateOnboardingDraft: (patch: Partial<OnboardingData>) => void;
   resetOnboardingDraft: () => void;
-  completeOnboarding: (data: OnboardingData) => Promise<void>;
+  completeOnboarding: (data: OnboardingData, name?: string) => Promise<void>;
+  // v2: writes the onboarding without refreshing the profile, so the app does
+  // not leave the ELLIE welcome; refreshProfile() then enters the main tabs.
+  saveOnboardingProfile: (data: OnboardingData, name?: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -422,16 +425,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
     setOnboardingDraft(buildDraft(profile));
   }, [profile]);
 
-  const completeOnboarding = useCallback(
-    async (data: OnboardingData) => {
+  const saveOnboardingProfile = useCallback(
+    async (data: OnboardingData, name?: string) => {
       if (!session) {
         throw new Error('No hay una sesión activa.');
       }
 
-      await updateOnboardingProfile(session.user.id, data);
+      await updateOnboardingProfile(session.user.id, data, name);
+    },
+    [session],
+  );
+
+  const completeOnboarding = useCallback(
+    async (data: OnboardingData, name?: string) => {
+      await saveOnboardingProfile(data, name);
       await refreshProfile();
     },
-    [refreshProfile, session],
+    [refreshProfile, saveOnboardingProfile],
   );
 
   const signOut = useCallback(async () => {
@@ -470,10 +480,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       updateOnboardingDraft,
       resetOnboardingDraft,
       completeOnboarding,
+      saveOnboardingProfile,
       signOut,
     }),
     [
       completeOnboarding,
+      saveOnboardingProfile,
       flow,
       isHydrating,
       onboardingDraft,

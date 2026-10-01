@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EmailIcon, SuccessIcon } from '@app/assets/icons';
-import { AuthButton } from '@app/components/auth/AuthButton';
-import { BrandHeader } from '@app/components/auth/BrandHeader';
-import { AuthScreenLayout } from '@app/components/auth/AuthScreenLayout';
-import { AuthTextField } from '@app/components/auth/AuthTextField';
-import { FormMessage } from '@app/components/auth/FormMessage';
+import { Lock, Mail } from 'lucide-react-native';
+import {
+  AuthFormLayout,
+  Button,
+  TextField,
+  TextV2,
+  useThemeV2,
+  useToast,
+} from '@app/components/v2';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
-import { useAppTheme } from '@app/hooks/useAppTheme';
-import {safeGoBack} from '@app/navigation/safeGoBack';
+import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AuthStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ForgotPassword'>;
@@ -19,20 +21,24 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+// AUTH_04 / AUTH_05 · Recuperar contraseña (Auth.dc.html). One field, one
+// action; once sent, the same space confirms and offers to resend.
 export function ForgotPasswordScreen({ navigation }: Props) {
   const { requestPasswordReset, isSupabaseConfigured } = useAuth();
-  const { theme } = useAppTheme();
+  const { colors, scene, shadow, mode } = useThemeV2();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const styles = createStyles(theme);
 
-  const handleSubmit = async () => {
+  const goToLogin = () => safeGoBack(navigation, [AUTH_ROUTES.Login]);
+
+  const send = async (isResend: boolean) => {
     setError('');
 
-    if (!email.trim() || !isValidEmail(email)) {
-      setError('Ingresa un correo válido');
+    if (!email.trim() || !isValidEmail(email.trim())) {
+      setError('Escribe un correo válido.');
       return;
     }
 
@@ -41,11 +47,14 @@ export function ForgotPasswordScreen({ navigation }: Props) {
     try {
       await requestPasswordReset(email.trim());
       setSent(true);
+      if (isResend) {
+        toast.show('Te enviamos otro enlace');
+      }
     } catch (nextError) {
       setError(
         nextError instanceof Error
           ? nextError.message
-          : 'No se pudo enviar el correo de recuperación',
+          : 'No pudimos enviar el enlace. Inténtalo de nuevo.',
       );
     } finally {
       setSubmitting(false);
@@ -54,84 +63,140 @@ export function ForgotPasswordScreen({ navigation }: Props) {
 
   if (sent) {
     return (
-      <AuthScreenLayout
-        centered
-        footer={
-          <AuthButton
-            label="Volver a iniciar sesión"
-            onPress={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
-            variant="secondary"
-          />
-        }
-        header={
-          <BrandHeader
-            compact
-            subtitle="Abre el enlace desde este dispositivo para crear tu nueva contraseña en Athelete."
-            title="Revisa tu bandeja de entrada"
-          />
-        }
-        onBack={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
+      <AuthFormLayout
+        barTitle="Recuperar contraseña"
+        onBack={goToLogin}
+        stateKey="sent"
       >
-        <View style={styles.successBody}>
-          <SuccessIcon color={theme.colors.textPrimary} />
-          <FormMessage
-            appearance="dark"
-            message={`Enviamos un enlace de recuperación a ${email}.`}
-            tone="success"
-          />
+        <View
+          style={[
+            styles.disc,
+            styles.sentDisc,
+            {
+              backgroundColor: colors.surface.raised,
+              boxShadow:
+                mode === 'light'
+                  ? '0 1px 2px rgba(0,0,0,.05), 0 10px 24px rgba(0,0,0,.07)'
+                  : shadow.subtle,
+            },
+          ]}
+        >
+          <Mail color={colors.text.primary} size={26} strokeWidth={2} />
         </View>
-      </AuthScreenLayout>
+        <View style={styles.texts}>
+          <TextV2 variant="title24" accessibilityRole="header">
+            Revisa tu correo
+          </TextV2>
+          <TextV2 variant="body" tone="secondary">
+            Te enviamos un enlace a{' '}
+            <TextV2 variant="bodyStrong">{email.trim()}</TextV2>. Ábrelo desde
+            este teléfono para crear tu contraseña nueva.
+          </TextV2>
+        </View>
+        {error ? (
+          <TextV2
+            variant="meta"
+            color={
+              mode === 'light' ? colors.ember.deep : colors.ember.textOnDark
+            }
+          >
+            {error}
+          </TextV2>
+        ) : null}
+        <Button
+          label="Volver a iniciar sesión"
+          onPress={goToLogin}
+          style={styles.cta}
+        />
+        <Button
+          variant="text"
+          label="Reenviar"
+          loading={submitting}
+          loadingLabel="Reenviando…"
+          onPress={() => send(true)}
+          style={styles.resend}
+        />
+      </AuthFormLayout>
     );
   }
 
   return (
-    <AuthScreenLayout
-      backLabel="Volver"
-      header={
-        <BrandHeader
-          compact
-          subtitle="Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña."
-          title="¿Olvidaste tu contraseña?"
-        />
-      }
-      onBack={() => safeGoBack(navigation, [AUTH_ROUTES.Login])}
-    >
-      {error ? (
-        <FormMessage appearance="dark" message={error} tone="error" />
-      ) : null}
+    <AuthFormLayout barTitle="Recuperar contraseña" onBack={goToLogin}>
+      <View
+        style={[
+          styles.disc,
+          {
+            backgroundColor: mode === 'light' ? scene.plate : scene.deep,
+          },
+        ]}
+      >
+        <Lock color={scene.onDark.primary} size={24} strokeWidth={2} />
+      </View>
+      <View style={styles.texts}>
+        <TextV2 variant="title24" accessibilityRole="header">
+          ¿Olvidaste tu contraseña?
+        </TextV2>
+        <TextV2 variant="body" tone="secondary">
+          Escribe tu correo y te enviamos un enlace para crear una nueva.
+        </TextV2>
+      </View>
       {!isSupabaseConfigured ? (
-        <FormMessage
-          appearance="dark"
-          message="Supabase no está configurado todavía. Agrega SUPABASE_URL y SUPABASE_ANON_KEY en .env para habilitar este flujo."
-          tone="neutral"
-        />
+        <TextV2 variant="meta" tone="secondary">
+          Supabase no está configurado todavía. Agrega SUPABASE_URL y
+          SUPABASE_ANON_KEY en .env para habilitar este flujo.
+        </TextV2>
       ) : null}
-      <AuthTextField
-        autoCapitalize="none"
-        icon={<EmailIcon color={theme.colors.textSecondary} />}
-        keyboardType="email-address"
+      <TextField
         label="Correo electrónico"
-        onChangeText={setEmail}
-        placeholder="tu@ejemplo.com"
-        textContentType="emailAddress"
+        icon={Mail}
         value={email}
+        onChangeText={value => {
+          setEmail(value);
+          setError('');
+        }}
+        error={error || undefined}
+        placeholder="tu@ejemplo.com"
+        autoCapitalize="none"
+        autoComplete="email"
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        returnKeyType="send"
+        onSubmitEditing={() => send(false)}
       />
-      <AuthButton
-        label={submitting ? 'Enviando…' : 'Enviar enlace'}
+      <Button
+        label="Enviar enlace"
         loading={submitting}
-        onPress={handleSubmit}
+        loadingLabel="Enviando…"
+        onPress={() => send(false)}
+        style={styles.ctaForm}
       />
-    </AuthScreenLayout>
+    </AuthFormLayout>
   );
 }
 
-type Theme = ReturnType<typeof useAppTheme>['theme'];
-
-function createStyles(theme: Theme) {
-  return StyleSheet.create({
-    successBody: {
-      alignItems: 'center',
-      gap: theme.spacing.xl,
-    },
-  });
-}
+const styles = StyleSheet.create({
+  disc: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // The confirmation starts 20 pt lower than the form (150 vs 130).
+  sentDisc: {
+    marginTop: 20,
+  },
+  texts: {
+    gap: 8,
+  },
+  ctaForm: {
+    marginTop: 4,
+  },
+  cta: {
+    marginTop: 6,
+  },
+  resend: {
+    alignSelf: 'center',
+    height: 40,
+  },
+});

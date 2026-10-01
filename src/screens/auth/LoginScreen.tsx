@@ -1,36 +1,43 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { useRef, useState } from 'react';
+import { StyleSheet, View, type TextInput } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EmailIcon, PrivacyIcon } from '@app/assets/icons';
-import { AuthButton } from '@app/components/auth/AuthButton';
-import { BrandHeader } from '@app/components/auth/BrandHeader';
-import { AuthScreenLayout } from '@app/components/auth/AuthScreenLayout';
-import { AuthTextField } from '@app/components/auth/AuthTextField';
-import { AuthThemeToggle } from '@app/components/auth/AuthTopActions';
-import { FormMessage } from '@app/components/auth/FormMessage';
+import { Lock, Mail } from 'lucide-react-native';
+import {
+  AuthHeroLayout,
+  Button,
+  PressableScale,
+  TextField,
+  TextV2,
+  ThemeToggleButton,
+} from '@app/components/v2';
 import { AUTH_ROUTES } from '@app/constants/routes';
+import {
+  toLoginError,
+  type LoginErrorView,
+} from '@app/features/auth/loginError';
 import { useAuth } from '@app/hooks/useAuth';
-import { useAppTheme } from '@app/hooks/useAppTheme';
 import type { AuthStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
+
+const HERO_PHOTO = require('@app/assets/v2/photos/overhead.jpg');
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+// AUTH_01 / AUTH_02 · Iniciar sesión (Auth.dc.html).
 export function LoginScreen({ navigation }: Props) {
   const { signIn, isSupabaseConfigured } = useAuth();
-  const { theme } = useAppTheme();
+  const passwordRef = useRef<TextInput>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<LoginErrorView | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
-  const styles = createStyles(theme);
 
   const validate = () => {
     const nextErrors: typeof fieldErrors = {};
@@ -52,7 +59,7 @@ export function LoginScreen({ navigation }: Props) {
   };
 
   const handleSubmit = async () => {
-    setError('');
+    setError(null);
 
     if (!validate()) {
       return;
@@ -64,110 +71,120 @@ export function LoginScreen({ navigation }: Props) {
       await signIn(email.trim(), password);
     } catch (nextError) {
       setError(
-        nextError instanceof Error
-          ? nextError.message
-          : 'Credenciales inválidas',
+        toLoginError(
+          nextError instanceof Error
+            ? nextError.message
+            : 'Correo o contraseña incorrectos.',
+        ),
       );
     } finally {
       setSubmitting(false);
     }
   };
 
+  // Typing clears the error (handoff §7 · Error · credenciales).
+  const clearErrors = (field: 'email' | 'password') => {
+    setError(null);
+    setFieldErrors(current =>
+      current[field] ? { ...current, [field]: undefined } : current,
+    );
+  };
+
   return (
-    <AuthScreenLayout
-      centered
+    <AuthHeroLayout
+      photo={HERO_PHOTO}
+      title="Qué bueno verte de nuevo."
+      topRight={<ThemeToggleButton />}
       footer={
-        <Text style={styles.footerText}>
-          ¿No tienes cuenta?{' '}
-          <Text
+        <View style={styles.footer}>
+          <TextV2 variant="body" tone="secondary">
+            ¿Primera vez aquí?
+          </TextV2>
+          <PressableScale
+            accessibilityRole="button"
+            hitSlop={10}
             onPress={() => navigation.navigate(AUTH_ROUTES.Register)}
-            style={styles.footerLink}
           >
-            Crear cuenta
-          </Text>
-        </Text>
+            <TextV2 variant="bodyStrong">Crear cuenta</TextV2>
+          </PressableScale>
+        </View>
       }
-      header={
-        <BrandHeader
-          showLogo
-          subtitle="Inicia sesión para continuar con tu progreso."
-          title="Qué bueno verte de nuevo"
-        />
-      }
-      topActions={<AuthThemeToggle />}
     >
-      {error ? (
-        <FormMessage appearance="dark" message={error} tone="error" />
-      ) : null}
       {!isSupabaseConfigured ? (
-        <FormMessage
-          appearance="dark"
-          message="Supabase no está configurado todavía. Agrega SUPABASE_URL y SUPABASE_ANON_KEY en .env para habilitar este flujo."
-          tone="neutral"
-        />
+        <TextV2 variant="meta" tone="secondary">
+          Supabase no está configurado todavía. Agrega SUPABASE_URL y
+          SUPABASE_ANON_KEY en .env para habilitar este flujo.
+        </TextV2>
       ) : null}
-      <AuthTextField
-        autoCapitalize="none"
-        error={fieldErrors.email}
-        icon={<EmailIcon color={theme.colors.textSecondary} />}
-        keyboardType="email-address"
+      <TextField
         label="Correo electrónico"
-        onChangeText={setEmail}
-        placeholder="tu@ejemplo.com"
-        textContentType="emailAddress"
+        icon={Mail}
         value={email}
-      />
-      <AuthTextField
+        onChangeText={value => {
+          setEmail(value);
+          clearErrors('email');
+        }}
+        error={fieldErrors.email}
+        placeholder="tu@ejemplo.com"
         autoCapitalize="none"
-        error={fieldErrors.password}
-        icon={<PrivacyIcon color={theme.colors.textSecondary} />}
-        label="Contraseña"
-        onChangeText={setPassword}
-        placeholder="••••••••"
-        passwordToggle
-        textContentType="password"
-        value={password}
+        autoComplete="email"
+        keyboardType="email-address"
+        textContentType="emailAddress"
+        returnKeyType="next"
+        onSubmitEditing={() => passwordRef.current?.focus()}
       />
-      <Pressable
+      <TextField
+        ref={passwordRef}
+        label="Contraseña"
+        icon={Lock}
+        secure
+        value={password}
+        onChangeText={value => {
+          setPassword(value);
+          clearErrors('password');
+        }}
+        error={fieldErrors.password ?? error?.text}
+        invalid={
+          Boolean(fieldErrors.password) || Boolean(error?.ringOnPassword)
+        }
+        placeholder="Tu contraseña"
+        autoCapitalize="none"
+        autoComplete="password"
+        textContentType="password"
+        returnKeyType="go"
+        onSubmitEditing={handleSubmit}
+      />
+      <PressableScale
+        accessibilityRole="button"
         hitSlop={8}
         onPress={() => navigation.navigate(AUTH_ROUTES.ForgotPassword)}
-        style={styles.helper}
+        style={styles.forgot}
       >
-        <Text style={styles.helperLink}>¿Olvidaste tu contraseña?</Text>
-      </Pressable>
-      <AuthButton
-        label={submitting ? 'Iniciando sesión…' : 'Iniciar sesión'}
+        <TextV2 variant="label">¿Olvidaste tu contraseña?</TextV2>
+      </PressableScale>
+      <Button
+        label="Iniciar sesión"
         loading={submitting}
+        loadingLabel="Entrando…"
         onPress={handleSubmit}
+        style={styles.cta}
       />
-    </AuthScreenLayout>
+    </AuthHeroLayout>
   );
 }
 
-type Theme = ReturnType<typeof useAppTheme>['theme'];
-
-function createStyles(theme: Theme) {
-  return StyleSheet.create({
-    footerText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      textAlign: 'center',
-    },
-    footerLink: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontWeight: theme.typography.weights.semibold,
-    },
-    helper: {
-      alignSelf: 'flex-end',
-      paddingVertical: theme.spacing.xs,
-    },
-    helperLink: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.medium,
-    },
-  });
-}
+const styles = StyleSheet.create({
+  forgot: {
+    alignSelf: 'flex-end',
+    paddingVertical: 2,
+  },
+  cta: {
+    marginTop: 6,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+});

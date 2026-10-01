@@ -15,10 +15,13 @@ export type OnboardingData = {
   profilePhotoUrl: string | null;
   goal: OnboardingGoal;
   birthDate: string;
-  gender: ProfileGender;
+  // Not asked by the v2 onboarding (user decision 2026-09-30): null.
+  gender: ProfileGender | null;
   weight: number;
   height: number;
   trainingDaysPerWeek: number;
+  // v2 onboarding (step "equipamiento"); written only when provided.
+  availableEquipment?: string[];
 };
 
 export type ProfileRecord = {

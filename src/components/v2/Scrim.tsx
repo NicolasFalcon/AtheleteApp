@@ -8,6 +8,16 @@ const RECIPES = {
     colors: ['rgba(20,19,18,0)', 'rgba(20,19,18,.55)', 'rgba(20,19,18,.96)'],
     locations: [0, 0.5, 1],
   },
+  // Auth heroes (Login, Crear cuenta): darker top for the glass buttons.
+  auth: {
+    colors: ['rgba(20,19,18,.55)', 'rgba(20,19,18,.12)', 'rgba(20,19,18,.88)'],
+    locations: [0, 0.32, 1],
+  },
+  // Crear cuenta: lower hero, softer middle.
+  authShort: {
+    colors: ['rgba(20,19,18,.5)', 'rgba(20,19,18,.2)', 'rgba(20,19,18,.8)'],
+    locations: [0, 0.45, 1],
+  },
   hero: {
     colors: [
       'rgba(20,19,18,.6)',
@@ -20,8 +30,10 @@ const RECIPES = {
   },
 } as const;
 
+export type ScrimVariant = keyof typeof RECIPES;
+
 export type ScrimProps = {
-  variant?: keyof typeof RECIPES;
+  variant?: ScrimVariant;
   style?: StyleProp<ViewStyle>;
 };
 

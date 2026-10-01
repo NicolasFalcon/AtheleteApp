@@ -9,6 +9,8 @@ export type ColorsV2 = {
     track: string;
     skeleton: string;
     wearPlate: string;
+    // Input fill (prototype Auth/Onboarding fields).
+    field: string;
   };
   divider: string;
   border: {
@@ -93,6 +95,7 @@ export const lightColorsV2: ColorsV2 = {
     track: palette.track,
     skeleton: palette.canvas,
     wearPlate: palette.canvas,
+    field: palette.muted,
   },
   divider: palette.divider,
   border: {
@@ -159,6 +162,7 @@ export const darkColorsV2: ColorsV2 = {
     track: palette.darkTrack,
     skeleton: palette.darkRaised2,
     wearPlate: palette.darkRaised,
+    field: palette.darkTrack,
   },
   divider: palette.darkDivider,
   border: {

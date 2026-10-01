@@ -12,6 +12,7 @@ export const AUTH_ROUTES = {
 } as const;
 
 export const ONBOARDING_ROUTES = {
+  Flow: 'Flow',
   Welcome: 'Welcome',
   Avatar: 'Avatar',
   BirthDate: 'BirthDate',
