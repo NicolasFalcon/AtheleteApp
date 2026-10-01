@@ -17,7 +17,7 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 | 0.5 · Prerrequisitos y bugs | ✅ Cerrada (bugs B1/B2 pendientes de backend, §8.2; dependencias movidas a la fase 2) | 2026-09-30 |
 | 1 · Tokens | ✅ Cerrada (iOS; Android pendiente, §8.1) | 2026-09-30 |
 | 2 · Primitivas (incluye instalar las 4 dependencias) | 🟡 Hecha en iOS, pendiente de revisión y commits (ver §11) | — |
-| 3 · Pilotos (Ajustes, Inicio, Detalle de rutina, Progreso, hoja Registrar récord) | ⏳ | — |
+| 3 · Recorrido del usuario: Auth y Onboarding (ver §12) | 🟡 Implementado sin validación visual (sin Xcode); Inicio, Ajustes, Detalle de rutina y Progreso después | — |
 | 4 · Navegación final | ⏳ | — |
 | 5 · Restyling por módulo | ⏳ | — |
 | 6 · Estados del sistema | ⏳ | — |
@@ -322,6 +322,10 @@ Criterio: los valores exactos salen de los HTML; cada fila es una desviación do
 | D-32 | Plataforma | iconos SVG | `lucide-react-native`, trazo 2 | Decisión del usuario |
 | D-33 | Profile:switch (y cualquier escena) | Interruptor encendido con pomo blanco siempre (en Dark: blanco sobre marfil; en escena: blanco sobre blanco) | Pomo con el color de contenido invertido al encenderse: blanco sobre negro (Light), `#121212` sobre marfil (Dark) y sobre blanco (escena). Apagado: pomo blanco | Decisión del usuario (contraste); criterio "Selected: relleno con contenido invertido" (handoff §13) |
 | D-34 | Progress (Semana/Mes) | Segmented compacto: indicador blanco con sombra sobre pista muted | Mismo criterio que el Segmented grande en todos los modos: indicador `cta.primary` con texto `cta.primaryText`; `compact` solo cambia tamaño (30 pt) y tipo | Decisión del usuario (contraste en Dark/escena) |
+| D-35 | Auth (campos) | Handoff §4: inputs blancos con borde; error `#C23D0B` en ambos modos | HTML: relleno `#EFEEEA` / `#262422` sin borde (token `surface.field`); error `#C23D0B` en Light y `#FF8A5C` en Dark | Manda el HTML (decisión 1) |
+| D-36 | Auth (CTA inactiva) | Crear cuenta / Restablecer: CTA negra al 22 % (`rgba(18,18,18,.22)`) | Estado `disabled` de `Button` v2 (relleno `surface.muted` + texto `text.disabled`), igual que el resto de la app (handoff §3.3 `color.disabled`) | Coherencia del sistema |
+| D-37 | Auth:SLIDES[0] (Intro) | "Rutinas claras, técnica en 3D…" | "Rutinas claras, técnica en video…" — el modelo 3D está descartado (handoff §1 y §9, MoveKit) | Coherencia de producto |
+| D-38 | Auth:reset (requisitos) | Restablecer pide 8+, número y que coincidan (sin mayúscula) | Misma política que Crear cuenta (8+, número, mayúscula) + "Coinciden" (4 requisitos) | Decisión del usuario: una sola política de contraseña |
 
 Nota: en QuizDark, la ronda y el resultado son escenas oscuras en ambos modos; esas líneas deben ser idénticas a `Quiz.dc.html`.
 
@@ -608,6 +612,8 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 | `@react-native-community/blur@4.4` | **Blur real solo en iOS.** En Android: fondo sólido con `theme.v2.blur.androidFallbackAlpha` (.96) sobre `glass.*` (D-28) |
 | `boxShadow` | Sombras multicapa e `inset` de `theme.v2.shadow` en la nueva arquitectura |
 | Tipografía | Roboto con `fontVariant: ['tabular-nums']` |
+| Auth (fase 3) | Teclado: `KeyboardAvoidingView` solo en iOS; en Android depende de `adjustResize` (revisar que campo y CTA queden visibles) |
+| Onboarding (fase 3) | Selector de fecha nativo en diálogo (`display="default"`); back de Android vuelve a la pregunta anterior (`BackHandler`); regla de peso/altura con `snapToInterval` y háptica `selection` |
 
 ### 8.2 Pendiente backend
 
@@ -615,6 +621,10 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 |---|---|---|
 | BK-01 | RPC `award_gamification_event` falla (`42P10`) | Afecta a quiz y nutrición (comprobado) y previsiblemente al resto de eventos. Puntos y badges no se otorgan. Incluye el arreglo de B1 en la app |
 | BK-02 | Tipos de Supabase desactualizados | Faltan `personal_records`, `chat_messages`, `quiz_*`, `user_badges` |
+| BK-03 | Onboarding · nivel | El paso "¿Cuál es tu nivel?" se muestra pero no se guarda: no hay columna (p. ej. `profiles.training_level`) |
+| BK-04 | Onboarding · duración de sesión | "¿Cuánto dura tu sesión ideal?" se muestra pero no se guarda: no hay columna (p. ej. `profiles.session_minutes`) |
+| BK-05 | Onboarding · objetivo "Rendimiento" | Se guarda como `improve_health` (decisión del usuario 2026-09-30). Requiere un valor propio en `goal` y en sus consumidores (ELLIE, nutrición, Perfil) |
+| BK-06 | Onboarding · género y avatar | Ya no se piden (decisión del usuario: seguir el diseño). Usuarios nuevos: `gender = null` y sin avatar (iniciales hasta que se elija en Perfil). **Análisis (2026-09-30)**: en el repo no hay ningún cálculo que use el género (ni TMB/TDEE ni calorías; `daily_calorie_goal` solo se lee). Único uso: el contexto en texto de ELLIE (`shared/domain/ellie-context.ts:496`), que con `null` envía "Género declarado: No indicado". El código de la edge function `ellie-chat` (que genera los planes nutricionales) no está en este repo: **revisar en backend** si estima calorías con el género; si es así, pedirlo en ese momento (al pedir/activar un plan) cuando falte, sin añadirlo al onboarding |
 
 ---
 
@@ -763,3 +773,150 @@ Todos con `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 - Commits: `8cebf32` colores, `1858342` escenas, `ca77c85` tipografía/espaciado/radios, `8226341` sombras/blur/movimiento.
 - Verificación: `tsc`, `jest` (48/48) y lint en verde. Capturas de las 5 tabs en Light y Dark antes y después: 0 píxeles de diferencia fuera de la barra de estado; el bundle servido incluye los tokens nuevos.
 - Android: pendiente.
+
+---
+
+## 12. Fase 3 · Auth y Onboarding (recorrido del usuario)
+
+Orden: Login → Crear cuenta → Recuperar/Restablecer → Intro → Onboarding 8 pasos → Bienvenida de ELLIE. Desde el grupo 2 **sin Xcode** (reinstalación de IT): sin build, simulador, Maestro ni capturas; verificación solo con `tsc` + lint (+ `jest` si hay lógica). Nada de dependencias nativas nuevas.
+
+> **Commits de la fase 3**: usar la secuencia consolidada de **§12.7**. Los comandos de cada grupo (§12.1–§12.6) son orientativos: `index.ts`, `Scrim.tsx` y `AuthHeroLayout.tsx` acumulan cambios de varios grupos y esos commits sueltos no compilarían por separado.
+
+### 12.0 Pendiente de validación visual
+
+| Pantalla | Referencias (Light y Dark) | Estados a probar | Dudas / sin verificar |
+|---|---|---|---|
+| Login | `AUTH_01_LOGIN_*`, `AUTH_02_LOGIN_ERROR_*` | normal; error de credenciales (aro + sacudida + frase); errores de validación por campo; teclado abierto con contraseña enfocada; "Entrando…" | **Dark sin verificar** (la sesión se cortó antes de las capturas Dark). Recorte de la foto del hero en pantallas pequeñas. El título del hero queda bajo la barra de estado al hacer scroll con el teclado |
+| Crear cuenta | `AUTH_03_REGISTER_*` | vacía (CTA inactiva); requisitos cumpliéndose uno a uno (pop del check Ember); CTA activa; "Creando cuenta…"; error de Supabase (p. ej. correo ya registrado) bajo la contraseña; teclado con la contraseña enfocada (requisitos y CTA visibles); estado "Revisa tu correo" tras registrarse | Hero de 230 pt con foto `barra-mujer.jpg` (recorte); CTA inactiva con el estilo `disabled` v2 en vez de negro al 22 % (D-36); enlace "¿Ya tienes cuenta?" añadido (handoff §7, no está en el HTML); tracking del título 24 (−.015em en el token, 0 en el HTML) |
+| Recuperar contraseña | `AUTH_04_FORGOT_*`, `AUTH_05_FORGOT_SENT_*` | formulario; correo inválido (aro + frase); "Enviando…"; enlace enviado (disco del sobre con pop); "Reenviar" (toast "Te enviamos otro enlace"); teclado abierto | El disco del candado usa `scene.plate` / `scene.deep`; el disco del sobre en Dark usa `shadow.subtle` (borde) en vez del brillo blanco del HTML (D-15); "Reenviar" sale en `text.primary` (HTML: secundario) |
+| Restablecer contraseña | `AUTH_06_RESET_*`, `AUTH_07_RESET_SUCCESS_*` | requisitos en vivo (8, número, mayúscula, coinciden — D-38: 4 filas en vez de 3); CTA inactiva/activa; "Guardando…"; error de Supabase; éxito (check Ember 72 con halo); enlace caducado (estado nuevo, sin referencia); teclado con "Repite la contraseña" enfocada | Probar con un enlace real de recuperación (requiere P2/AppDelegate). "Para {correo}" sale del `session.user.email` de recuperación |
+| Intro deslizable | `ONB_01_INTRO` (escena: misma en Light y Dark) | deslizar entre las 3 fotos; "Siguiente" avanza; los puntos (22/6 pt) siguen al swipe; "Empezar" llama a `onComplete`; iPhone pequeño (el texto no debe chocar con los puntos) | Posición vertical del texto calculada sobre los controles fijos (no la del HTML, donde texto, puntos y CTA forman un bloque); la animación de cambio de texto del HTML (push) se sustituye por el propio swipe |
+| Onboarding · 8 pasos | `ONB_02_STEP_01_*` … `ONB_02_STEP_08_*` | cada paso con "Siguiente" inactivo hasta responder; back y back de Android entre pasos; transición (entra por la derecha al avanzar, por la izquierda al volver); nombre con teclado (CTA visible); fecha: hoja con el selector del sistema (iOS spinner) y "Listo"; peso/altura: arrastrar la regla (háptica por unidad, aguja fija, bordes desvanecidos); objetivo: tiles con foto y check Ember; nivel: barras + radio; días: − / + y la semana; equipamiento: multiselección con check Ember; duración: cápsulas con punto Ember en la recomendada; "Terminar" → Bienvenida | Regla: valores iniciales 70 kg / 170 cm (el HTML muestra 76/170 de ejemplo); el selector de fecha va en la `Sheet` v2 (el HTML solo dice "selector del sistema"); en el paso 1 no hay back (el usuario ya está dentro, sin intro previa); "Rendimiento" se guarda como `improve_health` |
+| Bienvenida de ELLIE | `ONB_03_ELLIE_WELCOME_*` | al aparecer guarda el perfil en segundo plano ("Guardando tu perfil…", salidas inactivas); guardado OK → "Ir a Inicio" → Inicio y "Hablar con ELLIE" → pestaña ELLIE ("Abriendo tu inicio…"); fallo al guardar (sin red) → frase de error + "Reintentar" en lugar de la primaria; resumen (días, min, objetivo) según las respuestas | La fila "Tu primera sesión" no tiene sesión real detrás (DA-27); el halo de la esfera (1,9× del HTML vs 128 + 34 pt); fondo de lino en Dark con `linen[2]` → `linen[3]` → `bg` |
+
+### 12.1 Grupo 1 · Login (AUTH_01, AUTH_02) — cerrado 2026-09-30
+
+- **Qué cambió**: `LoginScreen` reescrito con v2 (lógica de `signIn`, validación y navegación intactas). Nuevas primitivas: `TextField` (campo 54 pt, aro de error Ember profundo / Ember claro en oscuro, sacudida, ojo para contraseña), `Wordmark` (Λ + ATHELETE, PLACEHOLDER del logotipo), `ThemeToggleButton` (vidrio, luna/sol), `AuthHeroLayout` (foto + scrim `auth` + superficie que sube 28 pt; `KeyboardAvoidingView` + scroll al final en `keyboardDidShow` para que campo y CTA queden sobre el teclado). Token `surface.field` (`#EFEEEA` / `#262422`). Foto `src/assets/v2/photos/overhead.jpg` con `saturate(.4) contrast(1.1) brightness(.72)` horneado. Helper `features/auth/loginError.ts` + test.
+- **Desviaciones**: D-35 (abajo): relleno de campos `surface.field` en lugar de "blanco con borde" del handoff (manda el HTML). Error en oscuro con `#FF8A5C` (HTML) en vez de `#C23D0B` en ambos modos (handoff §4).
+- **Verificado** (antes del corte): Light normal, error de credenciales y teclado. Dark pendiente (§12.0).
+- **Bloqueos**: ninguno.
+- **Comandos git**:
+
+```bash
+git add src/theme/v2/colors.ts src/components/v2/{Scrim.tsx,TextField.tsx,Wordmark.tsx,ThemeToggleButton.tsx,AuthHeroLayout.tsx,index.ts} src/assets/v2/photos/overhead.jpg
+git commit -m "feat(ui): add v2 text field, wordmark, theme toggle and auth hero layout" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add src/screens/auth/LoginScreen.tsx src/features/auth/loginError.ts __tests__/loginError.test.ts
+git commit -m "feat(auth): migrate Login to v2 (AUTH_01, AUTH_02)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 12.2 Grupo 2 · Crear cuenta (AUTH_03) — 2026-09-30 (sin Xcode)
+
+- **Qué cambió**: `RegisterScreen` reescrito con v2: hero 230 pt (`barra-mujer.jpg` horneada `saturate(.4) contrast(1.08) brightness(.7)`, scrim `authShort` `.5 → .2 @45% → .8`, eyebrow "ATHELETE" 11/700 tracking .28em + título 24/600), back de vidrio, campos Nombre / Correo / Contraseña, **requisitos en vivo** (8 caracteres, número, mayúscula) con check Ember, CTA inactiva hasta cumplir todo, nota legal 12 terciaria. Tras `signUp` se mantiene el estado de verificación de correo (Supabase), con el estilo "Revisa tu correo" de AUTH_05.
+- **Primitivas nuevas**: `RequirementList` (aro 18 → check Ember con pop), `AuthFormLayout` (pantallas de Auth sin foto, usada también en el grupo 3). `AuthHeroLayout` admite `brand="eyebrow"` y `scrim`; `Scrim` añade `authShort`.
+- **Lógica**: `features/auth/passwordRules.ts` (+ test 2/2). `signUp(name, email, password)` sin cambios.
+- **Decisiones asumidas**: DA-16 se quita "Confirmar contraseña" (el diseño no la tiene; el ojo permite revisarla). DA-17 la política de contraseña del registro pasa a 8+ caracteres, número y mayúscula (solo UI; el login sigue aceptando contraseñas antiguas de 6+). DA-18 se mantiene el paso "Revisa tu correo" porque Supabase exige verificación (el prototipo salta a la Intro). DA-19 se añade "¿Ya tienes cuenta? Iniciar sesión" (handoff §7 lo lista como CTA secundaria).
+- **Desviaciones**: D-36 (CTA inactiva).
+- **Bloqueos**: sin Xcode, sin validación visual.
+- **Comandos git**:
+
+```bash
+git add src/components/v2/{RequirementList.tsx,AuthFormLayout.tsx,AuthHeroLayout.tsx,Scrim.tsx,index.ts} src/assets/v2/photos/barra-mujer.jpg src/features/auth/passwordRules.ts __tests__/passwordRules.test.ts
+git commit -m "feat(ui): add v2 requirement list and auth form layout" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add src/screens/auth/RegisterScreen.tsx
+git commit -m "feat(auth): migrate Crear cuenta to v2 with live password requirements (AUTH_03)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 12.3 Grupo 3 · Recuperar y Restablecer (AUTH_04 a AUTH_07) — 2026-09-30 (sin Xcode)
+
+- **Qué cambió**: `ForgotPasswordScreen` y `ResetPasswordScreen` reescritos sobre `AuthFormLayout` (barra con back 44 + título 15/600 secundario, contenido a 24 pt de la barra, campo y CTA sobre el teclado). Recuperar: disco oscuro con candado, título 24, campo, "Enviar enlace"; enviado: disco claro con el sobre, "Revisa tu correo", primaria "Volver a iniciar sesión" y "Reenviar" (vuelve a llamar a `requestPasswordReset` y confirma con toast). Restablecer: dos campos + requisitos en vivo, "Guardar contraseña" inactiva hasta cumplirlos, éxito con check Ember 72 + halo y "Iniciar sesión" (llama a `finishPasswordRecovery`, como antes).
+- **Lógica**: `requestPasswordReset`, `updateRecoveredPassword`, `finishPasswordRecovery` y el control de `isPasswordRecoveryActive` / `passwordRecoveryError` sin cambios. Validación de la nueva contraseña: de "6+ y coinciden" a `resetPasswordRequirements` = las reglas de Crear cuenta (8+, número, mayúscula) + "Coinciden" (D-38, ajuste del 2026-09-30).
+- **Decisiones asumidas**: DA-20 en "enlace enviado" la primaria del prototipo ("Abrir enlace (demo)", simulación) pasa a "Volver a iniciar sesión" y se quita "Caduca en 30 minutos" (la caducidad la define Supabase; no se puede afirmar). DA-21 el estado "enlace no válido/caducado" (no diseñado) se resuelve con la misma composición: disco, título, frase y "Pedir un enlace nuevo".
+- **Desviaciones**: D-36 (CTA inactiva). Disco del sobre en Dark con borde en vez de brillo blanco (criterio de D-15).
+- **Bloqueos**: sin Xcode, sin validación visual. Probar el enlace real exige un correo de recuperación (y el reenvío de URLs de P2).
+- **Comandos git**:
+
+```bash
+git add src/screens/auth/ForgotPasswordScreen.tsx src/screens/auth/ResetPasswordScreen.tsx
+git commit -m "feat(auth): migrate password recovery and reset to v2 (AUTH_04 to AUTH_07)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 12.4 Grupo 4 · Intro deslizable (ONB_01) — 2026-09-30 (sin Xcode)
+
+- **Qué cambió**: `VisualOnboardingScreen` reescrita como escena (`SceneScope`) a pantalla completa: `FlatList` paginada con las 3 fotos del prototipo (`overhead`, `movilidad` nueva horneada `saturate(.4) contrast(1.08) brightness(.74)`, `esfuerzo`), degradado `#161616` (0 → .92 entre 35 % y 75 %), título 28/700 (−.01em) y texto 17 `onDark.secondary`, puntos 6 pt (activo 22 pt blanco) y CTA blanca "Siguiente" / "Empezar". Se mantiene la API (`onComplete`) y el lugar en el flujo (primer arranque, antes de Login; `lib/visualOnboarding.ts` sin cambios).
+- **Desviaciones**: D-37 (copy "técnica en video").
+- **Decisiones asumidas**: DA-22 swipe además del botón (el handoff la llama "deslizable"; el HTML solo avanza con el botón). DA-23 la Intro sigue apareciendo antes del Login la primera vez (como hoy), no entre Crear cuenta y el onboarding como en el recorrido del prototipo; el recorrido dev "Recorrer onboarding" (grupo 5) la muestra en el orden del prototipo.
+- **Limpieza pendiente** (no borrado): `src/components/onboarding/VisualOnboardingPagination.tsx` y `src/assets/images/visual-onboarding/*` (+ sus exports en `src/assets/images/index.ts`) quedan sin uso.
+- **Bloqueos**: sin Xcode, sin validación visual.
+- **Comandos git**:
+
+```bash
+git add src/screens/onboarding/VisualOnboardingScreen.tsx src/assets/v2/photos/movilidad.jpg
+git commit -m "feat(onboarding): migrate intro slides to v2 (ONB_01)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 12.5 Grupo 5 · Onboarding 8 pasos (ONB_02) + "Recorrer onboarding" — 2026-09-30 (sin Xcode)
+
+- **Qué cambió**: el onboarding v1 (9 pantallas en stack) se sustituye por una sola pantalla `OnboardingScreen` → `OnboardingFlow` (8 preguntas + Bienvenida de ELLIE). `OnboardingWizard`: back 44 + "Tú · 1 de 8" 13/600, `StepProgress` (8 segmentos de 4 pt, hueco extra entre bloques), eyebrow "01 · Tú" + pregunta 32/600 (−.025em), cuerpo del paso con transición lateral (Reanimated, 320 ms), CTA fija "Siguiente"/"Terminar" sobre vidrio. Pasos en `features/onboarding/components/OnboardingSteps.tsx`.
+- **Primitivas nuevas (v2)**: `StepProgress`, `RulerInput` (regla con marcas cada 12 pt, aguja fija, bordes con degradado en vez de `mask-image` — D-30), `PhotoChoiceTile` (tile 196 pt con foto, scrim y check Ember), `ChoiceTile` + `IconChoiceContent` (tiles de equipamiento y cápsulas de duración: seleccionado = relleno `cta.primary` con contenido invertido).
+- **Datos** (`features/onboarding/onboardingModel.ts`, test 6/6): se guardan solo columnas existentes vía `completeOnboarding` → `updateOnboardingProfile`: `name`, `birth_date`, `weight`, `height`, `goal`, `training_days_per_week`, `available_equipment` (etiquetas en español, como las lee ELLIE) y `onboarding_completed`. Sin guardar (pendiente de backend): nivel (BK-03), duración (BK-04). `gender` y `avatar_key` quedan en `null` (BK-06). "Rendimiento" → `improve_health` (BK-05). Cambios mínimos: `OnboardingData.gender` admite `null`, `availableEquipment?` opcional, y `updateOnboardingProfile`/`completeOnboarding` aceptan `name` opcional.
+- **Navegación**: `OnboardingStackNavigator` registra solo `Flow`. Las respuestas se guardan en la Bienvenida; al quedar el perfil completo `RootNavigator` pasa a las pestañas. "Hablar con ELLIE" abre la pestaña ELLIE mediante `lib/postOnboarding.ts` (intención de un solo uso que lee `MainTabNavigator` al montar).
+- **Modo dev "Recorrer onboarding"**: nueva entrada en el menú de desarrollo (junto a "Catálogo v2") y URL `athelete://dev/onboarding`. Muestra Intro → 8 pasos → Bienvenida con datos de ejemplo; **no llama a Supabase, no crea usuarios ni guarda nada**; ✕ arriba a la derecha para salir; al terminar, toast "Recorrido terminado · iría a … (sin guardar)". Solo en `__DEV__` (`src/dev/DevOnboardingWalkthrough.tsx`).
+- **Decisiones del usuario aplicadas**: 8 pasos exactos sin género ni avatar; "Rendimiento" → `improve_health`.
+- **Decisiones asumidas**: DA-24 los pasos sin respuesta por defecto (fecha, objetivo, nivel, equipamiento, duración) exigen elegir antes de "Siguiente"; peso/altura y días arrancan en 70 kg / 170 cm / 3 días. DA-25 el selector de fecha del sistema se abre en una `Sheet` con "Listo" (iOS) o en el diálogo nativo (Android); máximo hoy, mínimo 1920. DA-26 sin back en la primera pregunta del flujo real (el usuario ya inició sesión; no hay pantalla previa).
+- **Limpieza pendiente** (no borrado): pantallas v1 `src/screens/onboarding/{WelcomeScreen,AvatarPickerScreen,BirthDateScreen,GenderSelectionScreen,WeightInputScreen,HeightInputScreen,TrainingFrequencyScreen,GoalSelectionScreen,ProfileSetupCompleteScreen}.tsx`, sus rutas en `ONBOARDING_ROUTES`/`OnboardingStackParamList`, `src/components/onboarding/*` y `src/components/auth/*` (ya solo los usan esas pantallas).
+- **Bloqueos**: sin Xcode, sin validación visual. `@react-native-community/datetimepicker` ya estaba instalado (no se añade nada nativo).
+
+### 12.6 Grupo 6 · Bienvenida de ELLIE (ONB_03) — 2026-09-30 (sin Xcode)
+
+- **Guardado (ajuste del 2026-09-30)**: el perfil se guarda **al mostrar** la Bienvenida, en segundo plano (`saveOnboardingProfile`: escribe sin refrescar el perfil, así la app no sale de la Bienvenida). Mientras guarda, las salidas están inactivas; si falla, se muestra la frase de error y "Reintentar". Las salidas solo navegan: `refreshProfile()` marca al usuario como completado y `RootNavigator` pasa a las pestañas (Inicio o ELLIE). `completeOnboarding` se mantiene (guardar + refrescar) para compatibilidad.
+- **Qué cambió**: `features/onboarding/components/EllieWelcome.tsx`: fondo de lino (`#EDE4D8 → #F3EDE5 → bg` en Light; `#241E18 → #1A1714 → bg` en Dark), esfera de ELLIE 128 respirando, eyebrow "ELLIE · Tu coach", voz 26/400 "Hola, {nombre}. Ya tengo tu punto de partida.", texto 15 secundario, trío días/sem · min · objetivo con divisores, fila "Tu primera sesión" (foto 56, radio 16), CTA "Ir a Inicio" y "Hablar con ELLIE". Ambas guardan el perfil; si falla se muestra la frase de error y se puede reintentar.
+- **Decisiones asumidas**: DA-27 la fila "Tu primera sesión" no apunta a una sesión real (no hay rutina recomendada antes de tener perfil): muestra "Sesión de inicio · {min} · {nivel}" y lleva a Inicio como "Ir a Inicio". DA-28 ~~el perfil se guarda al salir de la Bienvenida~~ → sustituida por la decisión del usuario: se guarda al mostrarla (ver arriba).
+- **Bloqueos**: sin Xcode, sin validación visual.
+- **Comandos git (grupos 5 y 6)**:
+
+```bash
+git add src/components/v2/{StepProgress.tsx,RulerInput.tsx,PhotoChoiceTile.tsx,ChoiceTile.tsx,index.ts} src/assets/v2/photos/{hero-entreno.jpg,hiit.jpg,cuerdas.jpg}
+git commit -m "feat(ui): add v2 step progress, ruler input and choice tiles" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add src/features/onboarding src/screens/onboarding/OnboardingScreen.tsx src/navigation/OnboardingStackNavigator.tsx src/navigation/MainTabNavigator.tsx src/lib/postOnboarding.ts src/constants/routes.ts src/types/navigation.ts src/types/auth.ts src/services/supabase/profile.ts src/providers/AuthProvider.tsx __tests__/onboardingModel.test.ts
+git commit -m "feat(onboarding): migrate onboarding to the v2 8-step flow and ELLIE welcome (ONB_02, ONB_03)" -m "Saves only existing profile columns; level and session length are shown but not stored (pending backend). Gender and avatar are no longer asked." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git add src/dev/DevOnboardingWalkthrough.tsx src/dev/DevCatalogHost.tsx
+git commit -m "feat(dev): add 'Recorrer onboarding' walkthrough without saving data" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
+
+### 12.7 Comandos git consolidados de la fase 3 (en este orden)
+
+Cubren todos los archivos pendientes. Las primitivas van primero (incluido `index.ts`), así cada commit siguiente solo depende de los anteriores. `tsc` del conjunto final en verde; no se compiló cada commit por separado.
+
+```bash
+# 1 · primitivas v2 de Auth y Onboarding + fotos horneadas
+git add src/theme/v2/colors.ts src/components/v2/{Scrim.tsx,TextField.tsx,Wordmark.tsx,ThemeToggleButton.tsx,AuthHeroLayout.tsx,AuthFormLayout.tsx,RequirementList.tsx,StepProgress.tsx,RulerInput.tsx,PhotoChoiceTile.tsx,ChoiceTile.tsx,index.ts} src/assets/v2/photos/{overhead.jpg,barra-mujer.jpg,movilidad.jpg,hero-entreno.jpg,hiit.jpg,cuerdas.jpg}
+git commit -m "feat(ui): add v2 auth and onboarding primitives" -m "Text field, wordmark, theme toggle, auth hero/form layouts, requirement list, step progress, ruler input and choice tiles. Package photos with the prototype treatment baked in (PLACEHOLDER)." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 2 · Login (AUTH_01, AUTH_02)
+git add src/screens/auth/LoginScreen.tsx src/features/auth/loginError.ts __tests__/loginError.test.ts
+git commit -m "feat(auth): migrate Login to v2 (AUTH_01, AUTH_02)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 3 · Crear cuenta (AUTH_03)
+git add src/screens/auth/RegisterScreen.tsx src/features/auth/passwordRules.ts __tests__/passwordRules.test.ts
+git commit -m "feat(auth): migrate Crear cuenta to v2 with live password requirements (AUTH_03)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 4 · Recuperar y restablecer (AUTH_04–AUTH_07)
+git add src/screens/auth/ForgotPasswordScreen.tsx src/screens/auth/ResetPasswordScreen.tsx
+git commit -m "feat(auth): migrate password recovery and reset to v2 (AUTH_04 to AUTH_07)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 5 · Intro (ONB_01)
+git add src/screens/onboarding/VisualOnboardingScreen.tsx
+git commit -m "feat(onboarding): migrate intro slides to v2 (ONB_01)" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 6 · Onboarding 8 pasos + Bienvenida de ELLIE (ONB_02, ONB_03)
+git add src/features/onboarding src/screens/onboarding/OnboardingScreen.tsx src/navigation/OnboardingStackNavigator.tsx src/navigation/MainTabNavigator.tsx src/lib/postOnboarding.ts src/constants/routes.ts src/types/navigation.ts src/types/auth.ts src/services/supabase/profile.ts src/providers/AuthProvider.tsx __tests__/onboardingModel.test.ts
+git commit -m "feat(onboarding): migrate onboarding to the v2 8-step flow and ELLIE welcome (ONB_02, ONB_03)" -m "The welcome saves the profile in the background when it appears (retry on failure); its buttons only navigate. Saves only existing profile columns; level and session length are shown but not stored (pending backend). Gender and avatar are no longer asked." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 7 · Recorrido de desarrollo
+git add src/dev/DevOnboardingWalkthrough.tsx src/dev/DevCatalogHost.tsx
+git commit -m "feat(dev): add 'Recorrer onboarding' walkthrough without saving data" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 8 · Documento
+git add docs/migration/MIGRATION_PROGRESS.md
+git commit -m "docs: phase 3 auth and onboarding progress" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
