@@ -1,15 +1,15 @@
-import {Brain} from 'lucide-react-native';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {StyleSheet, Text, View} from 'react-native';
-import {AppHeader, ScreenContainer} from '@app/components';
-import {EmptyState, Loader} from '@app/components/ui';
-import {HOME_ROUTES} from '@app/constants/routes';
-import {QuizCategoryCard} from '@app/features/quiz/components/QuizCategoryCard';
-import {useQuizCategories} from '@app/hooks/useQuiz';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {HomeStackParamList} from '@app/types/navigation';
+import { Brain } from 'lucide-react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { AppHeader, ScreenContainer } from '@app/components';
+import { EmptyState, Loader } from '@app/components/ui';
+import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { tabFallback } from '@app/navigation/safeGoBack';
+import { QuizCategoryCard } from '@app/features/quiz/components/QuizCategoryCard';
+import { useQuizCategories } from '@app/hooks/useQuiz';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'QuizLanding'>;
+type Props = AppScreenProps<'QuizLanding'>;
 
 export function QuizLandingScreen({navigation}: Props) {
   const {theme} = useAppTheme();
@@ -56,7 +56,7 @@ export function QuizLandingScreen({navigation}: Props) {
       <AppHeader
         showBackButton
         title="Aprende y gana"
-        backFallbacks={[HOME_ROUTES.Home]}
+        backFallbacks={[tabFallback(TAB_ROUTES.Home)]}
       />
 
       <View style={styles.introCard}>
@@ -84,7 +84,7 @@ export function QuizLandingScreen({navigation}: Props) {
             key={category.id}
             category={category}
             onPress={() =>
-              navigation.navigate(HOME_ROUTES.QuizQuestion, {
+              navigation.navigate(APP_ROUTES.QuizQuestion, {
                 categoryId: category.id,
                 categoryName: category.name,
                 categoryIcon: category.icon,

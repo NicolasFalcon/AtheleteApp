@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
 import {
   ActivityIndicator,
@@ -11,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loader } from '@app/components/ui';
-import { WORKOUTS_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES } from '@app/constants/routes';
 import { ExerciseDiscoveryHub } from '@app/features/workouts/components/ExerciseDiscoveryHub';
 import { ExerciseLibraryPanel } from '@app/features/workouts/components/ExerciseLibraryPanel';
 import { RoutineDiscoveryPanel } from '@app/features/workouts/components/RoutineDiscoveryPanel';
@@ -34,9 +33,9 @@ import {
   type LibraryExercise,
   type Workout,
 } from '@app/shared';
-import type { WorkoutsStackParamList } from '@app/types/navigation';
+import type { TabScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<WorkoutsStackParamList, 'WorkoutsRoot'>;
+type Props = TabScreenProps<'Workouts'>;
 type BrowseMode = 'routines' | 'exercises';
 type RoutineSourceView = 'library' | 'ellie' | 'mine';
 type ExerciseViewMode = 'all' | 'favorites';
@@ -203,15 +202,15 @@ export function WorkoutsScreen({ navigation }: Props) {
   });
 
   const openWorkoutDetail = (workoutId: string) => {
-    navigation.navigate(WORKOUTS_ROUTES.WorkoutDetail, { workoutId });
+    navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId });
   };
 
   const openExerciseDetail = (exerciseId: LibraryExercise['id']) => {
-    navigation.navigate(WORKOUTS_ROUTES.ExerciseDetail, { exerciseId });
+    navigation.navigate(APP_ROUTES.ExerciseDetail, { exerciseId });
   };
 
   const openCreateRoutine = () => {
-    navigation.navigate(WORKOUTS_ROUTES.CreateRoutine);
+    navigation.navigate(APP_ROUTES.CreateRoutine);
   };
 
   const toggleWorkoutFavorite = (workoutId: string) => {

@@ -1,17 +1,13 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {useQuery} from '@tanstack/react-query';
-import {Button, Card, EmptyState, Loader} from '@app/components/ui';
-import {
-  HOME_ROUTES,
-  WORKOUTS_ROUTES,
-} from '@app/constants/routes';
-import {RoutineBuilderHeader} from '@app/features/workouts/components/RoutineBuilderHeader';
-import {RoutineExerciseLibraryPicker} from '@app/features/workouts/components/RoutineExerciseLibraryPicker';
-import {RoutineExerciseRow} from '@app/features/workouts/components/RoutineExerciseRow';
-import {RoutineMetadataForm} from '@app/features/workouts/components/RoutineMetadataForm';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
+import { Button, Card, EmptyState, Loader } from '@app/components/ui';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
+import { RoutineBuilderHeader } from '@app/features/workouts/components/RoutineBuilderHeader';
+import { RoutineExerciseLibraryPicker } from '@app/features/workouts/components/RoutineExerciseLibraryPicker';
+import { RoutineExerciseRow } from '@app/features/workouts/components/RoutineExerciseRow';
+import { RoutineMetadataForm } from '@app/features/workouts/components/RoutineMetadataForm';
 import type {
   BuilderExercise,
   ExerciseMetricMode,
@@ -29,16 +25,10 @@ import {
   type LibraryExercise,
   type Workout,
 } from '@app/shared';
-import type {
-  HomeStackParamList,
-  WorkoutsStackParamList,
-} from '@app/types/navigation';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props =
-  | NativeStackScreenProps<HomeStackParamList, 'CreateRoutine'>
-  | NativeStackScreenProps<HomeStackParamList, 'EditRoutine'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'CreateRoutine'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'EditRoutine'>;
+// Registered twice in the root stack: CreateRoutine and EditRoutine.
+type Props = AppScreenProps<'CreateRoutine'> | AppScreenProps<'EditRoutine'>;
 
 function parseCommaSeparatedList(value: string) {
   return Array.from(
@@ -95,15 +85,13 @@ function getMetricMode(exercise: BuilderExercise): ExerciseMetricMode {
   return exercise.duration ? 'duration' : 'reps';
 }
 
-export function CreateRoutineScreen({navigation, route}: Props) {
-  const handleSafeBack = () =>
-    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
-  const {theme} = useAppTheme();
-  const {profile} = useAuth();
+export function CreateRoutineScreen({ navigation, route }: Props) {
+  const handleSafeBack = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
+  const { theme } = useAppTheme();
+  const { profile } = useAuth();
   const exercisesQuery = useExerciseLibrary();
   const routineBuilder = useRoutineBuilder();
 
-  const routeNames = navigation.getState().routeNames as string[];
   const params = route.params;
   const initialWorkoutId = params && 'workoutId' in params ? params.workoutId : undefined;
   const initialExerciseId =
@@ -289,10 +277,6 @@ export function CreateRoutineScreen({navigation, route}: Props) {
     },
   });
 
-  const detailRouteName = routeNames.includes(WORKOUTS_ROUTES.WorkoutDetail)
-    ? WORKOUTS_ROUTES.WorkoutDetail
-    : HOME_ROUTES.WorkoutDetail;
-
   const handleBack = () => {
     if (step === 'configure') {
       setStep('exercises');
@@ -451,7 +435,7 @@ export function CreateRoutineScreen({navigation, route}: Props) {
             })
           : await routineBuilder.createRoutine(payload);
 
-      (navigation as any).replace(detailRouteName, {
+      navigation.replace(APP_ROUTES.WorkoutDetail, {
         workoutId: savedWorkout.id,
       });
     } catch (error) {

@@ -10,7 +10,7 @@ import {
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { ALL_BADGES } from '@app/shared';
-import {PROFILE_ROUTES} from '@app/constants/routes';
+import { APP_ROUTES } from '@app/constants/routes';
 
 const FILTERS: Array<{ id: AchievementFilter; label: string }> = [
   { id: 'all', label: 'Todos' },
@@ -143,7 +143,7 @@ export function AchievementsScreen() {
         <AppHeader
           showBackButton
           title="Logros"
-          backFallbacks={[PROFILE_ROUTES.Profile]}
+          backFallbacks={[APP_ROUTES.Profile]}
         />
         <EmptyState
           title="No pudimos cargar tus logros"
@@ -160,7 +160,7 @@ export function AchievementsScreen() {
       <AppHeader
         showBackButton
         title="Logros"
-        backFallbacks={[PROFILE_ROUTES.Profile]}
+        backFallbacks={[APP_ROUTES.Profile]}
       />
 
       <View style={styles.summary}>

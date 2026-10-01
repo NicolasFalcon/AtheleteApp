@@ -8,7 +8,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -29,7 +28,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import { Button, EmptyState, Loader } from '@app/components/ui';
-import { HOME_ROUTES, WORKOUTS_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
@@ -41,14 +40,9 @@ import {safeGoBack} from '@app/navigation/safeGoBack';
 import { WorkoutThumbnail } from '@app/features/workouts/components/WorkoutThumbnail';
 import { equipmentLabels, bodyPartLabels } from '@app/shared/data/exercises';
 import { findExerciseByName, getWorkoutAccess } from '@app/shared';
-import type {
-  HomeStackParamList,
-  WorkoutsStackParamList,
-} from '@app/types/navigation';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props =
-  | NativeStackScreenProps<HomeStackParamList, 'WorkoutDetail'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'WorkoutDetail'>;
+type Props = AppScreenProps<'WorkoutDetail'>;
 
 type DetailTabKey = 'summary' | 'exercises' | 'reviews';
 
@@ -73,8 +67,7 @@ const workoutTypeLabels = {
 } as const;
 
 export function WorkoutDetailScreen({ navigation, route }: Props) {
-  const handleSafeBack = () =>
-    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
+  const handleSafeBack = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
   const { theme } = useAppTheme();
   const { profile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -544,11 +537,6 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
   }
 
   const access = getWorkoutAccess(workout, profile?.id);
-  const stackNavigation = navigation as any;
-  const routeNames = navigation.getState().routeNames as string[];
-  const editRouteName = routeNames.includes(WORKOUTS_ROUTES.EditRoutine)
-    ? WORKOUTS_ROUTES.EditRoutine
-    : HOME_ROUTES.EditRoutine;
   const sessionButtonLabel =
     workoutSession?.status === 'in_progress'
       ? 'Continuar entreno'
@@ -598,10 +586,9 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
         await startSession();
       }
 
-      stackNavigation.navigate(
-        'WorkoutSession' as never,
-        { workoutId: workout.id } as never,
-      );
+      navigation.navigate(APP_ROUTES.WorkoutSession, {
+        workoutId: workout.id,
+      });
     } catch (error) {
       Alert.alert(
         'No pudimos abrir la rutina',
@@ -611,12 +598,9 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
   };
 
   const handleEditRoutine = () => {
-    stackNavigation.navigate(
-      editRouteName as never,
-      {
-        workoutId: workout.id,
-      } as never,
-    );
+    navigation.navigate(APP_ROUTES.EditRoutine, {
+      workoutId: workout.id,
+    });
   };
 
   const handleDeleteRoutine = () => {
@@ -680,10 +664,9 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
         key={exercise.id}
         disabled={!libraryExercise}
         onPress={() =>
-          stackNavigation.navigate(
-            'ExerciseDetail' as never,
-            { exerciseId: libraryExercise!.id } as never,
-          )
+          navigation.navigate(APP_ROUTES.ExerciseDetail, {
+            exerciseId: libraryExercise!.id,
+          })
         }
         style={({ pressed }) => [
           styles.exerciseCard,

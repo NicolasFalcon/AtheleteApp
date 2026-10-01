@@ -1,27 +1,33 @@
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ArrowLeft, Clock3} from 'lucide-react-native';
-import {Image, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {Button, EmptyState} from '@app/components/ui';
-import {PROGRESS_ROUTES} from '@app/constants/routes';
-import {getBodyScienceArticleImage} from '@app/features/body-science/articleImages';
-import {BodyScienceCategoryBadge} from '@app/features/body-science/components/BodyScienceCategoryBadge';
-import {BodyScienceRichContent} from '@app/features/body-science/components/BodyScienceRichContent';
-import {bodyScienceArticles} from '@app/features/body-science/bodyScienceData';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {safeGoBack} from '@app/navigation/safeGoBack';
-import type {ProgressStackParamList} from '@app/types/navigation';
+import { ArrowLeft, Clock3 } from 'lucide-react-native';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { Button, EmptyState } from '@app/components/ui';
+import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { getBodyScienceArticleImage } from '@app/features/body-science/articleImages';
+import { BodyScienceCategoryBadge } from '@app/features/body-science/components/BodyScienceCategoryBadge';
+import { BodyScienceRichContent } from '@app/features/body-science/components/BodyScienceRichContent';
+import { bodyScienceArticles } from '@app/features/body-science/bodyScienceData';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { safeGoBack, tabFallback } from '@app/navigation/safeGoBack';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<
-  ProgressStackParamList,
-  'BodyScienceArticle'
->;
+type Props = AppScreenProps<'BodyScienceArticle'>;
 
 export function BodyScienceArticleDetailScreen({navigation, route}: Props) {
   const handleSafeBack = () =>
     safeGoBack(navigation, [
-      PROGRESS_ROUTES.BodyScience,
-      PROGRESS_ROUTES.Progress,
+      APP_ROUTES.BodyScience,
+      tabFallback(TAB_ROUTES.Progress),
     ]);
   const {theme} = useAppTheme();
   const insets = useSafeAreaInsets();

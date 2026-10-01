@@ -1,22 +1,25 @@
-import {useMemo} from 'react';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {AppHeader} from '@app/components';
-import {EmptyState} from '@app/components/ui';
-import {PROGRESS_ROUTES} from '@app/constants/routes';
-import {getBodyScienceArticleImage} from '@app/features/body-science/articleImages';
-import {BodyScienceArticleCard} from '@app/features/body-science/components/BodyScienceArticleCard';
+import { useMemo } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { AppHeader } from '@app/components';
+import { EmptyState } from '@app/components/ui';
+import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { getBodyScienceArticleImage } from '@app/features/body-science/articleImages';
+import { BodyScienceArticleCard } from '@app/features/body-science/components/BodyScienceArticleCard';
 import {
   bodyScienceArticles,
   categoryCaptions,
   categoryDisplayNames,
   featuredArticleIds,
 } from '@app/features/body-science/bodyScienceData';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {ProgressStackParamList} from '@app/types/navigation';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { tabFallback } from '@app/navigation/safeGoBack';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<ProgressStackParamList, 'BodyScience'>;
+type Props = AppScreenProps<'BodyScience'>;
 
 const categoryOrder = ['Training', 'Recovery', 'Nutrition', 'Mindset'] as const;
 
@@ -70,7 +73,7 @@ export function BodyScienceScreen({navigation}: Props) {
   });
 
   const openArticle = (articleId: string) => {
-    navigation.navigate(PROGRESS_ROUTES.BodyScienceArticle, {articleId});
+    navigation.navigate(APP_ROUTES.BodyScienceArticle, { articleId });
   };
 
   if (!featuredArticle || bodyScienceArticles.length === 0) {
@@ -94,7 +97,7 @@ export function BodyScienceScreen({navigation}: Props) {
         <AppHeader
           showBackButton
           title="Ciencia del cuerpo"
-          backFallbacks={[PROGRESS_ROUTES.Progress]}
+          backFallbacks={[tabFallback(TAB_ROUTES.Progress)]}
         />
 
         <BodyScienceArticleCard

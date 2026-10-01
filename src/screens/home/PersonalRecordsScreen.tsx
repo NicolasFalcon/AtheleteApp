@@ -1,19 +1,14 @@
-import {useMemo, useState} from 'react';
-import {Alert, Pressable, StyleSheet, Text, View} from 'react-native';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ChevronRight, Trophy} from 'lucide-react-native';
-import {AppHeader, ScreenContainer} from '@app/components';
-import {Button, Card, Chip, EmptyState, Loader} from '@app/components/ui';
-import {
-  HOME_ROUTES,
-  PROGRESS_ROUTES,
-  WORKOUTS_ROUTES,
-} from '@app/constants/routes';
-import {PrHistoryList} from '@app/features/pr/components/PrHistoryList';
-import {ProgressBarChart} from '@app/features/progress/components/ProgressBarChart';
-import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
-import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
-import {useAppTheme} from '@app/hooks/useAppTheme';
+import { useMemo, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ChevronRight, Trophy } from 'lucide-react-native';
+import { AppHeader, ScreenContainer } from '@app/components';
+import { Button, Card, Chip, EmptyState, Loader } from '@app/components/ui';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
+import { PrHistoryList } from '@app/features/pr/components/PrHistoryList';
+import { ProgressBarChart } from '@app/features/progress/components/ProgressBarChart';
+import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
+import { useAppTheme } from '@app/hooks/useAppTheme';
 import {
   formatPRValue,
   getBestPR,
@@ -22,16 +17,9 @@ import {
   type PersonalRecord,
   type PRType,
 } from '@app/shared';
-import type {
-  HomeStackParamList,
-  ProgressStackParamList,
-  WorkoutsStackParamList,
-} from '@app/types/navigation';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props =
-  | NativeStackScreenProps<HomeStackParamList, 'PersonalRecords'>
-  | NativeStackScreenProps<ProgressStackParamList, 'ProgressPersonalRecords'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'WorkoutPersonalRecords'>;
+type Props = AppScreenProps<'PersonalRecords'>;
 
 function formatHistoryDate(dateString: string) {
   return new Date(dateString).toLocaleDateString('es-CL', {
@@ -136,14 +124,10 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
     },
   });
 
-  const routeNames = navigation.getState().routeNames as string[];
-  const registerRouteName = routeNames.includes(HOME_ROUTES.RegisterPr)
-    ? HOME_ROUTES.RegisterPr
-    : routeNames.includes(WORKOUTS_ROUTES.RegisterPr)
-      ? WORKOUTS_ROUTES.RegisterPr
-      : PROGRESS_ROUTES.RegisterPr;
-
-  const allExercises = useMemo(() => exercisesQuery.data || [], [exercisesQuery.data]);
+  const allExercises = useMemo(
+    () => exercisesQuery.data || [],
+    [exercisesQuery.data],
+  );
   const resolvedExerciseName =
     initialExerciseName ||
     allExercises.find(item => item.id === exerciseId)?.name ||
@@ -227,15 +211,18 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
   );
 
   const openRegister = () => {
-    (navigation as any).navigate(registerRouteName, {
+    navigation.navigate(APP_ROUTES.RegisterPr, {
       exerciseId,
       exerciseName: resolvedExerciseName,
       showExercisePicker: !exerciseId,
     });
   };
 
-  const openExerciseHistory = (nextExerciseId: string, nextExerciseName: string) => {
-    (navigation as any).navigate(route.name, {
+  const openExerciseHistory = (
+    nextExerciseId: string,
+    nextExerciseName: string,
+  ) => {
+    navigation.navigate(APP_ROUTES.PersonalRecords, {
       exerciseId: nextExerciseId,
       exerciseName: nextExerciseName,
     });
@@ -278,11 +265,11 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
   if (recordsQuery.records.length === 0) {
     return (
       <ScreenContainer scrollable>
-        <AppHeader showBackButton title="Récords personales" backFallbacks={[
-          HOME_ROUTES.Home,
-          PROGRESS_ROUTES.Progress,
-          WORKOUTS_ROUTES.Workouts,
-        ]} />
+        <AppHeader
+          showBackButton
+          title="Récords personales"
+          backFallbacks={[ROOT_ROUTES.MainTabs]}
+        />
         <EmptyState
           title="Aún no tienes PRs registrados"
           description="Registra tu primera marca para empezar a seguir progreso por ejercicio, ver mejores marcas y consultar tu historial."
@@ -301,11 +288,11 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
 
     return (
       <ScreenContainer scrollable>
-        <AppHeader showBackButton title="Récords personales" backFallbacks={[
-          HOME_ROUTES.Home,
-          PROGRESS_ROUTES.Progress,
-          WORKOUTS_ROUTES.Workouts,
-        ]} />
+        <AppHeader
+          showBackButton
+          title="Récords personales"
+          backFallbacks={[ROOT_ROUTES.MainTabs]}
+        />
 
         <Card style={styles.summaryCard}>
           <View style={styles.summaryTopRow}>
@@ -371,11 +358,11 @@ export function PersonalRecordsScreen({navigation, route}: Props) {
 
   return (
     <ScreenContainer scrollable>
-      <AppHeader showBackButton title="Récords personales" backFallbacks={[
-        HOME_ROUTES.Home,
-        PROGRESS_ROUTES.Progress,
-        WORKOUTS_ROUTES.Workouts,
-      ]} />
+      <AppHeader
+        showBackButton
+        title="Récords personales"
+        backFallbacks={[ROOT_ROUTES.MainTabs]}
+      />
 
       {bestRecord ? (
         <Card style={styles.summaryCard}>

@@ -1,37 +1,30 @@
-import {useMemo} from 'react';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {Alert, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ChevronRight, Plus} from 'lucide-react-native';
-import {AppHeader} from '@app/components';
-import {Button, Card, EmptyState, Loader} from '@app/components/ui';
+import { useMemo } from 'react';
 import {
-  HOME_ROUTES,
-  WORKOUTS_ROUTES,
-} from '@app/constants/routes';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {useRoutineBuilder} from '@app/hooks/useRoutineBuilder';
-import type {
-  HomeStackParamList,
-  WorkoutsStackParamList,
-} from '@app/types/navigation';
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { ChevronRight, Plus } from 'lucide-react-native';
+import { AppHeader } from '@app/components';
+import { Button, Card, EmptyState, Loader } from '@app/components/ui';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useRoutineBuilder } from '@app/hooks/useRoutineBuilder';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props =
-  | NativeStackScreenProps<HomeStackParamList, 'AddExerciseToRoutine'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'AddExerciseToRoutine'>;
+type Props = AppScreenProps<'AddExerciseToRoutine'>;
 
 export function AddExerciseToRoutineScreen({navigation, route}: Props) {
   const {theme} = useAppTheme();
   const insets = useSafeAreaInsets();
   const routineBuilder = useRoutineBuilder();
-
-  const routeNames = navigation.getState().routeNames as string[];
-  const createRouteName = routeNames.includes(WORKOUTS_ROUTES.CreateRoutine)
-    ? WORKOUTS_ROUTES.CreateRoutine
-    : HOME_ROUTES.CreateRoutine;
-  const editRouteName = routeNames.includes(WORKOUTS_ROUTES.EditRoutine)
-    ? WORKOUTS_ROUTES.EditRoutine
-    : HOME_ROUTES.EditRoutine;
 
   const editableRoutines = useMemo(
     () => routineBuilder.editableWorkouts,
@@ -81,7 +74,7 @@ export function AddExerciseToRoutineScreen({navigation, route}: Props) {
   });
 
   const handleCreateNew = () => {
-    (navigation as any).navigate(createRouteName, {
+    navigation.navigate(APP_ROUTES.CreateRoutine, {
       initialExerciseId: route.params.exerciseId,
       initialExerciseName: route.params.exerciseName,
     });
@@ -95,7 +88,7 @@ export function AddExerciseToRoutineScreen({navigation, route}: Props) {
         exerciseName: route.params.exerciseName,
       });
 
-      (navigation as any).replace(editRouteName, {workoutId});
+      navigation.replace(APP_ROUTES.EditRoutine, { workoutId });
     } catch (error) {
       Alert.alert(
         'No pudimos agregar el ejercicio',
@@ -121,7 +114,7 @@ export function AddExerciseToRoutineScreen({navigation, route}: Props) {
         <AppHeader
           showBackButton
           title="Agregar a rutina"
-          backFallbacks={[WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]}
+          backFallbacks={[ROOT_ROUTES.MainTabs]}
         />
 
         <Card>

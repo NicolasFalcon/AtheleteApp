@@ -6,7 +6,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -19,21 +18,16 @@ import {
   XCircle,
 } from 'lucide-react-native';
 import { Button, Chip, EmptyState, Loader } from '@app/components/ui';
-import { HOME_ROUTES, WORKOUTS_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { ExerciseMediaHero } from '@app/features/workouts/components/ExerciseMediaHero';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
 import {safeGoBack} from '@app/navigation/safeGoBack';
 import { bodyPartLabels, equipmentLabels, levelLabels } from '@app/shared';
-import type {
-  HomeStackParamList,
-  WorkoutsStackParamList,
-} from '@app/types/navigation';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props =
-  | NativeStackScreenProps<HomeStackParamList, 'ExerciseDetail'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'ExerciseDetail'>;
+type Props = AppScreenProps<'ExerciseDetail'>;
 
 type ExerciseDetailHeaderProps = {
   name: string;
@@ -96,8 +90,7 @@ function ExerciseDetailHeader({
 }
 
 export function ExerciseDetailScreen({ navigation, route }: Props) {
-  const handleSafeBack = () =>
-    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
+  const handleSafeBack = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
@@ -254,14 +247,6 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
       </SafeAreaView>
     );
   }
-
-  const stackNavigation = navigation as any;
-  const routeNames = navigation.getState().routeNames as string[];
-  const addExerciseToRoutineRoute = routeNames.includes(
-    WORKOUTS_ROUTES.AddExerciseToRoutine,
-  )
-    ? WORKOUTS_ROUTES.AddExerciseToRoutine
-    : HOME_ROUTES.AddExerciseToRoutine;
 
   if (!exercise) {
     return (
@@ -437,13 +422,10 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
           label="Agregar a rutina"
           style={styles.ctaButton}
           onPress={() =>
-            stackNavigation.navigate(
-              addExerciseToRoutineRoute as never,
-              {
-                exerciseId: exercise.id,
-                exerciseName: exercise.name,
-              } as never,
-            )
+            navigation.navigate(APP_ROUTES.AddExerciseToRoutine, {
+              exerciseId: exercise.id,
+              exerciseName: exercise.name,
+            })
           }
           accessoryRight={
             <Plus

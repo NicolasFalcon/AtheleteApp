@@ -1,27 +1,17 @@
-import {useMemo, useState} from 'react';
-import {Alert} from 'react-native';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {AppHeader, ScreenContainer} from '@app/components';
-import {Card, Loader} from '@app/components/ui';
-import {
-  HOME_ROUTES,
-  PROGRESS_ROUTES,
-  WORKOUTS_ROUTES,
-} from '@app/constants/routes';
-import {PrForm} from '@app/features/pr/components/PrForm';
-import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
-import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
-import {safeGoBack} from '@app/navigation/safeGoBack';
-import type {
-  HomeStackParamList,
-  ProgressStackParamList,
-  WorkoutsStackParamList,
-} from '@app/types/navigation';
+import { useMemo, useState } from 'react';
+import { Alert } from 'react-native';
+import { AppHeader, ScreenContainer } from '@app/components';
+import { Card, Loader } from '@app/components/ui';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
+import { PrForm } from '@app/features/pr/components/PrForm';
+import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props =
-  | NativeStackScreenProps<HomeStackParamList, 'RegisterPr'>
-  | NativeStackScreenProps<ProgressStackParamList, 'ProgressRegisterPr'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'WorkoutRegisterPr'>;
+type Props = AppScreenProps<'RegisterPr'>;
+
+const BACK_FALLBACKS = [APP_ROUTES.PersonalRecords, ROOT_ROUTES.MainTabs];
 
 export function RegisterPrScreen({navigation, route}: Props) {
   const exercisesQuery = useExerciseLibrary();
@@ -51,14 +41,7 @@ export function RegisterPrScreen({navigation, route}: Props) {
       <AppHeader
         showBackButton
         title="Registrar PR"
-        backFallbacks={[
-          HOME_ROUTES.PersonalRecords,
-          PROGRESS_ROUTES.PersonalRecords,
-          WORKOUTS_ROUTES.PersonalRecords,
-          HOME_ROUTES.Home,
-          PROGRESS_ROUTES.Progress,
-          WORKOUTS_ROUTES.Workouts,
-        ]}
+        backFallbacks={BACK_FALLBACKS}
       />
 
       <Card>
@@ -77,15 +60,7 @@ export function RegisterPrScreen({navigation, route}: Props) {
                 [
                   {
                     text: 'Continuar',
-                    onPress: () =>
-                      safeGoBack(navigation, [
-                        HOME_ROUTES.PersonalRecords,
-                        PROGRESS_ROUTES.PersonalRecords,
-                        WORKOUTS_ROUTES.PersonalRecords,
-                        HOME_ROUTES.Home,
-                        PROGRESS_ROUTES.Progress,
-                        WORKOUTS_ROUTES.Workouts,
-                      ]),
+                    onPress: () => safeGoBack(navigation, BACK_FALLBACKS),
                   },
                 ],
               );

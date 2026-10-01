@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   ArrowRight,
   BarChart3,
@@ -28,7 +27,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loader } from '@app/components/ui';
-import { ELLIE_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES } from '@app/constants/routes';
 import { EllieChatInputBar } from '@app/features/ellie/components/EllieChatInputBar';
 import { EllieMessageRenderer } from '@app/features/ellie/components/EllieMessageRenderer';
 import { useAuth } from '@app/hooks/useAuth';
@@ -37,12 +36,9 @@ import { useEllieChat } from '@app/hooks/useEllieChat';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
-import type { EllieStackParamList } from '@app/types/navigation';
+import type { TabScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<
-  EllieStackParamList,
-  typeof ELLIE_ROUTES.Ellie
->;
+type Props = TabScreenProps<'Ellie'>;
 
 type QuickAction = {
   id: string;
@@ -433,7 +429,7 @@ export function EllieScreen({ navigation }: Props) {
   );
 
   const openNutritionPlan = useCallback(() => {
-    navigation.navigate(ELLIE_ROUTES.NutritionPlan);
+    navigation.navigate(APP_ROUTES.NutritionPlan);
   }, [navigation]);
 
   const handleSend = () => {

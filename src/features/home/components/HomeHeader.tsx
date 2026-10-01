@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import { NotificationBadgeButton } from '@app/features/notifications/components/NotificationBadgeButton';
 import { useAuth } from '@app/hooks/useAuth';
@@ -6,11 +6,15 @@ import { useAppTheme } from '@app/hooks/useAppTheme';
 import { getGreeting } from '@app/lib/date';
 
 type HomeHeaderProps = {
+  // TEMP-01: Perfil left the tab bar; until Inicio is migrated to v2 the
+  // avatar of this header is the way into it.
+  onOpenProfile?: () => void;
   onOpenNotifications?: () => void;
   notificationsCount?: number;
 };
 
 export function HomeHeader({
+  onOpenProfile,
   onOpenNotifications,
   notificationsCount = 0,
 }: HomeHeaderProps) {
@@ -52,11 +56,19 @@ export function HomeHeader({
   return (
     <View style={styles.container}>
       <View style={styles.userRow}>
-        <ProfileAvatar
-          avatarKey={profile?.avatarKey}
-          profilePhotoUrl={profile?.profilePhotoUrl}
-          size={40}
-        />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Perfil"
+          disabled={!onOpenProfile}
+          hitSlop={4}
+          onPress={onOpenProfile}
+        >
+          <ProfileAvatar
+            avatarKey={profile?.avatarKey}
+            profilePhotoUrl={profile?.profilePhotoUrl}
+            size={40}
+          />
+        </Pressable>
         <View style={styles.copy}>
           <Text style={styles.eyebrow}>{getGreeting()},</Text>
           <Text numberOfLines={1} style={styles.title}>

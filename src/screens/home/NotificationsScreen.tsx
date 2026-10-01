@@ -1,25 +1,30 @@
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {AppHeader} from '@app/components';
-import {EmptyState, Loader} from '@app/components/ui';
-import {HOME_ROUTES, TAB_ROUTES} from '@app/constants/routes';
-import {NotificationItemRow} from '@app/features/notifications/components/NotificationItemRow';
-import {NotificationsEmptyState} from '@app/features/notifications/components/NotificationsEmptyState';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { AppHeader } from '@app/components';
+import { EmptyState, Loader } from '@app/components/ui';
+import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { useOpenCore33 } from '@app/features/core33/useOpenCore33';
+import { NotificationItemRow } from '@app/features/notifications/components/NotificationItemRow';
+import { NotificationsEmptyState } from '@app/features/notifications/components/NotificationsEmptyState';
 import type {
   NotificationDestination,
   ProductNotification,
 } from '@app/features/notifications/types';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {useNotificationsOverview} from '@app/hooks/useNotificationsOverview';
-import type {HomeStackParamList} from '@app/types/navigation';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useNotificationsOverview } from '@app/hooks/useNotificationsOverview';
+import { tabFallback } from '@app/navigation/safeGoBack';
+import type { AppScreenProps, MainTabParamList } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'Notifications'>;
+type Props = AppScreenProps<'Notifications'>;
 
 export function NotificationsScreen({navigation}: Props) {
   const {theme} = useAppTheme();
   const insets = useSafeAreaInsets();
   const notificationsOverview = useNotificationsOverview();
+  const openCore33 = useOpenCore33();
 
   const styles = StyleSheet.create({
     safeArea: {
@@ -60,48 +65,53 @@ export function NotificationsScreen({navigation}: Props) {
     },
   });
 
+  // Notificaciones sits above the tabs: go back down to MainTabs on a tab.
+  const openTab = (screen: keyof MainTabParamList) => {
+    navigation.navigate(ROOT_ROUTES.MainTabs, { screen });
+  };
+
   const openDestination = (destination: NotificationDestination) => {
     if (destination === 'workouts') {
-      navigation.getParent()?.navigate(TAB_ROUTES.Workouts as never);
+      openTab(TAB_ROUTES.Workouts);
       return;
     }
 
     if (destination === 'challenge') {
-      navigation.navigate(HOME_ROUTES.Challenge);
+      openCore33();
       return;
     }
 
     if (destination === 'hydration') {
-      navigation.navigate(HOME_ROUTES.Home);
+      openTab(TAB_ROUTES.Home);
       return;
     }
 
     if (destination === 'nutrition') {
-      navigation.navigate(HOME_ROUTES.NutritionPlan);
+      navigation.navigate(APP_ROUTES.NutritionPlan);
       return;
     }
 
     if (destination === 'ellie') {
-      navigation.getParent()?.navigate(TAB_ROUTES.Ellie as never);
+      openTab(TAB_ROUTES.Ellie);
       return;
     }
 
     if (destination === 'progress') {
-      navigation.getParent()?.navigate(TAB_ROUTES.Progress as never);
+      openTab(TAB_ROUTES.Progress);
       return;
     }
 
     if (destination === 'quiz') {
-      navigation.navigate(HOME_ROUTES.QuizLanding);
+      navigation.navigate(APP_ROUTES.QuizLanding);
       return;
     }
 
-    navigation.navigate(HOME_ROUTES.PersonalRecords);
+    navigation.navigate(APP_ROUTES.PersonalRecords);
   };
 
   const handleNotificationPress = (notification: ProductNotification) => {
     if (notification.sourceAction === 'log_nutrition') {
-      navigation.navigate(HOME_ROUTES.NutritionPlan, {openLog: true});
+      navigation.navigate(APP_ROUTES.NutritionPlan, { openLog: true });
       return;
     }
 
@@ -112,7 +122,7 @@ export function NotificationsScreen({navigation}: Props) {
     <AppHeader
       showBackButton
       title="Notificaciones"
-      backFallbacks={[HOME_ROUTES.Home]}
+      backFallbacks={[tabFallback(TAB_ROUTES.Home)]}
     />
   );
 

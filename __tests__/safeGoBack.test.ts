@@ -1,9 +1,9 @@
-import {safeGoBack} from '@app/navigation/safeGoBack';
+import { safeGoBack, tabFallback } from '@app/navigation/safeGoBack';
 
 function createNavigation({
   canGoBack = false,
-  activeRoute = 'Detail',
-  routeNames = ['Detail', 'Root'],
+  activeRoute = 'Profile',
+  routeNames = ['MainTabs', 'Profile'],
   parent,
 }: {
   canGoBack?: boolean;
@@ -31,7 +31,7 @@ describe('safeGoBack', () => {
   it('uses real history when it exists', () => {
     const navigation = createNavigation({canGoBack: true});
 
-    expect(safeGoBack(navigation, ['Root'])).toBe(true);
+    expect(safeGoBack(navigation, ['MainTabs'])).toBe(true);
     expect(navigation.goBack).toHaveBeenCalledTimes(1);
     expect(navigation.navigate).not.toHaveBeenCalled();
   });
@@ -39,30 +39,43 @@ describe('safeGoBack', () => {
   it('navigates to a fallback owned by the current stack', () => {
     const navigation = createNavigation();
 
-    expect(safeGoBack(navigation, ['Root'])).toBe(true);
-    expect(navigation.navigate).toHaveBeenCalledWith('Root', undefined);
+    expect(safeGoBack(navigation, ['MainTabs'])).toBe(true);
+    expect(navigation.navigate).toHaveBeenCalledWith('MainTabs', undefined);
     expect(navigation.goBack).not.toHaveBeenCalled();
   });
 
   it('finds a fallback in a parent navigator', () => {
     const parent = createNavigation({
-      activeRoute: 'HomeTab',
-      routeNames: ['HomeTab', 'ProfileTab'],
+      activeRoute: 'MainTabs',
+      routeNames: ['MainTabs', 'Profile'],
     });
-    const navigation = createNavigation({routeNames: ['Detail'], parent});
+    const navigation = createNavigation({
+      activeRoute: 'Home',
+      routeNames: ['Home', 'Workouts'],
+      parent,
+    });
 
-    expect(safeGoBack(navigation, ['ProfileTab'])).toBe(true);
-    expect(parent.navigate).toHaveBeenCalledWith('ProfileTab', undefined);
+    expect(safeGoBack(navigation, ['Profile'])).toBe(true);
+    expect(parent.navigate).toHaveBeenCalledWith('Profile', undefined);
   });
 
   it('does not navigate to the active route or dispatch an invalid back', () => {
     const navigation = createNavigation({
-      activeRoute: 'Root',
-      routeNames: ['Root'],
+      activeRoute: 'MainTabs',
+      routeNames: ['MainTabs'],
     });
 
-    expect(safeGoBack(navigation, ['Root'])).toBe(false);
+    expect(safeGoBack(navigation, ['MainTabs'])).toBe(false);
     expect(navigation.goBack).not.toHaveBeenCalled();
     expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+
+  it('lands on a tab of MainTabs with tabFallback', () => {
+    const navigation = createNavigation();
+
+    expect(safeGoBack(navigation, [tabFallback('Workouts')])).toBe(true);
+    expect(navigation.navigate).toHaveBeenCalledWith('MainTabs', {
+      screen: 'Workouts',
+    });
   });
 });

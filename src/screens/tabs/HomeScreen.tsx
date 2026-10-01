@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Dumbbell,
   Droplets,
@@ -15,7 +14,8 @@ import {
   homeCore33Editorial,
   homeTrainingEditorial,
 } from '@app/assets/images';
-import { HOME_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { useOpenCore33 } from '@app/features/core33/useOpenCore33';
 import { RecoveryGuidanceCard } from '@app/features/home/components/RecoveryGuidanceCard';
 import { QuizPromoCard } from '@app/features/home/components/QuizPromoCard';
 import { RecentPRCard } from '@app/features/home/components/RecentPRCard';
@@ -41,9 +41,9 @@ import { NutritionLogModal } from '@app/features/nutrition/components/NutritionL
 import { WearBanner } from '@app/features/home/components/WearBanner';
 import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
 import { WorkoutCarousel } from '@app/features/home/components/WorkoutCarousel';
-import type { HomeStackParamList } from '@app/types/navigation';
+import type { TabScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'HomeRoot'>;
+type Props = TabScreenProps<'Home'>;
 
 export function HomeScreen({ navigation }: Props) {
   const { theme } = useAppTheme();
@@ -163,28 +163,26 @@ export function HomeScreen({ navigation }: Props) {
   });
 
   const openWorkoutDetail = (workoutId: string) => {
-    navigation.navigate(HOME_ROUTES.WorkoutDetail, { workoutId });
+    navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId });
   };
 
   const openWorkoutsTab = () => {
-    navigation.getParent()?.navigate(TAB_ROUTES.Workouts as never);
+    navigation.navigate(TAB_ROUTES.Workouts);
   };
 
   const openEllieTab = () => {
-    navigation.getParent()?.navigate(TAB_ROUTES.Ellie as never);
+    navigation.navigate(TAB_ROUTES.Ellie);
   };
 
   const openQuizLanding = () => {
-    navigation.navigate(HOME_ROUTES.QuizLanding);
+    navigation.navigate(APP_ROUTES.QuizLanding);
   };
 
   const openNotifications = () => {
-    navigation.navigate(HOME_ROUTES.Notifications);
+    navigation.navigate(APP_ROUTES.Notifications);
   };
 
-  const openChallengeFlow = () => {
-    navigation.navigate(HOME_ROUTES.Challenge);
-  };
+  const openChallengeFlow = useOpenCore33();
 
   const handleSaveNutritionLog = async (
     input: Parameters<typeof nutritionActions.saveTodayLog>[0],
@@ -202,7 +200,7 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   const openPersonalRecords = () => {
-    navigation.navigate(HOME_ROUTES.PersonalRecords);
+    navigation.navigate(APP_ROUTES.PersonalRecords);
   };
 
   const openLatestPersonalRecord = () => {
@@ -218,14 +216,14 @@ export function HomeScreen({ navigation }: Props) {
         exercise => exercise.id === latest.exerciseId,
       )?.name || 'Ejercicio';
 
-    navigation.navigate(HOME_ROUTES.PersonalRecords, {
+    navigation.navigate(APP_ROUTES.PersonalRecords, {
       exerciseId: latest.exerciseId,
       exerciseName,
     });
   };
 
   const openRegisterPr = () => {
-    navigation.navigate(HOME_ROUTES.RegisterPr, {
+    navigation.navigate(APP_ROUTES.RegisterPr, {
       showExercisePicker: true,
     });
   };
@@ -237,7 +235,7 @@ export function HomeScreen({ navigation }: Props) {
       workoutId &&
       (workoutsQuery.data || []).some(item => item.id === workoutId)
     ) {
-      navigation.navigate(HOME_ROUTES.WorkoutSession, { workoutId });
+      navigation.navigate(APP_ROUTES.WorkoutSession, { workoutId });
       return;
     }
 
@@ -421,6 +419,7 @@ export function HomeScreen({ navigation }: Props) {
       <SafeAreaView edges={['top']} style={styles.safeArea}>
         <View style={styles.content}>
           <HomeHeader
+            onOpenProfile={() => navigation.navigate(APP_ROUTES.Profile)}
             notificationsCount={notificationsOverview.unreadCount}
             onOpenNotifications={openNotifications}
           />

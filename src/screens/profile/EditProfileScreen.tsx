@@ -1,12 +1,12 @@
-import {useEffect, useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {AppHeader, ScreenContainer} from '@app/components';
-import {AppTextInput, Button, Card, Loader} from '@app/components/ui';
-import {useAuth} from '@app/hooks/useAuth';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {PROFILE_ROUTES} from '@app/constants/routes';
-import {updateProfileDetails} from '@app/services/supabase/profile';
-import type {OnboardingGoal} from '@app/types/auth';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppHeader, ScreenContainer } from '@app/components';
+import { AppTextInput, Button, Card, Loader } from '@app/components/ui';
+import { useAuth } from '@app/hooks/useAuth';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { APP_ROUTES } from '@app/constants/routes';
+import { updateProfileDetails } from '@app/services/supabase/profile';
+import type { OnboardingGoal } from '@app/types/auth';
 
 const goals: Array<{key: OnboardingGoal; label: string}> = [
   {key: 'lose_weight', label: 'Perder peso'},
@@ -125,7 +125,7 @@ export function EditProfileScreen() {
       <AppHeader
         showBackButton
         title="Editar perfil"
-        backFallbacks={[PROFILE_ROUTES.Profile]}
+        backFallbacks={[APP_ROUTES.Profile]}
       />
 
       <Card style={styles.card}>

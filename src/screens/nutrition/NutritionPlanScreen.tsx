@@ -1,34 +1,33 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
-import {useNavigation} from '@react-navigation/native';
-import {useRoute} from '@react-navigation/native';
-import {Alert, ScrollView, StyleSheet, Text, View} from 'react-native';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {AppHeader} from '@app/components';
-import {Button, Loader} from '@app/components/ui';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  ELLIE_ROUTES,
-  HOME_ROUTES,
-  PROFILE_ROUTES,
-  PROGRESS_ROUTES,
-  TAB_ROUTES,
-} from '@app/constants/routes';
-import {NutritionEmptyState} from '@app/features/nutrition/components/NutritionEmptyState';
-import {NutritionDailySummaryCard} from '@app/features/nutrition/components/NutritionDailySummaryCard';
-import {NutritionGuidelinesCard} from '@app/features/nutrition/components/NutritionGuidelinesCard';
-import {NutritionLogModal} from '@app/features/nutrition/components/NutritionLogModal';
-import {NutritionMacroGrid} from '@app/features/nutrition/components/NutritionMacroGrid';
-import {NutritionPlanActions} from '@app/features/nutrition/components/NutritionPlanActions';
-import {NutritionPlanSummaryCard} from '@app/features/nutrition/components/NutritionPlanSummaryCard';
-import {NutritionStructureCard} from '@app/features/nutrition/components/NutritionStructureCard';
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import { AppHeader } from '@app/components';
+import { Button, Loader } from '@app/components/ui';
+import { ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { NutritionEmptyState } from '@app/features/nutrition/components/NutritionEmptyState';
+import { NutritionDailySummaryCard } from '@app/features/nutrition/components/NutritionDailySummaryCard';
+import { NutritionGuidelinesCard } from '@app/features/nutrition/components/NutritionGuidelinesCard';
+import { NutritionLogModal } from '@app/features/nutrition/components/NutritionLogModal';
+import { NutritionMacroGrid } from '@app/features/nutrition/components/NutritionMacroGrid';
+import { NutritionPlanActions } from '@app/features/nutrition/components/NutritionPlanActions';
+import { NutritionPlanSummaryCard } from '@app/features/nutrition/components/NutritionPlanSummaryCard';
+import { NutritionStructureCard } from '@app/features/nutrition/components/NutritionStructureCard';
 import {
   buildMealStructure,
   buildNutritionGuidelines,
   buildNutritionSummary,
 } from '@app/features/nutrition/nutritionPlanContent';
-import {useAuth} from '@app/hooks/useAuth';
-import {useNutritionPlan} from '@app/hooks/useNutritionPlan';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {NutritionPlanRouteParams} from '@app/types/navigation';
+import { useAuth } from '@app/hooks/useAuth';
+import { useNutritionPlan } from '@app/hooks/useNutritionPlan';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type {
+  NutritionPlanRouteParams,
+  RootNavigation,
+} from '@app/types/navigation';
 
 const goalLabels: Record<string, string> = {
   lose_weight: 'Perder peso',
@@ -38,7 +37,7 @@ const goalLabels: Record<string, string> = {
 };
 
 export function NutritionPlanScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<RootNavigation>();
   const route = useRoute();
   const {theme} = useAppTheme();
   const {profile} = useAuth();
@@ -134,7 +133,7 @@ export function NutritionPlanScreen() {
   });
 
   const openEllie = () => {
-    navigation.getParent()?.navigate(TAB_ROUTES.Ellie as never);
+    navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Ellie });
   };
 
   useEffect(() => {
@@ -201,12 +200,7 @@ export function NutritionPlanScreen() {
         <AppHeader
           showBackButton
           title="Plan de nutrición"
-          backFallbacks={[
-            HOME_ROUTES.Home,
-            ELLIE_ROUTES.Ellie,
-            PROGRESS_ROUTES.Progress,
-            PROFILE_ROUTES.Profile,
-          ]}
+          backFallbacks={[ROOT_ROUTES.MainTabs]}
         />
 
         {nutritionPlan.error ? (

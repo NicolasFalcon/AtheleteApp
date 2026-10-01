@@ -29,13 +29,17 @@ export const TAB_ROUTES = {
   Workouts: 'Workouts',
   Ellie: 'Ellie',
   Progress: 'Progress',
-  Profile: 'Profile',
+  Community: 'Community',
 } as const;
 
-export const HOME_ROUTES = {
-  Home: 'HomeRoot',
+// Screens of the shared root stack (above the tabs). One name per screen:
+// the tab bar is hidden on all of them (handoff §6).
+export const APP_ROUTES = {
+  Profile: 'Profile',
+  EditProfile: 'EditProfile',
+  Achievements: 'Achievements',
   Notifications: 'Notifications',
-  Challenge: 'Challenge',
+  Core33: 'Core33',
   WorkoutDetail: 'WorkoutDetail',
   WorkoutSession: 'WorkoutSession',
   ExerciseDetail: 'ExerciseDetail',
@@ -48,40 +52,6 @@ export const HOME_ROUTES = {
   PersonalRecords: 'PersonalRecords',
   RegisterPr: 'RegisterPr',
   NutritionPlan: 'NutritionPlan',
-} as const;
-
-export const WORKOUTS_ROUTES = {
-  Workouts: 'WorkoutsRoot',
-  CreateRoutine: 'CreateRoutine',
-  EditRoutine: 'EditRoutine',
-  AddExerciseToRoutine: 'AddExerciseToRoutine',
-  WorkoutDetail: 'WorkoutDetail',
-  WorkoutSession: 'WorkoutSession',
-  ExerciseDetail: 'ExerciseDetail',
-  PersonalRecords: 'WorkoutPersonalRecords',
-  RegisterPr: 'WorkoutRegisterPr',
-} as const;
-
-export const ELLIE_ROUTES = {
-  Ellie: 'EllieRoot',
-  Challenge: 'Challenge',
-  NutritionPlan: 'NutritionPlan',
-} as const;
-
-export const PROGRESS_ROUTES = {
-  Progress: 'ProgressRoot',
-  PersonalRecords: 'ProgressPersonalRecords',
-  RegisterPr: 'ProgressRegisterPr',
-  Challenge: 'ProgressChallenge',
-  NutritionPlan: 'NutritionPlan',
   BodyScience: 'BodyScience',
   BodyScienceArticle: 'BodyScienceArticle',
-} as const;
-
-export const PROFILE_ROUTES = {
-  Profile: 'ProfileRoot',
-  Challenge: 'Challenge',
-  EditProfile: 'EditProfile',
-  Achievements: 'Achievements',
-  NutritionPlan: 'NutritionPlan',
 } as const;

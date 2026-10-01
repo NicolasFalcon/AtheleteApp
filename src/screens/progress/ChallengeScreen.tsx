@@ -1,35 +1,22 @@
-import {useEffect, useMemo, useState} from 'react';
-import {
-  Alert,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {AppHeader, ScreenContainer} from '@app/components';
-import {
-  ELLIE_ROUTES,
-  HOME_ROUTES,
-  PROFILE_ROUTES,
-  PROGRESS_ROUTES,
-} from '@app/constants/routes';
-import {EmptyState, Loader} from '@app/components/ui';
-import {Core33HabitSelectionView} from '@app/features/core33/components/Core33HabitSelectionView';
-import {Core33IntroView} from '@app/features/core33/components/Core33IntroView';
-import {Core33StepIndicator} from '@app/features/core33/components/Core33StepIndicator';
-import {Core33SummaryView} from '@app/features/core33/components/Core33SummaryView';
-import {Core33TrackerView} from '@app/features/core33/components/Core33TrackerView';
-import {useCore33} from '@app/hooks/useCore33';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {Core33HabitSelection} from '@app/services/supabase/core33';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { AppHeader, ScreenContainer } from '@app/components';
+import { ROOT_ROUTES } from '@app/constants/routes';
+import { EmptyState, Loader } from '@app/components/ui';
+import { Core33HabitSelectionView } from '@app/features/core33/components/Core33HabitSelectionView';
+import { Core33IntroView } from '@app/features/core33/components/Core33IntroView';
+import { Core33StepIndicator } from '@app/features/core33/components/Core33StepIndicator';
+import { Core33SummaryView } from '@app/features/core33/components/Core33SummaryView';
+import { Core33TrackerView } from '@app/features/core33/components/Core33TrackerView';
+import { useCore33 } from '@app/hooks/useCore33';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { Core33HabitSelection } from '@app/services/supabase/core33';
 
 type Step = 'intro' | 'habits' | 'summary' | 'tracker';
 
-const BACK_FALLBACKS = [
-  HOME_ROUTES.Home,
-  ELLIE_ROUTES.Ellie,
-  PROGRESS_ROUTES.Progress,
-  PROFILE_ROUTES.Profile,
-];
+// Core 33 opens from Inicio, Progreso, Notificaciones and Perfil (see
+// features/core33/core33Entry.ts); without history it falls back to the tabs.
+const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 
 const EMPTY_SELECTION: Core33HabitSelection = {
   training: '',

@@ -1,9 +1,18 @@
+import type { AnyRouteName, MainTabParamList } from '@app/types/navigation';
+
 type FallbackTarget = {
-  name: string;
+  name: AnyRouteName;
+  // e.g. { screen: 'Workouts' } to land on a tab of MainTabs.
   params?: object;
 };
 
-export type BackFallback = string | FallbackTarget;
+// Typed against the real route names so tsc catches renamed routes.
+export type BackFallback = AnyRouteName | FallbackTarget;
+
+// Fallback to the root of a tab (screens above the tabs live in the root stack).
+export function tabFallback(screen: keyof MainTabParamList): FallbackTarget {
+  return { name: 'MainTabs', params: { screen } };
+}
 
 type NavigationLike = {
   canGoBack: () => boolean;

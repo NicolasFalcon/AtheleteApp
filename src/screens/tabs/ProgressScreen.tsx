@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RefreshCw } from 'lucide-react-native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, Loader } from '@app/components/ui';
-import { PROGRESS_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES } from '@app/constants/routes';
+import { useOpenCore33 } from '@app/features/core33/useOpenCore33';
 import { ActiveChallengeCard } from '@app/features/progress/components/ActiveChallengeCard';
 import { AiAnalysisCard } from '@app/features/progress/components/AiAnalysisCard';
 import { HydrationProgressCard } from '@app/features/progress/components/HydrationProgressCard';
@@ -17,9 +17,9 @@ import { useProgressData } from '@app/hooks/useProgressData';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
-import type { ProgressStackParamList } from '@app/types/navigation';
+import type { TabScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<ProgressStackParamList, 'ProgressRoot'>;
+type Props = TabScreenProps<'Progress'>;
 type ProgressSection = 'dashboard' | 'retos';
 type ProgressRange = 'week' | 'month';
 
@@ -28,6 +28,7 @@ export function ProgressScreen({ navigation }: Props) {
   const tabBarMotion = useTabBarMotion();
   const { bottomClearance } = useTabBarMetrics();
   const progress = useProgressData();
+  const openCore33 = useOpenCore33();
   const [section, setSection] = useState<ProgressSection>('dashboard');
   const [range, setRange] = useState<ProgressRange>('week');
 
@@ -121,7 +122,7 @@ export function ProgressScreen({ navigation }: Props) {
               logs={overview.dailyNutritionLogs}
               plan={overview.nutritionPlan}
               range={range}
-              onOpen={() => navigation.navigate(PROGRESS_ROUTES.NutritionPlan)}
+              onOpen={() => navigation.navigate(APP_ROUTES.NutritionPlan)}
             />
             <HydrationProgressCard
               logs={overview.hydrationLogs}
@@ -131,7 +132,7 @@ export function ProgressScreen({ navigation }: Props) {
             <PersonalRecordsCard
               records={progress.recordSummaries}
               onOpen={(exerciseId, exerciseName) =>
-                navigation.navigate(PROGRESS_ROUTES.PersonalRecords, {
+                navigation.navigate(APP_ROUTES.PersonalRecords, {
                   exerciseId,
                   exerciseName,
                 })
@@ -141,7 +142,7 @@ export function ProgressScreen({ navigation }: Props) {
         ) : (
           <ActiveChallengeCard
             challenge={overview.challenge}
-            onOpen={() => navigation.navigate(PROGRESS_ROUTES.Challenge)}
+            onOpen={openCore33}
           />
         )}
       </ScrollView>

@@ -1,22 +1,21 @@
-import {useRef, useState} from 'react';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {Alert, StyleSheet, Text, View} from 'react-native';
-import {AppHeader, ScreenContainer} from '@app/components';
-import {Button, Card, EmptyState, Loader} from '@app/components/ui';
-import {HOME_ROUTES} from '@app/constants/routes';
-import {QuizAnswerOption} from '@app/features/quiz/components/QuizAnswerOption';
-import {QuizProgressHeader} from '@app/features/quiz/components/QuizProgressHeader';
+import { useRef, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
+import { AppHeader, ScreenContainer } from '@app/components';
+import { Button, Card, EmptyState, Loader } from '@app/components/ui';
+import { APP_ROUTES } from '@app/constants/routes';
+import { QuizAnswerOption } from '@app/features/quiz/components/QuizAnswerOption';
+import { QuizProgressHeader } from '@app/features/quiz/components/QuizProgressHeader';
 import {
   randomizeQuizOptions,
   type AttemptQuizQuestion,
 } from '@app/features/quiz/randomizeQuizOptions';
-import {useQuizQuestions, useQuizSubmit} from '@app/hooks/useQuiz';
-import {createQuizAttemptId} from '@app/services/supabase/quiz';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import type {HomeStackParamList} from '@app/types/navigation';
-import type {QuizAttemptAnswer} from '@app/types/quiz';
+import { useQuizQuestions, useQuizSubmit } from '@app/hooks/useQuiz';
+import { createQuizAttemptId } from '@app/services/supabase/quiz';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import type { AppScreenProps } from '@app/types/navigation';
+import type { QuizAttemptAnswer } from '@app/types/quiz';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'QuizQuestion'>;
+type Props = AppScreenProps<'QuizQuestion'>;
 type AnswerState = 'unanswered' | 'correct' | 'incorrect';
 
 export function QuizQuestionScreen({navigation, route}: Props) {
@@ -31,7 +30,7 @@ export function QuizQuestionScreen({navigation, route}: Props) {
   const submissionStartedRef = useRef(false);
   const attemptQuestionsRef = useRef<AttemptQuizQuestion[] | null>(null);
   const returnToCategories = () => {
-    navigation.popTo(HOME_ROUTES.QuizLanding);
+    navigation.popTo(APP_ROUTES.QuizLanding);
   };
 
   const styles = StyleSheet.create({
@@ -188,7 +187,7 @@ export function QuizQuestionScreen({navigation, route}: Props) {
         answers: finalAnswers,
       });
 
-      navigation.replace(HOME_ROUTES.QuizResult, {
+      navigation.replace(APP_ROUTES.QuizResult, {
         categoryId: route.params.categoryId,
         categoryName: route.params.categoryName,
         categoryIcon: route.params.categoryIcon,

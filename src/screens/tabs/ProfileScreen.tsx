@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from 'react';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LogOut, RefreshCw } from 'lucide-react-native';
 import {
   type LayoutChangeEvent,
@@ -11,9 +10,14 @@ import {
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { Card, Loader, EmptyState } from '@app/components/ui';
-import { PROFILE_ROUTES } from '@app/constants/routes';
+import { BackButton } from '@app/components/v2';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
+import { useOpenCore33 } from '@app/features/core33/useOpenCore33';
 import { BadgeGridCard } from '@app/features/profile/components/BadgeGridCard';
 import { CurrentPlanSummaryCard } from '@app/features/profile/components/CurrentPlanSummaryCard';
 import { ProfileHeroCard } from '@app/features/profile/components/ProfileHeroCard';
@@ -23,11 +27,12 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useProfilePreferences } from '@app/hooks/useProfilePreferences';
-import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
-import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
-import type { ProfileStackParamList } from '@app/types/navigation';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<ProfileStackParamList, 'ProfileRoot'>;
+// Perfil left the tab bar (phase 4): it is a stacked screen opened from the
+// avatar, so it has its own back button and no tab bar clearance.
+type Props = AppScreenProps<'Profile'>;
 type ThemePreference = 'light' | 'dark' | 'system';
 type ProfileSection = 'profile' | 'plan' | 'achievements' | 'preferences' | 'account';
 
@@ -68,11 +73,11 @@ function calculateAge(birthDate: string | null): string {
 
 export function ProfileScreen({ navigation }: Props) {
   const { theme, preferredMode, setPreferredMode } = useAppTheme();
-  const tabBarMotion = useTabBarMotion();
+  const insets = useSafeAreaInsets();
+  const openCore33 = useOpenCore33();
   const { profile, signOut } = useAuth();
   const overviewQuery = useProfileOverview();
   const preferences = useProfilePreferences();
-  const { bottomClearance } = useTabBarMetrics();
   const scrollRef = useRef<ScrollView>(null);
   const sectionOffsets = useRef<Record<ProfileSection, number>>({
     profile: 0,
@@ -92,8 +97,13 @@ export function ProfileScreen({ navigation }: Props) {
     content: {
       paddingHorizontal: theme.spacing.md,
       paddingTop: theme.spacing.sm,
-      paddingBottom: bottomClearance + theme.spacing.lg,
+      paddingBottom:
+        Math.max(insets.bottom, theme.spacing.md) + theme.spacing.lg,
       gap: theme.spacing.md,
+    },
+    backRow: {
+      paddingHorizontal: theme.spacing.md,
+      paddingTop: theme.spacing.xs,
     },
     anchorBar: {
       minHeight: 44,
@@ -184,8 +194,6 @@ export function ProfileScreen({ navigation }: Props) {
 
   const handleScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-      tabBarMotion.onScroll(event);
-
       const marker = event.nativeEvent.contentOffset.y + 72;
       let nextSection: ProfileSection = 'profile';
 
@@ -208,12 +216,21 @@ export function ProfileScreen({ navigation }: Props) {
         current === nextSection ? current : nextSection,
       );
     },
-    [tabBarMotion],
+    [],
+  );
+
+  const backRow = (
+    <View style={styles.backRow}>
+      <BackButton
+        onPress={() => safeGoBack(navigation, [ROOT_ROUTES.MainTabs])}
+      />
+    </View>
   );
 
   if (!profile || overviewQuery.isLoading || !preferences.hydrated) {
     return (
       <SafeAreaView edges={['top']} style={styles.safeArea}>
+        {backRow}
         <Loader label="Cargando perfil..." />
       </SafeAreaView>
     );
@@ -222,6 +239,7 @@ export function ProfileScreen({ navigation }: Props) {
   if (overviewQuery.error) {
     return (
       <SafeAreaView edges={['top']} style={styles.safeArea}>
+        {backRow}
         <View style={styles.content}>
           <EmptyState
             title="No pudimos cargar tu perfil"
@@ -265,6 +283,7 @@ export function ProfileScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={styles.safeArea}>
+      {backRow}
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.content}
@@ -283,7 +302,7 @@ export function ProfileScreen({ navigation }: Props) {
           points={overview?.points || 0}
           currentStreak={overview?.currentStreak || 0}
           badgeCount={overview?.badges.length || 0}
-          onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
+          onEdit={() => navigation.navigate(APP_ROUTES.EditProfile)}
         />
 
         <View style={styles.anchorBar}>
@@ -323,7 +342,7 @@ export function ProfileScreen({ navigation }: Props) {
             ageLabel={calculateAge(profile.birthDate)}
             weightLabel={profile.weight ? String(profile.weight) : '—'}
             heightLabel={profile.height ? String(profile.height) : '—'}
-            onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
+            onEdit={() => navigation.navigate(APP_ROUTES.EditProfile)}
           />
         </View>
 
@@ -333,13 +352,11 @@ export function ProfileScreen({ navigation }: Props) {
             trainingLabel={trainingLabel}
             nutritionLabel={nutritionSummary}
             challengeLabel={challengeSummary}
-            onEdit={() => navigation.navigate(PROFILE_ROUTES.EditProfile)}
+            onEdit={() => navigation.navigate(APP_ROUTES.EditProfile)}
             onOpenNutrition={() =>
-              navigation.navigate(PROFILE_ROUTES.NutritionPlan)
+              navigation.navigate(APP_ROUTES.NutritionPlan)
             }
-            onOpenChallenge={() =>
-              navigation.navigate(PROFILE_ROUTES.Challenge)
-            }
+            onOpenChallenge={openCore33}
           />
         </View>
 
@@ -350,7 +367,7 @@ export function ProfileScreen({ navigation }: Props) {
             previewCount={5}
             points={overview?.points || 0}
             currentStreak={overview?.currentStreak || 0}
-            onOpenAll={() => navigation.navigate(PROFILE_ROUTES.Achievements)}
+            onOpenAll={() => navigation.navigate(APP_ROUTES.Achievements)}
           />
         </View>
 

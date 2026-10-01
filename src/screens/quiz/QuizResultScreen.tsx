@@ -1,13 +1,12 @@
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {StyleSheet} from 'react-native';
-import {ScreenContainer} from '@app/components';
-import {HOME_ROUTES} from '@app/constants/routes';
-import {QuizScoreSummaryCard} from '@app/features/quiz/components/QuizScoreSummaryCard';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {safeGoBack} from '@app/navigation/safeGoBack';
-import type {HomeStackParamList} from '@app/types/navigation';
+import { StyleSheet } from 'react-native';
+import { ScreenContainer } from '@app/components';
+import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { QuizScoreSummaryCard } from '@app/features/quiz/components/QuizScoreSummaryCard';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { safeGoBack, tabFallback } from '@app/navigation/safeGoBack';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props = NativeStackScreenProps<HomeStackParamList, 'QuizResult'>;
+type Props = AppScreenProps<'QuizResult'>;
 
 export function QuizResultScreen({navigation, route}: Props) {
   const {theme} = useAppTheme();
@@ -31,14 +30,17 @@ export function QuizResultScreen({navigation, route}: Props) {
         isPerfect={route.params.isPerfect}
         unlockedBadges={route.params.unlockedBadges || []}
         onRetry={() =>
-          navigation.replace(HOME_ROUTES.QuizQuestion, {
+          navigation.replace(APP_ROUTES.QuizQuestion, {
             categoryId: route.params.categoryId,
             categoryName: route.params.categoryName,
             categoryIcon: route.params.categoryIcon,
           })
         }
         onGoBack={() =>
-          safeGoBack(navigation, [HOME_ROUTES.QuizLanding, HOME_ROUTES.Home])
+          safeGoBack(navigation, [
+            APP_ROUTES.QuizLanding,
+            tabFallback(TAB_ROUTES.Home),
+          ])
         }
       />
     </ScreenContainer>

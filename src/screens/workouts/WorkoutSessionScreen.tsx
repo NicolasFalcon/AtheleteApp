@@ -1,25 +1,42 @@
-import {useEffect, useMemo, useRef, useState} from 'react';
-import {Alert, Pressable, ScrollView, StyleSheet, Text, View} from 'react-native';
-import type {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
-import {ArrowLeft, Clock3, Flame, Play, Save, Sparkles} from 'lucide-react-native';
-import {Button, Card, EmptyState, Loader, ProgressBar} from '@app/components/ui';
-import {HOME_ROUTES, TAB_ROUTES, WORKOUTS_ROUTES} from '@app/constants/routes';
-import {WorkoutSessionExerciseRow} from '@app/features/workouts/components/WorkoutSessionExerciseRow';
-import {useAppTheme} from '@app/hooks/useAppTheme';
-import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
-import {useWorkoutLibrary} from '@app/hooks/useWorkoutLibrary';
-import {useWorkoutSession} from '@app/hooks/useWorkoutSession';
-import {safeGoBack} from '@app/navigation/safeGoBack';
-import {findExerciseByName} from '@app/shared';
-import type {
-  HomeStackParamList,
-  WorkoutsStackParamList,
-} from '@app/types/navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+import {
+  ArrowLeft,
+  Clock3,
+  Flame,
+  Play,
+  Save,
+  Sparkles,
+} from 'lucide-react-native';
+import {
+  Button,
+  Card,
+  EmptyState,
+  Loader,
+  ProgressBar,
+} from '@app/components/ui';
+import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { WorkoutSessionExerciseRow } from '@app/features/workouts/components/WorkoutSessionExerciseRow';
+import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
+import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import { findExerciseByName } from '@app/shared';
+import type { AppScreenProps } from '@app/types/navigation';
 
-type Props =
-  | NativeStackScreenProps<HomeStackParamList, 'WorkoutSession'>
-  | NativeStackScreenProps<WorkoutsStackParamList, 'WorkoutSession'>;
+type Props = AppScreenProps<'WorkoutSession'>;
 
 function formatTimer(totalSeconds: number) {
   const hours = Math.floor(totalSeconds / 3600);
@@ -34,10 +51,9 @@ function formatTimer(totalSeconds: number) {
   return `${pad(minutes)}:${pad(seconds)}`;
 }
 
-export function WorkoutSessionScreen({navigation, route}: Props) {
-  const handleSafeBack = () =>
-    safeGoBack(navigation, [WORKOUTS_ROUTES.Workouts, HOME_ROUTES.Home]);
-  const {theme} = useAppTheme();
+export function WorkoutSessionScreen({ navigation, route }: Props) {
+  const handleSafeBack = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const workoutsQuery = useWorkoutLibrary();
   const exercisesQuery = useExerciseLibrary();
@@ -349,19 +365,12 @@ export function WorkoutSessionScreen({navigation, route}: Props) {
   };
 
   const openExerciseDetail = (exerciseId: string) => {
-    const stackNavigation = navigation as any;
-    stackNavigation.navigate('ExerciseDetail' as never, {exerciseId} as never);
+    navigation.navigate(APP_ROUTES.ExerciseDetail, { exerciseId });
   };
 
   const goHome = () => {
-    const tabNavigation = navigation.getParent();
-
-    if (tabNavigation) {
-      tabNavigation.navigate(TAB_ROUTES.Home as never);
-      return;
-    }
-
-    handleSafeBack();
+    // The session sits above the tabs: pop back to MainTabs on Inicio.
+    navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
   };
 
   if (isLoading || workoutsQuery.isLoading || exercisesQuery.isLoading) {
