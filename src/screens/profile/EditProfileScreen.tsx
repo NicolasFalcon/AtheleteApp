@@ -13,6 +13,7 @@ const goals: Array<{key: OnboardingGoal; label: string}> = [
   {key: 'gain_muscle', label: 'Ganar músculo'},
   {key: 'maintain', label: 'Mantenerme'},
   {key: 'improve_health', label: 'Mejorar salud'},
+  {key: 'performance', label: 'Rendimiento'},
 ];
 
 export function EditProfileScreen() {

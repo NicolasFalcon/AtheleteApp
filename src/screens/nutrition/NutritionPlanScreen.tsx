@@ -34,6 +34,7 @@ const goalLabels: Record<string, string> = {
   gain_muscle: 'Ganar músculo',
   maintain: 'Mantenerme',
   improve_health: 'Mejorar salud',
+  performance: 'Rendimiento',
 };
 
 export function NutritionPlanScreen() {

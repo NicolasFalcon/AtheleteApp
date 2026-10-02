@@ -7,6 +7,7 @@ const goalBodyPart = {
   gain_muscle: 'chest',
   maintain: 'fullbody',
   improve_health: 'mobility',
+  performance: 'fullbody',
 } as const;
 
 export function useExerciseDiscovery(enabled: boolean) {

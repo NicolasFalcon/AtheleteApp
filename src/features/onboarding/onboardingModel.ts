@@ -1,9 +1,13 @@
-import type { OnboardingData, OnboardingGoal } from '@app/types/auth';
+import type {
+  OnboardingData,
+  OnboardingGoal,
+  TrainingLevel,
+} from '@app/types/auth';
 
 // Onboarding v2 (Auth.dc.html · STEPS): 8 questions in 3 blocks.
-// Saved to existing `profiles` columns: name, birth_date, weight, height,
-// goal, training_days_per_week, available_equipment.
-// Shown but NOT saved (no column, pending backend): level, session length.
+// Saved to `profiles`: name, birth_date, weight, height, goal,
+// training_level, training_days_per_week, available_equipment and
+// preferred_session_minutes.
 // Not asked any more (user decision 2026-09-30): gender and avatar.
 
 export const BLOCKS = ['Tú', 'Tu objetivo', 'Tu semana'] as const;
@@ -43,8 +47,6 @@ export type GoalOption = {
   value: OnboardingGoal;
 };
 
-// "Rendimiento" has no value of its own yet: it is stored as improve_health
-// (user decision 2026-09-30, pending backend).
 export const GOALS: GoalOption[] = [
   {
     label: 'Ganar músculo',
@@ -68,26 +70,52 @@ export const GOALS: GoalOption[] = [
     label: 'Rendimiento',
     subtitle: 'Correr, saltar, competir',
     short: ['Rendir', 'más'],
-    value: 'improve_health',
+    value: 'performance',
   },
 ];
 
-export const LEVELS = [
-  { label: 'Principiante', subtitle: 'Empiezo o vuelvo tras un tiempo' },
-  { label: 'Intermedio', subtitle: 'Entreno con regularidad' },
-  { label: 'Avanzado', subtitle: 'Programo y sigo cargas' },
-] as const;
+export const LEVELS: ReadonlyArray<{
+  label: string;
+  subtitle: string;
+  value: TrainingLevel;
+}> = [
+  {
+    label: 'Principiante',
+    subtitle: 'Empiezo o vuelvo tras un tiempo',
+    value: 'beginner',
+  },
+  {
+    label: 'Intermedio',
+    subtitle: 'Entreno con regularidad',
+    value: 'intermediate',
+  },
+  { label: 'Avanzado', subtitle: 'Programo y sigo cargas', value: 'advanced' },
+];
 
+// `value` is stored in profiles.preferred_session_minutes (5–240); "60+"
+// is saved as 60.
 export const DURATIONS = [
-  { minutes: '20', label: '20 minutos', subtitle: 'Corta e intensa' },
-  { minutes: '35', label: '35 minutos', subtitle: 'Lo justo para progresar' },
+  {
+    minutes: '20',
+    value: 20,
+    label: '20 minutos',
+    subtitle: 'Corta e intensa',
+  },
+  {
+    minutes: '35',
+    value: 35,
+    label: '35 minutos',
+    subtitle: 'Lo justo para progresar',
+  },
   {
     minutes: '45',
+    value: 45,
     label: '45 minutos',
     subtitle: 'Recomendada para tu objetivo',
   },
   {
     minutes: '60+',
+    value: 60,
     label: '60 minutos o más',
     subtitle: 'Con calentamiento completo',
   },
@@ -197,8 +225,7 @@ export type OnboardingPayload = {
   data: OnboardingData;
 };
 
-// Only the existing profile columns. Level and session length stay in the
-// UI (pending backend); gender and avatar are no longer asked.
+// Gender and avatar are no longer asked (null).
 export function toOnboardingPayload(
   answers: OnboardingAnswers,
 ): OnboardingPayload {
@@ -218,6 +245,12 @@ export function toOnboardingPayload(
       height: answers.height,
       trainingDaysPerWeek: answers.days,
       availableEquipment: answers.equipment,
+      ...(answers.level !== null
+        ? { trainingLevel: LEVELS[answers.level].value }
+        : {}),
+      ...(answers.duration !== null
+        ? { preferredSessionMinutes: DURATIONS[answers.duration].value }
+        : {}),
     },
   };
 }

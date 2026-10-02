@@ -24,9 +24,9 @@ describe('onboarding v2 model', () => {
     expect(canContinue('body', answers)).toBe(true);
     expect(canContinue('goal', answers)).toBe(false);
     expect(canContinue('equipment', answers)).toBe(false);
-    expect(
-      canContinue('equipment', { ...answers, equipment: ['Barra'] }),
-    ).toBe(true);
+    expect(canContinue('equipment', { ...answers, equipment: ['Barra'] })).toBe(
+      true,
+    );
   });
 
   it('draws the training days on the week like the prototype', () => {
@@ -50,7 +50,7 @@ describe('onboarding v2 model', () => {
     expect(toggleEquipment(['Barra', 'Bandas'], 'Barra')).toEqual(['Bandas']);
   });
 
-  it('maps answers to existing profile columns only', () => {
+  it('maps every answer to its profile column', () => {
     const payload = toOnboardingPayload({
       ...initialAnswers(' Nicolas '),
       birthDate: '1989-08-30',
@@ -74,9 +74,26 @@ describe('onboarding v2 model', () => {
       height: 170,
       trainingDaysPerWeek: 6,
       availableEquipment: ['Peso corporal', 'Mancuernas'],
+      trainingLevel: 'intermediate',
+      preferredSessionMinutes: 45,
     });
-    expect(GOALS[3].value).toBe('improve_health');
-    expect(payload.data).not.toHaveProperty('level');
+    expect(GOALS[3].value).toBe('performance');
+  });
+
+  it('saves "60 minutos o más" as 60 and every level value', () => {
+    const base = {
+      ...initialAnswers('Ana'),
+      birthDate: '1990-01-01',
+      goal: 0,
+      equipment: ['Barra'],
+    };
+
+    expect(
+      toOnboardingPayload({ ...base, level: 0, duration: 3 }).data,
+    ).toMatchObject({ trainingLevel: 'beginner', preferredSessionMinutes: 60 });
+    expect(
+      toOnboardingPayload({ ...base, level: 2, duration: 0 }).data,
+    ).toMatchObject({ trainingLevel: 'advanced', preferredSessionMinutes: 20 });
   });
 
   it('refuses to build the payload with missing answers', () => {

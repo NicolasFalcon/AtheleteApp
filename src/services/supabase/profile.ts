@@ -6,6 +6,7 @@ import type {
   OnboardingGoal,
   ProfileGender,
   ProfileRecord,
+  TrainingLevel,
 } from '@app/types/auth';
 import type { Database } from '@app/types/supabase';
 import type { AvatarKey } from '@app/types/profileIdentity';
@@ -19,12 +20,21 @@ function mapGoal(value: string | null): OnboardingGoal | null {
     value === 'lose_weight' ||
     value === 'gain_muscle' ||
     value === 'maintain' ||
-    value === 'improve_health'
+    value === 'improve_health' ||
+    value === 'performance'
   ) {
     return value;
   }
 
   return null;
+}
+
+function mapTrainingLevel(value: string | null): TrainingLevel | null {
+  return value === 'beginner' ||
+    value === 'intermediate' ||
+    value === 'advanced'
+    ? value
+    : null;
 }
 
 function mapGender(value: string | null): ProfileGender | null {
@@ -52,6 +62,8 @@ function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
     dailyWaterGoal: row.daily_water_goal,
     trainingEnvironment: row.training_environment,
     availableEquipment: row.available_equipment || [],
+    trainingLevel: mapTrainingLevel(row.training_level),
+    preferredSessionMinutes: row.preferred_session_minutes,
   };
 }
 
@@ -126,6 +138,12 @@ export async function updateOnboardingProfile(
       weight: onboarding.weight,
       height: onboarding.height,
       training_days_per_week: onboarding.trainingDaysPerWeek,
+      ...(onboarding.trainingLevel
+        ? { training_level: onboarding.trainingLevel }
+        : {}),
+      ...(onboarding.preferredSessionMinutes
+        ? { preferred_session_minutes: onboarding.preferredSessionMinutes }
+        : {}),
       ...(onboarding.availableEquipment
         ? { available_equipment: onboarding.availableEquipment }
         : {}),

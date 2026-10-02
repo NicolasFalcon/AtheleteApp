@@ -6,7 +6,11 @@ export type OnboardingGoal =
   | 'lose_weight'
   | 'gain_muscle'
   | 'maintain'
-  | 'improve_health';
+  | 'improve_health'
+  | 'performance';
+
+// profiles.training_level
+export type TrainingLevel = 'beginner' | 'intermediate' | 'advanced';
 
 export type ProfileGender = 'male' | 'female';
 
@@ -22,6 +26,9 @@ export type OnboardingData = {
   trainingDaysPerWeek: number;
   // v2 onboarding (step "equipamiento"); written only when provided.
   availableEquipment?: string[];
+  // v2 onboarding steps "nivel" and "duración"; written only when provided.
+  trainingLevel?: TrainingLevel;
+  preferredSessionMinutes?: number;
 };
 
 export type ProfileRecord = {
@@ -44,4 +51,6 @@ export type ProfileRecord = {
   dailyWaterGoal: number | null;
   trainingEnvironment: string | null;
   availableEquipment: string[];
+  trainingLevel: TrainingLevel | null;
+  preferredSessionMinutes: number | null;
 };

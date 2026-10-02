@@ -487,6 +487,7 @@ export function serializeEllieContext(ctx: EllieFullContext): string {
     gain_muscle: 'Ganar músculo',
     maintain: 'Mantener',
     improve_health: 'Mejorar salud',
+    performance: 'Rendimiento',
   };
 
   let serialized = `ESTADO ACTUAL DEL USUARIO:
