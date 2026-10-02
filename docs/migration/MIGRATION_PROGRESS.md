@@ -8,6 +8,8 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 ---
 
 > **Fase 2 (2026-09-30)**: resumen en 2 minutos, decisiones asumidas, problemas y commits propuestos en **§11**.
+>
+> **Backend (2026-10-01)**: la fuente de verdad del backend es [`docs/backend/BACKEND_SUMMARY.md`](../backend/BACKEND_SUMMARY.md) (aplicado por Lovable en Supabase). Estado, cambios de la app y pendientes con responsable en **§14**.
 
 ## 0. Estado por fase
 
@@ -585,7 +587,7 @@ Método: Maestro 2.10 (JDK portátil) sobre el simulador; los avisos de JS se le
 | Paso | Resultado |
 |---|---|
 | 3 · Correcciones B1/B2 | ⏸ **Pendiente backend.** No se corrige ni en la app ni en la base de datos. Causa raíz documentada arriba (RPC `award_gamification_event`, Postgres `42P10`). Queda para la fase de backend: leer la definición SQL, añadir la restricción única que el `ON CONFLICT` necesita (o corregir el `ON CONFLICT`) y, en la app, hacer que un fallo de recompensa no invalide un plan ya guardado (`awardGamificationEventBestEffort`, `gamification.ts:96`) |
-| 4 · Tipos de Supabase | ⏸ **Pendiente backend** (requiere `supabase login`; ref `eqbabbaxfwqfhbtrraoz`) |
+| 4 · Tipos de Supabase | ✅ **Resuelto 2026-10-01** con los tipos generados por Lovable (BK-02, §14) |
 | 5 · Borrar `PlaceholderScreen` | ✅ Commit `5664fdd chore: remove unused PlaceholderScreen`. `tsc`, `jest` (34/34) y lint en verde; iOS arranca y navega las 5 tabs |
 | 6 · Dependencias | ↪ **Movidas al inicio de la fase 2**, cuando se usen. Orden y versiones se mantienen: Reanimated 4.6.x + worklets 0.12.x (4.7 exige RN ≥ 0.86) → `@gorhom/bottom-sheet@5` → `react-native-haptic-feedback@3` → `@react-native-community/blur@4.4` |
 | 7 · Cierre | ✅ Este documento |
@@ -619,11 +621,11 @@ Funcionalidad nueva (Social, HealthKit, Scan, etc.): después de la migración v
 
 | ID | Tema | Detalle |
 |---|---|---|
-| BK-01 | RPC `award_gamification_event` falla (`42P10`) | Afecta a quiz y nutrición (comprobado) y previsiblemente al resto de eventos. Puntos y badges no se otorgan. Incluye el arreglo de B1 en la app |
-| BK-02 | Tipos de Supabase desactualizados | Faltan `personal_records`, `chat_messages`, `quiz_*`, `user_badges` |
-| BK-03 | Onboarding · nivel | El paso "¿Cuál es tu nivel?" se muestra pero no se guarda: no hay columna (p. ej. `profiles.training_level`) |
-| BK-04 | Onboarding · duración de sesión | "¿Cuánto dura tu sesión ideal?" se muestra pero no se guarda: no hay columna (p. ej. `profiles.session_minutes`) |
-| BK-05 | Onboarding · objetivo "Rendimiento" | Se guarda como `improve_health` (decisión del usuario 2026-09-30). Requiere un valor propio en `goal` y en sus consumidores (ELLIE, nutrición, Perfil) |
+| BK-01 | ✅ **Resuelto 2026-10-01** (backend). ~~RPC `award_gamification_event` falla (`42P10`)~~ | `gamification_events` tiene `UNIQUE (user_id, event_type, reference_id)`; catálogo de eventos y alias (BACKEND_SUMMARY §6). La app usa los nombres nuevos (§14.2). Resuelve la causa de B1 y B2 |
+| BK-02 | ✅ **Resuelto 2026-10-01**. ~~Tipos de Supabase desactualizados~~ | `src/types/supabase.ts` reemplazado por los tipos generados por Lovable con el esquema completo (§14.1) |
+| BK-03 | ✅ **Resuelto 2026-10-01**. ~~Onboarding · nivel sin columna~~ | Se guarda en `profiles.training_level` (`beginner`/`intermediate`/`advanced`) |
+| BK-04 | ✅ **Resuelto 2026-10-01**. ~~Onboarding · duración sin columna~~ | Se guarda en `profiles.preferred_session_minutes` (20/35/45/60; "60 o más" = 60) |
+| BK-05 | ✅ **Resuelto 2026-10-01**. ~~"Rendimiento" guardado como `improve_health`~~ | `profiles.goal = 'performance'`; añadido en Perfil, Editar perfil, Nutrición, ELLIE, Inicio y Descubrir ejercicios (§14.2) |
 | BK-06 | Onboarding · género y avatar | Ya no se piden (decisión del usuario: seguir el diseño). Usuarios nuevos: `gender = null` y sin avatar (iniciales hasta que se elija en Perfil). **Análisis (2026-09-30)**: en el repo no hay ningún cálculo que use el género (ni TMB/TDEE ni calorías; `daily_calorie_goal` solo se lee). Único uso: el contexto en texto de ELLIE (`shared/domain/ellie-context.ts:496`), que con `null` envía "Género declarado: No indicado". El código de la edge function `ellie-chat` (que genera los planes nutricionales) no está en este repo: **revisar en backend** si estima calorías con el género; si es así, pedirlo en ese momento (al pedir/activar un plan) cuando falte, sin añadirlo al onboarding |
 
 ---
@@ -791,7 +793,7 @@ Orden: Login → Crear cuenta → Recuperar/Restablecer → Intro → Onboarding
 | Recuperar contraseña | `AUTH_04_FORGOT_*`, `AUTH_05_FORGOT_SENT_*` | formulario; correo inválido (aro + frase); "Enviando…"; enlace enviado (disco del sobre con pop); "Reenviar" (toast "Te enviamos otro enlace"); teclado abierto | El disco del candado usa `scene.plate` / `scene.deep`; el disco del sobre en Dark usa `shadow.subtle` (borde) en vez del brillo blanco del HTML (D-15); "Reenviar" sale en `text.primary` (HTML: secundario) |
 | Restablecer contraseña | `AUTH_06_RESET_*`, `AUTH_07_RESET_SUCCESS_*` | requisitos en vivo (8, número, mayúscula, coinciden — D-38: 4 filas en vez de 3); CTA inactiva/activa; "Guardando…"; error de Supabase; éxito (check Ember 72 con halo); enlace caducado (estado nuevo, sin referencia); teclado con "Repite la contraseña" enfocada | Probar con un enlace real de recuperación (requiere P2/AppDelegate). "Para {correo}" sale del `session.user.email` de recuperación |
 | Intro deslizable | `ONB_01_INTRO` (escena: misma en Light y Dark) | deslizar entre las 3 fotos; "Siguiente" avanza; los puntos (22/6 pt) siguen al swipe; "Empezar" llama a `onComplete`; iPhone pequeño (el texto no debe chocar con los puntos) | Posición vertical del texto calculada sobre los controles fijos (no la del HTML, donde texto, puntos y CTA forman un bloque); la animación de cambio de texto del HTML (push) se sustituye por el propio swipe |
-| Onboarding · 8 pasos | `ONB_02_STEP_01_*` … `ONB_02_STEP_08_*` | cada paso con "Siguiente" inactivo hasta responder; back y back de Android entre pasos; transición (entra por la derecha al avanzar, por la izquierda al volver); nombre con teclado (CTA visible); fecha: hoja con el selector del sistema (iOS spinner) y "Listo"; peso/altura: arrastrar la regla (háptica por unidad, aguja fija, bordes desvanecidos); objetivo: tiles con foto y check Ember; nivel: barras + radio; días: − / + y la semana; equipamiento: multiselección con check Ember; duración: cápsulas con punto Ember en la recomendada; "Terminar" → Bienvenida | Regla: valores iniciales 70 kg / 170 cm (el HTML muestra 76/170 de ejemplo); el selector de fecha va en la `Sheet` v2 (el HTML solo dice "selector del sistema"); en el paso 1 no hay back (el usuario ya está dentro, sin intro previa); "Rendimiento" se guarda como `improve_health` |
+| Onboarding · 8 pasos | `ONB_02_STEP_01_*` … `ONB_02_STEP_08_*` | cada paso con "Siguiente" inactivo hasta responder; back y back de Android entre pasos; transición (entra por la derecha al avanzar, por la izquierda al volver); nombre con teclado (CTA visible); fecha: hoja con el selector del sistema (iOS spinner) y "Listo"; peso/altura: arrastrar la regla (háptica por unidad, aguja fija, bordes desvanecidos); objetivo: tiles con foto y check Ember; nivel: barras + radio; días: − / + y la semana; equipamiento: multiselección con check Ember; duración: cápsulas con punto Ember en la recomendada; "Terminar" → Bienvenida | Regla: valores iniciales 70 kg / 170 cm (el HTML muestra 76/170 de ejemplo); el selector de fecha va en la `Sheet` v2 (el HTML solo dice "selector del sistema"); en el paso 1 no hay back (el usuario ya está dentro, sin intro previa); "Rendimiento" se guarda como `performance` (desde 2026-10-01, BK-05) |
 | Bienvenida de ELLIE | `ONB_03_ELLIE_WELCOME_*` | al aparecer guarda el perfil en segundo plano ("Guardando tu perfil…", salidas inactivas); guardado OK → "Ir a Inicio" → Inicio y "Hablar con ELLIE" → pestaña ELLIE ("Abriendo tu inicio…"); fallo al guardar (sin red) → frase de error + "Reintentar" en lugar de la primaria; resumen (días, min, objetivo) según las respuestas | La fila "Tu primera sesión" no tiene sesión real detrás (DA-27); el halo de la esfera (1,9× del HTML vs 128 + 34 pt); fondo de lino en Dark con `linen[2]` → `linen[3]` → `bg` |
 
 ### 12.1 Grupo 1 · Login (AUTH_01, AUTH_02) — cerrado 2026-09-30
@@ -858,10 +860,10 @@ git commit -m "feat(onboarding): migrate intro slides to v2 (ONB_01)" -m "Co-Aut
 
 - **Qué cambió**: el onboarding v1 (9 pantallas en stack) se sustituye por una sola pantalla `OnboardingScreen` → `OnboardingFlow` (8 preguntas + Bienvenida de ELLIE). `OnboardingWizard`: back 44 + "Tú · 1 de 8" 13/600, `StepProgress` (8 segmentos de 4 pt, hueco extra entre bloques), eyebrow "01 · Tú" + pregunta 32/600 (−.025em), cuerpo del paso con transición lateral (Reanimated, 320 ms), CTA fija "Siguiente"/"Terminar" sobre vidrio. Pasos en `features/onboarding/components/OnboardingSteps.tsx`.
 - **Primitivas nuevas (v2)**: `StepProgress`, `RulerInput` (regla con marcas cada 12 pt, aguja fija, bordes con degradado en vez de `mask-image` — D-30), `PhotoChoiceTile` (tile 196 pt con foto, scrim y check Ember), `ChoiceTile` + `IconChoiceContent` (tiles de equipamiento y cápsulas de duración: seleccionado = relleno `cta.primary` con contenido invertido).
-- **Datos** (`features/onboarding/onboardingModel.ts`, test 6/6): se guardan solo columnas existentes vía `completeOnboarding` → `updateOnboardingProfile`: `name`, `birth_date`, `weight`, `height`, `goal`, `training_days_per_week`, `available_equipment` (etiquetas en español, como las lee ELLIE) y `onboarding_completed`. Sin guardar (pendiente de backend): nivel (BK-03), duración (BK-04). `gender` y `avatar_key` quedan en `null` (BK-06). "Rendimiento" → `improve_health` (BK-05). Cambios mínimos: `OnboardingData.gender` admite `null`, `availableEquipment?` opcional, y `updateOnboardingProfile`/`completeOnboarding` aceptan `name` opcional.
+- **Datos** (`features/onboarding/onboardingModel.ts`, test 6/6): se guardan solo columnas existentes vía `completeOnboarding` → `updateOnboardingProfile`: `name`, `birth_date`, `weight`, `height`, `goal`, `training_days_per_week`, `available_equipment` (etiquetas en español, como las lee ELLIE) y `onboarding_completed`. Sin guardar (pendiente de backend): nivel (BK-03), duración (BK-04). `gender` y `avatar_key` quedan en `null` (BK-06). "Rendimiento" → `improve_health` (BK-05). **Actualización 2026-10-01**: nivel, duración y `performance` ya se guardan (§14.2). Cambios mínimos: `OnboardingData.gender` admite `null`, `availableEquipment?` opcional, y `updateOnboardingProfile`/`completeOnboarding` aceptan `name` opcional.
 - **Navegación**: `OnboardingStackNavigator` registra solo `Flow`. Las respuestas se guardan en la Bienvenida; al quedar el perfil completo `RootNavigator` pasa a las pestañas. "Hablar con ELLIE" abre la pestaña ELLIE mediante `lib/postOnboarding.ts` (intención de un solo uso que lee `MainTabNavigator` al montar).
 - **Modo dev "Recorrer onboarding"**: nueva entrada en el menú de desarrollo (junto a "Catálogo v2") y URL `athelete://dev/onboarding`. Muestra Intro → 8 pasos → Bienvenida con datos de ejemplo; **no llama a Supabase, no crea usuarios ni guarda nada**; ✕ arriba a la derecha para salir; al terminar, toast "Recorrido terminado · iría a … (sin guardar)". Solo en `__DEV__` (`src/dev/DevOnboardingWalkthrough.tsx`).
-- **Decisiones del usuario aplicadas**: 8 pasos exactos sin género ni avatar; "Rendimiento" → `improve_health`.
+- **Decisiones del usuario aplicadas**: 8 pasos exactos sin género ni avatar; "Rendimiento" → `improve_health` (sustituido el 2026-10-01 por `performance`, BK-05).
 - **Decisiones asumidas**: DA-24 los pasos sin respuesta por defecto (fecha, objetivo, nivel, equipamiento, duración) exigen elegir antes de "Siguiente"; peso/altura y días arrancan en 70 kg / 170 cm / 3 días. DA-25 el selector de fecha del sistema se abre en una `Sheet` con "Listo" (iOS) o en el diálogo nativo (Android); máximo hoy, mínimo 1920. DA-26 sin back en la primera pregunta del flujo real (el usuario ya inició sesión; no hay pantalla previa).
 - **Limpieza pendiente** (no borrado): pantallas v1 `src/screens/onboarding/{WelcomeScreen,AvatarPickerScreen,BirthDateScreen,GenderSelectionScreen,WeightInputScreen,HeightInputScreen,TrainingFrequencyScreen,GoalSelectionScreen,ProfileSetupCompleteScreen}.tsx`, sus rutas en `ONBOARDING_ROUTES`/`OnboardingStackParamList`, `src/components/onboarding/*` y `src/components/auth/*` (ya solo los usan esas pantallas).
 - **Bloqueos**: sin Xcode, sin validación visual. `@react-native-community/datetimepicker` ya estaba instalado (no se añade nada nativo).
@@ -1008,3 +1010,100 @@ git add docs/migration/MIGRATION_PROGRESS.md
 git commit -m "docs: phase 4 navigation" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
+---
+
+## 14. Backend (Lovable · Supabase) — 2026-10-01 · **cerrado**
+
+Fuente de verdad: [`docs/backend/BACKEND_SUMMARY.md`](../backend/BACKEND_SUMMARY.md). Todos los cambios del backend son aditivos. La app **no** crea migraciones ni toca la base de datos: el backend lo gestiona Lovable.
+
+### 14.1 Estado
+
+| Tema | Estado |
+|---|---|
+| BK-01 · `award_gamification_event` (`42P10`) | ✅ Resuelto en backend (UNIQUE completa, catálogo y alias, modo `log`). B1 y B2 dejan de fallar por esta causa (pendiente de comprobar en el simulador) |
+| BK-02 · tipos de Supabase | ✅ `src/types/supabase.ts` = tipos de Lovable (esquema completo, incluye `__InternalSupabase`, `Tables`/`TablesInsert`/`TablesUpdate`). Mismo export `Database`, sin cambios en los imports; `tsc` sin errores. El cliente (`createClient`) sigue sin tipar con `Database`, así que no cambia nada en tiempo de ejecución |
+| Estado general | ✅ **Backend cerrado** (2026-10-01, 19:20 UTC). Quedan solo los pendientes de §14.4 |
+| BK-03 / BK-04 / BK-05 · onboarding | ✅ Resueltos (columnas `training_level`, `preferred_session_minutes` y `goal = performance`) |
+| BK-06 · género | Sigue opcional (`gender` puede ser `null`). Pendiente de backend: confirmar si `ellie-chat` usa el género para calcular calorías |
+| Series por ejercicio y Comunidad | ✅ Tablas y RPC creadas en backend. La app **no** las usa todavía: entran con sus pantallas (§14.3) |
+
+### 14.2 Cambios en la app (2026-10-01)
+
+- **Gamificación** (`services/supabase/gamification.ts`):
+  - Respuesta nueva `{awarded, event_id, points_added, total_points, new_badges, reason}` normalizada en `normalizeAwardResult`: `badgesUnlocked` = `new_badges`, `totalPoints` = `total_points`, `alreadyProcessed` = `reason === 'duplicate'`.
+  - `GamificationEventType` = catálogo del backend; `referenceId` opcional (se envía vacío).
+- **Eventos**:
+  - `core33_streak_7` con `participation_id` (antes `core33_day_completed` + `…:streak_7`).
+  - `quiz_master_unlocked` sin referencia (antes `quiz_completed` + `quiz_master`).
+  - **Nuevo** `hydration_logged` con la fecha local al registrar agua (`addHydrationAmount`, best effort: si falla, no deshace el agua guardada).
+  - Sin cambios porque ya cumplían: `personal_record_created` (id del récord), `nutrition_activated` (id del plan), `nutrition_logged` (`YYYY-MM-DD`), `core33_day_completed` (`participation_id:YYYY-MM-DD`), `workout_completed`, `custom_workout_created`, `core33_completed`.
+- **Quiz**:
+  - Los puntos que se muestran en el resultado son los que concede el servidor (`points_added`). Si no concede nada en ese momento (reintento duplicado o fallo), se usan los del intento guardado.
+  - La app sigue enviando `_points` solo a título informativo; en modo `strict` el servidor los ignora.
+- **Escrituras directas**: comprobado que la app **no** escribe `profiles.points` ni inserta en `user_badges` (solo los lee en `profile-overview.ts` y `ellie.ts`).
+- **Onboarding**:
+  - `training_level` (Principiante → `beginner`, Intermedio → `intermediate`, Avanzado → `advanced`) y `preferred_session_minutes` (20/35/45/60) se guardan en `updateOnboardingProfile`;
+  - "Rendimiento" → `performance`.
+- **Objetivo `performance` en el resto de la app**:
+  - etiqueta "Rendimiento" en Perfil, Plan nutricional y contexto de ELLIE (`ellie-context.ts`);
+  - opción en Editar perfil;
+  - Inicio prioriza rutinas `hiit`/`cardio`;
+  - Descubrir ejercicios usa `fullbody` (DA-36).
+- **Tests**: `gamification.test.ts` (contrato nuevo, referencia vacía, duplicados), `quizSubmission.test.ts` (puntos del servidor), `onboardingModel.test.ts` (nivel, duración, `performance`). `tsc` + eslint + jest (16 suites, 66 tests) en verde.
+
+Decisiones asumidas:
+- DA-36: con `performance`, Inicio prioriza `hiit`/`cardio` y Descubrir ejercicios usa `fullbody` (antes, al guardarse como `improve_health`, priorizaba movilidad).
+- DA-37: los eventos sin referencia envían `_reference_id: ''`. **Confirmado con los tipos** (`_reference_id?: string`, no admite `null`) y con el alias del backend ("referencia vacía").
+- Hidratación (BACKEND_SUMMARY §6, actualización 19:20 UTC): `hydration_logged` se envía en **cada** registro de agua con la fecha del día. Los puntos se dan una vez al día (las siguientes llamadas devuelven `duplicate`), pero el servidor reevalúa los badges de hidratación en cada llamada y los devuelve en `new_badges`. La app ya lo hacía así (`addHydrationAmount`, única vía de escritura de agua); solo se corrigió el comentario.
+- `workout_templates.source = 'custom'` (rutinas creadas en la app móvil) se puede compartir (BACKEND_SUMMARY §8.1, actualizado).
+
+### 14.3 Qué usará cada pantalla pendiente (sin implementar todavía)
+
+**Sesión** (fase 7 · Pausa/Descanso, tras validar en el simulador):
+
+| Necesidad | Tabla / RPC del backend |
+|---|---|
+| Ejercicios planificados al empezar | `workout_session_exercises` (única por `session_id, position`) |
+| Cada serie (reps, kg, duración, calentamiento, descanso real) | `workout_session_sets`: `INSERT … ON CONFLICT (session_id, exercise_position, set_index) DO UPDATE` |
+| Compatibilidad con lo que ya lee la app | seguir escribiendo `workout_sessions.completed_exercises` |
+| Pausa que no cuenta como entreno | `workout_sessions.paused_at`, `paused_total_sec` |
+| "Guardar para después" | `workout_sessions.status = 'saved'` |
+| Volumen | `workout_sessions.volume_kg` (lo calcula el servidor al completar; vacío si no hay series) |
+| "Registrar récord" condicional en el Resumen | RPC `detect_session_prs(_session_id)` → guardar con `INSERT INTO personal_records … ON CONFLICT (user_id, session_set_id) DO NOTHING` (`source = 'session'`) |
+
+**Comunidad** (fase 7, tras validar en el simulador):
+
+| Pantalla | Tablas / RPC |
+|---|---|
+| Alta en Comunidad / nombre de usuario | `ensure_social_settings`, `set_username` |
+| Feed (SOCIAL_01) | `get_feed`, `get_friend_activity`; me gusta directo en `social_post_likes` |
+| Crear publicación / Compartir entreno (SOCIAL_02, 13) | `create_post`; fotos en `social-photos` (`{uid}/{post_id}/…`, `post_id` generado en la app, sin EXIF, JPG/PNG/WebP) |
+| Publicación y comentarios (SOCIAL_03) | `social_post_comments` (insert directo), `delete_comment`; editar o borrar mi post con `UPDATE` de `body`/`deleted_at` |
+| Rutina compartida (SOCIAL_04) | `save_shared_routine` |
+| Amigos y solicitudes (SOCIAL_05) | `find_user_by_username`, `send_friend_request`, `respond_friend_request`, `cancel_friend_request`, `create_friend_invite`, `redeem_friend_invite`, `get_social_profiles` |
+| Perfil de amigo (SOCIAL_06) | `get_social_profile`, `block_user`, `content_reports` |
+| Retos (SOCIAL_07 a 12) | `get_my_challenges`, `get_challenge_board`, `join_official_challenge`, `respond_challenge_invite`, `create_friend_challenge`, `add_manual_contribution`, `leave_challenge`, `cancel_friend_challenge`, `mark_challenge_celebrated` |
+| Privacidad (SOCIAL_14) | `social_settings` |
+| Notificaciones | `social_notifications` (`UPDATE` de `read_at`) |
+| Fotos de perfil de otros | URL firmada de `profile-photos`; si falla, `avatar_key` o avatar por defecto |
+
+La moderación (`is_moderator`, `set_moderator`, `moderate_content`, `moderation_queue`) es del panel interno, no de la app.
+
+### 14.4 Pendientes y responsables
+
+**Backend** (cerrado salvo esto):
+
+| Pendiente | Responsable | Cuándo |
+|---|---|---|
+| Activar el modo `strict` de gamificación | Backend, con aviso de Nicolás | Tras revisar la auditoría de `gamification_events.metadata.validation` (`strict_would`) y ajustar el catálogo si hace falta. La app móvil ya usa los nombres nuevos |
+| Cerrar el `UPDATE` directo de `profiles.points` y el `INSERT` directo en `user_badges` | Backend, con aviso de Nicolás | Cuando la web deje de escribir puntos directamente (`GamificationContext` de la web). La app móvil ya solo usa la RPC |
+| Tipos de archivo (JPG/PNG/WebP) en `social-photos` y `profile-photos`, y 5 MB en `profile-photos`, desde Cloud → Storage | Nicolás (manual) | Cuanto antes; mientras tanto la app valida el tipo |
+| Verificar la limpieza diaria de fotos (`social-photos-cleanup`, 03:17 UTC) | Nicolás / backend | Tras las primeras publicaciones con foto: comprobar que borra las de posts eliminados (≤ 1 día) y conserva 30 días las retiradas por moderación |
+
+**Producto y app:**
+
+| Pendiente | Responsable | Cuándo |
+|---|---|---|
+| Decidir si `exercise_reps` cuenta en retos entre amigos | Producto (Nicolás) | Sin fecha |
+| Confirmar si `ellie-chat` usa el género para calorías (BK-06) | Backend | Sin fecha |
+| Comprobar en el simulador: quiz (puntos del servidor y badge), activar plan nutricional (B1), registrar agua (badge al cumplir la meta), racha Core 33 | App (validación visual) | Con Xcode |

@@ -1,6 +1,6 @@
 # ATHELETE · Resumen del backend
 
-**Última actualización:** 1 de octubre de 2026 (16:20 UTC)
+**Última actualización:** 1 de octubre de 2026 (19:20 UTC)
 **Para:** equipo de la app móvil (React Native).
 **Alcance:** base de datos, RLS, funciones SQL, almacenamiento y edge functions. Todos los cambios son aditivos: no se renombró ni borró nada que use la app actual.
 
@@ -177,6 +177,8 @@ Nunca si hay bloqueo entre ambos. Subir, actualizar y borrar siguen limitados al
 ### Modo actual: `log`
 Todo se otorga como antes. Cada evento guarda en `metadata.validation` lo que haría el modo strict (`strict_would`). Los eventos no catalogados se otorgan y se marcan `unknown_event_type`. El catálogo se edita sin tocar la función.
 
+**Badges del servidor en cada llamada:** los badges de la columna "Badges del servidor" (hoy los de hidratación) se evalúan en cada llamada, aunque la respuesta sea `duplicate`. En ese caso no se suman puntos, pero `new_badges` trae los logros recién cumplidos. Así la app puede enviar `hydration_logged` con la fecha del día en cada vaso y el logro llega al cumplir la meta.
+
 ### Catálogo de eventos activos
 
 | Evento | Puntos | Origen de puntos | Badges permitidos | Badges del servidor | Referencia esperada | Límite diario | once_per |
@@ -221,7 +223,7 @@ En strict: se ignoran los puntos enviados por la app, se rechazan eventos descon
 | Decidir si las repeticiones cuentan en retos entre amigos (métrica `exercise_reps` hoy bloqueada) | Producto | Sin fecha |
 
 ## 8. Conflictos y adaptaciones respecto al documento social
-1. **`workout_templates.source`:** nunca vale `custom`; las rutinas propias lo tienen vacío. Para compartir se acepta vacío o `custom`; las copias usan `shared`.
+1. **`workout_templates.source`:** la app móvil crea las rutinas propias con `custom` (la web las deja vacías). Para compartir se aceptan ambas (probado: una rutina `custom` se publicó correctamente). Las copias guardadas desde un post usan `shared`.
 2. **Vista `social_profiles`:** reemplazada por la RPC `get_social_profiles` para no exponer una vista con permisos elevados.
 3. **Revertir una sesión completada** no deshace un reto ya completado ni su recompensa.
 4. **Avisos de seguridad:** 39 avisos del tipo "función con permisos elevados ejecutable por usuarios con sesión" (incluida `can_view_profile_photo`, que necesita la política de fotos). Son intencionales. Hay además un aviso previo de extensión en el esquema público.
