@@ -64,7 +64,9 @@ export type WorkoutSession = {
   completed: boolean;
   duration: number;
   caloriesBurned: number;
-  status: 'idle' | 'in_progress' | 'completed' | 'canceled';
+  // `saved` = "Guardar para después" (backend status; written from the v2
+  // session flow).
+  status: 'idle' | 'in_progress' | 'completed' | 'canceled' | 'saved';
   startedAt: string | null;
   endedAt: string | null;
   completedExercises: string[];

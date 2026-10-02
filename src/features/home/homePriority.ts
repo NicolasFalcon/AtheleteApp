@@ -1,48 +1,379 @@
-import type { WorkoutSession } from '@app/shared';
+import { getPRMainValue, type PersonalRecord, type PRType } from '@app/shared';
 
-export type HomePriorityKind = 'workout' | 'core33' | 'nutrition';
+// Inicio v2 hero modes (Home.dc.html · renderVals), in priority order:
+// new user → whole day closed → workout done → saved session → priority
+// (Core 33 or workout).
+export type HomeMode =
+  | 'new'
+  | 'allDone'
+  | 'workoutDone'
+  | 'resume'
+  | 'core33'
+  | 'workout';
 
-type ChallengeSummary = {
-  status?: 'active' | 'completed' | 'abandoned';
+export const HOME_MODES: HomeMode[] = [
+  'new',
+  'allDone',
+  'workoutDone',
+  'resume',
+  'core33',
+  'workout',
+];
+
+export type HomeChallengeState = {
+  active: boolean;
   completedToday: number;
   totalHabits: number;
 } | null;
 
-type HomePriorityInput = {
-  session: WorkoutSession | null;
-  challenge: ChallengeSummary;
-  hasNutritionPlan: boolean;
-  hasNutritionLog: boolean;
+export type HomeModeInput = {
+  hasCompletedEver: boolean;
+  workoutDoneToday: boolean;
+  hasResumableSession: boolean;
+  challenge: HomeChallengeState;
 };
 
-export function getHomePriority({
-  session,
+export function isChallengeActive(challenge: HomeChallengeState): boolean {
+  return Boolean(challenge?.active);
+}
+
+export function isCoreClosedToday(challenge: HomeChallengeState): boolean {
+  return Boolean(
+    challenge?.active &&
+      challenge.totalHabits > 0 &&
+      challenge.completedToday >= challenge.totalHabits,
+  );
+}
+
+export function resolveHomeMode({
+  hasCompletedEver,
+  workoutDoneToday,
+  hasResumableSession,
   challenge,
-  hasNutritionPlan,
-  hasNutritionLog,
-}: HomePriorityInput): HomePriorityKind {
-  if (session?.status === 'in_progress' || session?.status === 'canceled') {
-    return 'workout';
+}: HomeModeInput): HomeMode {
+  if (!hasCompletedEver) {
+    return 'new';
   }
 
-  if (
-    challenge?.status === 'active' &&
-    challenge.completedToday < challenge.totalHabits
-  ) {
-    return 'core33';
+  const coreActive = isChallengeActive(challenge);
+  const coreClosed = isCoreClosedToday(challenge);
+
+  if (workoutDoneToday) {
+    // Without an active Core 33 the workout closes the day on its own.
+    return !coreActive || coreClosed ? 'allDone' : 'workoutDone';
   }
 
-  if (!session || session.status !== 'completed') {
-    return 'workout';
+  if (hasResumableSession) {
+    return 'resume';
   }
 
-  if (hasNutritionPlan && !hasNutritionLog) {
-    return 'nutrition';
-  }
-
-  if (challenge?.status === 'active') {
+  // Same rule as the v1 priority: an open Core 33 day goes first.
+  if (coreActive && !coreClosed) {
     return 'core33';
   }
 
   return 'workout';
+}
+
+// ── Water: profiles.daily_water_goal is stored in 250 ml glasses ──────────
+export const GLASS_ML = 250;
+export const DEFAULT_WATER_GOAL_GLASSES = 14;
+
+// Same rounding as fetchHomeOverview.todayGlasses.
+export function toGlasses(ml: number): number {
+  return Math.round(Math.max(0, ml) / GLASS_ML);
+}
+
+// ── Tu día ─────────────────────────────────────────────────────────────────
+export type DayRingKind = 'core33' | 'workout' | 'nutrition' | 'hydration';
+
+export type DayRing = {
+  kind: DayRingKind;
+  label: string;
+  value: string;
+  unit: string;
+  progress: number; // 0–1
+  done: boolean;
+};
+
+export type DayRingsInput = {
+  mode: HomeMode;
+  challenge: HomeChallengeState;
+  workout: {
+    doneMinutes: number | null; // completed today
+    resumeFraction: number | null; // saved session progress 0–1
+    targetMinutes: number;
+  };
+  nutrition: { hasPlan: boolean; calories: number; targetCalories: number };
+  hydration: { todayMl: number; goalGlasses: number };
+};
+
+const clamp01 = (value: number) =>
+  Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
+
+export function formatThousands(value: number): string {
+  return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+export function buildDayRings({
+  mode,
+  challenge,
+  workout,
+  nutrition,
+  hydration,
+}: DayRingsInput): { rings: DayRing[]; dayPct: number } {
+  const showCore =
+    isChallengeActive(challenge) &&
+    (mode === 'workout' || mode === 'resume' || mode === 'workoutDone');
+
+  const first: DayRing = showCore
+    ? {
+        kind: 'core33',
+        label: 'Core 33',
+        value: `${challenge!.completedToday}/${challenge!.totalHabits}`,
+        unit: 'hábitos',
+        progress: clamp01(
+          challenge!.completedToday / Math.max(challenge!.totalHabits, 1),
+        ),
+        done: isCoreClosedToday(challenge),
+      }
+    : {
+        kind: 'workout',
+        label: 'Entreno',
+        value: String(workout.doneMinutes ?? 0),
+        unit: `de ${workout.targetMinutes} min`,
+        progress:
+          workout.doneMinutes !== null
+            ? 1
+            : clamp01(workout.resumeFraction ?? 0),
+        done: workout.doneMinutes !== null,
+      };
+
+  const glasses = toGlasses(hydration.todayMl);
+  const goal = Math.max(1, hydration.goalGlasses);
+  const hydrationDone = glasses >= goal;
+
+  const rings: DayRing[] = [
+    first,
+    {
+      kind: 'nutrition',
+      label: nutrition.hasPlan ? 'Nutrición' : 'Nutrición · sin plan',
+      value: formatThousands(nutrition.calories),
+      unit: 'kcal',
+      progress: nutrition.hasPlan
+        ? clamp01(nutrition.calories / Math.max(nutrition.targetCalories, 1))
+        : 0,
+      done:
+        nutrition.hasPlan &&
+        nutrition.calories >= Math.max(nutrition.targetCalories, 1),
+    },
+    {
+      kind: 'hydration',
+      label: hydrationDone ? 'Hidratación · cumplida' : 'Hidratación',
+      value: String(glasses),
+      unit: `de ${goal} vasos`,
+      progress: clamp01(glasses / goal),
+      done: hydrationDone,
+    },
+  ];
+
+  if (mode === 'new') {
+    return {
+      rings: rings.map(ring => ({
+        ...ring,
+        value: '0',
+        progress: 0,
+        done: false,
+      })),
+      dayPct: 0,
+    };
+  }
+
+  const dayPct = Math.round(
+    (rings.reduce((total, ring) => total + ring.progress, 0) / rings.length) *
+      100,
+  );
+
+  return { rings, dayPct };
+}
+
+// "Entreno, Core 33 y agua cerrados." listing only what is really closed.
+export function allDoneLine(params: {
+  coreActive: boolean;
+  coreClosed: boolean;
+  waterDone: boolean;
+}): string {
+  const parts = ['Entreno'];
+
+  if (params.coreActive && params.coreClosed) {
+    parts.push('Core 33');
+  }
+
+  if (params.waterDone) {
+    parts.push('agua');
+  }
+
+  if (parts.length === 1) {
+    return 'Entreno cerrado.';
+  }
+
+  const last = parts.pop();
+  return `${parts.join(', ')} y ${last} cerrados.`;
+}
+
+// ── Tu mejor marca ─────────────────────────────────────────────────────────
+// Mini curve (112 × 36 viewport) of an exercise's records over time, as in
+// the prototype: oldest → newest, newest is the highlighted dot.
+export function prCurve(
+  records: PersonalRecord[],
+  prType: PRType,
+  width = 104,
+  height = 34,
+): { points: string; last: [number, number] } | null {
+  const history = records
+    .filter(record => record.prType === prType)
+    .sort(
+      (left, right) =>
+        new Date(left.recordedAt).getTime() -
+        new Date(right.recordedAt).getTime(),
+    )
+    .map(getPRMainValue);
+
+  if (history.length === 0) {
+    return null;
+  }
+
+  const values = history.length === 1 ? [history[0], history[0]] : history;
+  const min = Math.min(...values) - 5;
+  const max = Math.max(...values) + 2;
+  const range = Math.max(max - min, 1);
+  const coords = values.map((value, index): [number, number] => [
+    (index / (values.length - 1)) * width,
+    height - ((value - min) / range) * (height - 4),
+  ]);
+
+  return {
+    points: coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '),
+    last: coords[coords.length - 1],
+  };
+}
+
+// ── Quiz: progress towards the Quiz Master badge ───────────────────────────
+// There is no level system in the app; the closest real progression is the
+// share of active categories with a perfect (100) best score.
+export function quizMastery(categories: Array<{ bestScore?: number }>): {
+  mastered: number;
+  total: number;
+  progress: number;
+  line: string;
+} {
+  const total = categories.length;
+  const mastered = categories.filter(
+    category => category.bestScore === 100,
+  ).length;
+
+  return {
+    mastered,
+    total,
+    progress: total > 0 ? mastered / total : 0,
+    line:
+      total === 0
+        ? 'Aún no hay categorías disponibles'
+        : mastered >= total
+        ? 'Quiz Master desbloqueado'
+        : `${mastered} de ${total} categorías al 100 %`,
+  };
+}
+
+// ── Formatting ─────────────────────────────────────────────────────────────
+const MONTHS = [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+];
+const WEEKDAYS = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
+
+export function isSameLocalDay(left: Date, right: Date): boolean {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+// "Martes 24 sep · Racha de 6 días" (streak only when there is one).
+export function homeDateLine(date: Date, streakDays: number): string {
+  const day = `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${
+    MONTHS[date.getMonth()]
+  }`;
+  return streakDays > 0
+    ? `${day} · Racha de ${streakDays} ${streakDays === 1 ? 'día' : 'días'}`
+    : day;
+}
+
+// "hoy" or "9 abr".
+export function shortDay(iso: string, now: Date = new Date()): string {
+  const date = new Date(iso);
+  return isSameLocalDay(date, now)
+    ? 'hoy'
+    : `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+}
+
+// Big value + unit line of "Tu mejor marca": "140" · "kg × 1 · 9 abr".
+export function bestMarkParts(
+  record: PersonalRecord,
+  now: Date = new Date(),
+): { value: string; unit: string; isNew: boolean } {
+  const when = shortDay(record.recordedAt, now);
+  const isNew = when === 'hoy';
+
+  switch (record.prType) {
+    case 'max_weight':
+      return {
+        value: String(record.valueWeight ?? 0),
+        unit: `kg × ${record.valueReps ?? 1} · ${when}`,
+        isNew,
+      };
+    case 'weight_reps':
+      return {
+        value: String(record.valueWeight ?? 0),
+        unit: `kg × ${record.valueReps ?? 0} · ${when}`,
+        isNew,
+      };
+    case 'max_reps':
+      return {
+        value: String(record.valueReps ?? 0),
+        unit: `reps · ${when}`,
+        isNew,
+      };
+    case 'duration': {
+      const seconds = record.valueDurationSec ?? 0;
+      const minutes = Math.floor(seconds / 60);
+      const rest = String(seconds % 60).padStart(2, '0');
+      return { value: `${minutes}:${rest}`, unit: `min · ${when}`, isNew };
+    }
+    case 'distance':
+      return {
+        value: formatThousands(record.valueDistanceM ?? 0),
+        unit: `m · ${when}`,
+        isNew,
+      };
+  }
 }

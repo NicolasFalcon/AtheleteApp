@@ -68,8 +68,16 @@ export type PaginatedResult<T> = {
   nextPage: number | undefined;
 };
 
-type HomeOverview = {
-  todaySession: WorkoutSession | null;
+export type HomeOverview = {
+  // Latest session completed today (local date).
+  completedToday: WorkoutSession | null;
+  // Session to resume: the latest `saved` one (backend status for "Guardar
+  // para después"; the app does not write it yet) or, otherwise, today's
+  // resumable one (`in_progress`, or `canceled` with progress, which is how
+  // the app saves for later today — see isResumableSession).
+  resumable: WorkoutSession | null;
+  // At least one completed session ever (new user otherwise).
+  hasCompletedEver: boolean;
   challenge:
     | (HabitChallenge & {
         challengeDay: number;
@@ -78,6 +86,8 @@ type HomeOverview = {
         completedToday: number;
         totalHabits: number;
         progressPct: number;
+        // Today's state of each habit, in habit order.
+        todayHabits: boolean[];
       })
     | null;
   nutritionPlan: NutritionPlan | null;
@@ -128,7 +138,8 @@ function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
     status:
       row.status === 'in_progress' ||
       row.status === 'completed' ||
-      row.status === 'canceled'
+      row.status === 'canceled' ||
+      row.status === 'saved'
         ? row.status
         : 'idle',
     startedAt: row.started_at,
@@ -802,7 +813,9 @@ export async function fetchHomeOverview(params: {
   const today = getLocalDateKey();
 
   const [
-    workoutSessionResult,
+    todaySessionsResult,
+    savedSessionResult,
+    completedEverResult,
     challengeResult,
     nutritionPlanResult,
     todayNutritionResult,
@@ -815,7 +828,19 @@ export async function fetchHomeOverview(params: {
       .eq('user_id', params.userId)
       .eq('date', today)
       .order('created_at', { ascending: false })
+      .limit(20),
+    client
+      .from('workout_sessions')
+      .select('*')
+      .eq('user_id', params.userId)
+      .eq('status', 'saved')
+      .order('created_at', { ascending: false })
       .limit(1),
+    client
+      .from('workout_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', params.userId)
+      .eq('completed', true),
     client
       .from('challenge_participations')
       .select('*')
@@ -850,8 +875,16 @@ export async function fetchHomeOverview(params: {
       .limit(14),
   ]);
 
-  if (workoutSessionResult.error) {
-    throw workoutSessionResult.error;
+  if (todaySessionsResult.error) {
+    throw todaySessionsResult.error;
+  }
+
+  if (savedSessionResult.error) {
+    throw savedSessionResult.error;
+  }
+
+  if (completedEverResult.error) {
+    throw completedEverResult.error;
   }
 
   if (challengeResult.error) {
@@ -874,9 +907,17 @@ export async function fetchHomeOverview(params: {
     throw hydrationRecentResult.error;
   }
 
-  const todaySession = workoutSessionResult.data?.[0]
-    ? mapWorkoutSession(workoutSessionResult.data[0] as WorkoutSessionRow)
-    : null;
+  const todayRows = (todaySessionsResult.data || []) as WorkoutSessionRow[];
+  const completedTodayRow = todayRows.find(
+    row => row.status === 'completed' || row.completed === true,
+  );
+  const savedRow = savedSessionResult.data?.[0] as
+    | WorkoutSessionRow
+    | undefined;
+  const resumableRow =
+    savedRow ||
+    todayRows.find(row => row.status === 'in_progress') ||
+    todayRows.find(isResumableSession);
 
   let challenge: HomeOverview['challenge'] = null;
   const participation = challengeResult.data?.[0] as
@@ -942,6 +983,9 @@ export async function fetchHomeOverview(params: {
       completedToday,
       totalHabits: habits.length || 3,
       progressPct: Math.round((completedDays / 33) * 100),
+      todayHabits:
+        logMap[today] ||
+        Array.from({ length: habits.length || 3 }, () => false),
     };
   }
 
@@ -966,7 +1010,12 @@ export async function fetchHomeOverview(params: {
   }));
 
   return {
-    todaySession,
+    completedToday: completedTodayRow
+      ? mapWorkoutSession(completedTodayRow)
+      : null,
+    resumable: resumableRow ? mapWorkoutSession(resumableRow) : null,
+    hasCompletedEver:
+      (completedEverResult.count ?? 0) > 0 || Boolean(completedTodayRow),
     challenge,
     nutritionPlan,
     todayNutritionLog,
@@ -1037,8 +1086,10 @@ export async function addHydrationAmount(params: {
   await awardHydrationLogged(today);
 }
 
-// One event per day (reference = local date); the server decides the
-// hydration badges. A failure never undoes the saved water.
+// Sent on every water entry with the local date as reference. Points are
+// granted once per day (later calls return `duplicate`), but the server
+// re-evaluates the hydration badges on each call, so the badge arrives when
+// the goal is met. A failure never undoes the saved water.
 async function awardHydrationLogged(date: string) {
   await awardGamificationEventBestEffort({
     source: 'hydration-log',

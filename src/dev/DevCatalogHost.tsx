@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DevSettings, Linking, StyleSheet, View } from 'react-native';
+import { useToast } from '@app/components/v2';
 import { DevOnboardingWalkthrough } from '@app/dev/DevOnboardingWalkthrough';
+import {
+  HOME_MODE_LABELS,
+  cycleHomeModeOverride,
+} from '@app/dev/homeModeOverride';
 import { V2CatalogScreen } from '@app/dev/V2CatalogScreen';
 
 type DevTool = 'catalog' | 'onboarding';
@@ -26,10 +31,22 @@ function toolFromUrl(url: string | null): DevTool | null {
 // onboarding") or with `xcrun simctl openurl booted athelete://dev/<tool>`.
 export function DevCatalogHost() {
   const [tool, setTool] = useState<DevTool | null>(null);
+  const toast = useToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
 
   useEffect(() => {
     DevSettings.addMenuItem('Catálogo v2', () => setTool('catalog'));
     DevSettings.addMenuItem('Recorrer onboarding', () => setTool('onboarding'));
+    // Visual override only: cycles the Inicio hero modes, writes nothing.
+    DevSettings.addMenuItem('Ver modos de Inicio', () => {
+      const mode = cycleHomeModeOverride();
+      toastRef.current.show(
+        mode
+          ? `Inicio · ${HOME_MODE_LABELS[mode]} (vista dev)`
+          : 'Inicio · modo real',
+      );
+    });
 
     Linking.getInitialURL()
       .then(url => {

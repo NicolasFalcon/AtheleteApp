@@ -28,9 +28,15 @@ export function useHomeFeed() {
       });
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ['home', 'overview', profile?.id],
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ['home', 'overview', profile?.id],
+        }),
+        // Notifications and ELLIE read hydration from the ELLIE overview.
+        queryClient.invalidateQueries({
+          queryKey: ['ellie', 'overview', profile?.id],
+        }),
+      ]);
     },
   });
 

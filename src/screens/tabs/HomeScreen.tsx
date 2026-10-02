@@ -1,257 +1,267 @@
-import { useMemo, useState } from 'react';
-import {
-  Dumbbell,
-  Droplets,
-  ListChecks,
-  RefreshCw,
-  UtensilsCrossed,
-} from 'lucide-react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { EmptyState, Loader } from '@app/components/ui';
-import {
-  bodyScienceThumbNutrition,
-  homeCore33Editorial,
-  homeTrainingEditorial,
-} from '@app/assets/images';
+import { useFocusEffect } from '@react-navigation/native';
+import { EllieSurface, StatusBarV2, useThemeV2 } from '@app/components/v2';
 import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import { useOpenCore33 } from '@app/features/core33/useOpenCore33';
-import { RecoveryGuidanceCard } from '@app/features/home/components/RecoveryGuidanceCard';
-import { QuizPromoCard } from '@app/features/home/components/QuizPromoCard';
-import { RecentPRCard } from '@app/features/home/components/RecentPRCard';
 import {
-  DailyStatusGrid,
-  type DailyStatusItem,
-} from '@app/features/home/components/DailyStatusGrid';
-import { HomePriorityCard } from '@app/features/home/components/HomePriorityCard';
-import { HomeSectionHeader } from '@app/features/home/components/HomeSectionHeader';
-import { getHomePriority } from '@app/features/home/homePriority';
-import { useHomeFeed } from '@app/hooks/useHomeFeed';
+  DEFAULT_WATER_GOAL_GLASSES,
+  allDoneLine,
+  bestMarkParts,
+  buildDayRings,
+  homeDateLine,
+  isChallengeActive,
+  isCoreClosedToday,
+  prCurve,
+  quizMastery,
+  resolveHomeMode,
+  toGlasses,
+  type DayRingKind,
+  type HomeChallengeState,
+} from '@app/features/home/homePriority';
+import {
+  BestMarkCard,
+  type BestMark,
+} from '@app/features/home/v2/BestMarkCard';
+import { DayRingsCard } from '@app/features/home/v2/DayRingsCard';
+import {
+  HERO_HEIGHT,
+  HomeHero,
+  type HeroWorkout,
+} from '@app/features/home/v2/HomeHero';
+import { workoutTypeLabel } from '@app/features/home/v2/homeLabels';
+import { QuizBanner } from '@app/features/home/v2/QuizBanner';
+import { WearBannerV2 } from '@app/features/home/v2/WearBannerV2';
+import { WeekCarousel } from '@app/features/home/v2/WeekCarousel';
+import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
+import { NutritionLogModal } from '@app/features/nutrition/components/NutritionLogModal';
+import { useHomeModeOverride } from '@app/dev/homeModeOverride';
 import { useAuth } from '@app/hooks/useAuth';
-import { useAppTheme } from '@app/hooks/useAppTheme';
-import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
-import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
+import { useEllieData } from '@app/hooks/useEllieData';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useHomeFeed } from '@app/hooks/useHomeFeed';
 import { useNotificationsOverview } from '@app/hooks/useNotificationsOverview';
 import { useNutritionPlan } from '@app/hooks/useNutritionPlan';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
+import { useQuizCategories } from '@app/hooks/useQuizCategories';
+import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
+import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
-import { HomeHeader } from '@app/features/home/components/HomeHeader';
-import { NutritionLogModal } from '@app/features/nutrition/components/NutritionLogModal';
-import { WearBanner } from '@app/features/home/components/WearBanner';
-import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
-import { WorkoutCarousel } from '@app/features/home/components/WorkoutCarousel';
+import { getGreeting } from '@app/lib/date';
+import { getBestPR, type Workout } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Home'>;
 
+const ELLIE_FALLBACK = 'ELLIE está lista para ayudarte con tu progreso de hoy.';
+
+function toHeroWorkout(workout: Workout | null): HeroWorkout | null {
+  return workout
+    ? {
+        title: workout.title,
+        typeLabel: workoutTypeLabel(workout.type),
+        minutes: workout.duration,
+        exercises: workout.exercises.length,
+        calories: workout.calories,
+      }
+    : null;
+}
+
+// Inicio v2 (Home.dc.html · HOME_01–07). Every block reads real Supabase data
+// through the existing services and has its own loading / empty / error state.
 export function HomeScreen({ navigation }: Props) {
-  const { theme } = useAppTheme();
+  const { colors, layout, radius } = useThemeV2();
   const tabBarMotion = useTabBarMotion();
   const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const homeQuery = useHomeFeed();
-  const notificationsOverview = useNotificationsOverview();
-  const nutritionActions = useNutritionPlan();
-  const personalRecordsQuery = usePersonalRecords();
-  const exercisesQuery = useExerciseLibrary();
   const workoutsQuery = useWorkoutLibrary();
-  const [wearPreviewVisible, setWearPreviewVisible] = useState(false);
+  const recordsQuery = usePersonalRecords();
+  const exercisesQuery = useExerciseLibrary();
+  const ellieData = useEllieData();
+  const notifications = useNotificationsOverview();
+  const quizQuery = useQuizCategories();
+  const nutritionActions = useNutritionPlan();
+  const openCore33 = useOpenCore33();
+  const modeOverride = useHomeModeOverride();
+  const [wearVisible, setWearVisible] = useState(false);
   const [nutritionLogVisible, setNutritionLogVisible] = useState(false);
-  const overview = homeQuery.data;
-  const session = overview?.todaySession || null;
-  const challenge = overview?.challenge || null;
-  const nutritionPlan = overview?.nutritionPlan || null;
-  const todayNutritionLog = overview?.todayNutritionLog || null;
-  const hasNutritionLog = Boolean(
-    todayNutritionLog &&
-      ((todayNutritionLog.calories || 0) > 0 ||
-        (todayNutritionLog.protein || 0) > 0 ||
-        (todayNutritionLog.carbs || 0) > 0 ||
-        (todayNutritionLog.fats || 0) > 0),
-  );
-  const completedExercises = session?.completedExercises.length || 0;
-  const totalExercises = session?.totalExercises || completedExercises || 0;
-  const workoutProgress =
-    session?.status === 'completed'
-      ? 100
-      : totalExercises > 0
-      ? Math.round((completedExercises / totalExercises) * 100)
-      : 0;
-  const nutritionProgress = nutritionPlan
-    ? Math.min(
-        100,
-        Math.round(
-          ((todayNutritionLog?.calories || 0) /
-            Math.max(nutritionPlan.targetCalories, 1)) *
-            100,
-        ),
-      )
-    : 0;
-  const coreDailyProgress = challenge
-    ? Math.round(
-        (challenge.completedToday / Math.max(challenge.totalHabits, 1)) * 100,
-      )
-    : 0;
-  const priority = getHomePriority({
-    session,
-    challenge,
-    hasNutritionPlan: Boolean(nutritionPlan),
-    hasNutritionLog,
-  });
 
-  const recommendedWorkouts = useMemo(() => {
-    const allWorkouts = workoutsQuery.data || [];
-    const featured = allWorkouts.filter(
+  // Refresh everything when coming back to Inicio (not on the first mount).
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      homeQuery.refetch().catch(() => {});
+      ellieData.overviewQuery.refetch().catch(() => {});
+      recordsQuery.refetch().catch(() => {});
+      quizQuery.refetch().catch(() => {});
+      workoutsQuery.refetch().catch(() => {});
+      // refetch functions are stable; listing the query objects would
+      // re-run this effect on every render.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
+
+  const overview = homeQuery.data;
+  const challenge = overview?.challenge ?? null;
+  const challengeState: HomeChallengeState = challenge
+    ? {
+        active: challenge.status === 'active',
+        completedToday: challenge.completedToday,
+        totalHabits: challenge.totalHabits,
+      }
+    : null;
+  const coreActive = isChallengeActive(challengeState);
+  const coreClosed = isCoreClosedToday(challengeState);
+
+  // ── Routines: current recommendation score by goal ──────────────────────
+  const workouts = workoutsQuery.data;
+  const recommended = useMemo(() => {
+    const all = workouts || [];
+    const featured = all.filter(
       workout => workout.sourceType === 'featured_editorial',
     );
-    const source = featured.length > 0 ? featured : allWorkouts;
+    const source = featured.length > 0 ? featured : all;
+    const goal = profile?.goal;
 
-    const scoreWorkout = (workout: (typeof source)[number]) => {
-      if (profile?.goal === 'lose_weight') {
+    const score = (workout: Workout) => {
+      if (goal === 'lose_weight') {
         return workout.type === 'cardio' || workout.type === 'hiit' ? 2 : 0;
       }
-
-      if (profile?.goal === 'gain_muscle') {
+      if (goal === 'gain_muscle') {
         return workout.type === 'strength' || workout.type === 'fullbody'
           ? 2
           : 0;
       }
-
-      if (profile?.goal === 'improve_health') {
+      if (goal === 'performance') {
+        return workout.type === 'hiit' || workout.type === 'cardio' ? 2 : 0;
+      }
+      if (goal === 'improve_health') {
         return workout.type === 'mobility' || workout.type === 'fullbody'
           ? 2
           : 0;
       }
-
       return workout.sourceType === 'featured_editorial' ? 2 : 0;
     };
 
-    return [...source]
-      .sort((left, right) => scoreWorkout(right) - scoreWorkout(left))
-      .slice(0, 8);
-  }, [profile?.goal, workoutsQuery.data]);
+    return [...source].sort((a, b) => score(b) - score(a)).slice(0, 8);
+  }, [profile?.goal, workouts]);
 
-  const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
+  // First session for a new user: shortest beginner routine (DA-42).
+  const firstSession = useMemo(() => {
+    const all = workouts || [];
+    const beginners = all.filter(workout => workout.difficulty === 'beginner');
+    const pool = beginners.length > 0 ? beginners : all;
+    return [...pool].sort((a, b) => a.duration - b.duration)[0] ?? null;
+  }, [workouts]);
+
+  const findWorkout = (id?: string | null) =>
+    id ? (workouts || []).find(workout => workout.id === id) ?? null : null;
+
+  // ── Mode ────────────────────────────────────────────────────────────────
+  const realMode = overview
+    ? resolveHomeMode({
+        hasCompletedEver: overview.hasCompletedEver,
+        workoutDoneToday: Boolean(overview.completedToday),
+        hasResumableSession: Boolean(overview.resumable),
+        challenge: challengeState,
+      })
+    : null;
+  // Development-only visual override ("Ver modos de Inicio"); null in prod.
+  const mode = modeOverride ?? realMode;
+  const isNewUser = mode === 'new';
+
+  const heroWorkoutSource = mode === 'new' ? firstSession : recommended[0];
+  const resumable = overview?.resumable ?? null;
+  const completedToday = overview?.completedToday ?? null;
+  const goalGlasses = profile?.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES;
+  const todayMl = overview?.hydration.todayMl ?? 0;
+  const waterDone = toGlasses(todayMl) >= goalGlasses;
+
+  const firstName = profile?.name?.trim().split(/\s+/)[0] || 'Athelete';
+  const greeting =
+    mode === 'workoutDone' || mode === 'allDone'
+      ? `Buen trabajo, ${firstName}`
+      : mode === 'new'
+      ? `Hola, ${firstName}`
+      : `${getGreeting()}, ${firstName}`;
+  const streak = ellieData.context?.training.currentStreak ?? 0;
+
+  // ── Tu día ──────────────────────────────────────────────────────────────
+  const targetMinutes =
+    profile?.preferredSessionMinutes || heroWorkoutSource?.duration || 30;
+  const { rings, dayPct } = buildDayRings({
+    mode: mode ?? 'workout',
+    challenge: challengeState,
+    workout: {
+      doneMinutes: completedToday ? completedToday.duration : null,
+      resumeFraction:
+        resumable && resumable.totalExercises > 0
+          ? resumable.completedExercises.length / resumable.totalExercises
+          : null,
+      targetMinutes,
     },
-    content: {
-      paddingHorizontal: theme.spacing.md,
-      paddingTop: 2,
-      paddingBottom: bottomClearance + theme.spacing.lg,
-      gap: theme.spacing.lg,
+    nutrition: {
+      hasPlan: Boolean(overview?.nutritionPlan),
+      calories: overview?.todayNutritionLog?.calories ?? 0,
+      targetCalories: overview?.nutritionPlan?.targetCalories ?? 0,
     },
-    section: {
-      gap: theme.spacing.sm,
-    },
-    actionList: {
-      gap: theme.spacing.sm,
-    },
-    toolRow: {
-      flexDirection: 'row',
-      gap: theme.spacing.sm,
-    },
-    discoverySection: {
-      gap: theme.spacing.md,
-      marginTop: theme.spacing.xs,
-      paddingTop: theme.spacing.lg,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-    },
+    hydration: { todayMl, goalGlasses },
   });
 
-  const openWorkoutDetail = (workoutId: string) => {
-    navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId });
-  };
-
-  const openWorkoutsTab = () => {
-    navigation.navigate(TAB_ROUTES.Workouts);
-  };
-
-  const openEllieTab = () => {
-    navigation.navigate(TAB_ROUTES.Ellie);
-  };
-
-  const openQuizLanding = () => {
-    navigation.navigate(APP_ROUTES.QuizLanding);
-  };
-
-  const openNotifications = () => {
-    navigation.navigate(APP_ROUTES.Notifications);
-  };
-
-  const openChallengeFlow = useOpenCore33();
-
-  const handleSaveNutritionLog = async (
-    input: Parameters<typeof nutritionActions.saveTodayLog>[0],
-  ) => {
-    try {
-      await nutritionActions.saveTodayLog(input);
-      setNutritionLogVisible(false);
-      Alert.alert('Nutrición registrada', 'Tu consumo de hoy quedó guardado.');
-    } catch (error) {
-      Alert.alert(
-        'No pudimos guardar tu nutrición',
-        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
-      );
+  // ── Tu mejor marca ──────────────────────────────────────────────────────
+  const latestRecord = recordsQuery.latestRecord;
+  const bestMark = useMemo<BestMark | null>(() => {
+    if (!latestRecord) {
+      return null;
     }
-  };
-
-  const openPersonalRecords = () => {
-    navigation.navigate(APP_ROUTES.PersonalRecords);
-  };
-
-  const openLatestPersonalRecord = () => {
-    const latest = personalRecordsQuery.latestRecord;
-
-    if (!latest) {
-      openPersonalRecords();
-      return;
-    }
-
+    const exerciseRecords = recordsQuery.records.filter(
+      record => record.exerciseId === latestRecord.exerciseId,
+    );
+    const best =
+      getBestPR(exerciseRecords, latestRecord.prType) ?? latestRecord;
+    const parts = bestMarkParts(best);
     const exerciseName =
       (exercisesQuery.data || []).find(
-        exercise => exercise.id === latest.exerciseId,
+        exercise => exercise.id === latestRecord.exerciseId,
       )?.name || 'Ejercicio';
 
-    navigation.navigate(APP_ROUTES.PersonalRecords, {
-      exerciseId: latest.exerciseId,
+    return {
       exerciseName,
-    });
+      value: parts.value,
+      unit: parts.unit,
+      isNew: parts.isNew,
+      curve: prCurve(exerciseRecords, latestRecord.prType),
+    };
+  }, [exercisesQuery.data, latestRecord, recordsQuery.records]);
+
+  // ── Navigation ──────────────────────────────────────────────────────────
+  const openWorkouts = () => navigation.navigate(TAB_ROUTES.Workouts);
+
+  const startHeroWorkout = () => {
+    if (heroWorkoutSource) {
+      navigation.navigate(APP_ROUTES.WorkoutDetail, {
+        workoutId: heroWorkoutSource.id,
+      });
+      return;
+    }
+    openWorkouts();
   };
 
-  const openRegisterPr = () => {
-    navigation.navigate(APP_ROUTES.RegisterPr, {
-      showExercisePicker: true,
-    });
-  };
-
-  const handleTodayWorkoutPress = () => {
-    const workoutId = overview?.todaySession?.workoutId;
-
-    if (
-      workoutId &&
-      (workoutsQuery.data || []).some(item => item.id === workoutId)
-    ) {
+  const resumeSession = () => {
+    const workoutId = resumable?.workoutId;
+    if (workoutId && findWorkout(workoutId)) {
       navigation.navigate(APP_ROUTES.WorkoutSession, { workoutId });
       return;
     }
-
-    openWorkoutsTab();
+    openWorkouts();
   };
 
-  const handleNutritionPress = () => {
-    if (nutritionPlan) {
-      setNutritionLogVisible(true);
-      return;
-    }
-
-    openEllieTab();
-  };
-
-  const handleAddWater = () => {
+  const addWater = () => {
     homeQuery.addHydration(250).catch(() => {
       Alert.alert(
         'No pudimos registrar el agua',
@@ -260,268 +270,220 @@ export function HomeScreen({ navigation }: Props) {
     });
   };
 
-  const priorityContent =
-    priority === 'core33'
-      ? {
-          eyebrow: 'Core 33',
-          title: challenge
-            ? `Día ${challenge.challengeDay} de 33`
-            : 'Construye tu constancia',
-          description: challenge
-            ? challenge.completedToday >= challenge.totalHabits
-              ? 'Completaste los hábitos de hoy. Revisa tu avance en el reto.'
-              : `Completa ${Math.max(
-                  challenge.totalHabits - challenge.completedToday,
-                  0,
-                )} hábitos para cerrar el día.`
-            : 'Empieza un reto simple de tres hábitos durante 33 días.',
-          progress: challenge ? coreDailyProgress : 0,
-          progressLabel: challenge
-            ? `${challenge.completedToday} de ${challenge.totalHabits} hábitos`
-            : 'Reto sin iniciar',
-          ctaLabel: challenge ? 'Continuar reto' : 'Conocer Core 33',
-          Icon: ListChecks,
-          backgroundSource: homeCore33Editorial,
-          overlayOpacity: 0.72,
-          onPress: openChallengeFlow,
+  const openRing = (kind: DayRingKind) => {
+    switch (kind) {
+      case 'core33':
+        openCore33();
+        return;
+      case 'workout':
+        if (resumable) {
+          resumeSession();
+        } else {
+          startHeroWorkout();
         }
-      : priority === 'nutrition'
-      ? {
-          eyebrow: 'Nutrición',
-          title: hasNutritionLog
-            ? 'Tu registro está al día'
-            : 'Registra tu alimentación',
-          description: hasNutritionLog
-            ? 'Revisa cómo avanza tu consumo frente a tus objetivos diarios.'
-            : 'Carga tu consumo para mantener visibles calorías y macros.',
-          progress: nutritionProgress,
-          progressLabel: nutritionPlan
-            ? `${todayNutritionLog?.calories || 0} de ${
-                nutritionPlan.targetCalories
-              } kcal`
-            : 'Sin plan activo',
-          ctaLabel: hasNutritionLog ? 'Ver nutrición' : 'Registrar ahora',
-          Icon: UtensilsCrossed,
-          backgroundSource: bodyScienceThumbNutrition,
-          overlayOpacity: 0.74,
-          onPress: handleNutritionPress,
+        return;
+      case 'nutrition':
+        if (overview?.nutritionPlan) {
+          setNutritionLogVisible(true);
+        } else {
+          navigation.navigate(APP_ROUTES.NutritionPlan);
         }
-      : {
-          eyebrow: 'Entrenamiento',
-          title:
-            session?.status === 'completed'
-              ? 'Entrenamiento completado'
-              : session?.status === 'in_progress' ||
-                session?.status === 'canceled'
-              ? session.workoutTitle
-              : 'Entrenamiento de hoy',
-          description:
-            session?.status === 'completed'
-              ? `${session.duration} min y ${
-                  session.caloriesBurned || 0
-                } kcal. Tu sesión ya quedó registrada.`
-              : session?.status === 'in_progress' ||
-                session?.status === 'canceled'
-              ? `Llevas ${completedExercises} de ${totalExercises} ejercicios.`
-              : 'Elige una sesión alineada con tu objetivo y empieza cuando quieras.',
-          progress: workoutProgress,
-          progressLabel:
-            session?.status === 'completed'
-              ? 'Sesión terminada'
-              : totalExercises > 0
-              ? `${completedExercises} de ${totalExercises} ejercicios`
-              : 'Aún no has entrenado',
-          ctaLabel:
-            session?.status === 'completed'
-              ? 'Ver sesión'
-              : session?.status === 'in_progress' ||
-                session?.status === 'canceled'
-              ? 'Continuar entreno'
-              : 'Elegir entreno',
-          Icon: Dumbbell,
-          backgroundSource: homeTrainingEditorial,
-          overlayOpacity: 0.58,
-          onPress: handleTodayWorkoutPress,
-        };
+        return;
+      case 'hydration':
+        navigation.navigate(APP_ROUTES.NutritionPlan);
+        return;
+    }
+  };
 
-  const dailyStatuses: DailyStatusItem[] = [
-    {
-      key: 'workout',
-      label: 'Entrenamiento',
-      value:
-        session?.status === 'completed'
-          ? 'Listo'
-          : totalExercises > 0
-          ? `${completedExercises}/${totalExercises}`
-          : 'Pendiente',
-      detail:
-        session?.status === 'completed'
-          ? '100% del día'
-          : session?.status === 'in_progress' || session?.status === 'canceled'
-          ? `${workoutProgress}% completado`
-          : '0% del día',
-      progress: workoutProgress,
-      Icon: Dumbbell,
-      onPress: handleTodayWorkoutPress,
-    },
-    {
-      key: 'nutrition',
-      label: 'Nutrición',
-      value: nutritionPlan ? `${nutritionProgress}%` : 'Sin plan',
-      detail: nutritionPlan
-        ? hasNutritionLog
-          ? 'Registro cargado'
-          : 'Pendiente hoy'
-        : 'Pídele una guía a ELLIE',
-      progress: nutritionProgress,
-      Icon: UtensilsCrossed,
-      onPress: handleNutritionPress,
-    },
-    {
-      key: 'hydration',
-      label: 'Hidratación',
-      value: overview?.hydration
-        ? `${overview.hydration.todayGlasses}/${overview.hydration.goalGlasses}`
-        : '—',
-      detail: homeQuery.isAddingHydration ? 'Registrando…' : '+1 vaso al tocar',
-      progress: overview?.hydration.todayPercentage || 0,
-      Icon: Droplets,
-      onPress: handleAddWater,
-      disabled: !overview?.hydration || homeQuery.isAddingHydration,
-    },
-    {
-      key: 'core33',
-      label: 'Core 33',
-      value: challenge
-        ? `${challenge.completedToday}/${challenge.totalHabits}`
-        : 'Sin reto',
-      detail: challenge
-        ? challenge.status === 'completed'
-          ? 'Reto completado'
-          : `Día ${challenge.challengeDay} de 33`
-        : 'Conoce el desafío',
-      progress: coreDailyProgress,
-      Icon: ListChecks,
-      onPress: openChallengeFlow,
-    },
-  ];
+  const handleSaveNutritionLog = async (
+    input: Parameters<typeof nutritionActions.saveTodayLog>[0],
+  ) => {
+    try {
+      await nutritionActions.saveTodayLog(input);
+      setNutritionLogVisible(false);
+      homeQuery.refetch().catch(() => {});
+    } catch (error) {
+      Alert.alert(
+        'No pudimos guardar tu nutrición',
+        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
+      );
+    }
+  };
 
-  if (homeQuery.isLoading || workoutsQuery.isLoading) {
-    return (
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <Loader label="Cargando tu inicio..." />
-      </SafeAreaView>
-    );
-  }
-
-  if (homeQuery.error || workoutsQuery.error) {
-    return (
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View style={styles.content}>
-          <HomeHeader
-            onOpenProfile={() => navigation.navigate(APP_ROUTES.Profile)}
-            notificationsCount={notificationsOverview.unreadCount}
-            onOpenNotifications={openNotifications}
-          />
-          <EmptyState
-            title="No pudimos cargar tu inicio"
-            description="Revisa la configuración de Supabase o vuelve a intentarlo más tarde."
-            icon={
-              <RefreshCw
-                color={theme.colors.textSecondary}
-                size={20}
-                strokeWidth={2}
-              />
-            }
-            actionLabel="Reintentar"
-            onAction={() => {
-              Promise.all([homeQuery.refetch(), workoutsQuery.refetch()]).catch(
-                () => {},
-              );
-            }}
-          />
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const completedWorkout = findWorkout(completedToday?.workoutId);
+  const points =
+    ellieData.context?.achievements.totalPoints ??
+    ellieData.overviewQuery.data?.profileExtras.points ??
+    null;
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <StatusBarV2 style="light" />
       <ScrollView
-        contentContainerStyle={styles.content}
         onScroll={tabBarMotion.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: bottomClearance }}
       >
-        <HomeHeader
-          notificationsCount={notificationsOverview.unreadCount}
-          onOpenNotifications={openNotifications}
-        />
-        <HomePriorityCard {...priorityContent} />
-
-        <View style={styles.section}>
-          <HomeSectionHeader
-            title="Tu día"
-            subtitle="Un vistazo rápido a lo que llevas hoy"
-          />
-          <DailyStatusGrid items={dailyStatuses} />
-        </View>
-
-        <View style={styles.section}>
-          <HomeSectionHeader
-            title="Impulsa tu progreso"
-            subtitle="Acciones breves que complementan tu entrenamiento"
-          />
-          <View style={styles.actionList}>
-            <QuizPromoCard onPress={openQuizLanding} />
-            <View style={styles.toolRow}>
-              <RecentPRCard
-                record={personalRecordsQuery.latestRecord}
-                exerciseName={
-                  personalRecordsQuery.latestRecord
-                    ? (exercisesQuery.data || []).find(
-                        exercise =>
-                          exercise.id ===
-                          personalRecordsQuery.latestRecord!.exerciseId,
-                      )?.name || null
-                    : null
+        <HomeHero
+          mode={homeQuery.error && !modeOverride ? null : mode}
+          error={Boolean(homeQuery.error) && !modeOverride}
+          onRetry={() => {
+            homeQuery.refetch().catch(() => {});
+          }}
+          greeting={greeting}
+          dateLine={homeDateLine(new Date(), streak)}
+          identity={{
+            avatarKey: profile?.avatarKey,
+            profilePhotoUrl: profile?.profilePhotoUrl,
+          }}
+          hasNotifications={notifications.unreadCount > 0}
+          data={{
+            core: challenge
+              ? {
+                  day: challenge.challengeDay,
+                  habits: challenge.habits.map((habit, index) => ({
+                    name: habit.name,
+                    done: Boolean(challenge.todayHabits[index]),
+                  })),
+                  left: Math.max(
+                    challenge.totalHabits - challenge.completedToday,
+                    0,
+                  ),
                 }
-                onOpen={openLatestPersonalRecord}
-                onRegister={openRegisterPr}
-              />
-              <RecoveryGuidanceCard onPress={openEllieTab} />
-            </View>
-          </View>
-        </View>
+              : null,
+            workout: toHeroWorkout(heroWorkoutSource ?? null),
+            resume: resumable
+              ? {
+                  title: resumable.workoutTitle,
+                  done: resumable.completedExercises.length,
+                  total: resumable.totalExercises,
+                  minutes: resumable.duration,
+                }
+              : null,
+            done: completedToday
+              ? {
+                  minutes: completedToday.duration,
+                  typeLabel: workoutTypeLabel(
+                    completedWorkout?.type,
+                  ).toLowerCase(),
+                }
+              : null,
+            allDoneLine: allDoneLine({ coreActive, coreClosed, waterDone }),
+          }}
+          onOpenProfile={() => navigation.navigate(APP_ROUTES.Profile)}
+          onOpenNotifications={() =>
+            navigation.navigate(APP_ROUTES.Notifications)
+          }
+          onOpenCore33={openCore33}
+          onStartWorkout={startHeroWorkout}
+          onResume={resumeSession}
+          onOpenProgress={() => navigation.navigate(TAB_ROUTES.Progress)}
+        />
 
-        <View style={styles.discoverySection}>
-          <HomeSectionHeader
-            title="Descubre"
-            subtitle="Ideas, equipamiento y sesiones para seguir explorando"
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: colors.bg,
+              borderTopLeftRadius: radius.rise,
+              borderTopRightRadius: radius.rise,
+              paddingHorizontal: layout.gutter,
+            },
+          ]}
+        >
+          <DayRingsCard
+            loading={homeQuery.isLoading}
+            error={Boolean(homeQuery.error)}
+            onRetry={() => {
+              homeQuery.refetch().catch(() => {});
+            }}
+            rings={rings}
+            dayPct={dayPct}
+            isNewUser={isNewUser}
+            addingWater={homeQuery.isAddingHydration}
+            onAddWater={addWater}
+            onOpenRing={openRing}
           />
-          <WearBanner onPress={() => setWearPreviewVisible(true)} />
-          <WorkoutCarousel
-            title="Recomendados para ti"
-            subtitle="Seleccionados por ELLIE según tus objetivos"
-            workouts={recommendedWorkouts}
-            onSelectWorkout={openWorkoutDetail}
+
+          <EllieSurface
+            message={ellieData.heroInsight?.text ?? ELLIE_FALLBACK}
+            action={{
+              label: 'Hablar con ELLIE',
+              onPress: () => navigation.navigate(TAB_ROUTES.Ellie),
+            }}
+            orbSize={48}
+            style={{ marginHorizontal: -layout.gutter }}
           />
+
+          <BestMarkCard
+            loading={recordsQuery.isLoading}
+            error={Boolean(recordsQuery.error)}
+            onRetry={() => {
+              recordsQuery.refetch().catch(() => {});
+            }}
+            mark={bestMark}
+            onOpenRecords={() =>
+              navigation.navigate(APP_ROUTES.PersonalRecords)
+            }
+            onRegister={() =>
+              navigation.navigate(APP_ROUTES.RegisterPr, {
+                showExercisePicker: true,
+              })
+            }
+          />
+
+          <WeekCarousel
+            loading={workoutsQuery.isLoading}
+            error={Boolean(workoutsQuery.error)}
+            onRetry={() => {
+              workoutsQuery.refetch().catch(() => {});
+            }}
+            workouts={recommended}
+            onOpenWorkout={workoutId =>
+              navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId })
+            }
+            onOpenAll={openWorkouts}
+          />
+
+          <QuizBanner
+            loading={ellieData.overviewQuery.isLoading || quizQuery.isLoading}
+            points={points}
+            mastery={quizQuery.data ? quizMastery(quizQuery.data) : null}
+            onPress={() => navigation.navigate(APP_ROUTES.QuizLanding)}
+          />
+
+          <WearBannerV2 onPress={() => setWearVisible(true)} />
         </View>
       </ScrollView>
+
       <WearPreviewModal
-        visible={wearPreviewVisible}
-        onClose={() => setWearPreviewVisible(false)}
+        visible={wearVisible}
+        onClose={() => setWearVisible(false)}
       />
-      {nutritionPlan ? (
+      {overview?.nutritionPlan ? (
         <NutritionLogModal
           visible={nutritionLogVisible}
-          plan={nutritionPlan}
-          todayLog={todayNutritionLog}
+          plan={overview.nutritionPlan}
+          todayLog={overview.todayNutritionLog}
           saving={nutritionActions.isSavingTodayLog}
           onClose={() => setNutritionLogVisible(false)}
           onSave={handleSaveNutritionLog}
         />
       ) : null}
-    </SafeAreaView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  // Surface that rises 32 pt over the hero (radius 32 on top).
+  sheet: {
+    marginTop: -32,
+    paddingTop: 28,
+    gap: 32,
+    minHeight: HERO_HEIGHT,
+  },
+});
