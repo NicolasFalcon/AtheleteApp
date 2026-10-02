@@ -19,7 +19,7 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 | 0.5 · Prerrequisitos y bugs | ✅ Cerrada (bugs B1/B2 pendientes de backend, §8.2; dependencias movidas a la fase 2) | 2026-09-30 |
 | 1 · Tokens | ✅ Cerrada (iOS; Android pendiente, §8.1) | 2026-09-30 |
 | 2 · Primitivas (incluye instalar las 4 dependencias) | 🟡 Hecha en iOS, pendiente de revisión y commits (ver §11) | — |
-| 3 · Recorrido del usuario: Auth y Onboarding (ver §12) | 🟡 Implementado sin validación visual (sin Xcode); Inicio, Ajustes, Detalle de rutina y Progreso después | — |
+| 3 · Recorrido del usuario: Auth y Onboarding (§12), Inicio y Notificaciones (§15) | 🟡 Implementado sin validación visual (sin Xcode); Ajustes, Detalle de rutina y Progreso después | — |
 | 4 · Navegación final (ver §13) | 🟡 Implementada sin validación visual (sin Xcode); `tsc` + lint + jest en verde | — |
 | 5 · Restyling por módulo | ⏳ | — |
 | 6 · Estados del sistema | ⏳ | — |
@@ -951,7 +951,7 @@ Verificación: `tsc` + eslint de los archivos tocados + `jest` (16 suites, 62 te
 - **`useTabBarMetrics`**: ya no usa `useBottomTabBarHeight` (lanzaba fuera de los tabs); calcula la geometría v2 (`height` = 68 + separación inferior; `bottomClearance` = máx(120, height + 16)).
 - **Comunidad** (`src/screens/tabs/CommunityScreen.tsx`): v2 puro; avatar 44 → Perfil, título 28 "Comunidad", círculo con `Users`, "Muy pronto" y una frase. Sin CTA.
 - **Perfil**: pantalla apilada. Sin `useTabBarMotion`/`useTabBarMetrics` (lanzaban fuera de los tabs); `BackButton` v2 arriba (también en carga y error); margen inferior por safe area.
-- **TEMP-01 · acceso temporal a Perfil**: el avatar de `HomeHeader` (Inicio v1) es pulsable ("Perfil") → `Profile`. Se sustituye al migrar Inicio (avatar 44 sobre el hero del shell).
+- **TEMP-01 · acceso temporal a Perfil**: el avatar de `HomeHeader` (Inicio v1) es pulsable ("Perfil") → `Profile`. Se sustituye al migrar Inicio (avatar 44 sobre el hero del shell). ✅ **Resuelto 2026-10-01** (§15.1): el avatar del hero v2 abre Perfil; `HomeHeader` queda sin uso.
 - **Core 33 · entrada única**: `src/features/core33/core33Entry.ts` (`core33EntryState`, `resolveCore33Entry`; estados `intro | explore | ready | active | completed` como punto de extensión) + `useOpenCore33()` + test. Lo usan Inicio, Progreso, Notificaciones y Perfil. Hoy todo resuelve a `Core33` (ChallengeScreen ya decide intro / hábitos / tracker).
 - **Navegaciones que se habrían roto en ejecución y se corrigieron**: `getParent()?.navigate(TAB)` desde pantallas que ahora viven en el stack raíz (Notificaciones, Sesión, Plan nutricional) → `navigate('MainTabs', {screen})`; desde tabs (Inicio) → `navigate('Workouts' | 'Ellie')`; selección de ruta por `routeNames` en Récords, Detalle de rutina, Detalle de ejercicio, Crear rutina y Añadir a rutina → nombres fijos; Perfil fuera de los tabs (hooks de la barra).
 - **`safeGoBack`**: fallbacks tipados (`AnyRouteName` o `{name, params}`) + helper `tabFallback('Workouts')`. Las listas de varios tabs pasan a `MainTabs` (vuelve al tab en el que estaba el usuario).
@@ -1107,3 +1107,182 @@ La moderación (`is_moderator`, `set_moderator`, `moderate_content`, `moderation
 | Decidir si `exercise_reps` cuenta en retos entre amigos | Producto (Nicolás) | Sin fecha |
 | Confirmar si `ellie-chat` usa el género para calorías (BK-06) | Backend | Sin fecha |
 | Comprobar en el simulador: quiz (puntos del servidor y badge), activar plan nutricional (B1), registrar agua (badge al cumplir la meta), racha Core 33 | App (validación visual) | Con Xcode |
+
+---
+
+## 15. Fase 3 · Inicio y Notificaciones (2026-10-01, sin Xcode)
+
+Fuente: `Home.dc.html` / `HomeDark.dc.html` (estados en su script) y capturas HOME_01 a HOME_09. Verificación: `tsc` + eslint de los archivos tocados + `jest`. Todo con datos reales de Supabase, a través de los servicios existentes.
+
+### 15.1 Grupo 1 · Inicio (HOME_01 a HOME_07)
+
+**Qué cambió**
+- **`HomeScreen` reescrita en v2**:
+  - hero fotográfico de 500 pt (escena) con los 6 modos;
+  - una superficie que sube 32 pt sobre el hero (radio 32), con: Tu día (anillos), banda de ELLIE, Tu mejor marca, Para entrenar esta semana, banner del Quiz y banner de ATHELETE Wear.
+  - Componentes en `src/features/home/v2/`: `HomeHero`, `DayRingsCard`, `BestMarkCard`, `WeekCarousel`, `QuizBanner`, `WearBannerV2`, `BlockError`, `homePhotos`, `homeLabels`.
+- **`features/home/homePriority.ts` reescrito** (lógica pura, 17 tests):
+  - `resolveHomeMode` con el orden del prototipo: usuario nuevo → todo completado → entreno hecho → sesión guardada → prioridad (Core 33 o entreno);
+  - el modo `nutrition` de v1 desaparece: la nutrición vive en su anillo;
+  - helpers: `buildDayRings`, `allDoneLine`, `prCurve`, `bestMarkParts`, `quizMastery`, `homeDateLine`, `toGlasses`.
+- **Cómo se calcula el modo** (datos reales, `fetchHomeOverview` ampliado):
+  - **Usuario nuevo**: ninguna sesión completada nunca (`count` de `workout_sessions` con `completed = true`).
+  - **Entreno hecho hoy**: alguna sesión completada con fecha local de hoy. Antes solo se leía la última sesión del día, que podía no ser la completada.
+  - **Core 33 cerrado hoy**: los `habit_logs` del día de la participación activa (`completedToday >= totalHabits`). Se expone también `todayHabits` para los segmentos.
+  - **Retomar**: la sesión `saved` más reciente; si no hay, la reanudable de hoy (`in_progress`, o `canceled` con progreso). Ver DA-38.
+  - **Prioridad**: regla actual de v1. Core 33 si hay reto activo sin cerrar; si no, entreno.
+- **Contenido por modo**:
+  - `core33`: "Core 33 · Día N" ("Último día" en el día 33), N / 33, 3 segmentos con los nombres reales de los hábitos y "Cerrar el día" → Core 33.
+  - `workout`: rutina recomendada n.º 1 con minutos, ejercicios y kcal → Detalle de rutina.
+  - `resume`: "Sesión guardada · {título}", hechos / total y "Retomar · {min}" → Sesión.
+  - `workoutDone`: "{min} min de {tipo}" y "Siguiente: cerrar Core 33".
+  - `new`: la rutina principiante más corta.
+  - `allDone`: 3 checks y la línea de lo cerrado → Progreso.
+- **Fotos del hero por modo**: paquete con el tratamiento horneado (`saturate .45 · contrast 1.08 · brightness .78`), PLACEHOLDER, en `src/assets/v2/photos/home/` (`hero-core`, `hero-entreno`, `total`, `esfuerzo`, `movilidad`, `overhead`). Wear: `mancuerna-bn` en grises (`contrast 1.12 · brightness .78`). Ancho máximo 900 px, 532 KB en total.
+- **Avatar del hero → Perfil (TEMP-01 resuelto). Campana** con punto Ember si hay avisos pendientes (`useNotificationsOverview().unreadCount`).
+- **Tu día**:
+  - anillos 156 (radios 64 / 49 / 34, pista `surface.track`: D-01 en Dark);
+  - anillo 1 = Core 33 (hábitos) en los modos entreno / retomar / entreno hecho si hay reto activo; si no, Entreno ("{min} de {meta} min");
+  - anillo 2 = Nutrición (kcal registradas / objetivo del plan; "sin plan" a 0);
+  - anillo 3 = Hidratación en vasos con "+1".
+  - "+1" llama a `addHydrationAmount(250)`: guarda de verdad y envía `hydration_logged`. Refresca Inicio y el overview de ELLIE (notificaciones).
+- **ELLIE**: frase de `useEllieData().heroInsight` (lógica existente `generateSmartInsights`) → tab ELLIE.
+- **Tu mejor marca**:
+  - el ejercicio del último récord, su mejor marca (`getBestPR`), NUEVO si es de hoy y la mini curva de su historial (D-12 en Dark);
+  - "Récords" → Récords; "Registrar" → pantalla Registrar PR (con selector de ejercicio);
+  - vacío: "Registra tu primera marca…".
+- **Para entrenar esta semana**: las 8 rutinas recomendadas actuales (score por objetivo), en tarjetas 210 × 280 → Detalle; "Todo" → Entrenos.
+- **Quiz**: puntos reales (`profiles.points` vía overview de ELLIE) + progreso hacia Quiz Master (DA-40) → Quiz.
+- **Wear**: destino actual (`WearPreviewModal`).
+- **Estados por bloque**:
+  - skeleton v2 mientras carga;
+  - error en línea con "Reintentar" (solo ese bloque);
+  - si falla el overview, el hero muestra "No pudimos cargar tu día" con reintento y el resto sigue.
+- **Refresco al volver a Inicio** (`useFocusEffect`, sin el primer montaje): overview de Inicio, de ELLIE, récords, quiz y biblioteca.
+- **Dev "Ver modos de Inicio"** (`src/dev/homeModeOverride.ts` + menú en `DevCatalogHost`, que solo se monta con `__DEV__`):
+  - cicla auto → nuevo → todo → hecho → retomar → Core 33 → entreno, con un toast;
+  - es solo visual: no escribe datos, y `useHomeModeOverride()` devuelve `null` fuera de `__DEV__`;
+  - los modos sin datos muestran textos neutros.
+- **Otros cambios**: `WorkoutSession.status` admite `saved`; `ProfileRecord` expone `trainingLevel` y `preferredSessionMinutes`.
+
+**Desviaciones**
+- D-01 (pista de anillos en Dark), D-12 (mini curva en Dark) y D-16 (banner del Quiz en Dark con borde interior) vía tokens.
+- CTAs del hero con la altura de `Button` v2 (56 / 48) en lugar de 52 / 48.
+- El "?" gigante del Quiz usa `surface.muted` (Light `#EFEEEA` frente a `#F4F2EE`; Dark `#2A2826` frente a `#24221F`).
+- Las fotos remotas de las rutinas no tienen el filtro horneado: llevan una capa oscura al 18 % + degradado.
+
+**Decisiones asumidas**
+
+| ID | Decisión |
+|---|---|
+| DA-38 | **Retomar** = la sesión `saved` más reciente; si no hay, la reanudable de hoy (`in_progress`, o `canceled` con progreso, que es como la app "guarda para después" hoy). Cuando Sesión escriba `saved`, se retira el caso `canceled`. Pendiente: abrir una sesión `saved` de otro día requiere el flujo de Sesión v2 (`fetchEffectiveWorkoutSession` solo mira hoy) |
+| DA-39 | **Meta de agua en vasos de 250 ml**: `profiles.daily_water_goal` se interpreta en vasos (convención de toda la app: Inicio, ELLIE, Progreso, Nutrición; por defecto 14). Vasos = `water_ml / 250` redondeado |
+| DA-40 | **"Nivel" del Quiz**: no existe un sistema de niveles. Se muestra el progreso hacia el badge Quiz Master (categorías con mejor puntuación 100 / categorías activas); "Quiz Master desbloqueado" al completarlo |
+| DA-41 | La CTA de la banda de ELLIE abre el tab ELLIE ("Hablar con ELLIE"); el tab no admite un prompt inicial |
+| DA-42 | Hero `workout` = rutina recomendada n.º 1; hero `new` = la rutina principiante más corta (si no hay principiantes, la más corta) |
+| DA-43 | `allDone` también se da sin reto activo (entreno hecho = día cerrado); la línea solo nombra lo cerrado ("Entreno y agua cerrados.") |
+| DA-44 | Meta del anillo Entreno = `preferred_session_minutes` del perfil; si no hay, la duración de la rutina del hero; si no, 30 |
+| DA-45 | La nutrición del anillo abre el registro del día (`NutritionLogModal`, todavía v1) si hay plan; si no, Plan nutricional. Hidratación → Plan nutricional |
+
+**Omitido (anotado)**
+- "Reto de la semana": depende de Comunidad en la app.
+- La línea de Apple Health (HOME_07): sin HealthKit.
+- La mini animación de la cifra al sumar un vaso.
+
+**Componentes que dejan de usarse (no se han borrado)**
+- `features/home/components/`: `ChallengeBannerCard`, `DailyStatusGrid`, `HomeHeader`, `HomePriorityCard`, `HomeSectionHeader`, `HydrationOverviewCard`, `NutritionOverviewCard`, `QuizPromoCard`, `RecentPRCard`, `RecoveryGuidanceCard`, `TodayWorkoutCard`, `WearBanner` (v1) y `WorkoutCarousel`.
+- `features/notifications/components/NotificationBadgeButton` (solo lo usaba `HomeHeader`).
+- Assets `homeCore33Editorial` y `homeTrainingEditorial`.
+- Siguen en uso: `WearPreviewModal` y `bodyScienceThumbNutrition` (Body Science).
+
+**Pendiente de validación visual · Inicio** (Light y Dark en cada modo; forzarlo con el menú dev "Ver modos de Inicio" o con datos reales)
+
+| Modo | Cómo conseguirlo con datos reales | Qué comprobar |
+|---|---|---|
+| Usuario nuevo (HOME_05) | Cuenta sin ninguna sesión completada | Hero "Tu primera sesión" con la rutina más corta; anillos a 0 + frase; sin "+1" |
+| Entreno pendiente (HOME_01) | Sin entreno hoy y sin Core 33 activo, o con Core 33 ya cerrado hoy | Rutina n.º 1, trío min / ejercicios / kcal, Empezar → Detalle |
+| Core 33 prioridad (HOME_02) | Core 33 activo con hábitos pendientes hoy | Día N / 33, segmentos con nombres, "Cerrar el día" → Core 33; "Último día" en el día 33 |
+| Sesión guardada (HOME_04) | Empezar un entreno, marcar algún ejercicio y salir sin terminar | Hechos / total, segmentos, "Retomar · min" → Sesión |
+| Entreno hecho (HOME_03) | Completar un entreno con Core 33 activo sin cerrar | Check, "{min} min de {tipo}", "Siguiente: cerrar Core 33" |
+| Todo completado (HOME_06) | Entreno completado + Core 33 cerrado (o sin reto) | 3 checks, línea de lo cerrado, "Ver tu semana" → Progreso |
+
+Además:
+- **Avatar → Perfil; campana → Notificaciones** (punto si hay pendientes).
+- **Tu día:** porcentaje; "+1" suma un vaso de verdad (y el badge de hidratación al cumplir la meta); anillo de nutrición con y sin plan.
+- **Bloques:**
+  - ELLIE con la frase real;
+  - Tu mejor marca con y sin récords (NUEVO si es de hoy);
+  - carrusel con *snap*;
+  - Quiz con puntos y la barra de Quiz Master;
+  - Wear abre la vista previa.
+- **Estados:** skeletons en la primera carga; error de cada bloque (modo avión) y reintento; volver a Inicio desde otra pestaña refresca los datos.
+- **Barra de estado:** clara sobre el hero.
+- **Android:** sombra de las tarjetas (`boxShadow`); halo radial del hero (SVG).
+
+
+### 15.2 Grupo 2 · Notificaciones (HOME_08 y HOME_09)
+
+**Qué cambió**
+- **`NotificationsScreen` reescrita en v2**: `GlassHeader` con `BackButton` y "Notificaciones", `StatusBarV2`. Bloques:
+  - **Para hoy · N**: los avisos pendientes reales de `useNotificationsOverview` (nudges de ELLIE: entreno, Core 33, agua, nutrición).
+    - El primero va **destacado**: foto 168 pt, degradado lateral, etiqueta HOY / ÚLTIMO DÍA (Core 33 en el día 33) / EN CURSO (azul, hidratación) y flecha.
+    - El resto en filas con miniatura de 48.
+    - Fotos por destino: Core 33 → `hero-core`, entreno → `total`, agua → `movilidad`, nutrición → `hero-entreno`, resto → `overhead`.
+    - Los destinos siguen igual que antes, incluido "registrar nutrición" con `openLog`.
+  - **Todo al día** (HOME_09): check Ember 56 + "Te avisaremos cuando haya algo para hoy." cuando no hay pendientes.
+  - **Banda de ELLIE**: `heroInsight` (lógica existente) → tab ELLIE.
+  - **Hitos**: carrusel de tarjetas 150.
+    - Badges de `user_badges` (título e icono de `ALL_BADGES`, fecha `earned_at`) + los 3 récords más recientes, ordenados por fecha, como mucho 6.
+    - "Fresh" si son de hoy: placa oscura en ambos modos y texto blanco (D-03); las demás con `shadow.subtle` (borde interior en Dark, D-15).
+    - Badge → Logros; récord → Récords.
+  - **Actividad reciente** (línea de tiempo): sesiones completadas de los últimos 7 días (overview de ELLIE), agua de hoy en vasos y kcal registradas hoy. Como mucho 5, hoy primero.
+  - **"Activa tu plan nutricional"** al final, si no hay plan → tab ELLIE (como antes).
+- **Estados:** skeleton en la primera carga; error con "Reintentar" (sin romper la banda de ELLIE); refresco al volver (`useFocusEffect`).
+- **Lógica pura** en `features/notifications/notificationsModel.ts` (`buildTodayItems`, `buildMilestones`, `buildActivity`, `relativeDay`, `photoForDestination`) + `__tests__/notificationsModel.test.ts` (4 tests).
+
+**Desviaciones / decisiones**
+- DA-46: el hexágono del hito se aproxima con un rectángulo redondeado de 44 × 48 y un aro Ember (sin `clip-path`). `HexMedal` v2 empieza en 58 pt.
+- DA-47: el número de "Para hoy" cuenta solo los avisos pendientes; "Activa tu plan nutricional" va aparte, abajo, como "Configuración pendiente".
+- Las miniaturas usan las fotos horneadas del hero (filtro .45 / 1.08 / .78 en lugar de .4 / 1.08 / .7).
+
+**Omitido (anotado)**
+- La hora del mensaje de ELLIE ("hace 1 h"): ese dato no existe.
+- La actividad de Quiz: los intentos no se exponen con fecha en la app.
+- Todo lo social (solicitudes, me gusta, retos): depende de Comunidad.
+
+**Componentes que dejan de usarse (no se han borrado)**
+- `features/notifications/components/`: `NotificationItemRow`, `NotificationsEmptyState`, `NotificationIcon` (solo lo usaba `NotificationItemRow`) y `NotificationBadgeButton` (solo `HomeHeader`).
+
+**Pendiente de validación visual · Notificaciones** (Light y Dark)
+- **Con pendientes (HOME_08):** destacada con foto y etiqueta correcta (HOY, ÚLTIMO DÍA en el día 33 de Core 33, EN CURSO azul en agua); filas con miniatura; cada toque lleva a su destino.
+- **Sin pendientes (HOME_09):** "Todo al día" (día completo: entreno, Core 33, agua y nutrición registrados).
+- **Hitos:** con badge de hoy (placa oscura) y antiguos; carrusel horizontal.
+- **Actividad:** con entrenos de la semana, agua y kcal de hoy; sin datos no aparece.
+- **Plan:** la fila "Activa tu plan nutricional" aparece solo sin plan.
+- **Navegación:** back y back de Android vuelven a Inicio; skeleton y error (modo avión).
+
+### 15.3 Comandos git (fase 3 · Inicio y Notificaciones)
+
+Incluyen los dos commits pendientes de la tarea anterior (tipos y onboarding), en un orden en el que cada commit compila.
+
+```bash
+# 1 · Tipos de Supabase (BK-02), pendiente de la tarea anterior
+git add src/types/supabase.ts
+git commit -m "chore(types): replace Supabase types with the full generated schema" -m "Resolves BK-02." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 2 · Onboarding: nivel, duración y objetivo performance (pendiente de la tarea anterior; incluye exponer nivel y duración en ProfileRecord)
+git add src/types/auth.ts src/features/onboarding/onboardingModel.ts src/services/supabase/profile.ts src/screens/tabs/ProfileScreen.tsx src/screens/nutrition/NutritionPlanScreen.tsx src/screens/profile/EditProfileScreen.tsx src/shared/domain/ellie-context.ts src/hooks/useExerciseDiscovery.ts __tests__/onboardingModel.test.ts
+git commit -m "feat(onboarding): save training level, session length and the performance goal" -m "Resolves BK-03, BK-04 and BK-05; adds Rendimiento to ELLIE, Perfil, Editar perfil and Nutrición and exposes both fields on ProfileRecord." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 3 · Inicio v2
+git add src/shared/domain/types.ts src/services/supabase/fitness.ts src/hooks/useHomeFeed.ts src/features/home/homePriority.ts src/features/home/v2 src/assets/v2/photos/home src/dev/homeModeOverride.ts src/dev/DevCatalogHost.tsx src/screens/tabs/HomeScreen.tsx __tests__/homePriority.test.ts
+git commit -m "feat(home): v2 Inicio with real-data hero modes, day rings and blocks" -m "Six hero modes from Supabase data (new user, all done, workout done, saved session, Core 33 or workout), Tu día rings with a working +1 glass, ELLIE, best mark, weekly routines, Quiz and Wear. Per-block skeleton, empty and error states, refresh on focus and a dev-only mode override. Resolves TEMP-01." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 4 · Notificaciones v2
+git add src/features/notifications/notificationsModel.ts src/screens/home/NotificationsScreen.tsx __tests__/notificationsModel.test.ts
+git commit -m "feat(notifications): v2 notifications with today, milestones and activity" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 5 · Documento
+git add docs/migration/MIGRATION_PROGRESS.md
+git commit -m "docs: phase 3 Inicio and Notificaciones" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```
