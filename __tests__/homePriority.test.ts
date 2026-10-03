@@ -332,8 +332,8 @@ describe('trainedMinutesToday', () => {
 
 describe('hasCompletedEver', () => {
   it('looks at the whole history, not at today, a routine or logged sets', () => {
-    // The test account: 29 completed sessions, the latest in May, none with
-    // rows in workout_session_sets, nothing today → not a new user.
+    // Any history counts: a user with completed sessions (even old ones and
+    // without rows in workout_session_sets) and nothing today is not new.
     expect(hasCompletedEver(29, false)).toBe(true);
     expect(hasCompletedEver(1, false)).toBe(true);
     // Only a session completed today (count not refreshed yet) also counts.

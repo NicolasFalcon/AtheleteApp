@@ -17,11 +17,9 @@ export type LibraryExercise = {
     primary: string[];
     secondary: string[];
   };
-  recommendations: {
-    strength: { sets: string; reps: string };
-    hypertrophy: { sets: string; reps: string };
-    endurance: { sets: string; reps: string };
-  };
+  // exercises.recommended_sets_reps as stored (JSON by goal, free-text
+  // values). Read it with recommendationFor / parseSetsReps (setsReps.ts).
+  recommendedSetsReps: Json | null;
   usedInRoutines: string[];
   category: string;
 };
@@ -89,33 +87,6 @@ export const levelLabels: Record<string, string> = {
   advanced: 'Avanzado',
 };
 
-function parseRecommendations(recJson: Json | null) {
-  const parseEntry = (value?: string) => {
-    if (!value) {
-      return { sets: '-', reps: '-' };
-    }
-
-    const match = value.match(/^(\d+)x(.+)$/);
-
-    if (match) {
-      return { sets: match[1], reps: match[2] };
-    }
-
-    return { sets: '-', reps: value };
-  };
-
-  const record =
-    recJson && typeof recJson === 'object' && !Array.isArray(recJson)
-      ? (recJson as Record<string, string>)
-      : {};
-
-  return {
-    strength: parseEntry(record.strength),
-    hypertrophy: parseEntry(record.hypertrophy),
-    endurance: parseEntry(record.endurance),
-  };
-}
-
 export function mapDbExerciseRow(row: any): LibraryExercise {
   return {
     id: row.id,
@@ -137,7 +108,7 @@ export function mapDbExerciseRow(row: any): LibraryExercise {
       primary: row.primary_muscles || [],
       secondary: row.secondary_muscles || [],
     },
-    recommendations: parseRecommendations(row.recommended_sets_reps),
+    recommendedSetsReps: (row.recommended_sets_reps ?? null) as Json | null,
     usedInRoutines: [],
     category: row.category || 'strength',
   };

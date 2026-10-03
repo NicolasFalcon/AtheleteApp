@@ -1,12 +1,11 @@
 import {
   activeFilterCount,
   countBy,
-  countByType,
+  countByCategory,
+  routineTypeLabel,
   filterExercises,
   filterRoutines,
   levelBars,
-  normalizeWorkoutType,
-  typeLabel,
   NO_EXERCISE_FILTERS,
   pathMeta,
   recommendRoutines,
@@ -14,6 +13,7 @@ import {
   routineScopeTitle,
   routineScopeFrom,
   countByCollection,
+  ROUTINE_CATEGORIES,
   isMyRoutine,
   routineMeta,
   schemeChip,
@@ -52,11 +52,7 @@ function exercise(
     coachingCues: [],
     commonMistakes: [],
     musclesWorked: { primary: ['Pectoral'], secondary: [] },
-    recommendations: {
-      strength: { sets: '3', reps: '8' },
-      hypertrophy: { sets: '3', reps: '10' },
-      endurance: { sets: '2', reps: '15' },
-    },
+    recommendedSetsReps: { hypertrophy: '3x10' },
     usedInRoutines: [],
     category: 'strength',
     ...patch,
@@ -65,21 +61,33 @@ function exercise(
 
 describe('routines', () => {
   const list = [
-    workout('a', { title: 'Total Body Dumbbell', type: 'fullbody' }),
-    workout('b', { title: 'Brazos a fondo' }),
-    workout('c', { title: 'HIIT de 20', type: 'hiit' }),
+    workout('a', {
+      title: 'Total Body Dumbbell',
+      type: 'fullbody',
+      routineCategory: 'cuerpo_completo',
+    }),
+    workout('b', { title: 'Brazos a fondo', routineCategory: 'tren_superior' }),
+    workout('c', { title: 'HIIT de 20', type: 'hiit', routineCategory: 'hiit' }),
+    // The server could not classify it: only "Todas" shows it.
+    workout('n', { title: 'Sin categoría', routineCategory: null }),
   ];
 
   it('filters by type, collection and search', () => {
     const base = { query: '', favoriteIds: [] as string[], userId: 'u1' };
     expect(
       filterRoutines(list, { ...base, scope: { collection: 'all' } }),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(
-      filterRoutines(list, { ...base, scope: { type: 'strength' } }).map(
+      filterRoutines(list, { ...base, scope: { category: 'tren_superior' } }).map(
         w => w.id,
       ),
     ).toEqual(['b']);
+    // A routine without category belongs to no category list.
+    ROUTINE_CATEGORIES.forEach(category =>
+      expect(
+        filterRoutines(list, { ...base, scope: { category } }).map(w => w.id),
+      ).not.toContain('n'),
+    );
     expect(
       filterRoutines(list, {
         ...base,
@@ -117,19 +125,28 @@ describe('routines', () => {
     ).toEqual({ favorites: 1, mine: 2, all: 4 });
   });
 
-  it('counts per type and builds titles and meta', () => {
-    expect(countByType(list)).toMatchObject({
-      strength: 1,
-      fullbody: 1,
+  it('counts per category and builds titles and meta', () => {
+    expect(countByCategory(list)).toMatchObject({
+      cuerpo_completo: 1,
+      tren_superior: 1,
       hiit: 1,
-      cardio: 0,
+      fuerza: 0,
     });
+    // The routine without category is not in any category count.
+    expect(
+      Object.values(countByCategory(list)).reduce((a, b) => a + b, 0),
+    ).toBe(3);
     expect(routineScopeTitle({ collection: 'all' })).toBe('Todas las rutinas');
-    expect(routineScopeTitle({ type: 'hiit' })).toBe('HIIT');
+    expect(routineScopeTitle({ category: 'hiit' })).toBe('HIIT');
+    expect(routineScopeTitle({ category: 'tren_inferior' })).toBe(
+      'Tren inferior',
+    );
     expect(routineScopeTitle({ collection: 'mine' })).toBe('Tus rutinas');
     expect(routineEmptyText({ collection: 'favorites' })).toContain('corazón');
-    expect(routineScopeFrom({ type: 'full_body' })).toEqual({
-      type: 'fullbody',
+    expect(routineScopeFrom({ category: 'core' })).toEqual({ category: 'core' });
+    // An unknown category falls back to the collection.
+    expect(routineScopeFrom({ category: 'yoga' })).toEqual({
+      collection: 'all',
     });
     expect(routineScopeFrom({ collection: 'favorites' })).toEqual({
       collection: 'favorites',
@@ -141,7 +158,11 @@ describe('routines', () => {
   it('recommends featured routines by goal', () => {
     const featured = [
       workout('s', { sourceType: 'featured_editorial', type: 'strength' }),
-      workout('h', { sourceType: 'featured_editorial', type: 'hiit' }),
+      workout('h', {
+        sourceType: 'featured_editorial',
+        type: 'hiit',
+        routineCategory: 'hiit',
+      }),
     ];
     expect(
       recommendRoutines([...featured, workout('x')], 'performance')[0].id,
@@ -208,17 +229,15 @@ describe('exercises', () => {
   });
 });
 
-describe('workout type', () => {
-  it('normalizes database values', () => {
-    expect(normalizeWorkoutType('full_body')).toBe('fullbody');
-    expect(normalizeWorkoutType('Fuerza')).toBe('strength');
-    expect(normalizeWorkoutType('yoga')).toBeNull();
-    expect(typeLabel('full_body')).toBe('Full body');
-    expect(typeLabel('yoga_flow')).toBe('Yoga flow');
+describe('routine type label', () => {
+  it('uses the category and falls back to the raw type text', () => {
     expect(
-      countByType([workout('z', { type: 'full_body' as Workout['type'] })])
-        .fullbody,
-    ).toBe(1);
+      routineTypeLabel({ type: 'strength', routineCategory: 'tren_inferior' }),
+    ).toBe('Tren inferior');
+    expect(
+      routineTypeLabel({ type: 'full_body' as Workout['type'], routineCategory: null }),
+    ).toBe('Full body');
+    expect(routineTypeLabel(null)).toBe('Rutina');
   });
 });
 

@@ -58,6 +58,7 @@ function mapSet(row: SetRow): LoggedSet {
     reps: row.reps,
     weightKg: row.weight_kg,
     durationSec: row.duration_sec,
+    distanceM: row.distance_m,
   };
 }
 
@@ -118,7 +119,18 @@ export async function fetchLastWeights(
   return result;
 }
 
-// Planned exercises, once per session (existing rows are left untouched).
+// Readable message of a Supabase / unknown error (for logs and dev screens).
+export function describeError(error: unknown): string {
+  if (error && typeof error === 'object') {
+    const e = error as { message?: string; code?: string; details?: string };
+    return [e.code, e.message, e.details].filter(Boolean).join(' · ');
+  }
+  return String(error);
+}
+
+// Planned exercises, once per session. Idempotent and independent of the
+// unique constraint: it reads which positions exist and inserts only the
+// missing ones, so it can be repeated (retry, save, complete).
 export async function ensureSessionExercises(
   sessionId: string,
   plan: PlannedExercise[],
@@ -127,8 +139,20 @@ export async function ensureSessionExercises(
     return;
   }
   const client = getClient();
-  const { error } = await (client.from('workout_session_exercises') as any).upsert(
-    plan.map(exercise => ({
+  const existing = await client
+    .from('workout_session_exercises')
+    .select('position')
+    .eq('session_id', sessionId);
+  if (existing.error) {
+    throw existing.error;
+  }
+  const have = new Set((existing.data ?? []).map(row => row.position));
+  const missing = plan.filter(exercise => !have.has(exercise.position));
+  if (missing.length === 0) {
+    return;
+  }
+  const { error } = await (client.from('workout_session_exercises') as any).insert(
+    missing.map(exercise => ({
       session_id: sessionId,
       position: exercise.position,
       exercise_id: exercise.exerciseId,
@@ -138,8 +162,8 @@ export async function ensureSessionExercises(
       planned_reps: exercise.reps,
       planned_duration_sec: exercise.durationSec,
       planned_rest_sec: exercise.restSec,
+      planned_weight_kg: exercise.plannedWeightKg,
     })),
-    { onConflict: 'session_id,position', ignoreDuplicates: true },
   );
   if (error) {
     throw error;
@@ -151,7 +175,8 @@ export type SetWrite = {
   userId: string;
   exerciseId: string | null;
   set: LoggedSet;
-  restTakenSec?: number | null;
+  // Real rest BEFORE this set (null for the first set of the session).
+  restActualSec?: number | null;
   completedAt: string;
 };
 
@@ -169,7 +194,8 @@ export async function upsertSessionSet(write: SetWrite): Promise<string> {
         reps: write.set.reps,
         weight_kg: write.set.weightKg,
         duration_sec: write.set.durationSec,
-        rest_taken_sec: write.restTakenSec ?? null,
+        distance_m: write.set.distanceM,
+        rest_actual_sec: write.restActualSec ?? null,
         completed_at: write.completedAt,
       },
       { onConflict: 'session_id,exercise_position,set_index' },
@@ -299,6 +325,7 @@ export async function reopenSession(
 export async function discardSession(sessionId: string): Promise<void> {
   await updateSession(sessionId, {
     status: 'canceled',
+    cancel_reason: 'user',
     completed: false,
     ended_at: new Date().toISOString(),
     paused_at: null,

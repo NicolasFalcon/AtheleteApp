@@ -679,6 +679,9 @@ export type Database = {
           available_equipment: string[] | null
           avatar_key: string | null
           birth_date: string | null
+          core33_completed_at: string | null
+          core33_intro_seen_at: string | null
+          core33_invite_dismissed_at: string | null
           created_at: string
           daily_calorie_goal: number | null
           daily_carbs_goal: number | null
@@ -710,6 +713,9 @@ export type Database = {
           available_equipment?: string[] | null
           avatar_key?: string | null
           birth_date?: string | null
+          core33_completed_at?: string | null
+          core33_intro_seen_at?: string | null
+          core33_invite_dismissed_at?: string | null
           created_at?: string
           daily_calorie_goal?: number | null
           daily_carbs_goal?: number | null
@@ -741,6 +747,9 @@ export type Database = {
           available_equipment?: string[] | null
           avatar_key?: string | null
           birth_date?: string | null
+          core33_completed_at?: string | null
+          core33_intro_seen_at?: string | null
+          core33_invite_dismissed_at?: string | null
           created_at?: string
           daily_calorie_goal?: number | null
           daily_carbs_goal?: number | null
@@ -1384,6 +1393,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          planned_weight_kg: number | null
           reps: number | null
           rest_time: number | null
           sets: number | null
@@ -1396,6 +1406,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          planned_weight_kg?: number | null
           reps?: number | null
           rest_time?: number | null
           sets?: number | null
@@ -1408,6 +1419,7 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          planned_weight_kg?: number | null
           reps?: number | null
           rest_time?: number | null
           sets?: number | null
@@ -1476,6 +1488,23 @@ export type Database = {
           blocker_id?: string
           created_at?: string
         }
+        Relationships: []
+      }
+      user_favorites: {
+        Row: {
+          created_at: string
+          item_id: string
+          item_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          item_id: string
+          item_type: string
+          user_id: string
+        }
+        // No Update: favourites are inserted or deleted, never updated (RLS).
+        Update: Record<string, never>
         Relationships: []
       }
       workout_session_exercises: {
@@ -1562,6 +1591,7 @@ export type Database = {
           is_warmup: boolean
           load_note: string | null
           reps: number | null
+          rest_actual_sec: number | null
           rest_taken_sec: number | null
           session_id: string
           set_index: number
@@ -1578,6 +1608,7 @@ export type Database = {
           is_warmup?: boolean
           load_note?: string | null
           reps?: number | null
+          rest_actual_sec?: number | null
           rest_taken_sec?: number | null
           session_id: string
           set_index: number
@@ -1594,6 +1625,7 @@ export type Database = {
           is_warmup?: boolean
           load_note?: string | null
           reps?: number | null
+          rest_actual_sec?: number | null
           rest_taken_sec?: number | null
           session_id?: string
           set_index?: number
@@ -1627,6 +1659,7 @@ export type Database = {
       workout_sessions: {
         Row: {
           calories_burned: number | null
+          cancel_reason: string | null
           completed: boolean | null
           completed_exercises: Json
           created_at: string
@@ -1646,6 +1679,7 @@ export type Database = {
         }
         Insert: {
           calories_burned?: number | null
+          cancel_reason?: string | null
           completed?: boolean | null
           completed_exercises?: Json
           created_at?: string
@@ -1665,6 +1699,7 @@ export type Database = {
         }
         Update: {
           calories_burned?: number | null
+          cancel_reason?: string | null
           completed?: boolean | null
           completed_exercises?: Json
           created_at?: string
@@ -1707,6 +1742,7 @@ export type Database = {
           image_url: string | null
           is_premium: boolean | null
           is_public: boolean | null
+          routine_category: string | null
           source: string | null
           tags: string[] | null
           target_muscles: string[] | null
@@ -1727,6 +1763,7 @@ export type Database = {
           image_url?: string | null
           is_premium?: boolean | null
           is_public?: boolean | null
+          routine_category?: string | null
           source?: string | null
           tags?: string[] | null
           target_muscles?: string[] | null
@@ -1747,6 +1784,7 @@ export type Database = {
           image_url?: string | null
           is_premium?: boolean | null
           is_public?: boolean | null
+          routine_category?: string | null
           source?: string | null
           tags?: string[] | null
           target_muscles?: string[] | null

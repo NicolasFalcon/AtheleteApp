@@ -11,16 +11,23 @@ import {
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Check } from 'lucide-react-native';
+import { Check, X } from 'lucide-react-native';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
 export type ToastOptions = {
   // Screens with the floating tab bar show the toast above it (D-27).
   withTabBar?: boolean;
+  // 'error': a failed action (X instead of the Ember check).
+  tone?: 'success' | 'error';
 };
 
-type ToastState = { id: number; message: string; withTabBar: boolean };
+type ToastState = {
+  id: number;
+  message: string;
+  withTabBar: boolean;
+  tone: 'success' | 'error';
+};
 
 type ToastContextValue = {
   show: (message: string, options?: ToastOptions) => void;
@@ -55,6 +62,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
         id: nextId.current,
         message,
         withTabBar: options?.withTabBar ?? false,
+        tone: options?.tone ?? 'success',
       });
       timer.current = setTimeout(() => {
         timer.current = null;
@@ -106,9 +114,15 @@ function ToastPill({ toast }: { toast: ToastState }) {
           },
         ]}
       >
-        <View style={[styles.check, { backgroundColor: colors.ember.base }]}>
-          <Check color={colors.ember.onText} size={15} strokeWidth={2.5} />
-        </View>
+        {toast.tone === 'error' ? (
+          <View style={[styles.check, { backgroundColor: colors.ember.deep }]}>
+            <X color={colors.ember.onText} size={15} strokeWidth={2.5} />
+          </View>
+        ) : (
+          <View style={[styles.check, { backgroundColor: colors.ember.base }]}>
+            <Check color={colors.ember.onText} size={15} strokeWidth={2.5} />
+          </View>
+        )}
         <TextV2
           variant="label"
           color={colors.cta.primaryText}

@@ -27,7 +27,12 @@ import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { formatPRValue, getBestPR } from '@app/shared';
+import {
+  formatPRValue,
+  formatSetsReps,
+  getBestPR,
+  recommendationFor,
+} from '@app/shared';
 import type { PRType } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -143,12 +148,9 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
   ]
     .filter(Boolean)
     .join(' · ');
-  const scheme = exercise.recommendations.hypertrophy;
-  // The library stores "-" when there is no recommendation.
-  const prescription =
-    hasValue(scheme.sets) && hasValue(scheme.reps)
-      ? `${scheme.sets.trim()} × ${scheme.reps.trim()}`
-      : null;
+  // recommended_sets_reps, read with units ("3 × 30 s · por lado", "3 × máx").
+  const scheme = recommendationFor(exercise.recommendedSetsReps, 'hypertrophy');
+  const prescription = formatSetsReps(scheme) || null;
   const [mainMuscle, ...otherPrimary] = exercise.musclesWorked.primary.map(capitalize);
   const secondaryMuscles = [
     ...otherPrimary,
@@ -353,11 +355,6 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
       </GlassSurface>
     </View>
   );
-}
-
-function hasValue(value?: string | null) {
-  const trimmed = value?.trim();
-  return Boolean(trimmed && trimmed !== '-');
 }
 
 function Dot({ color }: { color: string }) {

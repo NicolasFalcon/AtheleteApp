@@ -1,7 +1,9 @@
 import {getFeaturedRoutineMetadata} from '@app/shared/domain/featured-routines';
-import type {
-  Workout,
-  WorkoutExercise,
+import {
+  ROUTINE_CATEGORY_VALUES,
+  type RoutineCategory,
+  type Workout,
+  type WorkoutExercise,
 } from '@app/shared/domain/types';
 
 export function mapTemplateExerciseRowToExercise(exerciseRow: any): WorkoutExercise {
@@ -14,7 +16,17 @@ export function mapTemplateExerciseRowToExercise(exerciseRow: any): WorkoutExerc
     duration: exerciseRow.duration ?? undefined,
     restTime: exerciseRow.rest_time || 60,
     notes: exerciseRow.notes ?? undefined,
+    plannedWeightKg: exerciseRow.planned_weight_kg ?? undefined,
   };
+}
+
+// Unknown or missing values are null: the routine goes to "Todas" only.
+export function parseRoutineCategory(
+  value: string | null | undefined,
+): RoutineCategory | null {
+  return (ROUTINE_CATEGORY_VALUES as readonly string[]).includes(value ?? '')
+    ? (value as RoutineCategory)
+    : null;
 }
 
 export function mapTemplateRowToWorkout(
@@ -47,6 +59,7 @@ export function mapTemplateRowToWorkout(
     id: templateRow.id,
     title: templateRow.title,
     type: templateRow.type as Workout['type'],
+    routineCategory: parseRoutineCategory(templateRow.routine_category),
     duration: templateRow.duration,
     difficulty: templateRow.difficulty as Workout['difficulty'],
     calories: templateRow.calories,

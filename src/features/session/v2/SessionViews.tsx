@@ -34,6 +34,7 @@ import {
   formatDuration,
   formatKg,
   parseNumberInput,
+  planAmount,
   planScheme,
   type PlannedExercise,
   type RestKind,
@@ -459,7 +460,9 @@ function CurrentCard({
   onLogSet: () => void;
   onTechnique?: () => void;
 }) {
-  const timed = Boolean(exercise.durationSec);
+  // Seconds and metres are the planned amount (not typed); reps and "máx"
+  // are typed.
+  const fixedAmount = exercise.unit === 'sec' || exercise.unit === 'm';
 
   return (
     <View style={styles.card}>
@@ -504,12 +507,15 @@ function CurrentCard({
       </View>
       <View style={styles.cardBottom}>
         <View style={styles.metrics}>
-          {timed ? (
-            <Metric value={`${exercise.durationSec} s`} label="tiempo" />
+          {fixedAmount ? (
+            <Metric
+              value={planAmount(exercise) ?? '—'}
+              label={exercise.unit === 'm' ? 'distancia' : 'tiempo'}
+            />
           ) : (
             <EditableMetric
               value={draft.reps}
-              label="reps"
+              label={exercise.unit === 'max' ? 'reps · máx' : 'reps'}
               accessibilityLabel="Repeticiones de la serie"
               keyboardType="number-pad"
               onChange={reps => onDraft({ ...draft, reps })}
@@ -868,11 +874,7 @@ export function RestView({
                       {kind === 'set'
                         ? [
                             next.name,
-                            next.durationSec
-                              ? `${next.durationSec} s`
-                              : next.reps
-                              ? `${next.reps} reps`
-                              : null,
+                            planAmount(next),
                             formatKg(nextWeightKg),
                           ]
                             .filter(Boolean)
@@ -905,6 +907,7 @@ export function SaveErrorView({
   exercises,
   kcal,
   retrying,
+  debugMessage,
   onRetry,
   onContinue,
 }: {
@@ -914,6 +917,8 @@ export function SaveErrorView({
   exercises: number;
   kcal: number;
   retrying: boolean;
+  // __DEV__ only: technical cause of the failure.
+  debugMessage?: string | null;
   onRetry: () => void;
   onContinue: () => void;
 }) {
@@ -937,6 +942,11 @@ export function SaveErrorView({
             conexión.
           </TextV2>
         </View>
+        {__DEV__ && debugMessage ? (
+          <TextV2 variant="caption" color={C.tertiary} align="center" style={styles.errorText}>
+            {debugMessage}
+          </TextV2>
+        ) : null}
         <View style={styles.errorTrio}>
           <TrioItem value={formatDuration(durationSec)} label="Duración" />
           <View style={styles.trioDivider} />

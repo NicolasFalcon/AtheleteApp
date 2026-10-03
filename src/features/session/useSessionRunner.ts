@@ -13,6 +13,7 @@ import {
   pausedForSeconds,
   restAfter,
   restPhase,
+  restElapsedSec,
   restRemainingMs,
   resumeClock,
   startRest,
@@ -28,6 +29,7 @@ import {
 } from '@app/features/session/sessionModel';
 import {
   completeSession,
+  describeError,
   discardSession,
   enqueueSessionWrite,
   ensureSessionExercises,
@@ -68,6 +70,8 @@ type Params = {
   workout: Workout | null;
   sessionId: string | null;
   userId?: string;
+  // recommended_sets_reps of a library exercise (fills rows without reps).
+  recommendedFor?: (exerciseId: string) => unknown;
   dev?: DevSessionState | null;
   onCompleted: (result: CompletionResult) => void;
   onLeave: () => void;
@@ -88,6 +92,7 @@ function devSetup(
           reps: exercise.reps,
           weightKg: 16,
           durationSec: exercise.durationSec,
+          distanceM: exercise.distanceM,
         }))
       : [];
   const clock: ClockState = { startedAt: now - 1000, pausedTotalSec: 0, pausedAt: null };
@@ -122,12 +127,16 @@ export function useSessionRunner({
   workout,
   sessionId,
   userId,
+  recommendedFor,
   dev = null,
   onCompleted,
   onLeave,
 }: Params) {
   const dryRun = Boolean(dev);
-  const plan = useMemo(() => buildPlan(workout?.exercises ?? []), [workout]);
+  const plan = useMemo(
+    () => buildPlan(workout?.exercises ?? [], recommendedFor),
+    [recommendedFor, workout],
+  );
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [sets, setSets] = useState<LoggedSet[]>([]);
@@ -140,11 +149,15 @@ export function useSessionRunner({
   const [busy, setBusy] = useState<null | 'save' | 'finish' | 'discard'>(null);
   // STATE_09: the workout could not be saved (finishing or saving for later).
   const [saveError, setSaveError] = useState<CompletionPayload | null>(null);
+  // Technical cause of the last save error (shown only in __DEV__).
+  const [saveErrorDetail, setSaveErrorDetail] = useState<string | null>(null);
   const [saveErrorKind, setSaveErrorKind] = useState<'finish' | 'save'>(
     'finish',
   );
   const pendingWrites = useRef<Promise<unknown>[]>([]);
   const draftKey = useRef<string | null>(null);
+  // Real rest taken before the next set that gets logged (null: none yet).
+  const lastRestSec = useRef<number | null>(null);
 
   // ── Load (or the dev state) ───────────────────────────────────────────────
   useEffect(() => {
@@ -198,8 +211,12 @@ export function useSessionRunner({
         setSets(detail.sets);
         setClock(detail.clock);
         setLoadState('ready');
+        // Retried before saving or completing (see ensurePlanned).
         ensureSessionExercises(sessionId, plan).catch(error =>
-          console.warn('[session] Ejercicios planificados sin guardar.', error),
+          console.warn(
+            '[session] Ejercicios planificados sin guardar:',
+            describeError(error),
+          ),
         );
         const ids = plan
           .map(exercise => exercise.exerciseId)
@@ -236,6 +253,7 @@ export function useSessionRunner({
   // Rest reached zero → "Tu turno" for 1.5 s, then the active card.
   useEffect(() => {
     if (rest && !paused && remainingMs <= 0 && !dryRun) {
+      lastRestSec.current = restElapsedSec(rest, Date.now());
       haptics.success();
       setRest(null);
       setYourTurnUntil(Date.now() + YOUR_TURN_MS);
@@ -287,9 +305,10 @@ export function useSessionRunner({
       userId,
       exerciseId: exercise.exerciseId,
       set: next,
-      restTakenSec: null,
+      restActualSec: lastRestSec.current,
       completedAt: new Date().toISOString(),
     };
+    lastRestSec.current = null; // consumed by this set
     track(
       upsertSessionSet(write)
         .then(id =>
@@ -326,9 +345,13 @@ export function useSessionRunner({
     const next: LoggedSet = {
       position: cursor.position,
       setIndex: cursor.setIndex,
-      reps: current.durationSec ? null : draft.reps,
+      // reps and "máx" are typed; seconds and metres are the planned amount
+      // (workout_session_sets.duration_sec / distance_m).
+      reps:
+        current.unit === 'reps' || current.unit === 'max' ? draft.reps : null,
       weightKg: draft.weightKg,
       durationSec: current.durationSec,
+      distanceM: current.distanceM,
     };
     const setsAfter = withSet(sets, next);
     haptics.light();
@@ -381,11 +404,22 @@ export function useSessionRunner({
   }, []);
 
   const skipRest = useCallback(() => {
+    if (rest) {
+      lastRestSec.current = restElapsedSec(rest, Date.now());
+    }
     setRest(null);
     setYourTurnUntil(null);
-  }, []);
+  }, [rest]);
 
   const waitForWrites = () => Promise.allSettled([...pendingWrites.current]);
+
+  // The planned exercises must exist before the session is saved or
+  // completed; a failure here is a visible save error (STATE_09), not silent.
+  const ensurePlanned = async () => {
+    if (!dryRun && sessionId) {
+      await ensureSessionExercises(sessionId, plan);
+    }
+  };
 
   // Figures shown by STATE_09 and kept for a retry.
   const buildPayload = (closed: ClockState, at: number): CompletionPayload => {
@@ -438,11 +472,13 @@ export function useSessionRunner({
     setBusy('save');
     try {
       await waitForWrites();
+      await ensurePlanned();
       await saveSessionForLater(params);
       setSaveError(null);
       onLeave();
     } catch (error) {
-      console.warn('[session] No se pudo guardar para después.', error);
+      console.warn('[session] No se pudo guardar para después:', describeError(error));
+      setSaveErrorDetail(describeError(error));
       setClock(frozen);
       setSaveErrorKind('save');
       setSaveError(buildPayload(frozen, at));
@@ -475,11 +511,13 @@ export function useSessionRunner({
         // Sets that failed before must be on the server first (volume).
         await flushSessionOutbox(userId);
       }
+      await ensurePlanned();
       const result = await completeSession(payload);
       setSaveError(null);
       onCompleted(result);
     } catch (error) {
-      console.warn('[session] No se pudo completar la sesión.', error);
+      console.warn('[session] No se pudo completar la sesión:', describeError(error));
+      setSaveErrorDetail(describeError(error));
       setSaveError(payload);
     } finally {
       setBusy(null);
@@ -564,6 +602,7 @@ export function useSessionRunner({
     finish,
     saveError,
     saveErrorKind,
+    saveErrorDetail,
     retrySave,
     continueOffline,
     busy,

@@ -113,7 +113,7 @@ export async function openWorkoutsDevScreen(
       });
       return true;
     case 'typeList':
-      nav.navigate('RoutineList', { type: 'strength' });
+      nav.navigate('RoutineList', { category: 'fuerza' });
       return true;
     case 'favoritesList':
       nav.navigate('RoutineList', { collection: 'favorites' });

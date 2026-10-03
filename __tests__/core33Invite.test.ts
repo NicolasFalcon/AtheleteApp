@@ -1,6 +1,4 @@
 import {
-  NO_DISMISSALS,
-  recordDismissal,
   resolveCore33Invite,
   type Core33InviteInput,
 } from '../src/features/core33/core33Invite';
@@ -10,7 +8,7 @@ const base: Core33InviteInput = {
   hasCurrentChallenge: false,
   completedCount: 0,
   lastDay33: null,
-  dismissals: NO_DISMISSALS,
+  dismissedAt: null,
   today: '2026-10-02',
   now,
 };
@@ -35,47 +33,30 @@ describe('Core 33 discovery card', () => {
     );
   });
 
-  it('snoozes 14 days after the first "Ahora no" and stops after the second', () => {
-    const once = recordDismissal(NO_DISMISSALS, 0, new Date(daysAgo(3)));
-    expect(resolveCore33Invite({ ...base, dismissals: once })).toBeNull();
+  it('snoozes 14 days after "Ahora no" (profiles.core33_invite_dismissed_at)', () => {
     expect(
-      resolveCore33Invite({
-        ...base,
-        dismissals: { ...once, lastDismissedAt: daysAgo(14) },
-      }),
-    ).toBe('invite');
-
-    const twice = recordDismissal(
-      { ...once, lastDismissedAt: daysAgo(20) },
-      0,
-      new Date(daysAgo(1)),
-    );
-    expect(twice.count).toBe(2);
-    expect(
-      resolveCore33Invite({
-        ...base,
-        dismissals: { ...twice, lastDismissedAt: daysAgo(60) },
-      }),
+      resolveCore33Invite({ ...base, dismissedAt: daysAgo(3) }),
     ).toBeNull();
+    expect(
+      resolveCore33Invite({ ...base, dismissedAt: daysAgo(14) }),
+    ).toBe('invite');
+    // Not dismissed: the card shows.
+    expect(resolveCore33Invite({ ...base, dismissedAt: null })).toBe('invite');
   });
 
-  it('resets the counter when another Core 33 is completed', () => {
-    const twice = {
-      count: 2,
-      lastDismissedAt: daysAgo(1),
-      completedCountAtDismissal: 0,
+  it('starts over when another Core 33 was finished after the dismissal', () => {
+    const again = {
+      ...base,
+      completedCount: 1,
+      lastDay33: '2026-09-30',
     };
+    // Dismissed 3 days ago (09-29), before day 33 of the latest one: ignored.
     expect(
-      resolveCore33Invite({
-        ...base,
-        completedCount: 1,
-        lastDay33: '2026-09-30',
-        dismissals: twice,
-      }),
+      resolveCore33Invite({ ...again, dismissedAt: daysAgo(3) }),
     ).toBe('again');
-    expect(recordDismissal(twice, 1, now)).toMatchObject({
-      count: 1,
-      completedCountAtDismissal: 1,
-    });
+    // Dismissed after it ended: snoozed.
+    expect(
+      resolveCore33Invite({ ...again, dismissedAt: daysAgo(1) }),
+    ).toBeNull();
   });
 });

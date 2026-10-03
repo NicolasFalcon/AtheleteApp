@@ -9,6 +9,7 @@ import {
   parseNumberInput,
   pauseClock,
   restAfter,
+  restElapsedSec,
   restPhase,
   restRemainingMs,
   selectPendingSession,
@@ -31,6 +32,7 @@ const log = (position: number, setIndex: number, extra = {}): LoggedSet => ({
   reps: 12,
   weightKg: 16,
   durationSec: null,
+  distanceM: null,
   ...extra,
 });
 
@@ -150,5 +152,33 @@ describe('pending session (one rule for Inicio and the detail)', () => {
     expect(selectPendingSession([a, b], today, 'w1')?.id).toBe('a');
     expect(selectPendingSession([a, b], today, 'w2')?.id).toBe('b');
     expect(selectPendingSession([a, b], today, 'w3')).toBeNull();
+  });
+});
+
+describe('real rest taken (rest_actual_sec)', () => {
+  it('excludes a pause in the middle of the rest', () => {
+    // 60 s rest; paused at 20 s for 100 s; skipped 10 s after resuming.
+    let rest = startRest('set', 60, 0);
+    rest = freezeRest(rest, 20_000);
+    expect(restElapsedSec(rest, 90_000)).toBe(20); // still frozen
+    rest = thawRest(rest, 120_000);
+    expect(restElapsedSec(rest, 130_000)).toBe(30); // 20 + 10, not 130
+  });
+
+  it('counts "+30 s" and the full duration when the rest runs out', () => {
+    // 45 s planned, +30 s at 10 s: it ends at 75 s.
+    let rest = startRest('exercise', 45, 0);
+    rest = addRestTime(rest, 10_000);
+    expect(restElapsedSec(rest, 40_000)).toBe(40);
+    expect(restElapsedSec(rest, 75_000)).toBe(75);
+    expect(restElapsedSec(rest, 90_000)).toBe(75); // never above the total
+  });
+
+  it('combines +30 s and a pause', () => {
+    let rest = startRest('set', 60, 0);
+    rest = addRestTime(rest, 5_000); // total 90, ends at 90 s
+    rest = freezeRest(rest, 30_000); // 30 s elapsed, 60 s left
+    rest = thawRest(rest, 200_000); // paused 170 s
+    expect(restElapsedSec(rest, 230_000)).toBe(60); // skipped 30 s later
   });
 });

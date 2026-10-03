@@ -1558,3 +1558,63 @@ git commit -m "docs: Sesión module and backend todo" -m "Co-Authored-By: Claude
 - **Anillo "Entreno".** Suma los minutos activos (sin pausas) de las sesiones de hoy completadas, guardadas y en curso, cada fila una vez. Una sesión en curso sin pausar cuenta hasta su **última actividad registrada** (`duration`, que la app reescribe en cada serie y al pausar o reanudar), no hasta "ahora": cerrar la app o bloquear el teléfono no suma minutos.
 - **Guardar para después ya no falla en silencio.** Si no se puede guardar, aparece STATE_09 con las cifras y "Reintentar ahora" (el reloj queda congelado); "Continuar sin sincronizar" deja el guardado en la cola del teléfono y se reenvía al abrir una sesión.
 - **Resumen:** volumen NULL → "—". Récords `duration` y `distance` mostrados y registrados (BT-18 resuelto).
+
+**Cuenta de prueba de la app:** `falcon1989@gmail.com` · user id `7d143a1f-bf73-4481-b8d2-03f0b2e73ec5` (la contraseña no se guarda en el repositorio).
+
+**Verificación con esa cuenta (2026-10-03, solo lectura):**
+- Tiene 2 sesiones: una `canceled` y "Intro to Strength" `in_progress` (`paused_total_sec` 507, `duration` 4: la pausa y el latido de actividad sí se escriben).
+- **0 sesiones completadas** → "Tu primera sesión" era correcto para esa cuenta. (La sesión de mayo "Reinicio de Empuje Nicolas" es de otra cuenta, no de esta.)
+- **`workout_session_exercises` vacío** para la sesión en curso: la creación de los ejercicios planificados falló sin avisar. El `upsert … ON CONFLICT` pasa a ser "leer las posiciones que existen e insertar las que faltan" (idempotente), se reintenta antes de guardar o completar, y un fallo lleva a STATE_09; en `__DEV__` la pantalla muestra la causa técnica. **Pendiente de confirmar** con una sesión nueva en esta cuenta que las filas se crean.
+
+## 20. Lote de backend integrado (2026-10-03)
+
+> **Leer en 2 minutos.** Lovable aplicó el lote; la app lo usa. Verificado contra la base real con la cuenta de prueba `falcon1989@gmail.com` (id `7d143a1f-bf73-4481-b8d2-03f0b2e73ec5`): existen todas las columnas y la tabla `user_favorites`; las 9 categorías vienen pobladas (ninguna NULL). `tsc` sin errores, eslint sin errores, `jest` 118/118. Detalle del backend: `BACKEND_SUMMARY.md` §7; pendientes: `BACKEND_TODO.md`.
+
+### 20.1 Qué quedó hecho
+| # | Punto | Resultado |
+|---|---|---|
+| 0 | Tipos | `src/types/supabase.ts` a mano: `user_favorites`, `planned_weight_kg`, `rest_actual_sec`, `cancel_reason`, `core33_*` en `profiles` y `routine_category` |
+| 1 | Favoritos | `user_favorites` es la fuente de verdad (React Query compartido, UI optimista y toast de error al revertir). Migración única de AsyncStorage con upsert y marca `@athelete/favorites-migrated-v1:<userId>`. Cubre Favoritas de Entrenos, el corazón del Detalle y los ejercicios |
+| 2 | Peso planificado | kg inicial: serie anterior → último peso usado → `planned_weight_kg` → vacío. Se copia a `workout_session_exercises` y se conserva al editar una rutina |
+| 3 | Descanso real | `rest_actual_sec` = descanso real **antes** de la serie (sin pausas, con +30 s), en el mismo upsert; la primera serie lleva NULL. Test con pausa y con +30 s |
+| 4 | `cancel_reason` | "Salir sin guardar" → `canceled` + `'user'`. `in_progress` de otro día: sin series → `canceled` + `'expired'`; con series → `saved` |
+| 5 | Core 33 en el perfil | "Ahora no" escribe `core33_invite_dismissed_at`; el valor local se sube una vez y se borra; el reset dev pone la columna a `null`. `core33_intro_seen_at` / `core33_completed_at`: solo tipos y servicios |
+| 6 | Categoría | Tarjetas y `RoutineList` agrupan por `routine_category` (NULL → solo "Todas"). Mapeo local del texto libre eliminado |
+| 7 | Series y reps (A3) | Parser tolerante `parseSetsReps` (`src/shared/domain/setsReps.ts`) con unidades `reps`, `s`, `m`, `máx` y "por lado" |
+| 8 | Docs | BT-03, BT-12, BT-15, BT-17, BT-19 y BT-20 resueltos; BT-21 nuevo; `BACKEND_SUMMARY.md` §7 |
+
+**Punto 4 · el cambio `in_progress` → `saved` no existía:** antes solo se había propuesto. Se implementa aquí (`settleAbandonedSessions` en `fitness.ts`): la sesión queda `saved` congelada en su última serie. Cuando el usuario empieza otra rutina, la que estaba en curso se trata igual (con series → `saved`; sin series → `canceled` + `'user'`).
+
+**Punto 7 · de dónde salen las series y reps:**
+- La **Sesión** y el **Detalle de rutina** las leen de `template_exercises` (`sets`, `reps`, `duration`, números); `recommended_sets_reps` solo se usa cuando una fila de la rutina no trae reps ni tiempo.
+- El **Detalle de ejercicio** (la prescripción) sí leía `recommended_sets_reps`, con un regex `^(\d+)x(.+)$` que mostraba "- × -" para varias formas y habría lanzado una excepción con un objeto. En datos reales hay dos formas: por objetivo y `{sets, reps}` suelto.
+- `workout_session_sets` ya tiene `duration_sec` y `distance_m`: las series en segundos y metros los usan (se registra la cantidad planificada). Las series en "máx" registran las reps escritas. El Resumen no muestra el esquema por ejercicio; las unidades aparecen en las filas de récords (`duration`, `distance`).
+
+### 20.2 Decisiones asumidas
+| ID | Decisión |
+|---|---|
+| DA-71 | Favoritos: la migración sube solo ids con formato uuid y borra las claves locales aunque pertenezcan a otra cuenta del mismo dispositivo (eran globales al dispositivo) |
+| DA-72 | Un "like" repetido (`23505`) no es un error; quitar un favorito inexistente tampoco |
+| DA-73 | `rest_actual_sec` se calcula como `total − restante`: excluye las pausas por construcción y suma el +30 s |
+| DA-74 | Fotos de las tarjetas de categoría: las 4 sin foto propia (tren superior, tren inferior, core, acondicionamiento) reutilizan fotos del paquete como **PLACEHOLDER** |
+| DA-75 | Filas de rutina sin reps ni tiempo: el plan toma el esquema recomendado del ejercicio de la biblioteca (objetivo hipertrofia; si no existe, otro). El plan espera a la biblioteca antes de crear la sesión |
+| DA-76 | Un rango (`12–15`) propone el mínimo como valor inicial; la unidad `máx` deja las reps vacías para escribirlas |
+
+### 20.3 Desviaciones nuevas
+- **D-54** · **Core 33 "Ahora no" sin tope de dos descartes.** Con una sola fecha en el perfil no se puede saber cuántas veces se descartó: la tarjeta vuelve cada 14 días hasta que el usuario actúe. Se conserva el aplazamiento de 14 días y el reinicio al completar otro Core 33 (un descarte anterior al día 33 del último reto terminado ya no cuenta). Para recuperar el tope haría falta un contador en el perfil.
+- **D-55** · **Tarjetas "Por tipo": 9 categorías** (antes 5 tipos) más las 3 colecciones, 12 tarjetas en total. Las etiquetas largas se ajustan a una línea.
+- **D-56** · El tope de dos descartes que documentaba BT-03 deja de aplicarse (ver D-54).
+
+### 20.4 Pendientes
+- **Diseño:** no hay UI para editar el peso planificado de una rutina (no está en el diseño); la app solo lo lee y lo conserva. Fotos definitivas para 4 categorías de rutina.
+- **Backend:** BT-21 (estructurar `recommended_sets_reps`; propuesta sin aplicar); contador de descartes de Core 33 si se quiere el tope.
+- **Sin probar escribiendo:** favoritos (altas y bajas), `rest_actual_sec`, `cancel_reason`, la migración local y el "Ahora no" del perfil; no se hicieron escrituras de prueba (ver 20.5).
+
+### 20.5 Cómo verificarlo con `falcon1989` en el simulador
+- [ ] **Favoritos:** en Entrenos, un corazón en una rutina → aparece en "Favoritas" y en el Detalle; reinstala o cierra sesión y vuelve a entrar: sigue. En el modo avión, el corazón vuelve atrás y sale un toast de error. Si había favoritos locales antiguos, aparecen tras el primer inicio de sesión.
+- [ ] **Categorías:** las tarjetas de Entrenos muestran las 9 categorías con su conteo (Fuerza 2, Full body 6, Tren superior 7…); cada una abre su lista; "Todas" incluye las rutinas sin categoría.
+- [ ] **Series y reps:** Detalle de ejercicio → "3 × 12–15" (en vez de "- × -"); una rutina con ejercicios sin reps muestra el esquema recomendado.
+- [ ] **Peso inicial:** una serie nueva propone la anterior; en un ejercicio sin historial, el `planned_weight_kg` si lo tiene.
+- [ ] **Descanso:** registra dos series con un descanso con pausa y +30 s; en la base, `rest_actual_sec` de la segunda serie ≈ el descanso real, y la primera serie NULL.
+- [ ] **Salir sin guardar:** `canceled` con `cancel_reason = 'user'`.
+- [ ] **Core 33:** "Ahora no" en la tarjeta → `profiles.core33_invite_dismissed_at` con fecha y la tarjeta desaparece; menú dev "Restablecer card de Core 33" → la columna vuelve a `null`.

@@ -1,75 +1,26 @@
-import {useCallback, useEffect, useState} from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useMemo } from 'react';
+import { useUserFavorites } from '@app/hooks/useUserFavorites';
 
-const STORAGE_KEY = 'athelete_favorite_workouts';
-
+// Favourite routines (user_favorites, item_type 'routine').
 export function useFavoriteWorkouts() {
-  const [favoriteWorkoutIds, setFavoriteWorkoutIds] = useState<string[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadFavorites = async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-
-        if (!cancelled && Array.isArray(parsed)) {
-          setFavoriteWorkoutIds(parsed.filter(item => typeof item === 'string'));
-        }
-      } catch {
-        if (!cancelled) {
-          setFavoriteWorkoutIds([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoaded(true);
-        }
-      }
-    };
-
-    loadFavorites().catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const persist = useCallback(async (ids: string[]) => {
-    setFavoriteWorkoutIds(ids);
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-    } catch {
-    }
-  }, []);
+  const { idsOf, toggle, loaded } = useUserFavorites();
+  const favoriteWorkoutIds = useMemo(() => idsOf('routine'), [idsOf]);
 
   const isWorkoutFavorite = useCallback(
     (id: string) => favoriteWorkoutIds.includes(id),
     [favoriteWorkoutIds],
   );
-
   const toggleWorkoutFavorite = useCallback(
-    async (id: string) => {
-      const next = favoriteWorkoutIds.includes(id)
-        ? favoriteWorkoutIds.filter(item => item !== id)
-        : [id, ...favoriteWorkoutIds];
-
-      await persist(next);
-    },
-    [favoriteWorkoutIds, persist],
+    (id: string) => toggle('routine', id),
+    [toggle],
   );
-
   const removeWorkoutFavorite = useCallback(
     async (id: string) => {
-      if (!favoriteWorkoutIds.includes(id)) {
-        return;
+      if (favoriteWorkoutIds.includes(id)) {
+        await toggle('routine', id);
       }
-
-      await persist(favoriteWorkoutIds.filter(item => item !== id));
     },
-    [favoriteWorkoutIds, persist],
+    [favoriteWorkoutIds, toggle],
   );
 
   return {

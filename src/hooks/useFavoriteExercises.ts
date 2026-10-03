@@ -1,64 +1,18 @@
-import {useCallback, useEffect, useState} from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useMemo } from 'react';
+import { useUserFavorites } from '@app/hooks/useUserFavorites';
 
-const STORAGE_KEY = 'athelete_favorite_exercises';
-
+// Favourite exercises (user_favorites, item_type 'exercise').
 export function useFavoriteExercises() {
-  const [favoriteExerciseIds, setFavoriteExerciseIds] = useState<string[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadFavorites = async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-
-        if (!cancelled && Array.isArray(parsed)) {
-          setFavoriteExerciseIds(parsed.filter(item => typeof item === 'string'));
-        }
-      } catch {
-        if (!cancelled) {
-          setFavoriteExerciseIds([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoaded(true);
-        }
-      }
-    };
-
-    loadFavorites().catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const persist = useCallback(async (ids: string[]) => {
-    setFavoriteExerciseIds(ids);
-
-    try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-    } catch {
-    }
-  }, []);
+  const { idsOf, toggle, loaded } = useUserFavorites();
+  const favoriteExerciseIds = useMemo(() => idsOf('exercise'), [idsOf]);
 
   const isExerciseFavorite = useCallback(
     (id: string) => favoriteExerciseIds.includes(id),
     [favoriteExerciseIds],
   );
-
   const toggleExerciseFavorite = useCallback(
-    async (id: string) => {
-      const next = favoriteExerciseIds.includes(id)
-        ? favoriteExerciseIds.filter(item => item !== id)
-        : [id, ...favoriteExerciseIds];
-
-      await persist(next);
-    },
-    [favoriteExerciseIds, persist],
+    (id: string) => toggle('exercise', id),
+    [toggle],
   );
 
   return {

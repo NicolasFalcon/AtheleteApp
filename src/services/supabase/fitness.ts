@@ -162,22 +162,67 @@ export function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
   };
 }
 
-async function cancelWorkoutSessionsByIds(ids: string[]): Promise<void> {
+// Sessions left `in_progress` that can no longer run (another day, or the user
+// started a different routine). With logged sets they are kept as `saved`
+// (frozen at the last set, so they can be resumed); without sets they are
+// `canceled`, with the reason: 'expired' (another day) or 'user' (replaced).
+async function settleAbandonedSessions(
+  ids: string[],
+  reasonWithoutSets: 'user' | 'expired',
+): Promise<void> {
   if (ids.length === 0) {
     return;
   }
 
   const client = getClient();
-  const { error } = await (client.from('workout_sessions') as any)
-    .update({
-      status: 'canceled',
-      completed: false,
-      ended_at: new Date().toISOString(),
-    })
-    .in('id', ids);
+  const { data: setRows, error: setsError } = await client
+    .from('workout_session_sets')
+    .select('session_id, completed_at')
+    .in('session_id', ids);
 
-  if (error) {
-    throw error;
+  if (setsError) {
+    throw setsError;
+  }
+
+  const lastSetAt = new Map<string, string>();
+  (setRows || []).forEach(row => {
+    const current = lastSetAt.get(row.session_id);
+    if (!current || row.completed_at > current) {
+      lastSetAt.set(row.session_id, row.completed_at);
+    }
+  });
+
+  const withSets = ids.filter(id => lastSetAt.has(id));
+  const withoutSets = ids.filter(id => !lastSetAt.has(id));
+
+  for (const id of withSets) {
+    const { error } = await (client.from('workout_sessions') as any)
+      .update({
+        status: 'saved',
+        completed: false,
+        // Frozen at the last recorded activity.
+        paused_at: lastSetAt.get(id),
+      })
+      .eq('id', id);
+
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (withoutSets.length > 0) {
+    const { error } = await (client.from('workout_sessions') as any)
+      .update({
+        status: 'canceled',
+        completed: false,
+        ended_at: new Date().toISOString(),
+        cancel_reason: reasonWithoutSets,
+      })
+      .in('id', withoutSets);
+
+    if (error) {
+      throw error;
+    }
   }
 }
 
@@ -465,8 +510,11 @@ export async function fetchEffectiveWorkoutSession(
   const dropIds = [...staleIds, ...extraIds];
 
   if (dropIds.length > 0) {
-    await cancelWorkoutSessionsByIds(dropIds);
-    pending = pending.filter(session => !dropIds.includes(session.id));
+    await settleAbandonedSessions(staleIds, 'expired');
+    await settleAbandonedSessions(extraIds, 'user');
+    // Those with sets became `saved`: they stay pending.
+    const refreshed = await fetchPendingSessions(userId);
+    pending = refreshed;
   }
 
   const chosen = selectPendingSession(pending, today, workoutId);
@@ -527,14 +575,17 @@ export async function startWorkoutSession(params: {
       .map(row => row.id);
 
     if (otherIds.length > 0) {
-      await cancelWorkoutSessionsByIds(otherIds);
+      await settleAbandonedSessions(otherIds, 'user');
     }
 
     return mapWorkoutSession(matchingTodaySession);
   }
 
   if (inProgress.length > 0) {
-    await cancelWorkoutSessionsByIds(inProgress.map(row => row.id));
+    await settleAbandonedSessions(
+      inProgress.map(row => row.id),
+      'user',
+    );
   }
 
   const { data, error } = await (client.from('workout_sessions') as any)

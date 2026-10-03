@@ -227,3 +227,27 @@ En strict: se ignoran los puntos enviados por la app, se rechazan eventos descon
 2. **Vista `social_profiles`:** reemplazada por la RPC `get_social_profiles` para no exponer una vista con permisos elevados.
 3. **Revertir una sesión completada** no deshace un reto ya completado ni su recompensa.
 4. **Avisos de seguridad:** 39 avisos del tipo "función con permisos elevados ejecutable por usuarios con sesión" (incluida `can_view_profile_photo`, que necesita la política de fotos). Son intencionales. Hay además un aviso previo de extensión en el esquema público.
+
+---
+
+## 7. Lote del 3 de octubre de 2026
+
+### Tablas y columnas nuevas
+- **`user_favorites`** (`user_id uuid`, `item_type 'routine' | 'exercise'`, `item_id uuid`, `created_at`). PK (`user_id`, `item_type`, `item_id`). RLS: select, insert y delete solo los propios; no hay update.
+- **`template_exercises.planned_weight_kg`** `numeric(6,2)` NULL, `>= 0`.
+- **`workout_session_sets.rest_actual_sec`** `integer` NULL, `>= 0`: descanso real antes de esa serie.
+- **`workout_sessions.cancel_reason`** `text` NULL, solo `'user'` o `'expired'`.
+- **`profiles.core33_completed_at`**, **`core33_intro_seen_at`**, **`core33_invite_dismissed_at`** (`timestamptz` NULL).
+- **`workout_templates.routine_category`** `text` NULL: `fuerza | cuerpo_completo | tren_superior | tren_inferior | core | movilidad | acondicionamiento | hiit | cardio`. La calcula el servidor; la app nunca la escribe.
+
+### Tarea programada
+- Las sesiones `saved` con más de 14 días pasan a `canceled` con `cancel_reason = 'expired'`.
+
+### Qué hace la app con esto
+- Favoritos: `user_favorites` es la fuente de verdad; los favoritos locales se suben una vez y se borran.
+- Peso inicial de cada serie: serie anterior → último peso usado → `planned_weight_kg` → vacío.
+- `rest_actual_sec` se escribe en el mismo upsert de la serie; la primera serie de la sesión lleva NULL.
+- "Salir sin guardar": `canceled` + `'user'`. `in_progress` de otro día sin series: `canceled` + `'expired'`; con series: `saved`.
+- Core 33 "Ahora no": `core33_invite_dismissed_at`. `core33_intro_seen_at` y `core33_completed_at` quedan para el módulo Core 33.
+- Tipos y listas de rutinas: por `routine_category` (NULL → solo en "Todas").
+- Series y reps: `exercises.recommended_sets_reps` se lee con un parser tolerante (ver BT-21 en `BACKEND_TODO.md`).

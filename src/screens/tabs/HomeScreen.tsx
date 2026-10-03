@@ -68,7 +68,7 @@ function toHeroWorkout(workout: Workout | null): HeroWorkout | null {
   return workout
     ? {
         title: workout.title,
-        typeLabel: workoutTypeLabel(workout.type),
+        typeLabel: workoutTypeLabel(workout),
         minutes: workout.duration,
         exercises: workout.exercises.length,
         calories: workout.calories,
@@ -95,7 +95,7 @@ export function HomeScreen({ navigation }: Props) {
   const openCore33Discovery = useOpenCore33Discovery();
   const homeOverride = useHomeModeOverride();
   const modeOverride = homeOverride?.mode ?? null;
-  const inviteDismissals = useCore33InviteDismissals(profile?.id);
+  const inviteDismissals = useCore33InviteDismissals();
   const [wearVisible, setWearVisible] = useState(false);
   const [nutritionLogVisible, setNutritionLogVisible] = useState(false);
 
@@ -171,7 +171,7 @@ export function HomeScreen({ navigation }: Props) {
           hasCurrentChallenge: challenge?.status === 'active',
           completedCount: core33History?.completedCount ?? 0,
           lastDay33: core33History?.lastDay33 ?? null,
-          dismissals: inviteDismissals.dismissals,
+          dismissedAt: inviteDismissals.dismissedAt,
           today: getLocalDateKey(),
           now: new Date(),
         })
@@ -373,9 +373,7 @@ export function HomeScreen({ navigation }: Props) {
             done: completedToday
               ? {
                   minutes: completedToday.duration,
-                  typeLabel: workoutTypeLabel(
-                    completedWorkout?.type,
-                  ).toLowerCase(),
+                  typeLabel: workoutTypeLabel(completedWorkout).toLowerCase(),
                 }
               : null,
             allDoneLine: allDoneLine({ coreActive, coreClosed, waterDone }),
@@ -421,7 +419,7 @@ export function HomeScreen({ navigation }: Props) {
               completedCount={Math.max(core33History?.completedCount ?? 0, 1)}
               onPress={openCore33Discovery}
               onDismiss={() =>
-                inviteDismissals.dismiss(core33History?.completedCount ?? 0)
+                inviteDismissals.dismiss()
               }
             />
           ) : null}

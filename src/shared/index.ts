@@ -11,3 +11,4 @@ export * from '@app/shared/domain/progress-insights';
 export * from '@app/shared/domain/gamification';
 export * from '@app/shared/data/exercises';
 export * from '@app/shared/data/workouts';
+export * from '@app/shared/domain/setsReps';

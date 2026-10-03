@@ -64,6 +64,9 @@ function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
     availableEquipment: row.available_equipment || [],
     trainingLevel: mapTrainingLevel(row.training_level),
     preferredSessionMinutes: row.preferred_session_minutes,
+    core33IntroSeenAt: row.core33_intro_seen_at,
+    core33CompletedAt: row.core33_completed_at,
+    core33InviteDismissedAt: row.core33_invite_dismissed_at,
   };
 }
 
@@ -228,3 +231,42 @@ export async function updateProfileDetails(
     throw error;
   }
 }
+
+// ── Core 33 in the profile ──────────────────────────────────────────────────
+// Each function writes one timestamptz column of the user's own profile row
+// (ISO string, or null to clear it).
+async function setCore33Column(
+  userId: string,
+  column:
+    | 'core33_invite_dismissed_at'
+    | 'core33_intro_seen_at'
+    | 'core33_completed_at',
+  value: string | null,
+): Promise<void> {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    throw new Error('Supabase is not configured.');
+  }
+
+  const { error } = await (client.from('profiles') as any)
+    .update({ [column]: value })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+// "Ahora no" of the Inicio discovery card (null clears it: dev reset).
+export const setCore33InviteDismissedAt = (
+  userId: string,
+  value: string | null,
+) => setCore33Column(userId, 'core33_invite_dismissed_at', value);
+
+// For the Core 33 module (Intro seen / challenge completed).
+export const markCore33IntroSeen = (userId: string, at = new Date()) =>
+  setCore33Column(userId, 'core33_intro_seen_at', at.toISOString());
+
+export const markCore33Completed = (userId: string, at = new Date()) =>
+  setCore33Column(userId, 'core33_completed_at', at.toISOString());

@@ -19,6 +19,21 @@ export type WorkoutCollectionType =
   | 'user_created'
   | 'ellie_generated';
 
+// workout_templates.routine_category: computed by the server, the app only
+// reads it (never writes it). null → the routine only shows in "Todas".
+export const ROUTINE_CATEGORY_VALUES = [
+  'fuerza',
+  'cuerpo_completo',
+  'tren_superior',
+  'tren_inferior',
+  'core',
+  'movilidad',
+  'acondicionamiento',
+  'hiit',
+  'cardio',
+] as const;
+export type RoutineCategory = (typeof ROUTINE_CATEGORY_VALUES)[number];
+
 export type WorkoutExercise = {
   id: string;
   exerciseId?: string | null;
@@ -28,12 +43,17 @@ export type WorkoutExercise = {
   duration?: number;
   restTime: number;
   notes?: string;
+  // template_exercises.planned_weight_kg: starting kg of a set when the user
+  // has no history for the exercise (no editing UI yet).
+  plannedWeightKg?: number;
 };
 
 export type Workout = {
   id: string;
   title: string;
   type: WorkoutType;
+  // Server-computed group of the routine (see ROUTINE_CATEGORY_VALUES).
+  routineCategory?: RoutineCategory | null;
   duration: number;
   difficulty: WorkoutDifficulty;
   calories: number;

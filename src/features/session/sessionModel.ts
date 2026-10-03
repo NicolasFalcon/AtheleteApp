@@ -1,4 +1,10 @@
-import type { WorkoutExercise, WorkoutSession } from '@app/shared';
+import {
+  formatSetsReps,
+  recommendationFor,
+  type SetsRepsUnit,
+  type WorkoutExercise,
+  type WorkoutSession,
+} from '@app/shared';
 
 // Workout Session v2 (Session.dc.html): pure helpers for the plan, the set
 // cursor, the session clock (pauses excluded) and the rest timer.
@@ -42,22 +48,68 @@ export type PlannedExercise = {
   exerciseId: string | null;
   name: string;
   sets: number;
+  // Unit of the work: reps, seconds, metres, or "máx" (as many as possible).
+  unit: SetsRepsUnit;
+  // "por lado": the same work on each side.
+  perSide: boolean;
+  // Planned amount: reps (unit reps), seconds (sec), metres (m). `max` is the
+  // upper end of a range ("12–15"), equal to `amount` otherwise.
+  amount: number | null;
+  amountMax: number | null;
+  restSec: number;
+  plannedWeightKg: number | null;
+  // Derived (kept for the screens and the set log).
   reps: number | null;
   durationSec: number | null;
-  restSec: number;
+  distanceM: number | null;
 };
 
-export function buildPlan(exercises: WorkoutExercise[]): PlannedExercise[] {
-  return exercises.map((exercise, position) => ({
-    position,
-    templateExerciseId: exercise.id || null,
-    exerciseId: exercise.exerciseId ?? null,
-    name: exercise.name,
-    sets: exercise.sets && exercise.sets > 0 ? exercise.sets : DEFAULT_SETS,
-    reps: exercise.duration ? null : exercise.reps ?? null,
-    durationSec: exercise.duration ? exercise.duration : null,
-    restSec: exercise.restTime > 0 ? exercise.restTime : DEFAULT_REST_SEC,
-  }));
+// `recommendedFor` gives the library's recommended_sets_reps of an exercise:
+// it fills in a routine row that has neither reps nor time.
+export function buildPlan(
+  exercises: WorkoutExercise[],
+  recommendedFor?: (exerciseId: string) => unknown,
+): PlannedExercise[] {
+  return exercises.map((exercise, position) => {
+    let sets = exercise.sets && exercise.sets > 0 ? exercise.sets : DEFAULT_SETS;
+    let unit: SetsRepsUnit = exercise.duration ? 'sec' : 'reps';
+    let amount: number | null = exercise.duration
+      ? exercise.duration
+      : exercise.reps ?? null;
+    let amountMax = amount;
+    let perSide = false;
+
+    if (amount === null && exercise.exerciseId && recommendedFor) {
+      const scheme = recommendationFor(
+        recommendedFor(exercise.exerciseId),
+        'hypertrophy',
+      );
+      if (scheme.parsed) {
+        sets = exercise.sets && exercise.sets > 0 ? exercise.sets : scheme.sets;
+        unit = scheme.unit;
+        amount = scheme.min;
+        amountMax = scheme.max;
+        perSide = scheme.perSide;
+      }
+    }
+
+    return {
+      position,
+      templateExerciseId: exercise.id || null,
+      exerciseId: exercise.exerciseId ?? null,
+      name: exercise.name,
+      sets,
+      unit,
+      perSide,
+      amount,
+      amountMax,
+      restSec: exercise.restTime > 0 ? exercise.restTime : DEFAULT_REST_SEC,
+      plannedWeightKg: exercise.plannedWeightKg ?? null,
+      reps: unit === 'reps' ? amount : null,
+      durationSec: unit === 'sec' ? amount : null,
+      distanceM: unit === 'm' ? amount : null,
+    };
+  });
 }
 
 // ── Sets ────────────────────────────────────────────────────────────────────
@@ -66,7 +118,8 @@ export type LoggedSet = {
   setIndex: number; // 0-based, = workout_session_sets.set_index
   reps: number | null;
   weightKg: number | null;
-  durationSec: number | null;
+  durationSec: number | null; // unit sec → workout_session_sets.duration_sec
+  distanceM: number | null; // unit m → workout_session_sets.distance_m
   id?: string; // workout_session_sets.id once saved
 };
 
@@ -127,8 +180,9 @@ export function segmentProgress(
   );
 }
 
-// Values proposed for the next set: the last set logged in this exercise,
-// otherwise the plan (reps) and the user's last weight for the exercise.
+// Values proposed for the next set. kg, in this order:
+// 1) the previous set of this session, 2) the last weight the user used for
+// the exercise, 3) the routine's planned weight, 4) empty.
 export function suggestedSet(
   exercise: PlannedExercise,
   logs: LoggedSet[],
@@ -137,7 +191,11 @@ export function suggestedSet(
   const previous = setsFor(logs, exercise.position).pop();
   return {
     reps: previous?.reps ?? exercise.reps,
-    weightKg: previous?.weightKg ?? lastWeightKg ?? null,
+    weightKg:
+      previous?.weightKg ??
+      lastWeightKg ??
+      exercise.plannedWeightKg ??
+      null,
   };
 }
 
@@ -262,6 +320,14 @@ export function thawRest(rest: RestState, now: number): RestState {
     : { ...rest, endsAt: now + rest.frozenRemainingMs, frozenRemainingMs: null };
 }
 
+// Real rest taken, in seconds: from the start of the rest until it ended or
+// was skipped. Total − remaining: a pause freezes the remaining time (so it
+// is not counted) and "+30 s" extends the total (so it is).
+export function restElapsedSec(rest: RestState, now: number): number {
+  const remainingMs = restRemainingMs(rest, now);
+  return Math.max(0, Math.round(rest.totalSec - remainingMs / 1000));
+}
+
 export type RestPhase = 'counting' | 'warning' | 'go';
 export function restPhase(remainingMs: number): RestPhase {
   if (remainingMs <= 0) {
@@ -301,11 +367,34 @@ export function formatDuration(totalSeconds: number): string {
   return `${Math.floor(minutes / 60)} h ${pad(minutes % 60)} min`;
 }
 
-// "3 × 12" · "3 × 40 s"
+// "3 × 12" · "3 × 12–15" · "3 × 40 s · por lado" · "3 × máx" · "3 × 40 m"
 export function planScheme(exercise: PlannedExercise): string {
-  return exercise.durationSec
-    ? `${exercise.sets} × ${exercise.durationSec} s`
-    : `${exercise.sets} × ${exercise.reps ?? '—'}`;
+  if (exercise.unit !== 'max' && exercise.amount === null) {
+    return `${exercise.sets} × —`;
+  }
+  return formatSetsReps({
+    parsed: true,
+    sets: exercise.sets,
+    min: exercise.amount,
+    max: exercise.amountMax ?? exercise.amount,
+    unit: exercise.unit,
+    perSide: exercise.perSide,
+    raw: '',
+  });
+}
+
+// Amount of one set: "12 reps" · "40 s" · "40 m" · "máx".
+export function planAmount(exercise: PlannedExercise): string | null {
+  switch (exercise.unit) {
+    case 'max':
+      return 'máx';
+    case 'sec':
+      return exercise.amount !== null ? `${exercise.amount} s` : null;
+    case 'm':
+      return exercise.amount !== null ? `${exercise.amount} m` : null;
+    default:
+      return exercise.amount !== null ? `${exercise.amount} reps` : null;
+  }
 }
 
 // "16 kg" · "16,5 kg"

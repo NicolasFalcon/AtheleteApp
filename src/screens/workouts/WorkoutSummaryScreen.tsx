@@ -68,6 +68,7 @@ function devPreviewDetail(): SessionDetail {
       reps: 10,
       weightKg: 16,
       durationSec: null,
+      distanceM: null,
     })),
   };
 }

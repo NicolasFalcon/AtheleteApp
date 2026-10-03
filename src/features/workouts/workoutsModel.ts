@@ -1,9 +1,15 @@
-import type {
-  LibraryExercise,
-  Workout,
-  WorkoutExercise,
-  WorkoutType,
+import {
+  ROUTINE_CATEGORY_VALUES,
+  type LibraryExercise,
+  type RoutineCategory,
+  type Workout,
+  type WorkoutExercise,
+  type WorkoutType,
 } from '@app/shared';
+import {
+  formatSetsReps,
+  recommendationFor,
+} from '@app/shared/domain/setsReps';
 import type { OnboardingGoal } from '@app/types/auth';
 
 // Entrenos v2 (Workouts.dc.html): pure helpers shared by Rutinas, Ejercicios,
@@ -27,33 +33,43 @@ export const LEVEL_LABELS: Record<string, string> = {
 export const LEVEL_KEYS = ['beginner', 'intermediate', 'advanced'] as const;
 export type LevelKey = (typeof LEVEL_KEYS)[number];
 
-// workout_templates.type is free text in the database (e.g. "full_body",
-// "Fuerza"); map it to the app keys.
-const TYPE_ALIASES: Record<string, WorkoutType> = {
-  strength: 'strength',
-  fuerza: 'strength',
-  cardio: 'cardio',
-  fullbody: 'fullbody',
-  full_body: 'fullbody',
-  'full body': 'fullbody',
-  'full-body': 'fullbody',
-  'cuerpo completo': 'fullbody',
-  hiit: 'hiit',
-  mobility: 'mobility',
-  movilidad: 'mobility',
+// Routine groups (Por tipo): workout_templates.routine_category, computed by
+// the server. The app never maps the free-text `type` for grouping.
+export type { RoutineCategory };
+
+export const ROUTINE_CATEGORIES: readonly RoutineCategory[] =
+  ROUTINE_CATEGORY_VALUES;
+
+export const CATEGORY_LABELS: Record<RoutineCategory, string> = {
+  fuerza: 'Fuerza',
+  cuerpo_completo: 'Full body',
+  tren_superior: 'Tren superior',
+  tren_inferior: 'Tren inferior',
+  core: 'Core',
+  movilidad: 'Movilidad',
+  acondicionamiento: 'Acondicionamiento',
+  hiit: 'HIIT',
+  cardio: 'Cardio',
 };
 
-export function normalizeWorkoutType(
-  value?: string | null,
-): WorkoutType | null {
-  return (value && TYPE_ALIASES[value.trim().toLowerCase()]) || null;
+export function parseCategory(value?: string | null): RoutineCategory | null {
+  return (ROUTINE_CATEGORIES as readonly string[]).includes(value ?? '')
+    ? (value as RoutineCategory)
+    : null;
 }
 
-export function typeLabel(value?: string | null): string {
-  const key = normalizeWorkoutType(value);
-  return key
-    ? TYPE_LABELS[key]
-    : capitalize((value || 'Rutina').replace(/_/g, ' '));
+// Label of a routine for eyebrows and heroes: its category; without one, the
+// raw type text capitalised ("full_body" → "Full body"), or "Rutina".
+export function routineTypeLabel(
+  workout?: Pick<Workout, 'routineCategory' | 'type'> | null,
+): string {
+  if (!workout) {
+    return 'Rutina';
+  }
+  if (workout.routineCategory) {
+    return CATEGORY_LABELS[workout.routineCategory];
+  }
+  return capitalize((workout.type || 'Rutina').replace(/_/g, ' '));
 }
 
 export function levelLabel(level?: string | null): string {
@@ -69,17 +85,10 @@ export function levelBars(level?: string | null): number {
 // The root explores (types + collections); the list lives in RoutineList.
 export type RoutineCollection = 'favorites' | 'mine' | 'all';
 export type RoutineScope =
-  | { type: WorkoutType; collection?: undefined }
-  | { collection: RoutineCollection; type?: undefined };
+  | { category: RoutineCategory; collection?: undefined }
+  | { collection: RoutineCollection; category?: undefined };
 
-// "Por tipo" cards: every type, then the collections.
-export const TYPE_TILES: WorkoutType[] = [
-  'strength',
-  'cardio',
-  'hiit',
-  'mobility',
-  'fullbody',
-];
+// "Por tipo" cards: every category (ROUTINE_CATEGORIES), then the collections.
 export const COLLECTION_TILES: RoutineCollection[] = ['favorites', 'mine', 'all'];
 
 export const COLLECTION_LABELS: Record<RoutineCollection, string> = {
@@ -105,8 +114,8 @@ function inScope(
   favorites: Set<string>,
   userId?: string | null,
 ): boolean {
-  if (scope.type) {
-    return normalizeWorkoutType(workout.type) === scope.type;
+  if (scope.category) {
+    return workout.routineCategory === scope.category;
   }
   if (scope.collection === 'favorites') {
     return favorites.has(workout.id);
@@ -131,18 +140,17 @@ export function filterRoutines(
   );
 }
 
-export function countByType(workouts: Workout[]): Record<WorkoutType, number> {
-  const counts: Record<WorkoutType, number> = {
-    strength: 0,
-    cardio: 0,
-    fullbody: 0,
-    hiit: 0,
-    mobility: 0,
-  };
+// Routines per category; those without one are not counted here (they only
+// show in "Todas").
+export function countByCategory(
+  workouts: Workout[],
+): Record<RoutineCategory, number> {
+  const counts = Object.fromEntries(
+    ROUTINE_CATEGORIES.map(category => [category, 0]),
+  ) as Record<RoutineCategory, number>;
   workouts.forEach(workout => {
-    const key = normalizeWorkoutType(workout.type);
-    if (key) {
-      counts[key] += 1;
+    if (workout.routineCategory) {
+      counts[workout.routineCategory] += 1;
     }
   });
   return counts;
@@ -166,8 +174,8 @@ export function plural(count: number, one: string, many: string): string {
 }
 
 export function routineScopeTitle(scope: RoutineScope): string {
-  return scope.type
-    ? TYPE_LABELS[scope.type]
+  return scope.category
+    ? CATEGORY_LABELS[scope.category]
     : COLLECTION_LABELS[scope.collection];
 }
 
@@ -178,18 +186,20 @@ export function routineEmptyText(scope: RoutineScope): string {
   if (scope.collection === 'mine') {
     return 'Crea una rutina con “+” o pídesela a ELLIE.';
   }
-  return scope.type
-    ? `Sin rutinas de ${TYPE_LABELS[scope.type].toLowerCase()} todavía.`
+  return scope.category
+    ? `Sin rutinas de ${CATEGORY_LABELS[scope.category].toLowerCase()} todavía.`
     : 'Todavía no hay rutinas.';
 }
 
-// Route params → scope (type wins; default: all).
+// Route params → scope (category wins; default: all).
 export function routineScopeFrom(params?: {
-  type?: string;
+  category?: string;
   collection?: RoutineCollection;
 }): RoutineScope {
-  const type = normalizeWorkoutType(params?.type);
-  return type ? { type } : { collection: params?.collection ?? 'all' };
+  const category = parseCategory(params?.category);
+  return category
+    ? { category }
+    : { collection: params?.collection ?? 'all' };
 }
 
 // "Principiante · 35 min · 280 kcal"
@@ -226,18 +236,30 @@ export function recommendRoutines(
   );
   const source = featured.length > 0 ? featured : workouts;
 
+  const inGroup = (workout: Workout, groups: RoutineCategory[]) =>
+    workout.routineCategory ? groups.includes(workout.routineCategory) : false;
+
   const score = (workout: Workout) => {
     if (goal === 'lose_weight') {
-      return workout.type === 'cardio' || workout.type === 'hiit' ? 2 : 0;
+      return inGroup(workout, ['cardio', 'hiit', 'acondicionamiento']) ? 2 : 0;
     }
     if (goal === 'gain_muscle') {
-      return workout.type === 'strength' || workout.type === 'fullbody' ? 2 : 0;
+      return inGroup(workout, [
+        'fuerza',
+        'cuerpo_completo',
+        'tren_superior',
+        'tren_inferior',
+      ])
+        ? 2
+        : 0;
     }
     if (goal === 'performance') {
-      return workout.type === 'hiit' || workout.type === 'cardio' ? 2 : 0;
+      return inGroup(workout, ['hiit', 'cardio', 'acondicionamiento']) ? 2 : 0;
     }
     if (goal === 'improve_health') {
-      return workout.type === 'mobility' || workout.type === 'fullbody' ? 2 : 0;
+      return inGroup(workout, ['movilidad', 'cuerpo_completo', 'core'])
+        ? 2
+        : 0;
     }
     return workout.sourceType === 'featured_editorial' ? 2 : 0;
   };
@@ -380,7 +402,12 @@ export function primaryMuscle(exercise: LibraryExercise): string {
 
 // ── Routine path / builder ─────────────────────────────────────────────────
 // "3 × 10" · "3 × 45 s" · "Libre"
-export function schemeLabel(exercise: WorkoutExercise): string {
+// `recommended` is the library exercise's recommended_sets_reps: used only
+// when the routine row carries neither reps nor time (then "Libre").
+export function schemeLabel(
+  exercise: WorkoutExercise,
+  recommended?: unknown,
+): string {
   if (exercise.duration) {
     return exercise.sets
       ? `${exercise.sets} × ${exercise.duration} s`
@@ -389,19 +416,31 @@ export function schemeLabel(exercise: WorkoutExercise): string {
   if (exercise.sets && exercise.reps) {
     return `${exercise.sets} × ${exercise.reps}`;
   }
+  if (recommended !== undefined && recommended !== null) {
+    const scheme = recommendationFor(recommended, 'hypertrophy');
+    if (scheme.parsed) {
+      return formatSetsReps(scheme);
+    }
+  }
   return 'Libre';
 }
 
 // "3 × 10 · 45 s descanso"
-export function pathMeta(exercise: WorkoutExercise): string {
+export function pathMeta(
+  exercise: WorkoutExercise,
+  recommended?: unknown,
+): string {
   const rest = exercise.restTime > 0 ? `${exercise.restTime} s descanso` : '';
-  return [schemeLabel(exercise), rest].filter(Boolean).join(' · ');
+  return [schemeLabel(exercise, recommended), rest].filter(Boolean).join(' · ');
 }
 
 // "3 × 10 · 60 s" (review / tray chip)
-export function schemeChip(exercise: WorkoutExercise): string {
+export function schemeChip(
+  exercise: WorkoutExercise,
+  recommended?: unknown,
+): string {
   return [
-    schemeLabel(exercise),
+    schemeLabel(exercise, recommended),
     exercise.restTime > 0 ? `${exercise.restTime} s` : null,
   ]
     .filter(Boolean)

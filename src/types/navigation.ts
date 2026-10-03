@@ -8,7 +8,7 @@ import type {
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import type { DevSessionState } from '@app/features/session/useSessionRunner';
-import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
+import type { LibraryExercise, RoutineCategory, Workout } from '@app/shared';
 import type {
   QuizQuestionRouteParams,
   QuizResultRouteParams,
@@ -71,9 +71,9 @@ export type ExerciseListRouteParams = {
   focusSearch?: boolean;
 };
 
-// Entrenos · lista de rutinas (D-46): a type or a collection.
+// Entrenos · lista de rutinas (D-46): a category or a collection.
 export type RoutineListRouteParams = {
-  type?: WorkoutType;
+  category?: RoutineCategory;
   collection?: 'favorites' | 'mine' | 'all';
   focusSearch?: boolean;
   // Development only (__DEV__): shows the empty state (STATE_06).

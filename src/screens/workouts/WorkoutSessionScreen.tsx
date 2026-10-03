@@ -129,10 +129,20 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     [navigation, refreshSurfaces],
   );
 
+  // The plan reads the library (recommended sets and reps), so it waits for it.
+  const libraryData = exercisesQuery.data;
+  const recommendedFor = useCallback(
+    (exerciseId: string) =>
+      libraryData?.find(item => item.id === exerciseId)?.recommendedSetsReps,
+    [libraryData],
+  );
+  const planReady = !exercisesQuery.isLoading;
+
   const runner = useSessionRunner({
-    workout,
+    workout: planReady ? workout : null,
     sessionId,
     userId,
+    recommendedFor,
     dev,
     onCompleted,
     onLeave: goHome,
@@ -243,6 +253,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           exercises={runner.saveError.completedExercises.length}
           kcal={runner.saveError.caloriesBurned}
           retrying={runner.busy === 'finish' || runner.busy === 'save'}
+          debugMessage={runner.saveErrorDetail}
           onRetry={() => {
             runner.retrySave().catch(() => {});
           }}

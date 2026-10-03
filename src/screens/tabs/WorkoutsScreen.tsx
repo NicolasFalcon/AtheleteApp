@@ -146,8 +146,8 @@ export function WorkoutsScreen({ navigation, route }: Props) {
             onOpenWorkout={workoutId =>
               navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId })
             }
-            onOpenType={type =>
-              navigation.navigate(APP_ROUTES.RoutineList, { type })
+            onOpenCategory={category =>
+              navigation.navigate(APP_ROUTES.RoutineList, { category })
             }
             onOpenCollection={collection =>
               navigation.navigate(APP_ROUTES.RoutineList, { collection })

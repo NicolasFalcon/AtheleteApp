@@ -57,6 +57,8 @@ function buildExercisePayload(templateId: string, workout: RoutineDraft) {
     duration: exercise.duration ?? null,
     rest_time: exercise.restTime ?? 60,
     notes: exercise.notes || null,
+    // Kept when a routine is edited (there is no UI for it yet).
+    planned_weight_kg: exercise.plannedWeightKg ?? null,
     sort_order: index,
   }));
 }

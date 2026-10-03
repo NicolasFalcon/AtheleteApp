@@ -54,4 +54,9 @@ export type ProfileRecord = {
   availableEquipment: string[];
   trainingLevel: TrainingLevel | null;
   preferredSessionMinutes: number | null;
+  // Core 33 in the profile (timestamptz, ISO). Intro and completion are for
+  // the Core 33 module; the invite date drives the Inicio discovery card.
+  core33IntroSeenAt: string | null;
+  core33CompletedAt: string | null;
+  core33InviteDismissedAt: string | null;
 };

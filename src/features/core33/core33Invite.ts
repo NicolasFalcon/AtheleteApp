@@ -4,22 +4,11 @@
 
 export type Core33InviteVariant = 'invite' | 'again';
 
+// "Ahora no" hides the card for 14 days. The date is
+// profiles.core33_invite_dismissed_at (one timestamp: the earlier "at most
+// two dismissals" counter cannot be derived from it, so the card comes back
+// every 14 days until the user acts, D-54).
 export const INVITE_SNOOZE_DAYS = 14;
-export const INVITE_MAX_DISMISSALS = 2;
-
-// "Ahora no" history. `completedCountAtDismissal` resets the counter when the
-// user finishes another Core 33 after dismissing.
-export type Core33InviteDismissals = {
-  count: number;
-  lastDismissedAt: string | null; // ISO
-  completedCountAtDismissal: number;
-};
-
-export const NO_DISMISSALS: Core33InviteDismissals = {
-  count: 0,
-  lastDismissedAt: null,
-  completedCountAtDismissal: 0,
-};
 
 export type Core33InviteInput = {
   // Active or prepared (chosen, not started) challenge: Core 33 lives in the
@@ -27,25 +16,24 @@ export type Core33InviteInput = {
   hasCurrentChallenge: boolean;
   completedCount: number;
   lastDay33: string | null; // YYYY-MM-DD of day 33 of the latest finished one
-  dismissals: Core33InviteDismissals;
+  dismissedAt: string | null; // ISO, profiles.core33_invite_dismissed_at
   today: string; // YYYY-MM-DD (local)
   now: Date;
 };
 
-function effectiveDismissals(
-  dismissals: Core33InviteDismissals,
-  completedCount: number,
-): Core33InviteDismissals {
-  return completedCount > dismissals.completedCountAtDismissal
-    ? NO_DISMISSALS
-    : dismissals;
+// A dismissal made before the latest Core 33 ended no longer counts: after
+// finishing another one the card starts over.
+function localDateKey(iso: string): string {
+  const date = new Date(iso);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 export function resolveCore33Invite({
   hasCurrentChallenge,
   completedCount,
   lastDay33,
-  dismissals,
+  dismissedAt,
   today,
   now,
 }: Core33InviteInput): Core33InviteVariant | null {
@@ -61,32 +49,16 @@ export function resolveCore33Invite({
     return null;
   }
 
-  const state = effectiveDismissals(dismissals, completedCount);
+  const dismissalCounts =
+    dismissedAt && !(lastDay33 && localDateKey(dismissedAt) <= lastDay33);
 
-  if (state.count >= INVITE_MAX_DISMISSALS) {
-    return null;
-  }
-
-  if (state.count > 0 && state.lastDismissedAt) {
+  if (dismissalCounts && dismissedAt) {
     const elapsedDays =
-      (now.getTime() - new Date(state.lastDismissedAt).getTime()) / 86400000;
+      (now.getTime() - new Date(dismissedAt).getTime()) / 86400000;
     if (elapsedDays < INVITE_SNOOZE_DAYS) {
       return null;
     }
   }
 
   return variant;
-}
-
-export function recordDismissal(
-  dismissals: Core33InviteDismissals,
-  completedCount: number,
-  now: Date,
-): Core33InviteDismissals {
-  const state = effectiveDismissals(dismissals, completedCount);
-  return {
-    count: state.count + 1,
-    lastDismissedAt: now.toISOString(),
-    completedCountAtDismissal: completedCount,
-  };
 }

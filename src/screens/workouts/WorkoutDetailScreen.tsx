@@ -29,7 +29,7 @@ import {
   EQUIPMENT,
   LEVEL_LABELS,
   pathMeta,
-  typeLabel,
+  routineTypeLabel,
   zoneLabel,
 } from '@app/features/workouts/workoutsModel';
 import { EQUIPMENT_ICONS } from '@app/features/workouts/v2/workoutIcons';
@@ -281,7 +281,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           height={HERO_HEIGHT}
           image={image}
           onImageError={() => setImageBroken(true)}
-          eyebrow={[typeLabel(workout.type), LEVEL_LABELS[workout.difficulty]]
+          eyebrow={[routineTypeLabel(workout), LEVEL_LABELS[workout.difficulty]]
             .filter(Boolean)
             .join(' · ')}
           title={workout.title}
@@ -363,7 +363,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
                   return {
                     key: exercise.id,
                     title: exercise.name,
-                    subtitle: pathMeta(exercise),
+                    subtitle: pathMeta(exercise, libraryExercise?.recommendedSetsReps),
                     thumbnail: exerciseThumbnail(libraryExercise?.bodyPart),
                     trailing: libraryExercise ? (
                       <ChevronRight

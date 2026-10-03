@@ -13,7 +13,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 |---|---|---|---|---|
 | BT-01 | Core 33 | Catálogo de retos y estados elegido / preparado | Alta | Sí: Intro, Explorar, Detalle y Listo |
 | BT-02 | Core 33 | `completed_at` en `challenge_participations` | Media | No (aproximación con `start_date + 32`) |
-| BT-03 | Core 33 | "Intro vista" y descartes de la card de Inicio en el perfil | Media | No (AsyncStorage local) |
+| BT-03 | Core 33 | ~~"Intro vista" y descartes de la card de Inicio en el perfil~~ | — | **Resuelto** (2026-10-03) |
 | BT-04 | Gamificación | Activar el modo `strict` | Media | No |
 | BT-05 | Gamificación | Cerrar `UPDATE` de `profiles.points` e `INSERT` en `user_badges` | Media | No (depende de la web) |
 | BT-06 | ELLIE / Nutrición | Confirmar si `ellie-chat` usa el género para calorías | Baja | No |
@@ -22,15 +22,16 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-09 | Storage | Tipos de archivo en `social-photos` y `profile-photos`, 5 MB en `profile-photos` | Media | No (la app valida) |
 | BT-10 | Storage | Verificar la limpieza diaria de fotos (`social-photos-cleanup`, 03:17 UTC) | Baja | No |
 | BT-11 | Documentación | Corregir `training_level` en `BACKEND_SUMMARY.md` | Alta | No (la app ya usa los valores reales) |
-| BT-12 | Entrenos | Favoritos de rutinas y ejercicios en una tabla | Media | No (AsyncStorage local) |
+| BT-12 | Entrenos | ~~Favoritos de rutinas y ejercicios en una tabla~~ | — | **Resuelto** (2026-10-03) |
 | BT-13 | Entrenos | Videos MoveKit (MP4 en loop + póster) por ejercicio | Alta para EXERCISE_01 | No (póster PLACEHOLDER) |
 | BT-14 | Entrenos | Técnica estructurada: tempo, fases, pasos con título, consecuencia de cada error, recomendaciones completas | Media | No (se oculta lo que falta) |
-| BT-15 | Entrenos | `workout_templates.type` con valores cerrados | Baja | No (la app normaliza) |
+| BT-15 | Entrenos | ~~`workout_templates.type` con valores cerrados~~ | — | **Resuelto** (2026-10-03) |
 | BT-16 | Entrenos | Conteos y búsqueda en servidor cuando crezca la biblioteca | Baja | No |
-| BT-17 | Sesión | Peso planificado por ejercicio en las rutinas (`template_exercises`) | Media | No (último peso del usuario o vacío) |
+| BT-17 | Sesión | ~~Peso planificado por ejercicio en las rutinas (`template_exercises`)~~ | — | **Resuelto** (2026-10-03) |
 | BT-18 | Sesión | ~~Confirmar cuándo se calcula `volume_kg` y qué tipos devuelve `detect_session_prs`~~ | — | **Resuelto** (2026-10-03) |
-| BT-19 | Sesión | Sesiones `saved` antiguas: caducidad o limpieza | Baja | No |
-| BT-20 | Sesión | `rest_taken_sec` y fases del descanso (opcional) | Baja | No |
+| BT-19 | Sesión | ~~Sesiones `saved` antiguas: caducidad o limpieza~~ | — | **Resuelto** (2026-10-03) |
+| BT-20 | Sesión | ~~`rest_taken_sec` y fases del descanso (opcional)~~ | — | **Resuelto** (2026-10-03) |
+| BT-21 | Entrenos / Sesión | Estructurar `exercises.recommended_sets_reps` (hoy texto libre con 444 valores fuera de "N x M") | Media | No (la app lo lee con un parser tolerante) |
 
 ---
 
@@ -79,20 +80,16 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
   - backfill de las existentes con `start_date + 32 días`.
 - **Prioridad:** Media. **No bloquea.**
 
-### BT-03 · "Intro vista" y descartes de la card de Core 33 en el perfil
-- **Qué falta:** dónde guardar, por usuario, si ya vio la Intro de Core 33 y el "Ahora no" de la card de Inicio.
-- **Por qué:**
-  - La Intro se muestra una sola vez.
-  - La card vuelve a los 14 días y deja de mostrarse tras dos descartes; el contador se reinicia al completar un Core 33.
-  - Hoy los descartes están en AsyncStorage (`@athelete/core33-invite-v1:<userId>`), así que no se sincronizan entre dispositivos ni sobreviven a una reinstalación. "Intro vista" todavía no existe.
-- **Quién lo necesita:** la entrada inteligente de Core 33 (Intro o Explorar) y la card de Inicio (HOME_10 / HOME_11).
-- **Propuesta:** en `profiles` (privado, solo el dueño):
-  - `core33_intro_seen_at timestamptz NULL`;
-  - `core33_invite_dismiss_count int NOT NULL DEFAULT 0`;
-  - `core33_invite_dismissed_at timestamptz NULL`;
-  - `core33_invite_dismiss_completed_count int NOT NULL DEFAULT 0` (número de Core 33 completados al descartar, para el reinicio).
-  - Se escribe con `UPDATE` directo (RLS del dueño). No hace falta RPC.
-- **Prioridad:** Media. **No bloquea.**
+### BT-03 · "Intro vista" y descartes de la card de Core 33 en el perfil · ✅ resuelto (2026-10-03)
+- **Aplicado por backend:** `profiles.core33_intro_seen_at`, `core33_completed_at` y `core33_invite_dismissed_at` (`timestamptz NULL`).
+- **En la app:**
+  - "Ahora no" escribe `core33_invite_dismissed_at` (UPDATE directo, RLS del dueño). La card vuelve a los 14 días. Un descarte anterior al día 33 del último Core 33 terminado ya no cuenta.
+  - El "Ahora no" que había en AsyncStorage se sube una vez y se borra.
+  - La herramienta dev "Restablecer card de Core 33" pone la columna a `null`.
+  - `core33_intro_seen_at` y `core33_completed_at`: solo tipos y funciones de servicio (`markCore33IntroSeen`, `markCore33Completed`) para el módulo Core 33.
+- **Cambio de regla (D-54):** con una sola fecha la app ya no puede saber cuántas veces se descartó la card, así que **desaparece el tope de dos descartes**: la card vuelve cada 14 días hasta que el usuario actúe. Si se quiere conservarlo, hace falta un contador (`core33_invite_dismiss_count int`).
+
+---
 
 ## Gamificación
 
@@ -155,10 +152,9 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 
 ## Entrenos
 
-### BT-12 · Favoritos de rutinas y ejercicios
-- **Qué falta:** no existe una tabla de favoritos. La app los guarda en AsyncStorage (`useFavoriteWorkouts`, `useFavoriteExercises`), así que se pierden al cambiar de dispositivo o reinstalar.
-- **Propuesta:** `user_favorites (user_id, item_type 'workout' | 'exercise', item_id, created_at)`, PK `(user_id, item_type, item_id)`, RLS por `auth.uid()`. Al conectarla, la app migra una vez los favoritos locales.
-- **Prioridad:** Media. **No bloquea.**
+### BT-12 · Favoritos de rutinas y ejercicios · ✅ resuelto (2026-10-03)
+- **Aplicado por backend:** `user_favorites (user_id, item_type 'routine' | 'exercise', item_id, created_at)`, PK `(user_id, item_type, item_id)`. RLS: select / insert / delete solo los propios; sin update.
+- **En la app:** `user_favorites` es la fuente de verdad (UI optimista; si falla se revierte con un toast). Al iniciar sesión, los favoritos de AsyncStorage se suben una vez con upsert y se borran las claves locales (marca `@athelete/favorites-migrated-v1:<userId>`).
 
 ### BT-13 · Videos MoveKit
 - **Qué falta:** los loops del ejercicio (MP4, cámara fija, sin audio) y un póster (primer fotograma limpio). `exercises.video_url` existe, pero no hay assets MoveKit ni un campo de póster.
@@ -174,10 +170,9 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Propuesta:** columnas JSONB en `exercises` (`tempo`, `phases`, `technique_steps [{title, text}]`, `common_mistakes [{title, consequence}]`), manteniendo las listas actuales hasta migrar.
 - **Prioridad:** Media. **No bloquea.**
 
-### BT-15 · Tipo de rutina con valores cerrados
-- **Qué falta:** `workout_templates.type` es texto libre (aparecen `full_body`, `fullbody`…).
-- **Propuesta:** CHECK o enum `strength | cardio | fullbody | mobility | hiit` y normalizar los datos existentes. La app ya normaliza (`normalizeWorkoutType`).
-- **Prioridad:** Baja. **No bloquea.**
+### BT-15 · Tipo de rutina · ✅ resuelto (2026-10-03)
+- **Aplicado por backend:** `workout_templates.routine_category` (`fuerza | cuerpo_completo | tren_superior | tren_inferior | core | movilidad | acondicionamiento | hiit | cardio`, NULL permitido). La calcula el servidor; **la app nunca la escribe**.
+- **En la app:** las tarjetas por tipo y la lista agrupan por `routine_category`. Una rutina con NULL solo aparece en "Todas". Se eliminó el mapeo local del texto libre `type` (que sigue existiendo para el asistente de rutinas).
 
 ### BT-16 · Conteos y búsqueda en servidor
 - **Qué falta:** Entrenos carga toda la biblioteca y filtra en el dispositivo (conteos por tipo, zona y equipamiento). Sirve con el tamaño actual.
@@ -188,11 +183,10 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 
 ## Sesión
 
-### BT-17 · Peso planificado en las rutinas
-- **Qué falta:** `template_exercises` no tiene peso. `workout_session_exercises.planned_weight_kg` existe, pero no hay de dónde llenarlo.
-- **Hoy la app:** propone en cada serie el peso de la serie anterior del mismo ejercicio. Si no hay, usa el último peso que el usuario registró para ese ejercicio (`workout_session_sets`). Si tampoco hay, deja el campo vacío para que lo escriba.
-- **Propuesta:** `template_exercises.weight_kg` (opcional). La app lo copiará a `planned_weight_kg` y lo usará como propuesta.
-- **Prioridad:** Media. **No bloquea.**
+### BT-17 · Peso planificado en las rutinas · ✅ resuelto (2026-10-03)
+- **Aplicado por backend:** `template_exercises.planned_weight_kg numeric(6,2) NULL`, `>= 0`.
+- **En la app:** el kg inicial de cada serie sale, en este orden, de: 1) la serie anterior de la sesión, 2) el último peso usado en ese ejercicio, 3) `planned_weight_kg`, 4) vacío. Se copia a `workout_session_exercises.planned_weight_kg` y se conserva al editar una rutina.
+- **Pendiente de diseño:** no hay UI para editar el peso planificado (no está en el diseño).
 
 ### BT-18 · Volumen y récords de sesión · ✅ resuelto (2026-10-03)
 - **Confirmado por backend:**
@@ -203,15 +197,20 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 
 ---
 
-### BT-19 · Sesiones guardadas antiguas
-- **Qué falta:** una sesión `saved` se puede retomar cualquier día. Inicio muestra la más reciente; las más antiguas quedan guardadas sin fin.
-- **Propuesta:** decidir una caducidad (p. ej. 14 días → `canceled`) en la tarea programada existente.
-- **Prioridad:** Baja. **No bloquea.**
+### BT-19 · Sesiones guardadas antiguas · ✅ resuelto (2026-10-03)
+- **Aplicado por backend:** `workout_sessions.cancel_reason` (`'user'` | `'expired'`, NULL permitido) y un job que pasa las sesiones `saved` con más de 14 días a `canceled` con `cancel_reason = 'expired'`.
+- **En la app:** "Salir sin guardar" escribe `canceled` + `'user'`. Una sesión `in_progress` de otro día sin series se cancela con `'expired'`; si tiene series pasa a `saved`.
 
-### BT-20 · Descanso real entre series (opcional)
-- **Qué falta:** `workout_session_sets.rest_taken_sec` existe, pero la app aún no lo escribe; el descanso se puede alargar (+30 s) o saltar.
-- **Propuesta:** si sirve para ELLIE o Progreso, la app puede guardar el descanso real de la serie siguiente. Avisar si se quiere.
-- **Prioridad:** Baja. **No bloquea.**
+### BT-20 · Descanso real entre series · ✅ resuelto (2026-10-03)
+- **Aplicado por backend:** `workout_session_sets.rest_actual_sec integer NULL`, `>= 0`.
+- **En la app:** guarda el descanso real **antes** de cada serie (desde que empezó el descanso hasta que terminó o se saltó, sin pausas y con el +30 s). Se escribe en el mismo upsert del check; la primera serie de la sesión lleva NULL.
+
+### BT-21 · Estructurar `recommended_sets_reps`
+- **Qué falta:** `exercises.recommended_sets_reps` es un JSON por objetivo con valores de texto libre (`{"hypertrophy":"3x12-15"}`). 444 valores no siguen "N x M": `"2x15 each direction"`, `"2x30 sec each side"`, `"2x20m"`, `"3x max"`, `"3x12 each"`, `"3x40m"`, y filas con las claves `sets` y `reps` por separado.
+- **Hoy la app:** lo lee con un parser tolerante (`parseSetsReps`) que devuelve `{sets, min, max, unit: reps | sec | m | max, perSide}` y, si no puede leer un valor, el texto original. Se usa en el Detalle de ejercicio, en el Detalle de rutina y en la Sesión (para filas de rutina sin reps ni tiempo).
+- **Propuesta (sin aplicar):** una columna nueva, p. ej. `exercises.recommended_scheme jsonb`, con una lista `[{goal, sets, reps_min, reps_max, unit, per_side}]` (`goal`: strength | hypertrophy | endurance; `unit`: reps | sec | m | max), rellenada migrando los textos actuales y manteniendo la columna original hasta validar.
+- **Sobre las series:** `workout_session_sets` ya tiene `duration_sec` y `distance_m`: la app los usa para las series en segundos y en metros. No hace falta nada nuevo.
+- **Prioridad:** Media. **No bloquea.**
 
 ---
 
@@ -220,3 +219,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-03: BT-12 a BT-16 (módulo Entrenos).
 - 2026-10-03: BT-17 a BT-20 (módulo Sesión).
 - 2026-10-03: BT-18 resuelto.
+- 2026-10-03: lote de backend aplicado: BT-03, BT-12, BT-15, BT-17, BT-19 y BT-20 resueltos; BT-21 nuevo (estructurar `recommended_sets_reps`).
