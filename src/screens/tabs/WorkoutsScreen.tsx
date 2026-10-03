@@ -1,554 +1,194 @@
-import { useMemo, useState } from 'react';
-import { ArrowLeft, RefreshCw } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Plus } from 'lucide-react-native';
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { EmptyState, Loader } from '@app/components/ui';
+  IconButton,
+  Segmented,
+  StatusBarV2,
+  TextV2,
+  useThemeV2,
+} from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { ExerciseDiscoveryHub } from '@app/features/workouts/components/ExerciseDiscoveryHub';
-import { ExerciseLibraryPanel } from '@app/features/workouts/components/ExerciseLibraryPanel';
-import { RoutineDiscoveryPanel } from '@app/features/workouts/components/RoutineDiscoveryPanel';
-import { WorkoutListItem } from '@app/features/workouts/components/WorkoutListItem';
-import { WorkoutQuickFilterChips } from '@app/features/workouts/components/WorkoutQuickFilterChips';
-import { WorkoutSearchBar } from '@app/features/workouts/components/WorkoutSearchBar';
-import { WorkoutSegmentedControl } from '@app/features/workouts/components/WorkoutSegmentedControl';
-import { useAppTheme } from '@app/hooks/useAppTheme';
-import { useDebouncedValue } from '@app/hooks/useDebouncedValue';
-import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
-import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
-import { usePaginatedExerciseLibrary } from '@app/hooks/usePaginatedExerciseLibrary';
-import { usePaginatedWorkoutLibrary } from '@app/hooks/usePaginatedWorkoutLibrary';
-import { useWorkoutDiscovery } from '@app/hooks/useWorkoutDiscovery';
-import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
-import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import {
-  bodyPartLabels,
-  equipmentLabels,
-  type LibraryExercise,
-  type Workout,
-} from '@app/shared';
+  recommendRoutines,
+  type RoutineChip,
+} from '@app/features/workouts/workoutsModel';
+import { ExercisesView } from '@app/features/workouts/v2/ExercisesView';
+import { RoutinesView } from '@app/features/workouts/v2/RoutinesView';
+import { useAuth } from '@app/hooks/useAuth';
+import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
+import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
+import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
+import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Workouts'>;
-type BrowseMode = 'routines' | 'exercises';
-type RoutineSourceView = 'library' | 'ellie' | 'mine';
-type ExerciseViewMode = 'all' | 'favorites';
+type Segment = 'routines' | 'exercises';
 
-const filterOptions = [
-  'Todos',
-  'Fuerza',
-  'Cardio',
-  'Full body',
-  'HIIT',
-  'Movilidad',
-] as const;
-
-type RoutineFilter = (typeof filterOptions)[number];
-
-const workoutTypeMap: Record<RoutineFilter, string> = {
-  Todos: 'all',
-  Fuerza: 'strength',
-  Cardio: 'cardio',
-  'Full body': 'fullbody',
-  HIIT: 'hiit',
-  Movilidad: 'mobility',
-};
-
-function flattenUnique<T extends { id: string }>(
-  pages: { items: T[] }[] | undefined,
-) {
-  const seen = new Set<string>();
-
-  return (pages || []).flatMap(page =>
-    page.items.filter(item => {
-      if (seen.has(item.id)) {
-        return false;
-      }
-
-      seen.add(item.id);
-      return true;
-    }),
-  );
-}
-
-function ListSeparator() {
-  return <View style={separatorStyle.item} />;
-}
-
-const separatorStyle = StyleSheet.create({
-  item: {
-    height: 10,
-  },
-});
-
-export function WorkoutsScreen({ navigation }: Props) {
-  const { theme } = useAppTheme();
+// Entrenos v2 (Workouts.dc.html · WORKOUTS_01–03): root header with "+",
+// segmented Rutinas / Ejercicios. The whole library is loaded once (the same
+// query as Inicio and the routine detail) and filtered on the device, so
+// counts per type, zone and equipment are real.
+export function WorkoutsScreen({ navigation, route }: Props) {
+  const { colors, layout } = useThemeV2();
+  const insets = useSafeAreaInsets();
   const tabBarMotion = useTabBarMotion();
   const { bottomClearance } = useTabBarMetrics();
-  const workoutFavorites = useFavoriteWorkouts();
-  const exerciseFavorites = useFavoriteExercises();
-  const [browseMode, setBrowseMode] = useState<BrowseMode>('routines');
-  const [showRoutineResults, setShowRoutineResults] = useState(false);
-  const [routineSource, setRoutineSource] =
-    useState<RoutineSourceView>('library');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<RoutineFilter>('Todos');
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [exerciseViewMode, setExerciseViewMode] =
-    useState<ExerciseViewMode>('all');
-  const [showExerciseResults, setShowExerciseResults] = useState(false);
-  const [exerciseSearchQuery, setExerciseSearchQuery] = useState('');
-  const [equipmentFilter, setEquipmentFilter] = useState('all');
-  const [bodyPartFilter, setBodyPartFilter] = useState('all');
-  const [levelFilter, setLevelFilter] = useState('all');
-  const debouncedWorkoutSearch = useDebouncedValue(searchQuery);
-  const debouncedExerciseSearch = useDebouncedValue(exerciseSearchQuery);
-
-  const discoveryQuery = useWorkoutDiscovery(
-    browseMode === 'routines' && !showRoutineResults && workoutFavorites.loaded,
+  const { profile } = useAuth();
+  const workoutsQuery = useWorkoutLibrary();
+  const exercisesQuery = useExerciseLibrary();
+  const favorites = useFavoriteWorkouts();
+  const [segment, setSegment] = useState<Segment>(
+    route.params?.segment ?? 'routines',
   );
-  const workoutsQuery = usePaginatedWorkoutLibrary({
-    source: routineSource,
-    search: debouncedWorkoutSearch,
-    type: workoutTypeMap[activeFilter],
-    favoriteIds: favoritesOnly
-      ? [...workoutFavorites.favoriteWorkoutIds].sort()
-      : null,
-    enabled:
-      browseMode === 'routines' &&
-      showRoutineResults &&
-      workoutFavorites.loaded,
-  });
-  const exercisesQuery = usePaginatedExerciseLibrary({
-    search: debouncedExerciseSearch,
-    equipment: equipmentFilter,
-    bodyPart: bodyPartFilter,
-    level: levelFilter,
-    favoriteIds:
-      exerciseViewMode === 'favorites'
-        ? [...exerciseFavorites.favoriteExerciseIds].sort()
-        : null,
-    enabled:
-      browseMode === 'exercises' &&
-      showExerciseResults &&
-      exerciseFavorites.loaded,
-  });
+  const [chip, setChip] = useState<RoutineChip>(
+    route.params?.favoritesOnly ? 'favorites' : 'all',
+  );
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Tab params (dev screen cycler, deep links).
+  useEffect(() => {
+    if (route.params?.segment) {
+      setSegment(route.params.segment);
+    }
+    if (route.params?.favoritesOnly !== undefined) {
+      setChip(route.params.favoritesOnly ? 'favorites' : 'all');
+    }
+  }, [route.params]);
+
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      workoutsQuery.refetch().catch(() => {});
+      // refetch is stable.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   const workouts = useMemo(
-    () => flattenUnique<Workout>(workoutsQuery.data?.pages),
-    [workoutsQuery.data?.pages],
+    () => workoutsQuery.data ?? [],
+    [workoutsQuery.data],
   );
-  const exercises = useMemo(
-    () => flattenUnique<LibraryExercise>(exercisesQuery.data?.pages),
-    [exercisesQuery.data?.pages],
-  );
-
-  const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    modeControl: {
-      paddingHorizontal: theme.spacing.md,
-      paddingTop: theme.spacing.xs,
-      paddingBottom: theme.spacing.md,
-    },
-    content: {
-      paddingHorizontal: theme.spacing.md,
-      paddingBottom: bottomClearance + theme.spacing.md,
-    },
-    resultsHeader: {
-      gap: 12,
-      marginBottom: theme.spacing.md,
-    },
-    backButton: {
-      alignSelf: 'flex-start',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 7,
-      paddingVertical: 4,
-    },
-    backLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      fontWeight: theme.typography.weights.semibold,
-    },
-    resultTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 24,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.7,
-    },
-    resultSubtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
-      lineHeight: 17,
-      marginTop: 3,
-    },
-    footer: {
-      minHeight: 52,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  });
-
-  const openWorkoutDetail = (workoutId: string) => {
-    navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId });
-  };
-
-  const openExerciseDetail = (exerciseId: LibraryExercise['id']) => {
-    navigation.navigate(APP_ROUTES.ExerciseDetail, { exerciseId });
-  };
-
-  const openCreateRoutine = () => {
-    navigation.navigate(APP_ROUTES.CreateRoutine);
-  };
-
-  const toggleWorkoutFavorite = (workoutId: string) => {
-    workoutFavorites.toggleWorkoutFavorite(workoutId).catch(() => {});
-  };
-
-  const openRoutineResults = (source: RoutineSourceView, filter: string) => {
-    setRoutineSource(source);
-    setActiveFilter(filter as RoutineFilter);
-    setFavoritesOnly(false);
-    setSearchQuery('');
-    setShowRoutineResults(true);
-  };
-
-  const returnToDiscovery = () => {
-    setRoutineSource('library');
-    setActiveFilter('Todos');
-    setFavoritesOnly(false);
-    setSearchQuery('');
-    setShowRoutineResults(false);
-  };
-
-  const openExerciseResults = ({
-    bodyPart = bodyPartFilter,
-    equipment = equipmentFilter,
-  }: {
-    bodyPart?: string;
-    equipment?: string;
-  } = {}) => {
-    setBodyPartFilter(bodyPart);
-    setEquipmentFilter(equipment);
-    setShowExerciseResults(true);
-  };
-
-  const returnToExerciseDiscovery = () => {
-    setExerciseSearchQuery('');
-    setExerciseViewMode('all');
-    setEquipmentFilter('all');
-    setBodyPartFilter('all');
-    setLevelFilter('all');
-    setShowExerciseResults(false);
-  };
-
-  const modeControl = (
-    <WorkoutSegmentedControl
-      value={browseMode}
-      highlighted
-      options={[
-        { key: 'routines', label: 'Rutinas' },
-        { key: 'exercises', label: 'Ejercicios' },
-      ]}
-      onChange={setBrowseMode}
-    />
-  );
-
-  if (!workoutFavorites.loaded || !exerciseFavorites.loaded) {
-    return (
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <Loader label="Cargando entrenos..." />
-      </SafeAreaView>
-    );
-  }
-
-  if (browseMode === 'exercises') {
-    if (!showExerciseResults) {
-      return (
-        <SafeAreaView edges={['top']} style={styles.safeArea}>
-          <ExerciseDiscoveryHub
-            modeControl={modeControl}
-            bottomInset={bottomClearance}
-            viewMode={exerciseViewMode}
-            equipmentFilter={equipmentFilter}
-            bodyPartFilter={bodyPartFilter}
-            levelFilter={levelFilter}
-            onOpenResults={() => openExerciseResults()}
-            onSelectBodyPart={bodyPart => {
-              setExerciseSearchQuery('');
-              setExerciseViewMode('all');
-              setLevelFilter('all');
-              openExerciseResults({ bodyPart, equipment: 'all' });
-            }}
-            onSelectEquipment={equipment => {
-              setExerciseSearchQuery('');
-              setExerciseViewMode('all');
-              setLevelFilter('all');
-              openExerciseResults({ bodyPart: 'all', equipment });
-            }}
-            onApplyFilters={filters => {
-              setExerciseViewMode(filters.viewMode);
-              setEquipmentFilter(filters.equipment);
-              setBodyPartFilter(filters.bodyPart);
-              setLevelFilter(filters.level);
-              setShowExerciseResults(true);
-            }}
-            onScroll={tabBarMotion.onScroll}
-          />
-        </SafeAreaView>
-      );
-    }
-
-    const resultTitle =
-      exerciseViewMode === 'favorites'
-        ? 'Ejercicios favoritos'
-        : bodyPartFilter !== 'all'
-        ? bodyPartLabels[bodyPartFilter] || 'Ejercicios por zona'
-        : equipmentFilter !== 'all'
-        ? equipmentLabels[equipmentFilter] || 'Ejercicios por equipamiento'
-        : exerciseSearchQuery.trim()
-        ? 'Resultados de búsqueda'
-        : 'Todos los ejercicios';
-
-    return (
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <View style={styles.modeControl}>{modeControl}</View>
-        {exercisesQuery.error ? (
-          <View style={styles.content}>
-            <EmptyState
-              title="No pudimos cargar ejercicios"
-              description="Verifica la conexión con Supabase y vuelve a intentarlo."
-              icon={
-                <RefreshCw
-                  color={theme.colors.textSecondary}
-                  size={20}
-                  strokeWidth={2}
-                />
-              }
-              actionLabel="Reintentar"
-              onAction={() => {
-                exercisesQuery.refetch().catch(() => {});
-              }}
-            />
-          </View>
-        ) : (
-          <ExerciseLibraryPanel
-            exercises={exercises}
-            totalExercisesCount={exercisesQuery.data?.pages[0]?.total || 0}
-            favoriteExerciseIds={exerciseFavorites.favoriteExerciseIds}
-            loading={exercisesQuery.isPending}
-            loadingMore={exercisesQuery.isFetchingNextPage}
-            hasNextPage={exercisesQuery.hasNextPage}
-            bottomInset={bottomClearance}
-            viewMode={exerciseViewMode}
-            searchQuery={exerciseSearchQuery}
-            equipmentFilter={equipmentFilter}
-            bodyPartFilter={bodyPartFilter}
-            levelFilter={levelFilter}
-            resultTitle={resultTitle}
-            resultSubtitle="Refina la selección sin perder el contexto de tu búsqueda."
-            onBack={returnToExerciseDiscovery}
-            onViewModeChange={setExerciseViewMode}
-            onSearchChange={setExerciseSearchQuery}
-            onEquipmentChange={setEquipmentFilter}
-            onBodyPartChange={setBodyPartFilter}
-            onLevelChange={setLevelFilter}
-            onToggleFavorite={exerciseId => {
-              exerciseFavorites
-                .toggleExerciseFavorite(exerciseId)
-                .catch(() => {});
-            }}
-            onSelectExercise={openExerciseDetail}
-            onLoadMore={() => {
-              exercisesQuery.fetchNextPage().catch(() => {});
-            }}
-            onScroll={tabBarMotion.onScroll}
-          />
-        )}
-      </SafeAreaView>
-    );
-  }
-
-  if (!showRoutineResults) {
-    return (
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <RoutineDiscoveryPanel
-          modeControl={modeControl}
-          data={discoveryQuery.data}
-          loading={discoveryQuery.isPending}
-          error={Boolean(discoveryQuery.error)}
-          bottomInset={bottomClearance}
-          searchQuery={searchQuery}
-          filterOptions={filterOptions}
-          favoriteWorkoutIds={workoutFavorites.favoriteWorkoutIds}
-          onSearchChange={value => {
-            setSearchQuery(value);
-
-            if (value.trim()) {
-              setShowRoutineResults(true);
-            }
-          }}
-          onSelectFilter={filter => {
-            openRoutineResults('library', filter);
-          }}
-          onShowFavorites={() => {
-            setRoutineSource('library');
-            setActiveFilter('Todos');
-            setFavoritesOnly(true);
-            setShowRoutineResults(true);
-          }}
-          onToggleFavorite={toggleWorkoutFavorite}
-          onSelectWorkout={openWorkoutDetail}
-          onViewAll={openRoutineResults}
-          onCreateRoutine={openCreateRoutine}
-          onRetry={() => {
-            discoveryQuery.refetch().catch(() => {});
-          }}
-          onScroll={tabBarMotion.onScroll}
-        />
-      </SafeAreaView>
-    );
-  }
-
-  const resultTitle =
-    routineSource === 'ellie'
-      ? 'Rutinas de ELLIE'
-      : routineSource === 'mine'
-      ? 'Tus rutinas'
-      : favoritesOnly
-      ? 'Rutinas favoritas'
-      : activeFilter === 'Todos'
-      ? 'Todas las rutinas'
-      : activeFilter;
-
-  const resultsHeader = (
-    <View style={styles.resultsHeader}>
-      {modeControl}
-      <Pressable onPress={returnToDiscovery} style={styles.backButton}>
-        <ArrowLeft color={theme.colors.textSecondary} size={16} />
-        <Text style={styles.backLabel}>Volver a explorar</Text>
-      </Pressable>
-      <View>
-        <Text style={styles.resultTitle}>{resultTitle}</Text>
-        <Text style={styles.resultSubtitle}>
-          Resultados completos con búsqueda y carga progresiva.
-        </Text>
-      </View>
-      <WorkoutSegmentedControl
-        value={routineSource}
-        options={[
-          { key: 'library', label: 'Biblioteca' },
-          { key: 'ellie', label: 'ELLIE' },
-          { key: 'mine', label: 'Mis rutinas' },
-        ]}
-        onChange={setRoutineSource}
-      />
-      <WorkoutSearchBar
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-        placeholder="Buscar entreno"
-      />
-      <WorkoutQuickFilterChips
-        favoritesOnly={favoritesOnly}
-        onToggleFavorites={() => setFavoritesOnly(current => !current)}
-        options={filterOptions}
-        activeFilter={activeFilter}
-        onSelectFilter={filter => setActiveFilter(filter as RoutineFilter)}
-      />
-      {workoutsQuery.isPending ? <Loader label="Cargando rutinas..." /> : null}
-    </View>
+  const nextSession = useMemo(
+    () => recommendRoutines(workouts, profile?.goal, 1)[0] ?? null,
+    [profile?.goal, workouts],
   );
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
-      {workoutsQuery.error ? (
-        <View style={styles.content}>
-          {resultsHeader}
-          <EmptyState
-            title="No pudimos cargar rutinas"
-            description="Verifica la conexión con Supabase y vuelve a intentarlo."
-            icon={
-              <RefreshCw
-                color={theme.colors.textSecondary}
-                size={20}
-                strokeWidth={2}
-              />
-            }
-            actionLabel="Reintentar"
-            onAction={() => {
-              workoutsQuery.refetch().catch(() => {});
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <StatusBarV2 />
+      <ScrollView
+        ref={scrollRef}
+        onScroll={tabBarMotion.onScroll}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + 8,
+            paddingHorizontal: layout.gutter,
+            paddingBottom: bottomClearance,
+          },
+        ]}
+      >
+        <View style={styles.header}>
+          <View style={styles.titleRow}>
+            <TextV2 variant="title28" accessibilityRole="header">
+              Entrenos
+            </TextV2>
+            <IconButton
+              icon={Plus}
+              variant="solid"
+              accessibilityLabel="Crear rutina"
+              onPress={() => navigation.navigate(APP_ROUTES.CreateRoutine)}
+            />
+          </View>
+          <Segmented
+            options={[
+              { key: 'routines', label: 'Rutinas' },
+              { key: 'exercises', label: 'Ejercicios' },
+            ]}
+            value={segment}
+            onChange={key => {
+              setSegment(key);
+              scrollRef.current?.scrollTo({ y: 0, animated: false });
             }}
           />
         </View>
-      ) : (
-        <FlatList
-          data={workoutsQuery.isPending ? [] : workouts}
-          contentContainerStyle={styles.content}
-          keyExtractor={workout => workout.id}
-          ListHeaderComponent={resultsHeader}
-          renderItem={({ item }) => (
-            <WorkoutListItem
-              workout={item}
-              isFavorite={workoutFavorites.isWorkoutFavorite(item.id)}
-              onToggleFavorite={() => toggleWorkoutFavorite(item.id)}
-              onPress={() => openWorkoutDetail(item.id)}
-            />
-          )}
-          ItemSeparatorComponent={ListSeparator}
-          ListEmptyComponent={
-            !workoutsQuery.isPending ? (
-              <EmptyState
-                title={
-                  routineSource === 'mine'
-                    ? 'Aún no tienes rutinas propias'
-                    : routineSource === 'ellie'
-                    ? 'Sin rutinas de ELLIE'
-                    : 'No encontramos rutinas'
-                }
-                description={
-                  favoritesOnly
-                    ? 'Guarda rutinas con el corazón para verlas aquí.'
-                    : routineSource === 'mine'
-                    ? 'Crea una rutina y aparecerá en tu colección.'
-                    : 'Prueba con otra búsqueda o cambia el filtro actual.'
-                }
-              />
-            ) : null
-          }
-          ListFooterComponent={
-            <View style={styles.footer}>
-              {workoutsQuery.isFetchingNextPage ? (
-                <ActivityIndicator color={theme.colors.textSecondary} />
-              ) : null}
-            </View>
-          }
-          onEndReached={() => {
-            if (
-              workoutsQuery.hasNextPage &&
-              !workoutsQuery.isFetchingNextPage
-            ) {
-              workoutsQuery.fetchNextPage().catch(() => {});
+
+        {segment === 'routines' ? (
+          <RoutinesView
+            workouts={workouts}
+            nextSession={nextSession}
+            loading={workoutsQuery.isLoading || !favorites.loaded}
+            error={Boolean(workoutsQuery.error)}
+            onRetry={() => {
+              workoutsQuery.refetch().catch(() => {});
+            }}
+            userId={profile?.id}
+            chip={chip}
+            onChipChange={setChip}
+            favoriteIds={favorites.favoriteWorkoutIds}
+            onToggleFavorite={id => {
+              favorites.toggleWorkoutFavorite(id).catch(() => {});
+            }}
+            onOpenWorkout={workoutId =>
+              navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId })
             }
-          }}
-          onEndReachedThreshold={0.45}
-          keyboardShouldPersistTaps="handled"
-          onScroll={tabBarMotion.onScroll}
-          scrollEventThrottle={16}
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </SafeAreaView>
+          />
+        ) : (
+          <ExercisesView
+            exercises={exercisesQuery.data ?? []}
+            loading={exercisesQuery.isLoading}
+            error={Boolean(exercisesQuery.error)}
+            onRetry={() => {
+              exercisesQuery.refetch().catch(() => {});
+            }}
+            onSearch={() =>
+              navigation.navigate(APP_ROUTES.ExerciseList, {
+                focusSearch: true,
+              })
+            }
+            onOpenFilters={() =>
+              navigation.navigate(APP_ROUTES.ExerciseList, {
+                openFilters: true,
+              })
+            }
+            onOpenZone={zone =>
+              navigation.navigate(APP_ROUTES.ExerciseList, { zone })
+            }
+            onOpenEquipment={equipment =>
+              navigation.navigate(APP_ROUTES.ExerciseList, { equipment })
+            }
+            onOpenAll={() => navigation.navigate(APP_ROUTES.ExerciseList)}
+          />
+        )}
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
+  content: {
+    gap: 20,
+  },
+  header: {
+    gap: 14,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+});

@@ -45,12 +45,31 @@ export type WorkoutSessionRouteParams = {
 
 export type ExerciseDetailRouteParams = {
   exerciseId: LibraryExercise['id'];
+  // Opens the MoveKit area in full screen (EXERCISE_02).
+  fullscreen?: boolean;
+};
+
+// Entrenos · lista filtrada (WORKOUTS_04): a zone, an equipment or all.
+export type ExerciseListRouteParams = {
+  zone?: string;
+  equipment?: string;
+  openFilters?: boolean;
+  focusSearch?: boolean;
+};
+
+// Entrenos tab (WORKOUTS_01 / 02 / 03). Also set by the dev screen cycler.
+export type WorkoutsTabParams = {
+  segment?: 'routines' | 'exercises';
+  favoritesOnly?: boolean;
 };
 
 export type RoutineBuilderRouteParams = {
   workoutId?: Workout['id'];
   initialExerciseId?: LibraryExercise['id'];
   initialExerciseName?: string;
+  // Development only (__DEV__): open on a step with sample answers so each
+  // step can be reviewed. Nothing is saved unless "Guardar" is pressed.
+  devStep?: 0 | 1 | 2;
 };
 
 export type EditRoutineRouteParams = {
@@ -79,7 +98,7 @@ export type NutritionPlanRouteParams = {
 
 export type MainTabParamList = {
   Home: undefined;
-  Workouts: undefined;
+  Workouts: WorkoutsTabParams | undefined;
   Ellie: undefined;
   Progress: undefined;
   Community: undefined;
@@ -96,6 +115,7 @@ export type AppStackParamList = {
   WorkoutDetail: WorkoutDetailRouteParams;
   WorkoutSession: WorkoutSessionRouteParams;
   ExerciseDetail: ExerciseDetailRouteParams;
+  ExerciseList: ExerciseListRouteParams | undefined;
   CreateRoutine: RoutineBuilderRouteParams | undefined;
   EditRoutine: EditRoutineRouteParams;
   AddExerciseToRoutine: AddExerciseToRoutineRouteParams;

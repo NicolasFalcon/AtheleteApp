@@ -1,441 +1,478 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ArrowLeft, ChevronDown, ChevronRight, Heart, Plus } from 'lucide-react-native';
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from 'react-native';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
-import {
-  CheckCircle2,
-  ClipboardList,
-  Dumbbell,
-  Plus,
-  XCircle,
-} from 'lucide-react-native';
-import { Button, Chip, EmptyState, Loader } from '@app/components/ui';
+  Button,
+  Eyebrow,
+  GlassSurface,
+  IconButton,
+  PressableScale,
+  Skeleton,
+  SkeletonGroup,
+  StatusBarV2,
+  TextV2,
+  useThemeV2,
+} from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
-import { ExerciseMediaHero } from '@app/features/workouts/components/ExerciseMediaHero';
-import { useAppTheme } from '@app/hooks/useAppTheme';
+import { BlockError } from '@app/features/home/v2/BlockError';
+import { MoveKitPlayer } from '@app/features/workouts/movekit/MoveKitPlayer';
+import {
+  EQUIPMENT,
+  LEVEL_LABELS,
+  capitalize,
+  zoneLabel,
+} from '@app/features/workouts/workoutsModel';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
-import {safeGoBack} from '@app/navigation/safeGoBack';
-import { bodyPartLabels, equipmentLabels, levelLabels } from '@app/shared';
+import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import { formatPRValue, getBestPR } from '@app/shared';
+import type { PRType } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'ExerciseDetail'>;
 
-type ExerciseDetailHeaderProps = {
-  name: string;
-  equipmentLabel: string;
-  bodyPartLabel: string;
-  levelLabel: string;
-  summary: string;
-};
+const PR_ORDER: PRType[] = [
+  'max_weight',
+  'weight_reps',
+  'max_reps',
+  'duration',
+  'distance',
+];
+const ESSENTIAL_STEPS = 3;
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function ExerciseDetailHeader({
-  name,
-  equipmentLabel,
-  bodyPartLabel,
-  levelLabel,
-  summary,
-}: ExerciseDetailHeaderProps) {
-  const { theme } = useAppTheme();
-
-  const styles = StyleSheet.create({
-    header: {
-      gap: 10,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 26,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 0,
-      lineHeight: 31,
-    },
-    chips: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: theme.spacing.xs,
-    },
-    summary: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 21,
-      maxWidth: 320,
-    },
-  });
-
-  return (
-    <View style={styles.header}>
-      <Text style={styles.title}>{name}</Text>
-      <View style={styles.chips}>
-        <Chip>{equipmentLabel}</Chip>
-        <Chip>{bodyPartLabel}</Chip>
-        <Chip>{levelLabel}</Chip>
-      </View>
-      <Text style={styles.summary}>{summary}</Text>
-    </View>
-  );
-}
-
+// Exercise Detail · MoveKit v2 (EXERCISE_01 / 02, handoff §9). Light: the
+// video area bleeds over the studio background; Dark: a light box. Below,
+// name, prescription and best mark, muscles, essential technique (with the
+// full one and common mistakes collapsed) and the fixed "Agregar a rutina".
 export function ExerciseDetailScreen({ navigation, route }: Props) {
-  const handleSafeBack = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
-  const { theme } = useAppTheme();
+  const { colors, layout, mode } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
   const exercisesQuery = useExerciseLibrary();
-  const exerciseFavorites = useFavoriteExercises();
+  const favorites = useFavoriteExercises();
+  const exerciseId = route.params.exerciseId;
+  const recordsQuery = usePersonalRecords(exerciseId);
+  const [fullscreen, setFullscreen] = useState(Boolean(route.params.fullscreen));
+  const [techOpen, setTechOpen] = useState(false);
+  const [errOpen, setErrOpen] = useState(false);
+
+  useEffect(() => {
+    if (route.params.fullscreen !== undefined) {
+      setFullscreen(route.params.fullscreen);
+    }
+  }, [route.params.fullscreen]);
+
   const exercise = useMemo(
-    () =>
-      (exercisesQuery.data || []).find(
-        item => item.id === route.params.exerciseId,
-      ) || null,
-    [exercisesQuery.data, route.params.exerciseId],
+    () => (exercisesQuery.data ?? []).find(item => item.id === exerciseId) ?? null,
+    [exerciseId, exercisesQuery.data],
   );
-  const heroHeight = clamp(Math.round(screenHeight * 0.34), 270, 320);
-  const bottomInset = Math.max(insets.bottom, theme.spacing.lg);
-  const bottomBarHeight = 58 + theme.spacing.md + bottomInset;
-  const sheetOverlap = theme.spacing.xl;
 
-  const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    scrollContent: {
-      paddingBottom: bottomBarHeight + theme.spacing.md,
-    },
-    scroll: {
-      flex: 1,
-      marginTop: -sheetOverlap,
-    },
-    sheet: {
-      marginTop: 0,
-      borderTopLeftRadius: theme.radii.xl,
-      borderTopRightRadius: theme.radii.xl,
-      backgroundColor: theme.colors.surface,
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
-      paddingBottom: theme.spacing.xxl,
-      gap: theme.spacing.lg,
-      shadowColor: '#000000',
-      ...theme.elevations.prominent,
-    },
-    technicalBody: {
-      gap: theme.spacing.lg,
-    },
-    technicalCard: {
-      borderRadius: theme.radii.lg,
-      backgroundColor: theme.colors.surface,
-      padding: theme.spacing.md,
-      flexDirection: 'row',
-      gap: theme.spacing.md,
-      shadowColor: '#000000',
-      ...theme.elevations.subtle,
-    },
-    cardTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: 0,
-      lineHeight: 22,
-    },
-    iconShell: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surfaceMuted,
-      flexShrink: 0,
-    },
-    cardContent: {
-      flex: 1,
-      gap: theme.spacing.xs,
-    },
-    bodyText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      lineHeight: 18,
-    },
-    compactStack: {
-      gap: theme.spacing.xs,
-    },
-    stepRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: theme.spacing.sm,
-    },
-    stepIndex: {
-      width: 23,
-      height: 23,
-      borderRadius: 11.5,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surfaceMuted,
-      flexShrink: 0,
-    },
-    stepIndexText: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.bold,
-    },
-    stepText: {
-      flex: 1,
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      lineHeight: 19,
-    },
-    bulletRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: theme.spacing.sm,
-    },
-    bulletDot: {
-      width: 5,
-      height: 5,
-      borderRadius: 2.5,
-      marginTop: 7,
-      backgroundColor: theme.colors.textPrimary,
-      opacity: 0.45,
-      flexShrink: 0,
-    },
-    chipsRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: theme.spacing.xs,
-    },
-    muscleChip: {
-      backgroundColor: theme.colors.surfaceMuted,
-      borderColor: 'transparent',
-    },
-    bottomBar: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.sm,
-      paddingBottom: bottomInset,
-      backgroundColor: 'rgba(255,255,255,0.96)',
-    },
-    ctaButton: {
-      minHeight: 58,
-      borderRadius: theme.radii.md,
-    },
-  });
+  const bestMark = useMemo(() => {
+    const records = recordsQuery.records ?? [];
+    for (const type of PR_ORDER) {
+      const best = getBestPR(records, type);
+      if (best) {
+        // "60 kg" — the reps of a weight × reps mark are left for Récords.
+        return type === 'weight_reps'
+          ? `${best.valueWeight ?? 0} kg`
+          : formatPRValue(best);
+      }
+    }
+    return null;
+  }, [recordsQuery.records]);
 
-  if (exercisesQuery.isLoading || !exerciseFavorites.loaded) {
+  const back = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
+  const lightbox = mode === 'dark';
+  const backButton = (
+    <IconButton icon={ArrowLeft} variant="studio" accessibilityLabel="Volver" onPress={back} />
+  );
+
+  if (exercisesQuery.error) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <Loader label="Cargando ejercicio..." />
-      </SafeAreaView>
+      <Shell top={insets.top} bg={colors.bg} backButton={backButton}>
+        <BlockError
+          message="No pudimos cargar el ejercicio."
+          onRetry={() => {
+            exercisesQuery.refetch().catch(() => {});
+          }}
+        />
+      </Shell>
+    );
+  }
+
+  if (exercisesQuery.isLoading || !favorites.loaded) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+        <StatusBarV2 style="dark" />
+        <SkeletonGroup>
+          <Skeleton
+            height={lightbox ? 486 : 500}
+            radius={lightbox ? 34 : 0}
+            style={lightbox ? [styles.skeletonBox, { marginTop: insets.top }] : undefined}
+          />
+          <View style={[styles.body, styles.skeletonBody]}>
+            <Skeleton width="80%" height={26} />
+            <Skeleton width="50%" height={14} />
+            <Skeleton width="60%" height={14} />
+          </View>
+        </SkeletonGroup>
+      </View>
     );
   }
 
   if (!exercise) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.sheet}>
-          <EmptyState
-            title="Ejercicio no encontrado"
-            description="No pudimos encontrar este ejercicio dentro de la biblioteca actual."
-          />
-          <Button label="Volver" onPress={handleSafeBack} />
-        </View>
-      </SafeAreaView>
+      <Shell top={insets.top} bg={colors.bg} backButton={backButton}>
+        <TextV2 variant="section">Ejercicio no encontrado</TextV2>
+        <TextV2 variant="body" color={colors.text.secondary}>
+          No está en la biblioteca actual.
+        </TextV2>
+      </Shell>
     );
   }
 
+  const isFavorite = favorites.isExerciseFavorite(exercise.id);
   const equipmentLabel =
-    equipmentLabels[exercise.equipment] || exercise.equipment;
-  const bodyPartLabel = bodyPartLabels[exercise.bodyPart] || exercise.bodyPart;
-  const levelLabel = levelLabels[exercise.level] || exercise.level;
-  const summaryLine = `${bodyPartLabel} con ${equipmentLabel.toLowerCase()} · ${levelLabel}`;
-  const workedMuscles = Array.from(
-    new Set([
-      ...exercise.musclesWorked.primary,
-      ...exercise.musclesWorked.secondary,
-    ]),
-  );
+    EQUIPMENT.find(item => item.key === exercise.equipment)?.label ??
+    capitalize(exercise.equipment);
+  const meta = [
+    LEVEL_LABELS[exercise.level] ?? capitalize(exercise.level),
+    equipmentLabel,
+    zoneLabel(exercise.bodyPart),
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  const scheme = exercise.recommendations.hypertrophy;
+  // The library stores "-" when there is no recommendation.
+  const prescription =
+    hasValue(scheme.sets) && hasValue(scheme.reps)
+      ? `${scheme.sets.trim()} × ${scheme.reps.trim()}`
+      : null;
+  const [mainMuscle, ...otherPrimary] = exercise.musclesWorked.primary.map(capitalize);
+  const secondaryMuscles = [
+    ...otherPrimary,
+    ...exercise.musclesWorked.secondary.map(capitalize),
+  ];
+  // Essential technique: the coaching cues (short); the full technique is the
+  // step by step. Without cues, the first steps act as the essentials.
+  const essential = (
+    exercise.coachingCues.length > 0 ? exercise.coachingCues : exercise.howToPerform
+  ).slice(0, ESSENTIAL_STEPS);
+  const fullTechnique =
+    exercise.coachingCues.length > 0
+      ? exercise.howToPerform
+      : exercise.howToPerform.slice(ESSENTIAL_STEPS);
+  const footerHeight = 56 + 12 + Math.max(insets.bottom, 16) + 4;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ExerciseMediaHero
-        videoUrl={exercise.videoUrl}
-        thumbnailUrl={exercise.thumbnailUrl}
-        imageUrl={exercise.thumbnailUrl}
-        title={exercise.name}
-        height={heroHeight}
-        isFavorite={exerciseFavorites.isExerciseFavorite(exercise.id)}
-        topInset={insets.top}
-        onBack={handleSafeBack}
-        onToggleFavorite={() => {
-          exerciseFavorites.toggleExerciseFavorite(exercise.id).catch(() => {});
-        }}
-      />
-
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <StatusBarV2 style={lightbox ? 'light' : 'dark'} />
       <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: footerHeight + 40 }}
       >
-        <View style={styles.sheet}>
-          <ExerciseDetailHeader
-            name={exercise.name}
-            equipmentLabel={equipmentLabel}
-            bodyPartLabel={bodyPartLabel}
-            levelLabel={levelLabel}
-            summary={summaryLine}
-          />
+        <MoveKitPlayer
+          title={exercise.name}
+          variant={lightbox ? 'lightbox' : 'bleed'}
+          fullscreen={fullscreen}
+          onFullscreenChange={setFullscreen}
+          topInset={insets.top}
+          topLeft={backButton}
+          topRight={
+            <IconButton
+              icon={Heart}
+              variant="studio"
+              filled={isFavorite}
+              accessibilityLabel={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+              onPress={() => {
+                favorites.toggleExerciseFavorite(exercise.id).catch(() => {});
+              }}
+            />
+          }
+        />
 
-          <View style={styles.technicalBody}>
-            <View style={styles.technicalCard}>
-              <View style={styles.iconShell}>
-                <ClipboardList
-                  color={theme.colors.textPrimary}
-                  size={22}
-                  strokeWidth={2}
-                />
+        <View style={[styles.body, { paddingHorizontal: layout.gutter + 4 }]}>
+          <View style={styles.head}>
+            <TextV2 variant="title26" style={styles.title}>
+              {exercise.name}
+            </TextV2>
+            <TextV2 variant="body" color={colors.text.secondary}>
+              {meta}
+            </TextV2>
+            {prescription || bestMark ? (
+              <View style={styles.figures}>
+                {prescription ? (
+                  <TextV2 variant="bodyStrong">{prescription}</TextV2>
+                ) : null}
+                {prescription && bestMark ? <Dot color={colors.text.disabled} /> : null}
+                {bestMark ? (
+                  <PressableScale
+                    accessibilityRole="button"
+                    accessibilityLabel={`Tu mejor marca: ${bestMark}. Ver récords`}
+                    onPress={() =>
+                      navigation.navigate(APP_ROUTES.PersonalRecords, {
+                        exerciseId: exercise.id,
+                        exerciseName: exercise.name,
+                      })
+                    }
+                    style={styles.best}
+                  >
+                    <TextV2 variant="bodyStrong">{bestMark}</TextV2>
+                    <TextV2 variant="meta" color={colors.text.secondary}>
+                      tu mejor
+                    </TextV2>
+                  </PressableScale>
+                ) : null}
               </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Cómo realizarlo</Text>
-                <View style={styles.compactStack}>
-                  {exercise.howToPerform.length > 0 ? (
-                    exercise.howToPerform.map((step, index) => (
-                      <View key={`${step}-${index}`} style={styles.stepRow}>
-                        <View style={styles.stepIndex}>
-                          <Text style={styles.stepIndexText}>{index + 1}</Text>
-                        </View>
-                        <Text style={styles.stepText}>{step}</Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.bodyText}>
-                      La técnica detallada llegará en una siguiente iteración.
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.technicalCard}>
-              <View style={styles.iconShell}>
-                <CheckCircle2
-                  color={theme.colors.textPrimary}
-                  size={22}
-                  strokeWidth={2}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Puntos clave</Text>
-                <View style={styles.compactStack}>
-                  {exercise.coachingCues.length > 0 ? (
-                    exercise.coachingCues.map(cue => (
-                      <View key={cue} style={styles.bulletRow}>
-                        <View style={styles.bulletDot} />
-                        <Text style={styles.stepText}>{cue}</Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.bodyText}>
-                      Sin puntos clave registrados.
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.technicalCard}>
-              <View style={styles.iconShell}>
-                <XCircle
-                  color={theme.colors.textPrimary}
-                  size={22}
-                  strokeWidth={2}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Errores comunes</Text>
-                <View style={styles.compactStack}>
-                  {exercise.commonMistakes.length > 0 ? (
-                    exercise.commonMistakes.map(mistake => (
-                      <View key={mistake} style={styles.bulletRow}>
-                        <View style={styles.bulletDot} />
-                        <Text style={styles.stepText}>{mistake}</Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.bodyText}>
-                      Sin errores comunes registrados.
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.technicalCard}>
-              <View style={styles.iconShell}>
-                <Dumbbell
-                  color={theme.colors.textPrimary}
-                  size={22}
-                  strokeWidth={2}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Músculos trabajados</Text>
-                {workedMuscles.length > 0 ? (
-                  <View style={styles.chipsRow}>
-                    {workedMuscles.map(muscle => (
-                      <Chip key={muscle} style={styles.muscleChip}>
-                        {muscle}
-                      </Chip>
-                    ))}
-                  </View>
-                ) : (
-                  <Text style={styles.bodyText}>
-                    Sin músculos registrados.
-                  </Text>
-                )}
-              </View>
-            </View>
+            ) : null}
           </View>
+
+          {mainMuscle ? (
+            <View style={styles.block}>
+              <Eyebrow>Músculos</Eyebrow>
+              <View style={styles.muscleRow}>
+                <View style={[styles.mainDot, { backgroundColor: colors.ember.base }]} />
+                <TextV2 variant="section" style={styles.flex}>
+                  {mainMuscle}
+                </TextV2>
+              </View>
+              {secondaryMuscles.length > 0 ? (
+                <View style={styles.muscleRow}>
+                  <View
+                    style={[styles.secondaryDot, { backgroundColor: colors.recovery.base }]}
+                  />
+                  <TextV2 variant="body" color={colors.text.bodySoft} style={styles.flex}>
+                    {secondaryMuscles.join(' · ')}
+                  </TextV2>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {essential.length > 0 ? (
+            <View style={styles.technique}>
+              <Eyebrow>Técnica</Eyebrow>
+              {essential.map((step, index) => (
+                <View key={`${index}-${step}`} style={styles.step}>
+                  <TextV2
+                    variant="bodyStrong"
+                    color={colors.text.tertiary}
+                    style={styles.stepNumber}
+                  >
+                    {index + 1}
+                  </TextV2>
+                  <TextV2 variant="voice" style={styles.flex}>
+                    {step}
+                  </TextV2>
+                </View>
+              ))}
+              {techOpen ? (
+                <View style={styles.more}>
+                  {fullTechnique.map((step, index) => (
+                    <TextV2
+                      key={`${index}-${step}`}
+                      variant="body"
+                      color={colors.text.secondary}
+                    >
+                      {step}
+                    </TextV2>
+                  ))}
+                </View>
+              ) : null}
+              {fullTechnique.length > 0 ? (
+                <PressableScale
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: techOpen }}
+                  onPress={() => setTechOpen(open => !open)}
+                  style={styles.toggle}
+                >
+                  <TextV2 variant="bodyStrong">
+                    {techOpen ? 'Menos detalle' : 'Ver técnica completa'}
+                  </TextV2>
+                  <ChevronDown
+                    size={15}
+                    color={colors.text.primary}
+                    strokeWidth={2}
+                    style={techOpen ? styles.flip : undefined}
+                  />
+                </PressableScale>
+              ) : null}
+            </View>
+          ) : null}
+
+          {exercise.commonMistakes.length > 0 ? (
+            <View style={styles.mistakes}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityState={{ expanded: errOpen }}
+                onPress={() => setErrOpen(open => !open)}
+                style={styles.mistakesHead}
+              >
+                <TextV2 variant="cta">Errores comunes</TextV2>
+                <ChevronRight
+                  size={17}
+                  color={colors.text.primary}
+                  strokeWidth={2}
+                  style={[styles.dim, errOpen ? styles.rotate : null]}
+                />
+              </PressableScale>
+              {errOpen
+                ? exercise.commonMistakes.map(mistake => (
+                    <TextV2 key={mistake} variant="bodyStrong">
+                      {mistake}
+                    </TextV2>
+                  ))
+                : null}
+            </View>
+          ) : null}
         </View>
       </ScrollView>
 
-      <View style={styles.bottomBar}>
+      <GlassSurface
+        kind="nav"
+        style={[
+          styles.footer,
+          {
+            paddingBottom: Math.max(insets.bottom, 16) + 4,
+            borderTopColor: colors.divider,
+          },
+        ]}
+      >
         <Button
           label="Agregar a rutina"
-          style={styles.ctaButton}
+          icon={Plus}
+          iconPosition="start"
           onPress={() =>
             navigation.navigate(APP_ROUTES.AddExerciseToRoutine, {
               exerciseId: exercise.id,
               exerciseName: exercise.name,
             })
           }
-          accessoryRight={
-            <Plus
-              color={theme.colors.accentContrast}
-              size={16}
-              strokeWidth={2.2}
-            />
-          }
         />
-      </View>
-    </SafeAreaView>
+      </GlassSurface>
+    </View>
   );
 }
+
+function hasValue(value?: string | null) {
+  const trimmed = value?.trim();
+  return Boolean(trimmed && trimmed !== '-');
+}
+
+function Dot({ color }: { color: string }) {
+  return (
+    <TextV2 variant="body" color={color}>
+      ·
+    </TextV2>
+  );
+}
+
+// Error / not-found layout with the back button.
+function Shell({
+  top,
+  bg,
+  backButton,
+  children,
+}: {
+  top: number;
+  bg: string;
+  backButton: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={[styles.screen, styles.shell, { backgroundColor: bg, paddingTop: top + 8 }]}>
+      <StatusBarV2 />
+      <View style={styles.shellBack}>{backButton}</View>
+      {children}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  flex: { flex: 1 },
+  shell: {
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  shellBack: { alignSelf: 'flex-start' },
+  body: {
+    paddingTop: 22,
+    gap: 36,
+  },
+  skeletonBox: { marginHorizontal: 10 },
+  skeletonBody: { paddingHorizontal: 24 },
+  head: { gap: 10 },
+  title: {
+    fontWeight: '700',
+    lineHeight: 30,
+  },
+  figures: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  best: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  block: { gap: 10 },
+  muscleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  mainDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  secondaryDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginLeft: 1,
+  },
+  technique: { gap: 16 },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 16,
+  },
+  stepNumber: {
+    width: 14,
+    fontWeight: '700',
+  },
+  more: {
+    paddingLeft: 30,
+    gap: 12,
+  },
+  toggle: {
+    alignSelf: 'flex-start',
+    paddingLeft: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  flip: { transform: [{ rotate: '180deg' }] },
+  mistakes: { gap: 14 },
+  mistakesHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dim: { opacity: 0.55 },
+  rotate: { transform: [{ rotate: '90deg' }] },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+});
