@@ -3,22 +3,15 @@ import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
+import { BADGE_ICONS } from '@app/features/gamification/badgeIcons';
 import {
   ArrowRight,
   Award,
-  Brain,
-  CalendarDays,
   Check,
   ChevronRight,
   Droplets,
   Dumbbell,
-  Flame,
-  Medal,
-  PenLine,
-  Trophy,
   UtensilsCrossed,
-  Waves,
-  Wrench,
   type LucideIcon,
 } from 'lucide-react-native';
 import {
@@ -67,20 +60,6 @@ const PHOTOS: Record<PhotoKey, number> = {
   mobility: HOME_PHOTOS.mobility,
   workout: HOME_PHOTOS.workout,
   overhead: HOME_PHOTOS.overhead,
-};
-
-const BADGE_ICONS: Record<string, LucideIcon> = {
-  brain: Brain,
-  calendar: CalendarDays,
-  droplets: Droplets,
-  dumbbell: Dumbbell,
-  'file-pen': PenLine,
-  flame: Flame,
-  medal: Medal,
-  trophy: Trophy,
-  utensils: UtensilsCrossed,
-  waves: Waves,
-  wrench: Wrench,
 };
 
 const ACTIVITY_ICONS: Record<ActivityItem['kind'], LucideIcon> = {

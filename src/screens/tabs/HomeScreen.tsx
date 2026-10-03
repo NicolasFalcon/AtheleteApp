@@ -256,7 +256,11 @@ export function HomeScreen({ navigation }: Props) {
   const resumeSession = () => {
     const workoutId = resumable?.workoutId;
     if (workoutId && findWorkout(workoutId)) {
-      navigation.navigate(APP_ROUTES.WorkoutSession, { workoutId });
+      // The exact session: a 'saved' one may be from another day.
+      navigation.navigate(APP_ROUTES.WorkoutSession, {
+        workoutId,
+        sessionId: resumable?.id,
+      });
       return;
     }
     openWorkouts();

@@ -40,7 +40,9 @@ export function EllieSurface({
       />
       <EllieOrb size={orbSize} state={orbState} />
       <View style={styles.texts}>
-        <Eyebrow color={colors.ellie.textSecondary}>{eyebrow}</Eyebrow>
+        {eyebrow ? (
+          <Eyebrow color={colors.ellie.textSecondary}>{eyebrow}</Eyebrow>
+        ) : null}
         <TextV2 variant="voice">{message}</TextV2>
         {action ? (
           <PressableScale

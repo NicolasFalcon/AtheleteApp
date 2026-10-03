@@ -34,6 +34,7 @@ import { ExerciseListScreen } from '@app/screens/workouts/ExerciseListScreen';
 import { RoutineListScreen } from '@app/screens/workouts/RoutineListScreen';
 import { WorkoutDetailScreen } from '@app/screens/workouts/WorkoutDetailScreen';
 import { WorkoutSessionScreen } from '@app/screens/workouts/WorkoutSessionScreen';
+import { WorkoutSummaryScreen } from '@app/screens/workouts/WorkoutSummaryScreen';
 import type { RootStackParamList } from '@app/types/navigation';
 
 enableScreens();
@@ -135,6 +136,13 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.WorkoutSession}
             component={WorkoutSessionScreen}
+            // Leaving goes through "Salir del entreno" (no swipe back).
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.WorkoutSummary}
+            component={WorkoutSummaryScreen}
+            options={{ gestureEnabled: false }}
           />
           <Stack.Screen
             name={APP_ROUTES.ExerciseDetail}

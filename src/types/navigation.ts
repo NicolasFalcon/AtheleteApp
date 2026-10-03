@@ -7,6 +7,7 @@ import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
+import type { DevSessionState } from '@app/features/session/useSessionRunner';
 import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
 import type {
   QuizQuestionRouteParams,
@@ -41,6 +42,19 @@ export type WorkoutDetailRouteParams = {
 
 export type WorkoutSessionRouteParams = {
   workoutId: Workout['id'];
+  // A specific session (e.g. one saved for later on another day).
+  sessionId?: string;
+  // Development only (__DEV__): open in a state without writing anything.
+  devState?: DevSessionState;
+};
+
+// Resumen de cierre (SESSION_07).
+export type WorkoutSummaryRouteParams = {
+  sessionId: string;
+  // Badges unlocked by workout_completed (from the completion response).
+  newBadges?: string[];
+  // Development only (__DEV__): sample figures, nothing read or written.
+  devPreview?: boolean;
 };
 
 export type ExerciseDetailRouteParams = {
@@ -122,6 +136,7 @@ export type AppStackParamList = {
   Core33: undefined;
   WorkoutDetail: WorkoutDetailRouteParams;
   WorkoutSession: WorkoutSessionRouteParams;
+  WorkoutSummary: WorkoutSummaryRouteParams;
   ExerciseDetail: ExerciseDetailRouteParams;
   ExerciseList: ExerciseListRouteParams | undefined;
   RoutineList: RoutineListRouteParams | undefined;

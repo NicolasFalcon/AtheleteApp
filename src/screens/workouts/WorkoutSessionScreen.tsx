@@ -1,579 +1,398 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
-import {
-  ArrowLeft,
-  Clock3,
-  Flame,
-  Play,
-  Save,
-  Sparkles,
-} from 'lucide-react-native';
-import {
-  Button,
-  Card,
-  EmptyState,
-  Loader,
-  ProgressBar,
-} from '@app/components/ui';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, StyleSheet, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBarV2, TextV2 } from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
-import { WorkoutSessionExerciseRow } from '@app/features/workouts/components/WorkoutSessionExerciseRow';
-import { useAppTheme } from '@app/hooks/useAppTheme';
+import { BlockError } from '@app/features/home/v2/BlockError';
+import { planScheme } from '@app/features/session/sessionModel';
+import {
+  useSessionRunner,
+  type DevSessionState,
+} from '@app/features/session/useSessionRunner';
+import { ExitDialog } from '@app/features/session/v2/ExitDialog';
+import {
+  ActiveView,
+  doneLabel,
+  FinishFooter,
+  PausedView,
+  RestView,
+  SaveErrorView,
+  SESSION_COLORS,
+  SessionHeader,
+  SessionMenu,
+  type ThumbFor,
+} from '@app/features/session/v2/SessionViews';
+import {
+  exerciseThumbnail,
+  ZONE_IMAGES,
+} from '@app/features/workouts/workoutAssets';
+import type { ZoneKey } from '@app/features/workouts/workoutsModel';
+import { useAuth } from '@app/hooks/useAuth';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
+import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
+import { resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { findExerciseByName } from '@app/shared';
+import { SceneScope } from '@app/providers/ThemeProvider';
+import type { CompletionResult } from '@app/services/supabase/session';
+import type { RestKind } from '@app/features/session/sessionModel';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'WorkoutSession'>;
 
-function formatTimer(totalSeconds: number) {
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  const pad = (value: number) => value.toString().padStart(2, '0');
+const HEADER_HEIGHT = 58;
 
-  if (hours > 0) {
-    return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-  }
-
-  return `${pad(minutes)}:${pad(seconds)}`;
-}
-
+// Workout Session v2 (SESSION_01–06, STATE_09): modo foco oscuro con la
+// serie actual, pausa, descansos y el cierre. Sets are written one by one
+// (workout_session_sets) and kept on the phone when the network fails.
 export function WorkoutSessionScreen({ navigation, route }: Props) {
-  const handleSafeBack = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
-  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const userId = profile?.id;
+  const dev: DevSessionState | null = __DEV__
+    ? route.params.devState ?? null
+    : null;
   const workoutsQuery = useWorkoutLibrary();
   const exercisesQuery = useExerciseLibrary();
   const workout = useMemo(
     () =>
-      (workoutsQuery.data || []).find(
+      (workoutsQuery.data ?? []).find(
         item => item.id === route.params.workoutId,
-      ) || null,
+      ) ?? null,
     [route.params.workoutId, workoutsQuery.data],
   );
   const {
     workoutSession,
-    isLoading,
+    isLoading: sessionLoading,
     startSession,
-    isStartingSession,
-    persistCompletedExercises,
-    completeSession,
-    isCompletingSession,
-    saveSessionForLater,
-    isSavingSession,
-    resumeSession,
-    isResumingSession,
   } = useWorkoutSession(workout);
-  const [completedExerciseIds, setCompletedExerciseIds] = useState<string[]>([]);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-  const persistTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(
+    route.params.sessionId ?? null,
+  );
+  const [startFailed, setStartFailed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(dev === 'menu');
+  const [exitOpen, setExitOpen] = useState(dev === 'exit');
+  const starting = useRef(false);
+  const lastRestKind = useRef<RestKind>('exercise');
 
-  const status = workoutSession?.status ?? 'idle';
-  const isInteractive = status === 'in_progress';
-  const totalExercises = workout?.exercises.length || 0;
-  const completedCount = completedExerciseIds.length;
-  const progressPct =
-    totalExercises > 0 ? Math.round((completedCount / totalExercises) * 100) : 0;
-  const bottomBarClearance =
-    (status === 'in_progress' ? 96 + theme.spacing.sm : 48) +
-    theme.spacing.lg +
-    Math.max(insets.bottom, theme.spacing.lg);
+  // Session to run: the one in the route, today's for this routine, or new.
+  useEffect(() => {
+    if (dev || sessionId || !workout || sessionLoading || starting.current) {
+      return;
+    }
+    if (workoutSession) {
+      setSessionId(workoutSession.id);
+      return;
+    }
+    starting.current = true;
+    startSession()
+      .then(session => setSessionId(session.id))
+      .catch(error => {
+        console.warn('[session] No se pudo iniciar.', error);
+        setStartFailed(true);
+      })
+      .finally(() => {
+        starting.current = false;
+      });
+  }, [dev, sessionId, sessionLoading, startSession, workout, workoutSession]);
 
-  const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
+  const refreshSurfaces = useCallback(() => {
+    if (userId) {
+      invalidateWorkoutQueries(queryClient, userId).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ['home'] }).catch(() => {});
+    }
+  }, [queryClient, userId]);
+
+  const goHome = useCallback(() => {
+    refreshSurfaces();
+    navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
+  }, [navigation, refreshSurfaces]);
+
+  const onCompleted = useCallback(
+    (result: CompletionResult) => {
+      refreshSurfaces();
+      navigation.replace(APP_ROUTES.WorkoutSummary, {
+        sessionId: result.session.id,
+        newBadges: result.award?.badgesUnlocked ?? [],
+      });
     },
-    header: {
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.sm,
-      paddingBottom: theme.spacing.md,
-      gap: theme.spacing.md,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-      backgroundColor: theme.colors.background,
-    },
-    headerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.sm,
-    },
-    backButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-    },
-    titleBlock: {
-      flex: 1,
-      gap: 2,
-    },
-    title: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.bold,
-    },
-    subtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-    },
-    content: {
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
-      paddingBottom: bottomBarClearance + theme.spacing.lg,
-      gap: theme.spacing.lg,
-    },
-    helperCard: {
-      gap: theme.spacing.sm,
-    },
-    helperEyebrow: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.semibold,
-      letterSpacing: 1.2,
-      textTransform: 'uppercase',
-    },
-    helperTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.titleSm,
-      fontWeight: theme.typography.weights.bold,
-    },
-    helperText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 21,
-    },
-    statRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: theme.spacing.sm,
-    },
-    statChip: {
-      borderRadius: theme.radii.pill,
-      paddingHorizontal: theme.spacing.sm,
-      paddingVertical: theme.spacing.xs,
-      backgroundColor: theme.colors.surfaceMuted,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    statLabel: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      fontWeight: theme.typography.weights.medium,
-    },
-    sectionTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.semibold,
-    },
-    sectionSubtitle: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      marginTop: 2,
-    },
-    list: {
-      gap: theme.spacing.sm,
-    },
-    bottomBar: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      paddingHorizontal: theme.spacing.lg,
-      paddingTop: theme.spacing.lg,
-      gap: theme.spacing.sm,
-      backgroundColor: theme.colors.background,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.border,
-    },
+    [navigation, refreshSurfaces],
+  );
+
+  const runner = useSessionRunner({
+    workout,
+    sessionId,
+    userId,
+    dev,
+    onCompleted,
+    onLeave: goHome,
   });
 
-  useEffect(() => {
-    setCompletedExerciseIds(workoutSession?.completedExercises || []);
-  }, [workoutSession?.completedExercises, workoutSession?.id]);
-
-  useEffect(() => {
-    if (persistTimeoutRef.current) {
-      clearTimeout(persistTimeoutRef.current);
-      persistTimeoutRef.current = null;
+  const library = exercisesQuery.data;
+  const bodyPartOf = useCallback(
+    (exerciseId: string | null) =>
+      exerciseId
+        ? library?.find(item => item.id === exerciseId)?.bodyPart ?? null
+        : null,
+    [library],
+  );
+  const thumbFor: ThumbFor = useCallback(
+    exercise => exerciseThumbnail(bodyPartOf(exercise.exerciseId)),
+    [bodyPartOf],
+  );
+  const cardImage = useMemo(() => {
+    const zone = runner.current
+      ? (bodyPartOf(runner.current.exerciseId) as ZoneKey | null)
+      : null;
+    if (zone && ZONE_IMAGES[zone]) {
+      return ZONE_IMAGES[zone];
     }
+    return workout
+      ? resolveWorkoutThumbnailSource({
+          imageUrl: workout.imageUrl,
+          type: workout.type,
+          targetMuscles: workout.targetMuscles,
+          title: workout.title,
+        })
+      : null;
+  }, [bodyPartOf, runner, workout]);
 
-    if (!workoutSession?.startedAt || workoutSession.status !== 'in_progress') {
-      setElapsedSeconds((workoutSession?.duration || 0) * 60);
-      return;
-    }
+  if (runner.rest) {
+    lastRestKind.current = runner.rest.kind;
+  }
 
-    const updateElapsed = () => {
-      setElapsedSeconds(
-        Math.max(
-          0,
-          Math.floor((Date.now() - new Date(workoutSession.startedAt!).getTime()) / 1000),
-        ),
-      );
-    };
+  const title = workout?.title ?? 'Sesión';
+  const topPadding = insets.top + HEADER_HEIGHT;
+  const bottomInset = Math.max(insets.bottom, 16) + 18;
+  const total = runner.plan.length;
+  const progress = runner.plan.map(exercise =>
+    Math.min(
+      1,
+      runner.sets.filter(set => set.position === exercise.position).length /
+        exercise.sets,
+    ),
+  );
+  const doneText = doneLabel(runner.doneCount, total);
 
-    updateElapsed();
-    const intervalId = setInterval(updateElapsed, 1000);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [workoutSession?.duration, workoutSession?.startedAt, workoutSession?.status]);
-
-  const flushPendingExercises = async (nextIds: string[]) => {
-    if (!workoutSession || workoutSession.status !== 'in_progress') {
-      return;
-    }
-
-    if (persistTimeoutRef.current) {
-      clearTimeout(persistTimeoutRef.current);
-      persistTimeoutRef.current = null;
-    }
-
-    await persistCompletedExercises(nextIds);
-  };
-
-  const handleStart = async () => {
-    if (!workout) {
-      return;
-    }
-
-    try {
-      await startSession();
-    } catch (error) {
-      Alert.alert(
-        'No pudimos iniciar la rutina',
-        error instanceof Error ? error.message : 'Inténtalo otra vez.',
-      );
-    }
-  };
-
-  const handleToggleExercise = (exerciseId: string) => {
-    if (!isInteractive) {
-      return;
-    }
-
-    const nextIds = completedExerciseIds.includes(exerciseId)
-      ? completedExerciseIds.filter(id => id !== exerciseId)
-      : [...completedExerciseIds, exerciseId];
-
-    setCompletedExerciseIds(nextIds);
-
-    if (persistTimeoutRef.current) {
-      clearTimeout(persistTimeoutRef.current);
-    }
-
-    persistTimeoutRef.current = setTimeout(() => {
-      persistCompletedExercises(nextIds).catch(() => {
-        // The next explicit finish/save action will retry persistence.
-      });
-      persistTimeoutRef.current = null;
-    }, 450);
-  };
-
-  const handleSaveForLater = async () => {
-    if (!workoutSession || !workout) {
-      return;
-    }
-
-    try {
-      await flushPendingExercises(completedExerciseIds);
-      await saveSessionForLater(completedExerciseIds);
-      handleSafeBack();
-    } catch (error) {
-      Alert.alert(
-        'No pudimos guardar la sesión',
-        error instanceof Error ? error.message : 'Inténtalo otra vez.',
-      );
-    }
-  };
-
-  const handleComplete = async () => {
-    if (!workoutSession || !workout || completedExerciseIds.length === 0) {
-      return;
-    }
-
-    try {
-      await flushPendingExercises(completedExerciseIds);
-      await completeSession(completedExerciseIds);
-    } catch (error) {
-      Alert.alert(
-        'No pudimos finalizar la sesión',
-        error instanceof Error ? error.message : 'Inténtalo otra vez.',
-      );
-    }
-  };
-
-  const handleResume = async () => {
-    try {
-      await resumeSession();
-    } catch (error) {
-      Alert.alert(
-        'No pudimos reanudar la sesión',
-        error instanceof Error ? error.message : 'Inténtalo otra vez.',
-      );
-    }
-  };
-
-  const handleBack = () => {
-    if (status !== 'in_progress') {
-      handleSafeBack();
-      return;
-    }
-
+  const askDiscard = () => {
+    setMenuOpen(false);
     Alert.alert(
-      '¿Guardar para continuar después?',
-      'Tu progreso quedará listo para retomarlo más tarde desde Inicio.',
+      '¿Salir sin guardar?',
+      'Se descarta esta sesión y no podrás retomarla.',
       [
-        {text: 'Seguir entrenando', style: 'cancel'},
+        { text: 'Cancelar', style: 'cancel' },
         {
-          text: 'Guardar y salir',
+          text: 'Salir sin guardar',
+          style: 'destructive',
           onPress: () => {
-            handleSaveForLater().catch(() => {
-              // Errors are surfaced inside handleSaveForLater.
-            });
+            runner.discard().catch(() =>
+              Alert.alert('No pudimos salir', 'Revisa tu conexión e inténtalo otra vez.'),
+            );
           },
         },
       ],
     );
   };
 
-  const openExerciseDetail = (exerciseId: string) => {
-    navigation.navigate(APP_ROUTES.ExerciseDetail, { exerciseId });
+  const saveAndExit = () => {
+    setMenuOpen(false);
+    runner.saveForLater().catch(() => {
+      setExitOpen(false);
+      Alert.alert(
+        'No pudimos guardar la sesión',
+        'Revisa tu conexión. Tu progreso sigue en esta pantalla.',
+      );
+    });
   };
 
-  const goHome = () => {
-    // The session sits above the tabs: pop back to MainTabs on Inicio.
-    navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
-  };
-
-  if (isLoading || workoutsQuery.isLoading || exercisesQuery.isLoading) {
+  // ── STATE_09 · error al guardar ─────────────────────────────────────────
+  if (runner.saveError) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <Loader label="Cargando sesión..." />
-      </SafeAreaView>
+      <SceneScope>
+        <StatusBarV2 style="light" />
+        <SaveErrorView
+          topInset={insets.top}
+          bottomInset={bottomInset}
+          durationSec={runner.saveError.activeSec}
+          exercises={runner.saveError.completedExercises.length}
+          kcal={runner.saveError.caloriesBurned}
+          retrying={runner.busy === 'finish'}
+          onRetry={() => {
+            runner.retrySave().catch(() => {});
+          }}
+          onContinue={() => {
+            runner.continueOffline().catch(() => {});
+          }}
+        />
+      </SceneScope>
     );
   }
 
-  if (!workout) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.content}>
-          <EmptyState
-            title="Rutina no encontrada"
-            description="No pudimos abrir la rutina asociada a esta sesión."
+  const notReady =
+    !workout || runner.loadState !== 'ready' || (!dev && !sessionId);
+  const failed =
+    workoutsQuery.error || startFailed || runner.loadState === 'error';
+
+  let body: React.ReactNode = null;
+  if (notReady) {
+    body = (
+      <View style={[styles.state, { paddingTop: topPadding + 40 }]}>
+        {failed ? (
+          <BlockError
+            message="No pudimos abrir la sesión."
+            onRetry={() => {
+              setStartFailed(false);
+              if (workoutsQuery.error) {
+                workoutsQuery.refetch().catch(() => {});
+              }
+              runner.retryLoad();
+            }}
           />
-          <Button label="Volver" onPress={handleSafeBack} />
-        </View>
-      </SafeAreaView>
+        ) : !workoutsQuery.isLoading && !workout ? (
+          <TextV2 variant="body" color={SESSION_COLORS.meta} align="center">
+            Esta rutina ya no está disponible.
+          </TextV2>
+        ) : (
+          <TextV2 variant="body" color={SESSION_COLORS.meta} align="center">
+            Preparando tu sesión…
+          </TextV2>
+        )}
+      </View>
+    );
+  } else {
+    const current = runner.current;
+    const lastSet = runner.sets[runner.sets.length - 1];
+    const lastExercise = lastSet ? runner.plan[lastSet.position] : null;
+    const restKind = runner.rest?.kind ?? lastRestKind.current;
+    const doneLine =
+      restKind === 'set' && lastExercise && lastSet
+        ? `Serie ${lastSet.setIndex + 1} de ${lastExercise.sets} · ${lastExercise.name}`
+        : lastExercise
+        ? `Hecho · ${lastExercise.name} · ${planScheme(lastExercise)}`
+        : '';
+
+    body = (
+      <>
+        <ActiveView
+          topPadding={topPadding + 4}
+          bottomPadding={bottomInset + (current ? 40 : 110)}
+          elapsedSec={runner.elapsedSec}
+          plan={runner.plan}
+          progress={progress}
+          current={current}
+          setIndex={runner.cursor?.setIndex ?? 0}
+          doneCount={runner.doneCount}
+          draft={runner.draft}
+          onDraft={runner.setDraft}
+          thumbFor={thumbFor}
+          cardImage={cardImage}
+          onPause={runner.pause}
+          onLogSet={runner.logSet}
+          onTechnique={
+            current?.exerciseId
+              ? () =>
+                  navigation.navigate(APP_ROUTES.ExerciseDetail, {
+                    exerciseId: current.exerciseId as string,
+                  })
+              : undefined
+          }
+        />
+        {!current && !runner.rest ? (
+          <FinishFooter
+            bottomInset={bottomInset}
+            busy={runner.busy === 'finish'}
+            onFinish={() => {
+              runner.finish().catch(() => {});
+            }}
+          />
+        ) : null}
+        {runner.rest || runner.yourTurn ? (
+          <RestView
+            topPadding={topPadding}
+            bottomInset={bottomInset}
+            kind={restKind}
+            remainingMs={runner.rest?.remainingMs ?? 0}
+            totalSec={runner.rest?.totalSec ?? 1}
+            phase={runner.rest?.phase ?? 'go'}
+            progress={progress}
+            doneText={doneText}
+            doneLine={doneLine}
+            next={current}
+            nextSetIndex={runner.cursor?.setIndex ?? 0}
+            nextWeightKg={runner.draft.weightKg}
+            thumbFor={thumbFor}
+            onAdd={runner.addRest}
+            onSkip={runner.skipRest}
+          />
+        ) : null}
+        {runner.paused ? (
+          <PausedView
+            topPadding={topPadding + 20}
+            bottomInset={bottomInset}
+            elapsedSec={runner.elapsedSec}
+            pausedForSec={runner.pausedForSec}
+            progress={progress}
+            current={current}
+            total={total}
+            doneCount={runner.doneCount}
+            weightKg={runner.draft.weightKg}
+            thumbFor={thumbFor}
+            onResume={runner.resume}
+          />
+        ) : null}
+      </>
     );
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.header, {paddingTop: insets.top + theme.spacing.xs}]}>
-        <View style={styles.headerRow}>
-          <Pressable onPress={handleBack} style={styles.backButton}>
-            <ArrowLeft color={theme.colors.textPrimary} size={18} strokeWidth={2.2} />
-          </Pressable>
-          <View style={styles.titleBlock}>
-            <Text style={styles.title}>{workout.title}</Text>
-            <Text style={styles.subtitle}>
-              {completedCount}/{totalExercises} ejercicios · {formatTimer(elapsedSeconds)}
-            </Text>
-          </View>
-          {status === 'in_progress' ? (
-            <Pressable onPress={handleSaveForLater} style={styles.backButton}>
-              <Save color={theme.colors.textPrimary} size={16} strokeWidth={2.2} />
-            </Pressable>
-          ) : null}
-        </View>
-        <ProgressBar value={progressPct} max={100} />
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}>
-        {status === 'idle' ? (
-          <Card style={styles.helperCard}>
-            <Text style={styles.helperEyebrow}>Lista para empezar</Text>
-            <Text style={styles.helperTitle}>Comienza tu sesión</Text>
-            <Text style={styles.helperText}>
-              Esta vista seguirá tu progreso real y mantendrá la rutina lista para
-              continuarla después si necesitas pausar.
-            </Text>
-            <Button
-              label="Empezar rutina"
-              loading={isStartingSession}
-              onPress={handleStart}
-              accessoryRight={
-                <Play
-                  color={theme.colors.accentContrast}
-                  size={16}
-                  strokeWidth={2.2}
-                />
-              }
-            />
-          </Card>
+    <View style={styles.screen}>
+      <SceneScope>
+        <StatusBarV2 style="light" />
+        {body}
+        <SessionHeader
+          title={title}
+          topInset={insets.top}
+          onBack={() =>
+            notReady ? safeGoBack(navigation, [ROOT_ROUTES.MainTabs]) : setExitOpen(true)
+          }
+          onMenu={notReady ? undefined : () => setMenuOpen(open => !open)}
+        />
+        {menuOpen ? (
+          <SessionMenu
+            top={insets.top + HEADER_HEIGHT}
+            doneText={doneText}
+            onClose={() => setMenuOpen(false)}
+            onSave={saveAndExit}
+            onFinish={() => {
+              setMenuOpen(false);
+              runner.finish().catch(() => {});
+            }}
+            onDiscard={askDiscard}
+          />
         ) : null}
-
-        {status === 'canceled' ? (
-          <Card style={styles.helperCard}>
-            <Text style={styles.helperEyebrow}>Sesión guardada</Text>
-            <Text style={styles.helperTitle}>Lista para retomarla</Text>
-            <Text style={styles.helperText}>
-              Tu progreso quedó guardado. Puedes continuar justo donde lo dejaste.
-            </Text>
-            <View style={styles.statRow}>
-              <View style={styles.statChip}>
-                <Clock3 color={theme.colors.textSecondary} size={14} />
-                <Text style={styles.statLabel}>{workoutSession?.duration || 0} min</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Flame color={theme.colors.textSecondary} size={14} />
-                <Text style={styles.statLabel}>
-                  {workoutSession?.caloriesBurned || 0} kcal
-                </Text>
-              </View>
-            </View>
-          </Card>
-        ) : null}
-
-        {status === 'completed' ? (
-          <Card style={styles.helperCard}>
-            <Text style={styles.helperEyebrow}>Completado hoy</Text>
-            <Text style={styles.helperTitle}>Sesión registrada</Text>
-            <Text style={styles.helperText}>
-              Tu sesión quedó guardada con el progreso real de hoy.
-            </Text>
-            <View style={styles.statRow}>
-              <View style={styles.statChip}>
-                <Sparkles color={theme.colors.textSecondary} size={14} />
-                <Text style={styles.statLabel}>
-                  {completedCount}/{totalExercises} ejercicios
-                </Text>
-              </View>
-              <View style={styles.statChip}>
-                <Clock3 color={theme.colors.textSecondary} size={14} />
-                <Text style={styles.statLabel}>{workoutSession?.duration || 0} min</Text>
-              </View>
-              <View style={styles.statChip}>
-                <Flame color={theme.colors.textSecondary} size={14} />
-                <Text style={styles.statLabel}>
-                  {workoutSession?.caloriesBurned || 0} kcal
-                </Text>
-              </View>
-            </View>
-          </Card>
-        ) : null}
-
-        <View>
-          <Text style={styles.sectionTitle}>Checklist de ejercicios</Text>
-          <Text style={styles.sectionSubtitle}>
-            Marca lo que ya completaste y toca cualquier ejercicio para ver su detalle.
-          </Text>
-        </View>
-
-        <View style={styles.list}>
-          {workout.exercises.map((exercise, index) => {
-            const libraryExercise = findExerciseByName(
-              exercisesQuery.data || [],
-              exercise.name,
-            );
-
-            return (
-              <WorkoutSessionExerciseRow
-                key={exercise.id}
-                exercise={exercise}
-                index={index}
-                completed={completedExerciseIds.includes(exercise.id)}
-                interactive={isInteractive}
-                canOpenDetail={Boolean(libraryExercise)}
-                onToggle={() => handleToggleExercise(exercise.id)}
-                onOpenDetail={() => {
-                  if (libraryExercise) {
-                    openExerciseDetail(libraryExercise.id);
-                  }
-                }}
-              />
-            );
-          })}
-        </View>
-      </ScrollView>
-
-      <View
-        style={[
-          styles.bottomBar,
-          {paddingBottom: Math.max(insets.bottom, theme.spacing.lg)},
-        ]}>
-        {status === 'in_progress' ? (
-          <>
-            <Button
-              label={`Finalizar entreno (${completedCount}/${totalExercises})`}
-              loading={isCompletingSession}
-              disabled={completedCount === 0}
-              onPress={handleComplete}
-            />
-            <Button
-              label="Guardar para después"
-              variant="outline"
-              loading={isSavingSession}
-              onPress={handleSaveForLater}
-            />
-          </>
-        ) : null}
-
-        {status === 'canceled' ? (
-          <>
-            <Button
-              label="Reanudar sesión"
-              loading={isResumingSession}
-              onPress={handleResume}
-              accessoryRight={
-                <Play
-                  color={theme.colors.accentContrast}
-                  size={16}
-                  strokeWidth={2.2}
-                />
-              }
-            />
-            <Button label="Volver" variant="outline" onPress={handleSafeBack} />
-          </>
-        ) : null}
-
-        {status === 'completed' ? (
-          <>
-            <Button label="Volver al inicio" onPress={goHome} />
-            <Button label="Volver" variant="outline" onPress={handleSafeBack} />
-          </>
-        ) : null}
-      </View>
-    </SafeAreaView>
+      </SceneScope>
+      {exitOpen ? (
+        <ExitDialog
+          saving={runner.busy === 'save'}
+          onStay={() => setExitOpen(false)}
+          onSaveAndExit={saveAndExit}
+        />
+      ) : null}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: SESSION_COLORS.plate,
+  },
+  state: {
+    flex: 1,
+    paddingHorizontal: 20,
+    alignItems: 'stretch',
+  },
+});

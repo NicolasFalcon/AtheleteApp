@@ -42,6 +42,7 @@ export const APP_ROUTES = {
   Core33: 'Core33',
   WorkoutDetail: 'WorkoutDetail',
   WorkoutSession: 'WorkoutSession',
+  WorkoutSummary: 'WorkoutSummary',
   ExerciseDetail: 'ExerciseDetail',
   ExerciseList: 'ExerciseList',
   RoutineList: 'RoutineList',
