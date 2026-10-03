@@ -24,6 +24,9 @@ export type OnboardingFlowProps = {
   onExit?: () => void;
   // Prefilled answers for the dev walkthrough.
   seed?: Partial<OnboardingAnswers>;
+  // Dev walkthrough deep links: start on a given question or on the welcome.
+  initialStep?: number;
+  startOnWelcome?: boolean;
 };
 
 const SAVE_ERROR =
@@ -39,14 +42,20 @@ export function OnboardingFlow({
   onFinish,
   onExit,
   seed,
+  initialStep = 0,
+  startOnWelcome = false,
 }: OnboardingFlowProps) {
   const [answers, setAnswers] = useState<OnboardingAnswers>(() => ({
     ...initialAnswers(initialName),
     ...seed,
   }));
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() =>
+    Math.min(Math.max(initialStep, 0), STEPS.length - 1),
+  );
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
-  const [phase, setPhase] = useState<'wizard' | 'welcome'>('wizard');
+  const [phase, setPhase] = useState<'wizard' | 'welcome'>(
+    startOnWelcome ? 'welcome' : 'wizard',
+  );
   const [saveStatus, setSaveStatus] = useState<WelcomeSaveStatus>('saving');
   const [continuing, setContinuing] = useState(false);
   const [error, setError] = useState('');

@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { DevSettings, Linking, StyleSheet, View } from 'react-native';
+import {
+  DevSettings,
+  Linking,
+  Platform,
+  Settings,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useToast } from '@app/components/v2';
-import { DevOnboardingWalkthrough } from '@app/dev/DevOnboardingWalkthrough';
+import {
+  DevOnboardingWalkthrough,
+  type WalkthroughStart,
+} from '@app/dev/DevOnboardingWalkthrough';
 import {
   HOME_MODE_LABELS,
   cycleHomeModeOverride,
@@ -10,34 +20,61 @@ import { V2CatalogScreen } from '@app/dev/V2CatalogScreen';
 
 type DevTool = 'catalog' | 'onboarding';
 
-const DEV_URLS: Record<DevTool, string> = {
+type DevToolState = { tool: DevTool; start?: WalkthroughStart };
+
+const DEV_URLS = {
   catalog: 'athelete://dev/catalog',
   onboarding: 'athelete://dev/onboarding',
-};
+  welcome: 'athelete://dev/welcome',
+} as const;
 
-function toolFromUrl(url: string | null): DevTool | null {
+function queryParam(url: string, key: string): string | null {
+  const match = url.match(new RegExp(`[?&]${key}=([^&#]+)`));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// athelete://dev/catalog
+// athelete://dev/onboarding[?step=0…7]
+// athelete://dev/welcome[?status=error]
+function toolFromUrl(url: string | null): DevToolState | null {
   if (!url) {
     return null;
   }
-  const match = (Object.keys(DEV_URLS) as DevTool[]).find(tool =>
-    url.startsWith(DEV_URLS[tool]),
-  );
-  return match ?? null;
+  if (url.startsWith(DEV_URLS.catalog)) {
+    return { tool: 'catalog' };
+  }
+  if (url.startsWith(DEV_URLS.welcome)) {
+    return {
+      tool: 'onboarding',
+      start: { welcome: true, failSave: queryParam(url, 'status') === 'error' },
+    };
+  }
+  if (url.startsWith(DEV_URLS.onboarding)) {
+    const step = queryParam(url, 'step');
+    return {
+      tool: 'onboarding',
+      start: step !== null ? { step: Number(step) } : undefined,
+    };
+  }
+  return null;
 }
 
 // Development-only tools, rendered as an overlay above the navigator (inside
 // the toast provider) so they do not touch navigation or existing screens.
 // Open them from the React Native dev menu ("Catálogo v2", "Recorrer
-// onboarding") or with `xcrun simctl openurl booted athelete://dev/<tool>`.
+// onboarding") or with `xcrun simctl openurl booted athelete://dev/<tool>`
+// (see toolFromUrl for the onboarding / welcome query parameters).
 export function DevCatalogHost() {
-  const [tool, setTool] = useState<DevTool | null>(null);
+  const [state, setState] = useState<DevToolState | null>(null);
   const toast = useToast();
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
   useEffect(() => {
-    DevSettings.addMenuItem('Catálogo v2', () => setTool('catalog'));
-    DevSettings.addMenuItem('Recorrer onboarding', () => setTool('onboarding'));
+    DevSettings.addMenuItem('Catálogo v2', () => setState({ tool: 'catalog' }));
+    DevSettings.addMenuItem('Recorrer onboarding', () =>
+      setState({ tool: 'onboarding' }),
+    );
     // Visual override only: cycles the Inicio hero modes, writes nothing.
     DevSettings.addMenuItem('Ver modos de Inicio', () => {
       const mode = cycleHomeModeOverride();
@@ -48,11 +85,21 @@ export function DevCatalogHost() {
       );
     });
 
+    // iOS launch argument (no "Open in…" prompt), e.g.
+    // xcrun simctl launch booted <bundle> -devTool athelete://dev/welcome
+    const launchTool =
+      Platform.OS === 'ios'
+        ? toolFromUrl(Settings.get('devTool') ?? null)
+        : null;
+    if (launchTool) {
+      setState(launchTool);
+    }
+
     Linking.getInitialURL()
       .then(url => {
         const initial = toolFromUrl(url);
         if (initial) {
-          setTool(initial);
+          setState(initial);
         }
       })
       .catch(() => undefined);
@@ -60,23 +107,28 @@ export function DevCatalogHost() {
     const subscription = Linking.addEventListener('url', event => {
       const next = toolFromUrl(event.url);
       if (next) {
-        setTool(next);
+        // New key so a second link remounts the tool at its start.
+        setState(null);
+        setTimeout(() => setState(next), 0);
       }
     });
 
     return () => subscription.remove();
   }, []);
 
-  if (!tool) {
+  if (!state) {
     return null;
   }
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      {tool === 'catalog' ? (
-        <V2CatalogScreen onClose={() => setTool(null)} />
+      {state.tool === 'catalog' ? (
+        <V2CatalogScreen onClose={() => setState(null)} />
       ) : (
-        <DevOnboardingWalkthrough onClose={() => setTool(null)} />
+        <DevOnboardingWalkthrough
+          start={state.start}
+          onClose={() => setState(null)}
+        />
       )}
     </View>
   );

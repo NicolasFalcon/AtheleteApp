@@ -23,10 +23,27 @@ const SAMPLE: Partial<OnboardingAnswers> = {
 // Development-only walkthrough: Intro → 8 questions → ELLIE welcome, with
 // sample data. It never calls Supabase, never creates users and never saves
 // the profile ("Ir a Inicio" / "Hablar con ELLIE" just close it).
-export function DevOnboardingWalkthrough({ onClose }: { onClose: () => void }) {
+export type WalkthroughStart = {
+  // Question index (0–7) to open directly, skipping the intro.
+  step?: number;
+  // Open the ELLIE welcome directly; `failSave` simulates a save error.
+  welcome?: boolean;
+  failSave?: boolean;
+};
+
+export function DevOnboardingWalkthrough({
+  onClose,
+  start,
+}: {
+  onClose: () => void;
+  start?: WalkthroughStart;
+}) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const [phase, setPhase] = useState<'intro' | 'flow'>('intro');
+  const skipIntro = start?.step !== undefined || Boolean(start?.welcome);
+  const [phase, setPhase] = useState<'intro' | 'flow'>(
+    skipIntro ? 'flow' : 'intro',
+  );
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -35,9 +52,22 @@ export function DevOnboardingWalkthrough({ onClose }: { onClose: () => void }) {
       ) : (
         <OnboardingFlow
           seed={SAMPLE}
+          initialStep={start?.step}
+          startOnWelcome={start?.welcome}
           onExit={() => setPhase('intro')}
-          // Nothing is saved: the welcome just shows a short "saving" state.
-          onSave={() => new Promise(resolve => setTimeout(resolve, 600))}
+          // Nothing is saved: the welcome just shows a short "saving" state
+          // (or a simulated failure with ?status=error).
+          onSave={() =>
+            new Promise((resolve, reject) =>
+              setTimeout(
+                () =>
+                  start?.failSave
+                    ? reject(new Error('dev: simulated failure'))
+                    : resolve(undefined),
+                600,
+              ),
+            )
+          }
           onFinish={target => {
             onClose();
             toast.show(
