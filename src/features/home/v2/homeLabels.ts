@@ -1,4 +1,5 @@
-import type { WorkoutDifficulty, WorkoutType } from '@app/shared';
+import { typeLabel } from '@app/features/workouts/workoutsModel';
+import type { WorkoutDifficulty } from '@app/shared';
 
 const DIFFICULTY: Record<WorkoutDifficulty, string> = {
   beginner: 'Principiante',
@@ -6,18 +7,12 @@ const DIFFICULTY: Record<WorkoutDifficulty, string> = {
   advanced: 'Avanzado',
 };
 
-const TYPE: Record<WorkoutType, string> = {
-  strength: 'Fuerza',
-  cardio: 'Cardio',
-  fullbody: 'Cuerpo completo',
-  mobility: 'Movilidad',
-  hiit: 'HIIT',
-};
-
 export function difficultyLabel(value?: string | null): string {
   return (value && DIFFICULTY[value as WorkoutDifficulty]) || 'Rutina';
 }
 
+// Database types are free text (e.g. "full_body"): normalized in the Entrenos
+// model.
 export function workoutTypeLabel(value?: string | null): string {
-  return (value && TYPE[value as WorkoutType]) || 'Entreno';
+  return value ? typeLabel(value) : 'Entreno';
 }

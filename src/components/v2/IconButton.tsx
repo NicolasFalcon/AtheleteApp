@@ -10,7 +10,8 @@ import { ArrowLeft, type LucideIcon } from 'lucide-react-native';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
-export type IconButtonVariant = 'muted' | 'glass' | 'solid';
+// 'studio': light glass over the MoveKit studio background (Exercise Detail).
+export type IconButtonVariant = 'muted' | 'glass' | 'solid' | 'studio';
 
 export type IconButtonProps = {
   icon: LucideIcon;
@@ -19,6 +20,8 @@ export type IconButtonProps = {
   variant?: IconButtonVariant;
   size?: 44 | 36;
   badge?: boolean;
+  // Fills the icon (e.g. an active favourite heart).
+  filled?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 };
@@ -31,6 +34,7 @@ export function IconButton({
   variant = 'muted',
   size = 44,
   badge = false,
+  filled = false,
   disabled = false,
   style,
 }: IconButtonProps) {
@@ -41,12 +45,16 @@ export function IconButton({
       ? scene.glass.onPhoto
       : variant === 'solid'
       ? colors.cta.primary
+      : variant === 'studio'
+      ? 'rgba(255,255,255,.72)'
       : colors.surface.muted;
   const iconColor =
     variant === 'glass'
       ? scene.onDark.primary
       : variant === 'solid'
       ? colors.cta.primaryText
+      : variant === 'studio'
+      ? '#121212'
       : colors.text.primary;
   const radius = size / 2;
 
@@ -70,6 +78,7 @@ export function IconButton({
               : background,
           opacity: disabled ? 0.35 : 1,
         },
+        variant === 'studio' && styles.studio,
         style,
       ]}
     >
@@ -91,7 +100,12 @@ export function IconButton({
           />
         </View>
       ) : null}
-      <Icon color={iconColor} size={size === 44 ? 20 : 18} strokeWidth={2} />
+      <Icon
+        color={iconColor}
+        fill={filled ? iconColor : 'transparent'}
+        size={size === 44 ? 20 : 18}
+        strokeWidth={2}
+      />
       {badge ? (
         <View
           style={[
@@ -129,6 +143,9 @@ export function BackButton({
 }
 
 const styles = StyleSheet.create({
+  studio: {
+    boxShadow: '0 0 0 .5px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.06)',
+  },
   base: {
     alignItems: 'center',
     justifyContent: 'center',
