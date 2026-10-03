@@ -1440,3 +1440,17 @@ git commit -m "feat(home): Core 33 discovery card and dev screen tools" -m "Invi
 git add docs/migration/MIGRATION_PROGRESS.md docs/backend/BACKEND_TODO.md
 git commit -m "docs: Entrenos module, Core 33 card and backend todo" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
+
+### 18.8 Ajuste: Rutinas explora, la lista vive aparte (2026-10-03)
+- **D-46** · **Decisión de producto (Nicolás).** Rutinas funciona igual que Ejercicios: la raíz sirve para explorar y la lista vive en su propia pantalla. Se aparta del prototipo (WORKOUTS_01 / 02), que tiene chips y la lista en la raíz.
+  - **Raíz:** hero "Tu próxima sesión" y "+" en la cabecera, sin cambios. El buscador ("Buscar entre N rutinas") va entre el hero y "Por tipo"; abre "Todas las rutinas" con el foco en la búsqueda. "Por tipo" tiene cards para los 5 tipos (Fuerza, Cardio, HIIT, Movilidad, Full body) y otras 3 para Favoritas, Tus rutinas y Todas las rutinas (icono sobre escena oscura, con borde interior en Dark). Todas llevan conteo y ninguna tiene estado seleccionado. Se eliminan los chips y la lista.
+  - **`RoutineListScreen`** (ruta `RoutineList`, parámetros `type`, `collection: 'favorites' | 'mine' | 'all'` y `focusSearch`): GlassHeader con título, buscador "Buscar en …", conteo y A–Z, y la lista con `RoutineRow`. Estados: skeleton (STATE_02), vacío de Favoritas (STATE_06 con "Ver todas las rutinas"), vacío por tipo o colección, sin resultados de búsqueda y error con Reintentar.
+  - **"Tus rutinas"** = `created_by` del usuario, incluidas las de ELLIE (`isMyRoutine`), excepto las editoriales.
+- **Correcciones:**
+  - **`ExerciseRow`:** el músculo nunca se trunca. Si equipo y nivel no caben a su lado, pasan a una segunda línea sin el punto inicial. Verificado con Espalda ("Dorsal ancho", "Deltoides posteriores").
+  - **Protección de la status bar:** nueva primitiva `StatusBarShield`, una franja glass (`glass.statusbar`) que aparece con los primeros 12 pt de scroll. Se usa en Entrenos. Inicio no tenía este patrón: es candidata a usarlo.
+- **Dev:**
+  - `typeList` abre la lista de Fuerza y `favoritesList`, la lista real de Favoritas.
+  - `favorites` abre el vacío de STATE_06 de forma forzada (`devEmpty`, solo `__DEV__`).
+  - `list` acepta `&zone=<key>`.
+- **Limpieza:** el commit `21ac3e1` añadió por error 48 copias de archivos (en `src/features/home/v2/` y `src/features/workouts/`), creadas por un script de verificación. Se quitan en el commit de limpieza.
