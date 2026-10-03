@@ -18,6 +18,11 @@ import {
   openNextWorkoutsDevScreen,
   openWorkoutsDevScreen,
 } from '@app/dev/devWorkoutsScreens';
+import {
+  isSessionDevScreen,
+  openNextSessionDevScreen,
+  openSessionDevScreen,
+} from '@app/dev/devSessionScreens';
 import { resetCore33InviteDismissals } from '@app/features/core33/useCore33InviteDismissals';
 import { DevCore33CardPreview } from '@app/dev/DevCore33CardPreview';
 import { V2CatalogScreen } from '@app/dev/V2CatalogScreen';
@@ -59,8 +64,20 @@ function openWorkoutsFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/session?screen=<key>: navigates (no overlay).
+function openSessionFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/session')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'active';
+  if (isSessionDevScreen(screen)) {
+    openSessionDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
-  if (!url || openWorkoutsFromUrl(url)) {
+  if (!url || openWorkoutsFromUrl(url) || openSessionFromUrl(url)) {
     return null;
   }
   if (url.startsWith(DEV_URLS.catalog)) {
@@ -118,6 +135,15 @@ export function DevCatalogHost() {
         .then(label =>
           toastRef.current.show(
             label ? `Entrenos · ${label}` : 'Inicia sesión para ver Entrenos',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de Sesión', () => {
+      openNextSessionDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `Sesión · ${label}` : 'Inicia sesión para ver la Sesión',
           ),
         )
         .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));

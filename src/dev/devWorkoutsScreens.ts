@@ -37,7 +37,7 @@ export function isWorkoutsDevScreen(
   return WORKOUTS_DEV_SCREENS.some(screen => screen.key === value);
 }
 
-async function firstRoutineId(): Promise<string | null> {
+export async function firstRoutineId(): Promise<string | null> {
   const page = await fetchWorkoutLibraryPage({
     source: 'library',
     type: 'all',
