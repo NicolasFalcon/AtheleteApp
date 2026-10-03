@@ -1,7 +1,9 @@
 import {
   activeFilterCount,
   countBy,
-  countByCategory,
+  countByGroup,
+  CATEGORY_GROUP,
+  groupOf,
   routineTypeLabel,
   filterExercises,
   filterRoutines,
@@ -78,15 +80,16 @@ describe('routines', () => {
       filterRoutines(list, { ...base, scope: { collection: 'all' } }),
     ).toHaveLength(4);
     expect(
-      filterRoutines(list, { ...base, scope: { category: 'tren_superior' } }).map(
+      filterRoutines(list, { ...base, scope: { group: 'strength' } }).map(
         w => w.id,
       ),
     ).toEqual(['b']);
-    // A routine without category belongs to no category list.
-    ROUTINE_CATEGORIES.forEach(category =>
-      expect(
-        filterRoutines(list, { ...base, scope: { category } }).map(w => w.id),
-      ).not.toContain('n'),
+    // A routine without category belongs to no card.
+    (['strength', 'cardio', 'hiit', 'mobility', 'fullbody'] as const).forEach(
+      group =>
+        expect(
+          filterRoutines(list, { ...base, scope: { group } }).map(w => w.id),
+        ).not.toContain('n'),
     );
     expect(
       filterRoutines(list, {
@@ -125,27 +128,61 @@ describe('routines', () => {
     ).toEqual({ favorites: 1, mine: 2, all: 4 });
   });
 
-  it('counts per category and builds titles and meta', () => {
-    expect(countByCategory(list)).toMatchObject({
-      cuerpo_completo: 1,
-      tren_superior: 1,
-      hiit: 1,
-      fuerza: 0,
+  it('groups the 9 server categories into the 5 cards of the design', () => {
+    expect(CATEGORY_GROUP).toEqual({
+      fuerza: 'strength',
+      tren_superior: 'strength',
+      tren_inferior: 'strength',
+      core: 'strength',
+      cardio: 'cardio',
+      acondicionamiento: 'cardio',
+      hiit: 'hiit',
+      movilidad: 'mobility',
+      cuerpo_completo: 'fullbody',
     });
-    // The routine without category is not in any category count.
+    // Every server category lands in a card.
+    ROUTINE_CATEGORIES.forEach(category =>
+      expect(CATEGORY_GROUP[category]).toBeDefined(),
+    );
+    expect(groupOf({ routineCategory: 'tren_inferior' })).toBe('strength');
+    expect(groupOf({ routineCategory: null })).toBeNull();
+
+    const many = [
+      workout('1', { routineCategory: 'fuerza' }),
+      workout('2', { routineCategory: 'tren_superior' }),
+      workout('3', { routineCategory: 'core' }),
+      workout('4', { routineCategory: 'acondicionamiento' }),
+      workout('5', { routineCategory: 'cardio' }),
+      workout('6', { routineCategory: 'cuerpo_completo' }),
+      workout('7', { routineCategory: null }),
+    ];
+    expect(countByGroup(many)).toEqual({
+      strength: 3,
+      cardio: 2,
+      fullbody: 1,
+      hiit: 0,
+      mobility: 0,
+    });
+  });
+
+  it('counts the cards and builds titles and meta', () => {
+    expect(countByGroup(list)).toMatchObject({
+      fullbody: 1,
+      strength: 1,
+      hiit: 1,
+    });
+    // The routine without category is not counted in any card.
     expect(
-      Object.values(countByCategory(list)).reduce((a, b) => a + b, 0),
+      Object.values(countByGroup(list)).reduce((a, b) => a + b, 0),
     ).toBe(3);
     expect(routineScopeTitle({ collection: 'all' })).toBe('Todas las rutinas');
-    expect(routineScopeTitle({ category: 'hiit' })).toBe('HIIT');
-    expect(routineScopeTitle({ category: 'tren_inferior' })).toBe(
-      'Tren inferior',
-    );
+    expect(routineScopeTitle({ group: 'hiit' })).toBe('HIIT');
+    expect(routineScopeTitle({ group: 'fullbody' })).toBe('Full body');
     expect(routineScopeTitle({ collection: 'mine' })).toBe('Tus rutinas');
     expect(routineEmptyText({ collection: 'favorites' })).toContain('corazón');
-    expect(routineScopeFrom({ category: 'core' })).toEqual({ category: 'core' });
-    // An unknown category falls back to the collection.
-    expect(routineScopeFrom({ category: 'yoga' })).toEqual({
+    expect(routineScopeFrom({ type: 'mobility' })).toEqual({ group: 'mobility' });
+    // An unknown type falls back to the collection.
+    expect(routineScopeFrom({ type: 'yoga' })).toEqual({
       collection: 'all',
     });
     expect(routineScopeFrom({ collection: 'favorites' })).toEqual({

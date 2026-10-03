@@ -1579,7 +1579,7 @@ git commit -m "docs: Sesión module and backend todo" -m "Co-Authored-By: Claude
 | 3 | Descanso real | `rest_actual_sec` = descanso real **antes** de la serie (sin pausas, con +30 s), en el mismo upsert; la primera serie lleva NULL. Test con pausa y con +30 s |
 | 4 | `cancel_reason` | "Salir sin guardar" → `canceled` + `'user'`. `in_progress` de otro día: sin series → `canceled` + `'expired'`; con series → `saved` |
 | 5 | Core 33 en el perfil | "Ahora no" escribe `core33_invite_dismissed_at`; el valor local se sube una vez y se borra; el reset dev pone la columna a `null`. `core33_intro_seen_at` / `core33_completed_at`: solo tipos y servicios |
-| 6 | Categoría | Tarjetas y `RoutineList` agrupan por `routine_category` (NULL → solo "Todas"). Mapeo local del texto libre eliminado |
+| 6 | Categoría | Las 5 tarjetas del diseño y `RoutineList` agrupan las 9 `routine_category` (tabla en D-55; NULL → solo "Todas"). Mapeo local del texto libre eliminado |
 | 7 | Series y reps (A3) | Parser tolerante `parseSetsReps` (`src/shared/domain/setsReps.ts`) con unidades `reps`, `s`, `m`, `máx` y "por lado" |
 | 8 | Docs | BT-03, BT-12, BT-15, BT-17, BT-19 y BT-20 resueltos; BT-21 nuevo; `BACKEND_SUMMARY.md` §7 |
 
@@ -1596,13 +1596,22 @@ git commit -m "docs: Sesión module and backend todo" -m "Co-Authored-By: Claude
 | DA-71 | Favoritos: la migración sube solo ids con formato uuid y borra las claves locales aunque pertenezcan a otra cuenta del mismo dispositivo (eran globales al dispositivo) |
 | DA-72 | Un "like" repetido (`23505`) no es un error; quitar un favorito inexistente tampoco |
 | DA-73 | `rest_actual_sec` se calcula como `total − restante`: excluye las pausas por construcción y suma el +30 s |
-| DA-74 | Fotos de las tarjetas de categoría: las 4 sin foto propia (tren superior, tren inferior, core, acondicionamiento) reutilizan fotos del paquete como **PLACEHOLDER** |
 | DA-75 | Filas de rutina sin reps ni tiempo: el plan toma el esquema recomendado del ejercicio de la biblioteca (objetivo hipertrofia; si no existe, otro). El plan espera a la biblioteca antes de crear la sesión |
 | DA-76 | Un rango (`12–15`) propone el mínimo como valor inicial; la unidad `máx` deja las reps vacías para escribirlas |
 
 ### 20.3 Desviaciones nuevas
-- **D-54** · **Core 33 "Ahora no" sin tope de dos descartes.** Con una sola fecha en el perfil no se puede saber cuántas veces se descartó: la tarjeta vuelve cada 14 días hasta que el usuario actúe. Se conserva el aplazamiento de 14 días y el reinicio al completar otro Core 33 (un descarte anterior al día 33 del último reto terminado ya no cuenta). Para recuperar el tope haría falta un contador en el perfil.
-- **D-55** · **Tarjetas "Por tipo": 9 categorías** (antes 5 tipos) más las 3 colecciones, 12 tarjetas en total. Las etiquetas largas se ajustan a una línea.
+- **D-54** · **Core 33 "Ahora no" sin tope de dos descartes** (se mantiene; el tope vuelve con `core33_invite_dismiss_count`, BT-22). Con una sola fecha en el perfil no se puede saber cuántas veces se descartó: la tarjeta vuelve cada 14 días hasta que el usuario actúe. Se conserva el aplazamiento de 14 días y el reinicio al completar otro Core 33 (un descarte anterior al día 33 del último reto terminado ya no cuenta). Para recuperar el tope haría falta un contador en el perfil.
+- **D-55** · **Tarjetas "Por tipo": las 5 del diseño, agrupando las 9 `routine_category`.** Mismos textos y fotos que antes (Fuerza, Cardio, HIIT, Movilidad y Full body; fotos del paquete `barra`, `cuerdas`, `hiit`, `movilidad` y `total`), sin fotos de relleno. El paquete trae 4 tarjetas con foto; Full body es la quinta de D-46. Correspondencias (propuesta aplicada):
+
+  | Tarjeta | `routine_category` |
+  |---|---|
+  | Fuerza | `fuerza`, `tren_superior`, `tren_inferior`, `core` |
+  | Cardio | `cardio`, `acondicionamiento` |
+  | HIIT | `hiit` |
+  | Movilidad | `movilidad` |
+  | Full body | `cuerpo_completo` |
+
+  Una rutina sin categoría (NULL) solo aparece en "Todas". Con las 34 rutinas visibles para la cuenta de prueba: Fuerza 17, Full body 6, Cardio 5, Movilidad 5, HIIT 1. La categoría concreta ("Tren superior", "Core"…) sigue visible en la cabecera del Detalle de rutina.
 - **D-56** · El tope de dos descartes que documentaba BT-03 deja de aplicarse (ver D-54).
 
 ### 20.4 Pendientes
@@ -1618,3 +1627,9 @@ git commit -m "docs: Sesión module and backend todo" -m "Co-Authored-By: Claude
 - [ ] **Descanso:** registra dos series con un descanso con pausa y +30 s; en la base, `rest_actual_sec` de la segunda serie ≈ el descanso real, y la primera serie NULL.
 - [ ] **Salir sin guardar:** `canceled` con `cancel_reason = 'user'`.
 - [ ] **Core 33:** "Ahora no" en la tarjeta → `profiles.core33_invite_dismissed_at` con fecha y la tarjeta desaparece; menú dev "Restablecer card de Core 33" → la columna vuelve a `null`.
+
+### 20.6 Conteos de rutinas (comprobación)
+La base tiene más rutinas de `fuerza` y `cuerpo_completo` que las que muestra Entrenos para la cuenta de prueba (`falcon1989@gmail.com`, id `7d143a1f-bf73-4481-b8d2-03f0b2e73ec5`), pero **no es un filtro ni un límite de la app**:
+- La consulta es `workout_templates` con `created_by = yo OR is_public = true OR created_by IS NULL`, sin límite ni rango, y después `dedupeFeaturedTemplates` (quita duplicados de rutinas destacadas por `source`).
+- Sin ningún filtro, esa cuenta ya ve solo **34 rutinas** (todas de sistema, públicas, `created_by` NULL): Fuerza (`fuerza`) 2 y Full body (`cuerpo_completo`) 6. El filtro de la app da las mismas 34 y ninguna tiene `source`, así que el deduplicado no quita nada.
+- La diferencia con el conteo de la base (16 y 8) viene de lo que la seguridad por filas (RLS) no deja ver a esta cuenta: rutinas privadas de otros usuarios u otras filas no visibles. No se cambió nada.

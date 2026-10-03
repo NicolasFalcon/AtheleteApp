@@ -249,5 +249,5 @@ En strict: se ignoran los puntos enviados por la app, se rechazan eventos descon
 - `rest_actual_sec` se escribe en el mismo upsert de la serie; la primera serie de la sesión lleva NULL.
 - "Salir sin guardar": `canceled` + `'user'`. `in_progress` de otro día sin series: `canceled` + `'expired'`; con series: `saved`.
 - Core 33 "Ahora no": `core33_invite_dismissed_at`. `core33_intro_seen_at` y `core33_completed_at` quedan para el módulo Core 33.
-- Tipos y listas de rutinas: por `routine_category` (NULL → solo en "Todas").
+- Tarjetas y listas de rutinas por tipo: las 9 `routine_category` se agrupan en las 5 tarjetas del diseño (NULL → solo en "Todas").
 - Series y reps: `exercises.recommended_sets_reps` se lee con un parser tolerante (ver BT-21 en `BACKEND_TODO.md`).

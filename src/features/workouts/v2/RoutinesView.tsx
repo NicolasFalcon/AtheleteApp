@@ -23,20 +23,19 @@ import {
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { useRoutineImages } from '@app/features/workouts/v2/useRoutineImages';
-import { CATEGORY_IMAGES } from '@app/features/workouts/workoutAssets';
+import { TYPE_IMAGES } from '@app/features/workouts/workoutAssets';
 import {
   COLLECTION_LABELS,
   COLLECTION_TILES,
   countByCollection,
-  countByCategory,
-  CATEGORY_LABELS,
-  ROUTINE_CATEGORIES,
-  type RoutineCategory,
+  countByGroup,
+  GROUP_TILES,
+  TYPE_LABELS,
   plural,
   routineHeroMeta,
   type RoutineCollection,
 } from '@app/features/workouts/workoutsModel';
-import type { Workout } from '@app/shared';
+import type { Workout, WorkoutType } from '@app/shared';
 
 export type RoutinesViewProps = {
   workouts: Workout[];
@@ -47,7 +46,7 @@ export type RoutinesViewProps = {
   userId?: string;
   favoriteIds: string[];
   onOpenWorkout: (id: string) => void;
-  onOpenCategory: (category: RoutineCategory) => void;
+  onOpenType: (type: WorkoutType) => void;
   onOpenCollection: (collection: RoutineCollection) => void;
   onSearch: () => void;
 };
@@ -60,7 +59,7 @@ const COLLECTION_ICONS: Record<RoutineCollection, LucideIcon> = {
 
 // Entrenos · Rutinas (WORKOUTS_01, D-46): the root explores, like
 // Ejercicios. Recommended hero, search (opens the full list) and cards for
-// every category plus Favoritas / Tus rutinas / Todas; lists live in RoutineList.
+// the 5 type cards plus Favoritas / Tus rutinas / Todas; lists live in RoutineList.
 export function RoutinesView({
   workouts,
   nextSession,
@@ -70,7 +69,7 @@ export function RoutinesView({
   userId,
   favoriteIds,
   onOpenWorkout,
-  onOpenCategory,
+  onOpenType,
   onOpenCollection,
   onSearch,
 }: RoutinesViewProps) {
@@ -87,7 +86,7 @@ export function RoutinesView({
     return <RoutinesSkeleton />;
   }
 
-  const counts = countByCategory(workouts);
+  const counts = countByGroup(workouts);
   const collections = countByCollection(workouts, { favoriteIds, userId });
 
   return (
@@ -119,13 +118,13 @@ export function RoutinesView({
       <View style={styles.section}>
         <TextV2 variant="section">Por tipo</TextV2>
         <View style={styles.typeGrid}>
-          {ROUTINE_CATEGORIES.map(category => (
+          {GROUP_TILES.map(type => (
             <Tile
-              key={category}
-              label={CATEGORY_LABELS[category]}
-              count={counts[category]}
-              image={CATEGORY_IMAGES[category]}
-              onPress={() => onOpenCategory(category)}
+              key={type}
+              label={TYPE_LABELS[type]}
+              count={counts[type]}
+              image={TYPE_IMAGES[type]}
+              onPress={() => onOpenType(type)}
             />
           ))}
           {COLLECTION_TILES.map(collection => (

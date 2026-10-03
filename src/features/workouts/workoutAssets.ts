@@ -1,7 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 import type {
   EquipmentKey,
-  RoutineCategory,
   ZoneKey,
 } from '@app/features/workouts/workoutsModel';
 import type { WorkoutType } from '@app/shared';
@@ -53,21 +52,6 @@ export const TYPE_IMAGES: Record<WorkoutType, ImageSourcePropType> = {
   fullbody: require('@app/assets/v2/workouts/type-fullbody.jpg'),
   hiit: require('@app/assets/v2/workouts/type-hiit.jpg'),
   mobility: require('@app/assets/v2/workouts/type-mobility.jpg'),
-};
-
-// "Por tipo" cards. PLACEHOLDER photos: the four categories without their own
-// photo reuse the handoff photos (tren inferior: barbell on the back; tren
-// superior: overhead press; core: hanging; acondicionamiento: effort).
-export const CATEGORY_IMAGES: Record<RoutineCategory, ImageSourcePropType> = {
-  fuerza: TYPE_IMAGES.strength,
-  cuerpo_completo: TYPE_IMAGES.fullbody,
-  tren_superior: require('@app/assets/v2/photos/home/overhead.jpg'),
-  tren_inferior: require('@app/assets/v2/photos/home/hero-core.jpg'),
-  core: require('@app/assets/v2/photos/home/hero-entreno.jpg'),
-  movilidad: TYPE_IMAGES.mobility,
-  acondicionamiento: require('@app/assets/v2/photos/home/esfuerzo.jpg'),
-  hiit: TYPE_IMAGES.hiit,
-  cardio: TYPE_IMAGES.cardio,
 };
 
 export const SCAN_IMAGE: ImageSourcePropType = require('@app/assets/v2/workouts/scan-prensa.jpg');

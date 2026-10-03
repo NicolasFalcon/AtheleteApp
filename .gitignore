@@ -80,3 +80,6 @@ yarn-error.log
 # ATHELETE v2 design handoff (local reference only)
 migration-source/ATHELETE Alive Minimalism/
 .claude/settings.local.json
+
+# Local session run output
+session-run.log

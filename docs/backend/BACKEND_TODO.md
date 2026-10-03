@@ -32,6 +32,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-19 | Sesión | ~~Sesiones `saved` antiguas: caducidad o limpieza~~ | — | **Resuelto** (2026-10-03) |
 | BT-20 | Sesión | ~~`rest_taken_sec` y fases del descanso (opcional)~~ | — | **Resuelto** (2026-10-03) |
 | BT-21 | Entrenos / Sesión | Estructurar `exercises.recommended_sets_reps` (hoy texto libre con 444 valores fuera de "N x M") | Media | No (la app lo lee con un parser tolerante) |
+| BT-22 | Core 33 | `profiles.core33_invite_dismiss_count` para recuperar el tope de 2 descartes de la tarjeta de Inicio | Baja | No (la tarjeta vuelve cada 14 días, D-54) |
 
 ---
 
@@ -87,7 +88,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
   - El "Ahora no" que había en AsyncStorage se sube una vez y se borra.
   - La herramienta dev "Restablecer card de Core 33" pone la columna a `null`.
   - `core33_intro_seen_at` y `core33_completed_at`: solo tipos y funciones de servicio (`markCore33IntroSeen`, `markCore33Completed`) para el módulo Core 33.
-- **Cambio de regla (D-54):** con una sola fecha la app ya no puede saber cuántas veces se descartó la card, así que **desaparece el tope de dos descartes**: la card vuelve cada 14 días hasta que el usuario actúe. Si se quiere conservarlo, hace falta un contador (`core33_invite_dismiss_count int`).
+- **Cambio de regla (D-54):** con una sola fecha la app ya no puede saber cuántas veces se descartó la card, así que **desaparece el tope de dos descartes**: la card vuelve cada 14 días hasta que el usuario actúe. Se recupera cuando exista `profiles.core33_invite_dismiss_count` (ver BT-22).
 
 ---
 
@@ -212,6 +213,12 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Sobre las series:** `workout_session_sets` ya tiene `duration_sec` y `distance_m`: la app los usa para las series en segundos y en metros. No hace falta nada nuevo.
 - **Prioridad:** Media. **No bloquea.**
 
+### BT-22 · Contador de descartes de la tarjeta de Core 33
+- **Qué falta:** `profiles.core33_invite_dismiss_count int NOT NULL DEFAULT 0`.
+- **Por qué:** con solo `core33_invite_dismissed_at` la app no sabe cuántas veces se descartó la tarjeta, así que quedó sin el tope de dos descartes (D-54): vuelve cada 14 días hasta que el usuario actúe.
+- **Qué hará la app cuando exista:** incrementarlo en cada "Ahora no", ocultar la tarjeta definitivamente al llegar a 2 y reiniciarlo al completar otro Core 33 (un descarte anterior al día 33 del último reto terminado deja de contar, como hoy). La regla de 14 días no cambia.
+- **Prioridad:** Baja. **No bloquea.**
+
 ---
 
 ## Historial
@@ -220,3 +227,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-03: BT-17 a BT-20 (módulo Sesión).
 - 2026-10-03: BT-18 resuelto.
 - 2026-10-03: lote de backend aplicado: BT-03, BT-12, BT-15, BT-17, BT-19 y BT-20 resueltos; BT-21 nuevo (estructurar `recommended_sets_reps`).
+- 2026-10-03: BT-22 (contador de descartes de la tarjeta de Core 33).

@@ -52,12 +52,6 @@ export const CATEGORY_LABELS: Record<RoutineCategory, string> = {
   cardio: 'Cardio',
 };
 
-export function parseCategory(value?: string | null): RoutineCategory | null {
-  return (ROUTINE_CATEGORIES as readonly string[]).includes(value ?? '')
-    ? (value as RoutineCategory)
-    : null;
-}
-
 // Label of a routine for eyebrows and heroes: its category; without one, the
 // raw type text capitalised ("full_body" → "Full body"), or "Rutina".
 export function routineTypeLabel(
@@ -85,10 +79,43 @@ export function levelBars(level?: string | null): number {
 // The root explores (types + collections); the list lives in RoutineList.
 export type RoutineCollection = 'favorites' | 'mine' | 'all';
 export type RoutineScope =
-  | { category: RoutineCategory; collection?: undefined }
-  | { collection: RoutineCollection; category?: undefined };
+  | { group: WorkoutType; collection?: undefined }
+  | { collection: RoutineCollection; group?: undefined };
 
-// "Por tipo" cards: every category (ROUTINE_CATEGORIES), then the collections.
+// "Por tipo" cards: the 5 of the design (D-55), then the collections. The 9
+// server categories are grouped into them:
+//   Fuerza    ← fuerza, tren_superior, tren_inferior, core
+//   Cardio    ← cardio, acondicionamiento
+//   HIIT      ← hiit
+//   Movilidad ← movilidad
+//   Full body ← cuerpo_completo
+export const GROUP_TILES: WorkoutType[] = [
+  'strength',
+  'cardio',
+  'hiit',
+  'mobility',
+  'fullbody',
+];
+
+export const CATEGORY_GROUP: Record<RoutineCategory, WorkoutType> = {
+  fuerza: 'strength',
+  tren_superior: 'strength',
+  tren_inferior: 'strength',
+  core: 'strength',
+  cardio: 'cardio',
+  acondicionamiento: 'cardio',
+  hiit: 'hiit',
+  movilidad: 'mobility',
+  cuerpo_completo: 'fullbody',
+};
+
+// Card of a routine; null (no category) → only in "Todas".
+export function groupOf(workout: Pick<Workout, 'routineCategory'>): WorkoutType | null {
+  return workout.routineCategory
+    ? CATEGORY_GROUP[workout.routineCategory]
+    : null;
+}
+
 export const COLLECTION_TILES: RoutineCollection[] = ['favorites', 'mine', 'all'];
 
 export const COLLECTION_LABELS: Record<RoutineCollection, string> = {
@@ -114,8 +141,8 @@ function inScope(
   favorites: Set<string>,
   userId?: string | null,
 ): boolean {
-  if (scope.category) {
-    return workout.routineCategory === scope.category;
+  if (scope.group) {
+    return groupOf(workout) === scope.group;
   }
   if (scope.collection === 'favorites') {
     return favorites.has(workout.id);
@@ -140,17 +167,20 @@ export function filterRoutines(
   );
 }
 
-// Routines per category; those without one are not counted here (they only
-// show in "Todas").
-export function countByCategory(
-  workouts: Workout[],
-): Record<RoutineCategory, number> {
-  const counts = Object.fromEntries(
-    ROUTINE_CATEGORIES.map(category => [category, 0]),
-  ) as Record<RoutineCategory, number>;
+// Routines per card; those without a category are in no card (only in
+// "Todas").
+export function countByGroup(workouts: Workout[]): Record<WorkoutType, number> {
+  const counts: Record<WorkoutType, number> = {
+    strength: 0,
+    cardio: 0,
+    fullbody: 0,
+    hiit: 0,
+    mobility: 0,
+  };
   workouts.forEach(workout => {
-    if (workout.routineCategory) {
-      counts[workout.routineCategory] += 1;
+    const group = groupOf(workout);
+    if (group) {
+      counts[group] += 1;
     }
   });
   return counts;
@@ -174,8 +204,8 @@ export function plural(count: number, one: string, many: string): string {
 }
 
 export function routineScopeTitle(scope: RoutineScope): string {
-  return scope.category
-    ? CATEGORY_LABELS[scope.category]
+  return scope.group
+    ? TYPE_LABELS[scope.group]
     : COLLECTION_LABELS[scope.collection];
 }
 
@@ -186,19 +216,20 @@ export function routineEmptyText(scope: RoutineScope): string {
   if (scope.collection === 'mine') {
     return 'Crea una rutina con “+” o pídesela a ELLIE.';
   }
-  return scope.category
-    ? `Sin rutinas de ${CATEGORY_LABELS[scope.category].toLowerCase()} todavía.`
+  return scope.group
+    ? `Sin rutinas de ${TYPE_LABELS[scope.group].toLowerCase()} todavía.`
     : 'Todavía no hay rutinas.';
 }
 
-// Route params → scope (category wins; default: all).
+// Route params → scope (a card wins; default: all).
+const GROUP_KEYS: readonly string[] = GROUP_TILES;
+
 export function routineScopeFrom(params?: {
-  category?: string;
+  type?: string;
   collection?: RoutineCollection;
 }): RoutineScope {
-  const category = parseCategory(params?.category);
-  return category
-    ? { category }
+  return params?.type && GROUP_KEYS.includes(params.type)
+    ? { group: params.type as WorkoutType }
     : { collection: params?.collection ?? 'all' };
 }
 
