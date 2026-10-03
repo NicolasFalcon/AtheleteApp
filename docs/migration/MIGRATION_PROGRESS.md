@@ -1512,6 +1512,9 @@ git commit -m "docs: Entrenos module, Core 33 card and backend todo" -m "Co-Auth
 - **D-50** · Resumen sin "Compartir" (Comunidad pendiente) y sin la variante Apple Health (SESSION_08).
 - **D-51** · Banda de ELLIE del Resumen sin eyebrow (como el prototipo): `EllieSurface` acepta `eyebrow=""`.
 - **D-52** · En el descanso, los segmentos solo marcan lo hecho (no el ejercicio en curso).
+- **D-53** · **Textos del diálogo "Salir del entreno".** El prototipo (Overlays.dc.html) dice "Seguir entrenando" (primaria) y "Guardar y salir" (secundaria). Se sustituyen por tres acciones: **Guardar para después** (primaria), **Salir sin guardar** (en Ember, destructiva) y **Cancelar**.
+  - **Referencia:** handoff §7, tabla WORKOUT SESSION, fila "Salir del entreno (diálogo)": propósito "Decidir", CTA principal **Guardar para después**, secundaria **Salir sin guardar / Seguir**; y fila "Sesión en pausa", cuyo menú "…" lista Guardar para después · Finalizar entrenamiento · Salir sin guardar.
+  - **Por qué:** el diálogo también se abre desde la pausa y el descanso, y desde el botón atrás de Android; ahí hace falta una salida que no guarde y una que no haga nada. El texto de apoyo y el estilo (blanco en Light, #1C1B19 en Dark) no cambian.
 
 ### 19.4 Bloqueos y pendientes
 - **Backend** (`BACKEND_TODO.md`): BT-17 peso planificado, BT-18 confirmar volumen y tipos de récord, BT-19 caducidad de `saved`, BT-20 descanso real.
@@ -1548,3 +1551,10 @@ git commit -m "feat(dev): session screen states and deep links" -m "Co-Authored-
 git add docs/migration/MIGRATION_PROGRESS.md docs/backend/BACKEND_TODO.md docs/migration/SESSION_CHECKPOINT.md
 git commit -m "docs: Sesión module and backend todo" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
+
+### 19.7 Ajustes tras la prueba real (2026-10-03)
+- **Hero y Detalle leen lo mismo.** Un solo `fetchPendingSessions` (filas `in_progress` o `saved`) y una sola regla, `selectPendingSession`: la `in_progress` de hoy y, si no hay, la `saved` más reciente de cualquier día; el Detalle la restringe a su rutina. Antes eran dos consultas con prioridad distinta (el hero preferia `saved`; el Detalle, `in_progress`).
+- **Sesión pendiente primero.** Una `saved` o `in_progress` va antes que "Tu primera sesión" y que cualquier otro modo.
+- **Anillo "Entreno".** Suma los minutos activos (sin pausas) de las sesiones de hoy completadas, guardadas y en curso, cada fila una vez. Una sesión en curso sin pausar cuenta hasta su **última actividad registrada** (`duration`, que la app reescribe en cada serie y al pausar o reanudar), no hasta "ahora": cerrar la app o bloquear el teléfono no suma minutos.
+- **Guardar para después ya no falla en silencio.** Si no se puede guardar, aparece STATE_09 con las cifras y "Reintentar ahora" (el reloj queda congelado); "Continuar sin sincronizar" deja el guardado en la cola del teléfono y se reenvía al abrir una sesión.
+- **Resumen:** volumen NULL → "—". Récords `duration` y `distance` mostrados y registrados (BT-18 resuelto).

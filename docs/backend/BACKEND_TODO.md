@@ -28,7 +28,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-15 | Entrenos | `workout_templates.type` con valores cerrados | Baja | No (la app normaliza) |
 | BT-16 | Entrenos | Conteos y búsqueda en servidor cuando crezca la biblioteca | Baja | No |
 | BT-17 | Sesión | Peso planificado por ejercicio en las rutinas (`template_exercises`) | Media | No (último peso del usuario o vacío) |
-| BT-18 | Sesión | Confirmar cuándo se calcula `volume_kg` y qué tipos devuelve `detect_session_prs` | Media | No |
+| BT-18 | Sesión | ~~Confirmar cuándo se calcula `volume_kg` y qué tipos devuelve `detect_session_prs`~~ | — | **Resuelto** (2026-10-03) |
 | BT-19 | Sesión | Sesiones `saved` antiguas: caducidad o limpieza | Baja | No |
 | BT-20 | Sesión | `rest_taken_sec` y fases del descanso (opcional) | Baja | No |
 
@@ -194,13 +194,14 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Propuesta:** `template_exercises.weight_kg` (opcional). La app lo copiará a `planned_weight_kg` y lo usará como propuesta.
 - **Prioridad:** Media. **No bloquea.**
 
-### BT-18 · Volumen y récords de sesión: confirmar el contrato
-- **Qué confirmar:**
-  - que `volume_kg` se calcula en el mismo `UPDATE` que pone `status = 'completed'` (la app lo lee en la respuesta y en el Resumen);
-  - que una serie sincronizada después de completar (cola offline) recalcula el volumen;
-  - qué `pr_type` puede devolver `detect_session_prs` (la app muestra `max_weight`, `weight_reps` y `max_reps`) y si cubre los ejercicios por tiempo.
-- **Por qué:** el Resumen muestra el volumen del servidor. Si llega vacío, muestra las kcal estimadas.
-- **Prioridad:** Media. **No bloquea.**
+### BT-18 · Volumen y récords de sesión · ✅ resuelto (2026-10-03)
+- **Confirmado por backend:**
+  - el trigger calcula `volume_kg` al completar la sesión (sin contar calentamiento);
+  - `detect_session_prs` devuelve los tipos `max_weight`, `weight_reps`, `max_reps`, `duration` y `distance`.
+- **En la app:** el Resumen lee `volume_kg` de la respuesta y, si es NULL (sin pesos), muestra "—" (nunca kcal estimadas). La hoja de récords formatea los cinco tipos y registra `value_duration_sec` / `value_distance_m`.
+- **Nota:** si se completa una sesión con series pendientes en la cola local, el volumen se recalcula cuando llegan las series; el Resumen muestra el valor al abrirlo.
+
+---
 
 ### BT-19 · Sesiones guardadas antiguas
 - **Qué falta:** una sesión `saved` se puede retomar cualquier día. Inicio muestra la más reciente; las más antiguas quedan guardadas sin fin.
@@ -218,3 +219,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-02: documento creado con BT-01 a BT-11.
 - 2026-10-03: BT-12 a BT-16 (módulo Entrenos).
 - 2026-10-03: BT-17 a BT-20 (módulo Sesión).
+- 2026-10-03: BT-18 resuelto.

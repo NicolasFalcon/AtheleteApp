@@ -4,10 +4,13 @@ import {
   buildDayRings,
   homeDateLine,
   formatThousands,
+  hasCompletedEver,
   prCurve,
   quizMastery,
   resolveHomeMode,
+  sessionActiveSeconds,
   toGlasses,
+  trainedMinutesToday,
   type DayRingsInput,
   type HomeModeInput,
 } from '../src/features/home/homePriority';
@@ -27,14 +30,27 @@ function mode(patch: Partial<HomeModeInput>) {
 }
 
 describe('resolveHomeMode', () => {
-  it('shows the new-user hero before anything else', () => {
+  it('puts a pending session (saved or in progress) before every mode', () => {
+    // New user who left the first session halfway.
     expect(
       mode({
         hasCompletedEver: false,
         hasResumableSession: true,
         challenge: openCore,
       }),
-    ).toBe('new');
+    ).toBe('resume');
+    // Already trained today and another session is pending.
+    expect(
+      mode({
+        hasResumableSession: true,
+        workoutDoneToday: true,
+        challenge: closedCore,
+      }),
+    ).toBe('resume');
+  });
+
+  it('shows the new-user hero when nothing is pending', () => {
+    expect(mode({ hasCompletedEver: false, challenge: openCore })).toBe('new');
   });
 
   it('closes the day when the workout is done and Core 33 is closed or absent', () => {
@@ -69,7 +85,7 @@ describe('resolveHomeMode', () => {
 const ringsInput: DayRingsInput = {
   mode: 'workout',
   challenge: openCore,
-  workout: { doneMinutes: null, resumeFraction: null, targetMinutes: 35 },
+  workout: { minutesToday: 0, completedToday: false, targetMinutes: 35 },
   nutrition: { hasPlan: true, calories: 1425, targetCalories: 2850 },
   hydration: { todayMl: 1750, goalGlasses: 14 },
 };
@@ -100,21 +116,21 @@ describe('buildDayRings', () => {
     ).toMatchObject({ kind: 'workout', value: '0', unit: 'de 35 min' });
   });
 
-  it('fills the workout ring with a saved session or a finished one', () => {
+  it('fills the workout ring with the minutes trained today', () => {
     const base = { ...ringsInput, mode: 'allDone' as const };
     expect(
       buildDayRings({
         ...base,
-        workout: { doneMinutes: 42, resumeFraction: null, targetMinutes: 35 },
+        workout: { minutesToday: 42, completedToday: true, targetMinutes: 35 },
       }).rings[0],
     ).toMatchObject({ value: '42', progress: 1, done: true });
     expect(
       buildDayRings({
         ...base,
         mode: 'core33',
-        workout: { doneMinutes: null, resumeFraction: 0.5, targetMinutes: 35 },
-      }).rings[0].progress,
-    ).toBe(0.5);
+        workout: { minutesToday: 14, completedToday: false, targetMinutes: 35 },
+      }).rings[0],
+    ).toMatchObject({ value: '14', progress: 0.4, done: false });
   });
 
   it('shows empty rings for a new user and no nutrition without a plan', () => {
@@ -251,5 +267,79 @@ describe('formatting', () => {
       bestMarkParts({ ...base, prType: 'duration', valueDurationSec: 95 }, now)
         .value,
     ).toBe('1:35');
+  });
+});
+
+describe('trainedMinutesToday', () => {
+  const t0 = Date.parse('2026-10-03T10:00:00Z');
+  const at = (sec: number) => new Date(t0 + sec * 1000).toISOString();
+  const base = {
+    id: 'a',
+    status: 'in_progress',
+    startedAt: at(0),
+    endedAt: null,
+    pausedAt: null,
+    pausedTotalSec: 60,
+    duration: 0,
+  };
+
+  it('counts a running session only up to its last recorded activity', () => {
+    // Last activity wrote 3 active minutes; it does not grow with the clock,
+    // so closing the app or locking the phone adds nothing.
+    const running = { ...base, duration: 3 };
+    expect(sessionActiveSeconds(running)).toBe(180);
+    expect(trainedMinutesToday([running])).toBe(3);
+    // No activity recorded yet (just started): nothing to count.
+    expect(sessionActiveSeconds(base)).toBe(0);
+  });
+
+  it('counts paused, saved and completed sessions from their timestamps', () => {
+    // Paused: up to the pause, minus earlier pauses.
+    expect(sessionActiveSeconds({ ...base, pausedAt: at(273) })).toBe(213);
+    // Saved: frozen at paused_at.
+    expect(
+      sessionActiveSeconds({ ...base, status: 'saved', pausedAt: at(600) }),
+    ).toBe(540);
+    // Completed: ended − started − pauses.
+    expect(
+      sessionActiveSeconds({ ...base, status: 'completed', endedAt: at(1860) }),
+    ).toBe(1800);
+    // Discarded sessions do not count; legacy rows use the stored minutes.
+    expect(sessionActiveSeconds({ ...base, status: 'canceled' })).toBe(0);
+    expect(
+      sessionActiveSeconds({
+        ...base,
+        status: 'completed',
+        startedAt: null,
+        duration: 12,
+      }),
+    ).toBe(720);
+  });
+
+  it('sums today sessions once each (a resumed session is the same row)', () => {
+    const completed = {
+      ...base,
+      id: 'c',
+      status: 'completed',
+      endedAt: at(1260),
+      pausedTotalSec: 60,
+    };
+    const resumed = { ...base, id: 'r', duration: 5 };
+    expect(trainedMinutesToday([completed, resumed, resumed])).toBe(25);
+    expect(trainedMinutesToday([])).toBe(0);
+  });
+});
+
+describe('hasCompletedEver', () => {
+  it('looks at the whole history, not at today, a routine or logged sets', () => {
+    // The test account: 29 completed sessions, the latest in May, none with
+    // rows in workout_session_sets, nothing today → not a new user.
+    expect(hasCompletedEver(29, false)).toBe(true);
+    expect(hasCompletedEver(1, false)).toBe(true);
+    // Only a session completed today (count not refreshed yet) also counts.
+    expect(hasCompletedEver(0, true)).toBe(true);
+    // Really nothing completed.
+    expect(hasCompletedEver(0, false)).toBe(false);
+    expect(hasCompletedEver(null, false)).toBe(false);
   });
 });

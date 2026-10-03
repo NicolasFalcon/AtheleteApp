@@ -39,12 +39,13 @@ export type HomeHeroData = {
   } | null;
   // Hero routine for `workout` (recommended #1) and `new` (shortest beginner).
   workout: HeroWorkout | null;
-  // Saved session for `resume`.
+  // Pending session for `resume` (saved, or in progress / paused).
   resume: {
     title: string;
     done: number;
     total: number;
-    minutes: number;
+    minutes: number; // active minutes so far (pauses excluded)
+    inProgress?: boolean;
   } | null;
   // Finished session for `workoutDone`.
   done: { minutes: number; typeLabel: string } | null;
@@ -374,7 +375,9 @@ function ResumeContent({
   return (
     <View style={styles.content}>
       <Eyebrow tone="tertiary" numberOfLines={1}>
-        {resume ? `Sesión guardada · ${resume.title}` : 'Sesión guardada'}
+        {`${resume?.inProgress ? 'Sesión en curso' : 'Sesión guardada'}${
+          resume ? ` · ${resume.title}` : ''
+        }`}
       </Eyebrow>
       <BigNumber value={done} suffix={`/ ${total} ejercicios`} size={80} />
       <Segments

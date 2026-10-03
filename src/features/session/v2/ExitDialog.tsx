@@ -1,26 +1,30 @@
 import { StyleSheet, View } from 'react-native';
 import { Button, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 
-// Salir del entreno (Overlays.dc.html · SESSION_06). Rendered outside the
-// session scene: white card in Light, #1C1B19 with a hairline in Dark.
+// Salir del entreno (Overlays.dc.html · SESSION_06; handoff §7: "Guardar
+// para después o descartar · Salir sin guardar / Seguir"). Rendered outside
+// the session scene and above every session layer (pause, rest, menu):
+// white card in Light, #1C1B19 with a hairline in Dark.
 export function ExitDialog({
-  saving,
-  onStay,
-  onSaveAndExit,
+  busy,
+  onCancel,
+  onSaveForLater,
+  onDiscard,
 }: {
-  saving: boolean;
-  onStay: () => void;
-  onSaveAndExit: () => void;
+  busy: null | 'save' | 'discard';
+  onCancel: () => void;
+  onSaveForLater: () => void;
+  onDiscard: () => void;
 }) {
   const { colors, mode } = useThemeV2();
   const dark = mode === 'dark';
 
   return (
-    <View style={StyleSheet.absoluteFill}>
+    <View style={styles.root}>
       <PressableScale
         accessibilityRole="button"
-        accessibilityLabel="Seguir entrenando"
-        onPress={onStay}
+        accessibilityLabel="Cancelar"
+        onPress={onCancel}
         style={[
           StyleSheet.absoluteFill,
           { backgroundColor: dark ? 'rgba(0,0,0,.55)' : 'rgba(18,18,18,.32)' },
@@ -48,20 +52,34 @@ export function ExitDialog({
             Tu progreso queda guardado para retomarlo desde Inicio.
           </TextV2>
           <Button
-            label="Seguir entrenando"
-            onPress={onStay}
+            label="Guardar para después"
+            loading={busy === 'save'}
+            loadingLabel="Guardando"
+            disabled={Boolean(busy)}
+            onPress={onSaveForLater}
             style={styles.primary}
           />
           <PressableScale
             accessibilityRole="button"
-            accessibilityState={{ busy: saving }}
-            disabled={saving}
-            onPress={onSaveAndExit}
+            accessibilityState={{ busy: busy === 'discard', disabled: Boolean(busy) }}
+            disabled={Boolean(busy)}
+            onPress={onDiscard}
             style={styles.secondary}
           >
-            <TextV2 variant="bodyStrong">
-              {saving ? 'Guardando…' : 'Guardar y salir'}
+            <TextV2
+              variant="bodyStrong"
+              color={dark ? colors.ember.textOnDark : colors.ember.deep}
+            >
+              {busy === 'discard' ? 'Saliendo…' : 'Salir sin guardar'}
             </TextV2>
+          </PressableScale>
+          <PressableScale
+            accessibilityRole="button"
+            disabled={Boolean(busy)}
+            onPress={onCancel}
+            style={styles.secondary}
+          >
+            <TextV2 variant="bodyStrong">Cancelar</TextV2>
           </PressableScale>
         </View>
       </View>
@@ -70,6 +88,8 @@ export function ExitDialog({
 }
 
 const styles = StyleSheet.create({
+  // Above the pause / rest layers (zIndex 4), the header (5) and the menu (9).
+  root: { ...StyleSheet.absoluteFill, zIndex: 20, elevation: 20 },
   center: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',
@@ -79,7 +99,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     paddingTop: 24,
     paddingHorizontal: 20,
-    paddingBottom: 14,
+    paddingBottom: 6,
     gap: 8,
   },
   body: { lineHeight: 22 },

@@ -226,25 +226,42 @@ export async function syncCompletedExercises(
   });
 }
 
+// `duration` (minutes) is the last recorded activity of a running session:
+// Inicio counts a session that is still `in_progress` only up to it, never up
+// to "now" (closing the app or locking the phone adds nothing).
 export async function setSessionPaused(
   sessionId: string,
   clock: SessionClockFields,
+  activeSec: number,
 ): Promise<void> {
   await updateSession(sessionId, {
     paused_at: clock.pausedAt ? new Date(clock.pausedAt).toISOString() : null,
     paused_total_sec: clock.pausedTotalSec,
+    duration: Math.floor(activeSec / 60),
   });
+}
+
+// Last recorded activity (a logged set).
+export async function recordSessionActivity(
+  sessionId: string,
+  activeSec: number,
+): Promise<void> {
+  await updateSession(sessionId, { duration: Math.floor(activeSec / 60) });
 }
 
 // "Guardar para después": status 'saved', frozen as a pause so the time away
 // never counts (DA-60).
-export async function saveSessionForLater(params: {
+export type SaveForLaterParams = {
   sessionId: string;
   clock: SessionClockFields;
   activeSec: number;
   plan: PlannedExercise[];
   sets: LoggedSet[];
-}): Promise<WorkoutSession> {
+};
+
+export async function saveSessionForLater(
+  params: SaveForLaterParams,
+): Promise<WorkoutSession> {
   const now = Date.now();
   const row = await updateSession(params.sessionId, {
     status: 'saved',
@@ -368,9 +385,30 @@ export type DetectedPR = {
   prType: PRType;
   valueWeight: number | null;
   valueReps: number | null;
+  valueDurationSec: number | null;
+  valueDistanceM: number | null;
   previousWeight: number | null;
   previousReps: number | null;
+  previousDurationSec: number | null;
+  previousDistanceM: number | null;
 };
+
+const num = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+// The value that defines the record (a record without it cannot be saved).
+function mainValue(record: Pick<DetectedPR, 'prType' | 'valueWeight' | 'valueReps' | 'valueDurationSec' | 'valueDistanceM'>) {
+  switch (record.prType) {
+    case 'max_reps':
+      return record.valueReps;
+    case 'duration':
+      return record.valueDurationSec;
+    case 'distance':
+      return record.valueDistanceM;
+    default:
+      return record.valueWeight;
+  }
+}
 
 export async function detectSessionPRs(sessionId: string): Promise<DetectedPR[]> {
   const client = getClient();
@@ -387,11 +425,16 @@ export async function detectSessionPRs(sessionId: string): Promise<DetectedPR[]>
       sessionSetId: String(row.session_set_id),
       exerciseId: String(row.exercise_id),
       prType: row.pr_type as PRType,
-      valueWeight: (row.value_weight as number | null) ?? null,
-      valueReps: (row.value_reps as number | null) ?? null,
-      previousWeight: (row.previous_weight as number | null) ?? null,
-      previousReps: (row.previous_reps as number | null) ?? null,
-    }));
+      valueWeight: num(row.value_weight),
+      valueReps: num(row.value_reps),
+      valueDurationSec: num(row.value_duration_sec),
+      valueDistanceM: num(row.value_distance_m),
+      previousWeight: num(row.previous_weight),
+      previousReps: num(row.previous_reps),
+      previousDurationSec: num(row.previous_duration_sec),
+      previousDistanceM: num(row.previous_distance_m),
+    }))
+    .filter(record => mainValue(record) !== null);
 }
 
 // INSERT … ON CONFLICT (user_id, session_set_id) DO NOTHING, then
@@ -414,7 +457,16 @@ export async function registerSessionPRs(params: {
         pr_type: record.prType,
         value_weight: record.valueWeight,
         value_reps: record.valueReps,
-        unit: record.valueWeight !== null ? 'kg' : null,
+        value_duration_sec: record.valueDurationSec,
+        value_distance_m: record.valueDistanceM,
+        unit:
+          record.prType === 'distance'
+            ? 'm'
+            : record.prType === 'duration'
+            ? 's'
+            : record.valueWeight !== null
+            ? 'kg'
+            : null,
         recorded_at: now,
         source: 'session',
         workout_session_id: params.sessionId,
@@ -453,6 +505,7 @@ export async function registerSessionPRs(params: {
 // in AsyncStorage per user and replayed in order (both are idempotent).
 type OutboxItem =
   | { kind: 'set'; write: SetWrite }
+  | { kind: 'save'; params: SaveForLaterParams }
   | { kind: 'complete'; payload: CompletionPayload };
 
 const outboxKey = (userId: string) => `@athelete/session-outbox-v1:${userId}`;
@@ -482,6 +535,8 @@ export async function enqueueSessionWrite(
   const key = (entry: OutboxItem) =>
     entry.kind === 'set'
       ? `set:${entry.write.sessionId}:${entry.write.set.position}:${entry.write.set.setIndex}`
+      : entry.kind === 'save'
+      ? `save:${entry.params.sessionId}`
       : `complete:${entry.payload.sessionId}`;
   await writeOutbox(userId, [
     ...items.filter(entry => key(entry) !== key(item)),
@@ -506,6 +561,8 @@ export async function flushSessionOutbox(
     try {
       if (item.kind === 'set') {
         await upsertSessionSet(item.write);
+      } else if (item.kind === 'save') {
+        await saveSessionForLater(item.params);
       } else {
         completed.push(await completeSession(item.payload));
       }

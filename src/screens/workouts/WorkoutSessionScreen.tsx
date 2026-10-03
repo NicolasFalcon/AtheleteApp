@@ -74,8 +74,13 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   );
   const [startFailed, setStartFailed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(dev === 'menu');
-  const [exitOpen, setExitOpen] = useState(dev === 'exit');
+  const [exitOpen, setExitOpen] = useState(dev === 'exit' || dev === 'pausedExit');
   const starting = useRef(false);
+  // Set right before an intentional exit (saved, discarded, summary).
+  const allowLeave = useRef(false);
+  const readyRef = useRef(false);
+  const exitOpenRef = useRef(exitOpen);
+  exitOpenRef.current = exitOpen;
   const lastRestKind = useRef<RestKind>('exercise');
 
   // Session to run: the one in the route, today's for this routine, or new.
@@ -107,12 +112,14 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   }, [queryClient, userId]);
 
   const goHome = useCallback(() => {
+    allowLeave.current = true;
     refreshSurfaces();
     navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
   }, [navigation, refreshSurfaces]);
 
   const onCompleted = useCallback(
     (result: CompletionResult) => {
+      allowLeave.current = true;
       refreshSurfaces();
       navigation.replace(APP_ROUTES.WorkoutSummary, {
         sessionId: result.session.id,
@@ -177,6 +184,22 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   );
   const doneText = doneLabel(runner.doneCount, total);
 
+  // Any other way out (iOS swipe if enabled, Android back, a navigation
+  // from elsewhere) asks first: the same "Salir del entreno" dialog in the
+  // active, paused and rest states. Android back on the open dialog closes it.
+  useEffect(
+    () =>
+      navigation.addListener('beforeRemove', event => {
+        if (allowLeave.current || !readyRef.current) {
+          return;
+        }
+        event.preventDefault();
+        setMenuOpen(false);
+        setExitOpen(!exitOpenRef.current);
+      }),
+    [navigation],
+  );
+
   const askDiscard = () => {
     setMenuOpen(false);
     Alert.alert(
@@ -219,7 +242,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           durationSec={runner.saveError.activeSec}
           exercises={runner.saveError.completedExercises.length}
           kcal={runner.saveError.caloriesBurned}
-          retrying={runner.busy === 'finish'}
+          retrying={runner.busy === 'finish' || runner.busy === 'save'}
           onRetry={() => {
             runner.retrySave().catch(() => {});
           }}
@@ -233,6 +256,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
 
   const notReady =
     !workout || runner.loadState !== 'ready' || (!dev && !sessionId);
+  readyRef.current = !notReady;
   const failed =
     workoutsQuery.error || startFailed || runner.loadState === 'error';
 
@@ -376,9 +400,23 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
       </SceneScope>
       {exitOpen ? (
         <ExitDialog
-          saving={runner.busy === 'save'}
-          onStay={() => setExitOpen(false)}
-          onSaveAndExit={saveAndExit}
+          busy={
+            runner.busy === 'save' || runner.busy === 'discard'
+              ? runner.busy
+              : null
+          }
+          onCancel={() => setExitOpen(false)}
+          onSaveForLater={saveAndExit}
+          onDiscard={() => {
+            // The dialog is the confirmation: discard right away.
+            runner.discard().catch(() => {
+              setExitOpen(false);
+              Alert.alert(
+                'No pudimos salir',
+                'Revisa tu conexión. Tu progreso sigue en esta pantalla.',
+              );
+            });
+          }}
         />
       ) : null}
     </View>

@@ -1,4 +1,4 @@
-import type { WorkoutExercise } from '@app/shared';
+import type { WorkoutExercise, WorkoutSession } from '@app/shared';
 
 // Workout Session v2 (Session.dc.html): pure helpers for the plan, the set
 // cursor, the session clock (pauses excluded) and the rest timer.
@@ -10,6 +10,30 @@ export const REST_STEP_SEC = 30;
 export const REST_WARNING_SEC = 3;
 // "Tu turno" stays this long before the active card comes back.
 export const YOUR_TURN_MS = 1500;
+
+// ── Pending session (one rule for Inicio and the routine detail) ───────────
+// A session is pending when it is `in_progress` today or `saved` (any day).
+// An in-progress one wins (the user is training now); then the latest saved.
+// With `workoutId` only that routine's session is considered (routine detail).
+export function selectPendingSession(
+  sessions: WorkoutSession[],
+  today: string,
+  workoutId?: string,
+): WorkoutSession | null {
+  const newestFirst = [...sessions].sort((a, b) =>
+    (b.createdAt ?? '').localeCompare(a.createdAt ?? ''),
+  );
+  const candidates = newestFirst.filter(
+    session => !workoutId || session.workoutId === workoutId,
+  );
+  return (
+    candidates.find(
+      session => session.status === 'in_progress' && session.date === today,
+    ) ??
+    candidates.find(session => session.status === 'saved') ??
+    null
+  );
+}
 
 // ── Plan ────────────────────────────────────────────────────────────────────
 export type PlannedExercise = {

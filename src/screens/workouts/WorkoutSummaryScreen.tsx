@@ -79,8 +79,12 @@ const DEV_PRS: DetectedPR[] = [
     prType: 'max_weight',
     valueWeight: 32,
     valueReps: 8,
+    valueDurationSec: null,
+    valueDistanceM: null,
     previousWeight: 28,
     previousReps: 8,
+    previousDurationSec: null,
+    previousDistanceM: null,
   },
 ];
 
@@ -102,14 +106,45 @@ function realSeconds(params: {
   return real > 0 ? real : params.durationMin * 60;
 }
 
-function prValue(record: DetectedPR): string {
-  if (record.prType === 'max_reps') {
-    return `${record.valueReps ?? 0} reps`;
+// max_weight · weight_reps · max_reps · duration · distance
+function prText(
+  type: DetectedPR['prType'],
+  value: { weight: number | null; reps: number | null; durationSec: number | null; distanceM: number | null },
+): string | null {
+  switch (type) {
+    case 'max_reps':
+      return value.reps !== null ? `${value.reps} reps` : null;
+    case 'duration':
+      return value.durationSec !== null ? formatDuration(value.durationSec) : null;
+    case 'distance':
+      return value.distanceM !== null ? `${value.distanceM} m` : null;
+    case 'weight_reps': {
+      const kg = formatKg(value.weight);
+      return kg ? `${kg}${value.reps ? ` × ${value.reps}` : ''}` : null;
+    }
+    default:
+      return formatKg(value.weight);
   }
-  const kg = formatKg(record.valueWeight) ?? '—';
-  return record.prType === 'weight_reps' && record.valueReps
-    ? `${kg} × ${record.valueReps}`
-    : kg;
+}
+
+function prValue(record: DetectedPR): string {
+  return (
+    prText(record.prType, {
+      weight: record.valueWeight,
+      reps: record.valueReps,
+      durationSec: record.valueDurationSec,
+      distanceM: record.valueDistanceM,
+    }) ?? '—'
+  );
+}
+
+function prPrevious(record: DetectedPR): string | null {
+  return prText(record.prType, {
+    weight: record.previousWeight,
+    reps: record.previousReps,
+    durationSec: record.previousDurationSec,
+    distanceM: record.previousDistanceM,
+  });
 }
 
 // Resumen de cierre v2 (SESSION_07): photo hero with the Ember check, real
@@ -233,17 +268,16 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
         <View style={styles.trio}>
           <TrioItem value={formatDuration(seconds)} label="Duración" />
           <View style={[styles.trioDivider, { backgroundColor: colors.divider }]} />
-          {volume !== null ? (
-            <TrioItem
-              value={`${Math.round(volume).toLocaleString('es-ES')}`}
-              label="kg de volumen"
-            />
-          ) : (
-            <TrioItem
-              value={String(detail.session.caloriesBurned)}
-              label="kcal estimadas"
-            />
-          )}
+          {/* The server computes it on completion (BT-18); without weights
+              it stays empty and the summary shows "—", never kcal. */}
+          <TrioItem
+            value={
+              volume !== null
+                ? `${Math.round(volume).toLocaleString('es-ES')}`
+                : '—'
+            }
+            label="kg de volumen"
+          />
           <View style={[styles.trioDivider, { backgroundColor: colors.divider }]} />
           <TrioItem value={String(setsCount)} label={setsCount === 1 ? 'Serie' : 'Series'} />
         </View>
@@ -391,12 +425,8 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
               <View style={styles.badgeTexts}>
                 <TextV2 variant="bodyStrong">{exerciseName(record.exerciseId)}</TextV2>
                 <TextV2 variant="meta" tone="secondary">
-                  {record.previousWeight !== null || record.previousReps !== null
-                    ? `Antes: ${
-                        record.prType === 'max_reps'
-                          ? `${record.previousReps ?? 0} reps`
-                          : formatKg(record.previousWeight) ?? '—'
-                      }`
+                  {prPrevious(record)
+                    ? `Antes: ${prPrevious(record)}`
                     : 'Primera marca'}
                 </TextV2>
               </View>

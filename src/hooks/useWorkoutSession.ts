@@ -12,8 +12,9 @@ import {
   startWorkoutSession,
 } from '@app/services/supabase/fitness';
 
-function buildSessionKey(userId: string | undefined) {
-  return ['workout-session', userId];
+// One entry per routine: the pending session is chosen per routine.
+function buildSessionKey(userId: string | undefined, workoutId?: string) {
+  return ['workout-session', userId, workoutId];
 }
 
 export function useWorkoutSession(workout: Workout | null) {
@@ -22,13 +23,14 @@ export function useWorkoutSession(workout: Workout | null) {
   const userId = profile?.id;
 
   const sessionQuery = useQuery({
-    queryKey: buildSessionKey(userId),
-    enabled: Boolean(userId),
-    queryFn: async () => fetchEffectiveWorkoutSession(userId!),
+    queryKey: buildSessionKey(userId, workout?.id),
+    // The pending session is chosen per routine: wait for it.
+    enabled: Boolean(userId && workout),
+    queryFn: async () => fetchEffectiveWorkoutSession(userId!, workout?.id),
   });
 
   const syncSessionSurfaces = (nextSession: WorkoutSession) => {
-    queryClient.setQueryData(buildSessionKey(userId), nextSession);
+    queryClient.setQueryData(buildSessionKey(userId, workout?.id), nextSession);
     queryClient.setQueryData(
       ['home', 'overview', userId],
       (current: any) =>
@@ -75,7 +77,7 @@ export function useWorkoutSession(workout: Workout | null) {
       });
     },
     onSuccess: nextSession => {
-      queryClient.setQueryData(buildSessionKey(userId), nextSession);
+      queryClient.setQueryData(buildSessionKey(userId, workout?.id), nextSession);
     },
   });
 

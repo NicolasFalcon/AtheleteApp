@@ -1,8 +1,8 @@
 import { getPRMainValue, type PersonalRecord, type PRType } from '@app/shared';
 
 // Inicio v2 hero modes (Home.dc.html · renderVals), in priority order:
-// new user → whole day closed → workout done → saved session → priority
-// (Core 33 or workout).
+// pending session (saved or in progress) → new user → whole day closed →
+// workout done → priority (Core 33 or workout).
 export type HomeMode =
   | 'new'
   | 'allDone'
@@ -51,6 +51,12 @@ export function resolveHomeMode({
   hasResumableSession,
   challenge,
 }: HomeModeInput): HomeMode {
+  // A session left halfway goes first, even for a new user (never
+  // completed one) or after another workout today.
+  if (hasResumableSession) {
+    return 'resume';
+  }
+
   if (!hasCompletedEver) {
     return 'new';
   }
@@ -63,16 +69,82 @@ export function resolveHomeMode({
     return !coreActive || coreClosed ? 'allDone' : 'workoutDone';
   }
 
-  if (hasResumableSession) {
-    return 'resume';
-  }
-
   // Same rule as the v1 priority: an open Core 33 day goes first.
   if (coreActive && !coreClosed) {
     return 'core33';
   }
 
   return 'workout';
+}
+
+// ── Training time: active seconds of a session (pauses excluded) ─────────
+export type SessionTiming = {
+  status: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  pausedAt?: string | null;
+  pausedTotalSec?: number;
+  // Active minutes stored on the row. While a session runs the app rewrites
+  // it on every logged set and on resume ("last recorded activity").
+  duration: number;
+};
+
+const ms = (value: string | null | undefined) =>
+  value ? new Date(value).getTime() : NaN;
+
+// completed → ended − started − pauses; saved → paused_at − started −
+// pauses (saving freezes the clock in paused_at); paused → the same up to
+// the pause. A running session (not paused) is counted up to its last
+// recorded activity only (`duration`), never up to "now": closing the app or
+// locking the phone does not keep adding minutes. Falls back to `duration`.
+export function sessionActiveSeconds(session: SessionTiming): number {
+  const started = ms(session.startedAt);
+  const paused = session.pausedTotalSec ?? 0;
+  const stored = Math.max(0, session.duration * 60);
+
+  if (session.status === 'in_progress' && !session.pausedAt) {
+    return stored;
+  }
+
+  let end = NaN;
+  if (session.status === 'completed') {
+    end = ms(session.endedAt);
+  } else if (session.status === 'saved' || session.status === 'in_progress') {
+    end = ms(session.pausedAt);
+  } else {
+    return 0;
+  }
+  if (!Number.isFinite(started) || !Number.isFinite(end)) {
+    return stored;
+  }
+  return Math.max(0, Math.floor((end - started) / 1000 - paused));
+}
+
+// "Entreno" ring: today's completed, saved and in-progress sessions, each
+// row once (a resumed session is the same row).
+export function trainedMinutesToday(
+  sessions: Array<SessionTiming & { id: string }>,
+): number {
+  const seen = new Set<string>();
+  let seconds = 0;
+  sessions.forEach(session => {
+    if (seen.has(session.id)) {
+      return;
+    }
+    seen.add(session.id);
+    seconds += sessionActiveSeconds(session);
+  });
+  return Math.floor(seconds / 60);
+}
+
+// "Tu primera sesión" is for someone who never completed a workout:
+// workout_sessions with completed = true, any date, any routine, with or
+// without logged sets (count of the whole history) or one completed today.
+export function hasCompletedEver(
+  completedCount: number | null,
+  completedToday: boolean,
+): boolean {
+  return (completedCount ?? 0) > 0 || completedToday;
 }
 
 // ── Water: profiles.daily_water_goal is stored in 250 ml glasses ──────────
@@ -100,8 +172,8 @@ export type DayRingsInput = {
   mode: HomeMode;
   challenge: HomeChallengeState;
   workout: {
-    doneMinutes: number | null; // completed today
-    resumeFraction: number | null; // saved session progress 0–1
+    minutesToday: number; // trainedMinutesToday
+    completedToday: boolean; // a session completed today closes the ring
     targetMinutes: number;
   };
   nutrition: { hasPlan: boolean; calories: number; targetCalories: number };
@@ -140,13 +212,14 @@ export function buildDayRings({
     : {
         kind: 'workout',
         label: 'Entreno',
-        value: String(workout.doneMinutes ?? 0),
+        value: String(workout.minutesToday),
         unit: `de ${workout.targetMinutes} min`,
-        progress:
-          workout.doneMinutes !== null
-            ? 1
-            : clamp01(workout.resumeFraction ?? 0),
-        done: workout.doneMinutes !== null,
+        progress: workout.completedToday
+          ? 1
+          : clamp01(workout.minutesToday / Math.max(workout.targetMinutes, 1)),
+        done:
+          workout.completedToday ||
+          workout.minutesToday >= Math.max(workout.targetMinutes, 1),
       };
 
   const glasses = toGlasses(hydration.todayMl);

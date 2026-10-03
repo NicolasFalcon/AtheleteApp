@@ -1,3 +1,5 @@
+import { hasCompletedEver } from '@app/features/home/homePriority';
+import { selectPendingSession } from '@app/features/session/sessionModel';
 import { getLocalDateKey } from '@app/lib/date';
 import { awardGamificationEventBestEffort } from '@app/services/supabase/gamification';
 import {
@@ -74,6 +76,8 @@ export type HomeOverview = {
   // Session to resume: the latest `saved` one ("Guardar para después", any
   // day) or, otherwise, today's `in_progress`.
   resumable: WorkoutSession | null;
+  // Every session dated today (any status), for the "Entreno" ring minutes.
+  todaySessions: WorkoutSession[];
   // At least one completed session ever (new user otherwise).
   hasCompletedEver: boolean;
   // Finished Core 33 challenges, for the discovery card (HOME_10 / HOME_11).
@@ -146,6 +150,8 @@ export function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
         : 'idle',
     startedAt: row.started_at,
     endedAt: row.ended_at,
+    pausedAt: row.paused_at,
+    pausedTotalSec: row.paused_total_sec ?? 0,
     completedExercises: Array.isArray(row.completed_exercises)
       ? row.completed_exercises.filter(
           (item): item is string => typeof item === 'string',
@@ -413,86 +419,83 @@ export async function fetchWorkoutLibraryPage(
   };
 }
 
-export async function fetchEffectiveWorkoutSession(
+// The pending rows (`in_progress` or `saved`): the single read behind both
+// the Inicio hero and the routine detail. The choice among them is
+// `selectPendingSession`.
+export async function fetchPendingSessions(
   userId: string,
-): Promise<WorkoutSession | null> {
+): Promise<WorkoutSession[]> {
   const client = getClient();
-  const today = getLocalDateKey();
-
-  const { data: inProgressRows, error: inProgressError } = await client
+  const { data, error } = await client
     .from('workout_sessions')
     .select('*')
     .eq('user_id', userId)
-    .eq('status', 'in_progress')
-    .order('created_at', { ascending: false });
+    .in('status', ['in_progress', 'saved'])
+    .order('created_at', { ascending: false })
+    .limit(20);
 
-  if (inProgressError) {
-    throw inProgressError;
+  if (error) {
+    throw error;
   }
 
-  const inProgress = (inProgressRows || []) as WorkoutSessionRow[];
-  const staleIds = inProgress
-    .filter(row => row.date !== today)
-    .map(row => row.id);
+  return ((data || []) as WorkoutSessionRow[]).map(mapWorkoutSession);
+}
 
-  if (staleIds.length > 0) {
-    await cancelWorkoutSessionsByIds(staleIds);
+// Session shown by the routine detail: the pending one (same rule as the
+// Inicio hero, restricted to this routine) or, failing that, the one
+// completed today.
+export async function fetchEffectiveWorkoutSession(
+  userId: string,
+  workoutId?: string,
+): Promise<WorkoutSession | null> {
+  const client = getClient();
+  const today = getLocalDateKey();
+  let pending = await fetchPendingSessions(userId);
+
+  // In progress from another day, or more than one today: only one can run.
+  const staleIds = pending
+    .filter(
+      session => session.status === 'in_progress' && session.date !== today,
+    )
+    .map(session => session.id);
+  const todayRunning = pending.filter(
+    session => session.status === 'in_progress' && session.date === today,
+  );
+  const extraIds = todayRunning.slice(1).map(session => session.id);
+  const dropIds = [...staleIds, ...extraIds];
+
+  if (dropIds.length > 0) {
+    await cancelWorkoutSessionsByIds(dropIds);
+    pending = pending.filter(session => !dropIds.includes(session.id));
   }
 
-  const todayInProgress = inProgress.filter(row => row.date === today);
+  const chosen = selectPendingSession(pending, today, workoutId);
 
-  if (todayInProgress.length > 1) {
-    await cancelWorkoutSessionsByIds(
-      todayInProgress.slice(1).map(row => row.id),
-    );
+  if (chosen) {
+    return chosen;
   }
 
-  if (todayInProgress[0]) {
-    return mapWorkoutSession(todayInProgress[0]);
+  let completedQuery = client
+    .from('workout_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('date', today)
+    .eq('status', 'completed');
+
+  if (workoutId) {
+    completedQuery = completedQuery.eq('workout_id', workoutId);
   }
 
-  // "Guardar para después" (any day) comes before today's completed one, so
-  // the routine detail offers "Retomar" (DA-38 resolved: 'saved' replaces the
-  // legacy canceled-with-progress rule).
-  const [savedResult, recentResult] = await Promise.all([
-    client
-      .from('workout_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'saved')
-      .order('created_at', { ascending: false })
-      .limit(1),
-    client
-      .from('workout_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', today)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(1),
-  ]);
+  const { data, error } = await completedQuery
+    .order('created_at', { ascending: false })
+    .limit(1);
 
-  if (savedResult.error) {
-    throw savedResult.error;
-  }
-  if (recentResult.error) {
-    throw recentResult.error;
+  if (error) {
+    throw error;
   }
 
-  const saved = (savedResult.data || [])[0] as WorkoutSessionRow | undefined;
-  const completed = (recentResult.data || [])[0] as
-    | WorkoutSessionRow
-    | undefined;
-
-  if (saved) {
-    return mapWorkoutSession(saved);
-  }
-
-  if (completed) {
-    return mapWorkoutSession(completed);
-  }
-
-  return null;
+  const completed = (data || [])[0] as WorkoutSessionRow | undefined;
+  return completed ? mapWorkoutSession(completed) : null;
 }
 
 export async function startWorkoutSession(params: {
@@ -822,7 +825,7 @@ export async function fetchHomeOverview(params: {
 
   const [
     todaySessionsResult,
-    savedSessionResult,
+    pendingSessionsResult,
     completedEverResult,
     challengeResult,
     nutritionPlanResult,
@@ -838,13 +841,10 @@ export async function fetchHomeOverview(params: {
       .eq('date', today)
       .order('created_at', { ascending: false })
       .limit(20),
-    client
-      .from('workout_sessions')
-      .select('*')
-      .eq('user_id', params.userId)
-      .eq('status', 'saved')
-      .order('created_at', { ascending: false })
-      .limit(1),
+    fetchPendingSessions(params.userId).then(
+      data => ({ data, error: null }),
+      (error: unknown) => ({ data: null, error }),
+    ),
     client
       .from('workout_sessions')
       .select('id', { count: 'exact', head: true })
@@ -894,8 +894,8 @@ export async function fetchHomeOverview(params: {
     throw todaySessionsResult.error;
   }
 
-  if (savedSessionResult.error) {
-    throw savedSessionResult.error;
+  if (pendingSessionsResult.error) {
+    throw pendingSessionsResult.error;
   }
 
   if (completedEverResult.error) {
@@ -941,11 +941,11 @@ export async function fetchHomeOverview(params: {
   const completedTodayRow = todayRows.find(
     row => row.status === 'completed' || row.completed === true,
   );
-  const savedRow = savedSessionResult.data?.[0] as
-    | WorkoutSessionRow
-    | undefined;
-  const resumableRow =
-    savedRow || todayRows.find(row => row.status === 'in_progress');
+  // Same read and same rule as the routine detail (selectPendingSession).
+  const resumable = selectPendingSession(
+    (pendingSessionsResult.data as WorkoutSession[] | null) ?? [],
+    today,
+  );
 
   let challenge: HomeOverview['challenge'] = null;
   const participation = challengeResult.data?.[0] as
@@ -1041,9 +1041,12 @@ export async function fetchHomeOverview(params: {
     completedToday: completedTodayRow
       ? mapWorkoutSession(completedTodayRow)
       : null,
-    resumable: resumableRow ? mapWorkoutSession(resumableRow) : null,
-    hasCompletedEver:
-      (completedEverResult.count ?? 0) > 0 || Boolean(completedTodayRow),
+    resumable,
+    todaySessions: todayRows.map(mapWorkoutSession),
+    hasCompletedEver: hasCompletedEver(
+      completedEverResult.count,
+      Boolean(completedTodayRow),
+    ),
     core33History: {
       completedCount: completedChallenges.length,
       lastDay33,

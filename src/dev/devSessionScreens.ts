@@ -15,6 +15,7 @@ export const SESSION_DEV_SCREENS = [
   { key: 'restSet', label: 'Descanso · serie (SESSION_04)' },
   { key: 'restEnd', label: 'Tu turno (SESSION_05)' },
   { key: 'exit', label: 'Salir del entreno (SESSION_06)' },
+  { key: 'pausedExit', label: 'Salir del entreno desde la pausa' },
   { key: 'allDone', label: 'Todo hecho · Finalizar' },
   { key: 'error', label: 'Error al guardar (STATE_09)' },
   { key: 'summary', label: 'Resumen · última sesión o vista previa (SESSION_07)' },

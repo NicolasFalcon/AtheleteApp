@@ -20,6 +20,8 @@ import {
   prCurve,
   quizMastery,
   resolveHomeMode,
+  sessionActiveSeconds,
+  trainedMinutesToday,
   toGlasses,
   type DayRingKind,
   type HomeChallengeState,
@@ -199,11 +201,10 @@ export function HomeScreen({ navigation }: Props) {
     mode: mode ?? 'workout',
     challenge: challengeState,
     workout: {
-      doneMinutes: completedToday ? completedToday.duration : null,
-      resumeFraction:
-        resumable && resumable.totalExercises > 0
-          ? resumable.completedExercises.length / resumable.totalExercises
-          : null,
+      // Active minutes (pauses excluded) of today's completed, saved and
+      // in-progress sessions; refreshed every time Inicio gains focus.
+      minutesToday: trainedMinutesToday(overview?.todaySessions ?? []),
+      completedToday: Boolean(completedToday),
       targetMinutes,
     },
     nutrition: {
@@ -363,7 +364,10 @@ export function HomeScreen({ navigation }: Props) {
                   title: resumable.workoutTitle,
                   done: resumable.completedExercises.length,
                   total: resumable.totalExercises,
-                  minutes: resumable.duration,
+                  minutes: Math.floor(
+                    sessionActiveSeconds(resumable) / 60,
+                  ),
+                  inProgress: resumable.status === 'in_progress',
                 }
               : null,
             done: completedToday

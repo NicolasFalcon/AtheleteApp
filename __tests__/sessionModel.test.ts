@@ -11,6 +11,7 @@ import {
   restAfter,
   restPhase,
   restRemainingMs,
+  selectPendingSession,
   resumeClock,
   startRest,
   suggestedSet,
@@ -109,5 +110,45 @@ describe('rest timer', () => {
     expect(restPhase(10_000)).toBe('counting');
     expect(restPhase(3_000)).toBe('warning');
     expect(restPhase(0)).toBe('go');
+  });
+});
+
+describe('pending session (one rule for Inicio and the detail)', () => {
+  const row = (id: string, patch = {}) => ({
+    id,
+    workoutId: 'w1',
+    workoutTitle: 'Rutina',
+    userId: 'u',
+    date: '2026-10-03',
+    completed: false,
+    duration: 0,
+    caloriesBurned: 0,
+    status: 'in_progress' as const,
+    startedAt: null,
+    endedAt: null,
+    completedExercises: [],
+    totalExercises: 6,
+    createdAt: '2026-10-03T10:00:00Z',
+    ...patch,
+  });
+  const today = '2026-10-03';
+
+  it('prefers today in progress, then the latest saved of any day', () => {
+    const saved = row('s', { status: 'saved', date: '2026-09-30', createdAt: '2026-09-30T10:00:00Z' });
+    const running = row('r');
+    expect(selectPendingSession([saved, running], today)?.id).toBe('r');
+    expect(selectPendingSession([saved], today)?.id).toBe('s');
+    expect(selectPendingSession([], today)).toBeNull();
+    // An in-progress row from another day is not pending today.
+    expect(selectPendingSession([row('old', { date: '2026-10-01' })], today)).toBeNull();
+  });
+
+  it('gives the detail the same answer, restricted to its routine', () => {
+    const a = row('a', { workoutId: 'w1' });
+    const b = row('b', { workoutId: 'w2', status: 'saved', createdAt: '2026-10-02T10:00:00Z' });
+    expect(selectPendingSession([a, b], today)?.id).toBe('a');
+    expect(selectPendingSession([a, b], today, 'w1')?.id).toBe('a');
+    expect(selectPendingSession([a, b], today, 'w2')?.id).toBe('b');
+    expect(selectPendingSession([a, b], today, 'w3')).toBeNull();
   });
 });

@@ -69,6 +69,9 @@ export type WorkoutSession = {
   status: 'idle' | 'in_progress' | 'completed' | 'canceled' | 'saved';
   startedAt: string | null;
   endedAt: string | null;
+  // Pause bookkeeping (v2 session): the active time excludes pauses.
+  pausedAt?: string | null;
+  pausedTotalSec?: number;
   completedExercises: string[];
   totalExercises: number;
   createdAt?: string;

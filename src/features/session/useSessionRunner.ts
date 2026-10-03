@@ -37,11 +37,13 @@ import {
   markSessionExercise,
   reopenSession,
   saveSessionForLater,
+  recordSessionActivity,
   setSessionPaused,
   syncCompletedExercises,
   upsertSessionSet,
   type CompletionPayload,
   type CompletionResult,
+  type SaveForLaterParams,
   type SetWrite,
 } from '@app/services/supabase/session';
 import type { Workout } from '@app/shared';
@@ -51,6 +53,7 @@ import type { Workout } from '@app/shared';
 export type DevSessionState =
   | 'active'
   | 'paused'
+  | 'pausedExit'
   | 'restExercise'
   | 'restSet'
   | 'restEnd'
@@ -90,6 +93,7 @@ function devSetup(
   const clock: ClockState = { startedAt: now - 1000, pausedTotalSec: 0, pausedAt: null };
   switch (dev) {
     case 'paused':
+    case 'pausedExit':
       return {
         sets: [...full(plan[0]), ...full(plan[1])],
         clock: { startedAt: now - (12 * 60 + 34 + 73) * 1000, pausedTotalSec: 0, pausedAt: now - 73_000 },
@@ -134,8 +138,10 @@ export function useSessionRunner({
   const [draft, setDraft] = useState<SessionDraft>({ reps: null, weightKg: null });
   const [lastWeights, setLastWeights] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<null | 'save' | 'finish' | 'discard'>(null);
-  const [saveError, setSaveError] = useState<CompletionPayload | null>(
-    null,
+  // STATE_09: the workout could not be saved (finishing or saving for later).
+  const [saveError, setSaveError] = useState<CompletionPayload | null>(null);
+  const [saveErrorKind, setSaveErrorKind] = useState<'finish' | 'save'>(
+    'finish',
   );
   const pendingWrites = useRef<Promise<unknown>[]>([]);
   const draftKey = useRef<string | null>(null);
@@ -293,6 +299,14 @@ export function useSessionRunner({
         )
         .catch(() => enqueueSessionWrite(userId, { kind: 'set', write })),
     );
+    // Last recorded activity: Inicio counts a running session up to here.
+    if (clock) {
+      track(
+        recordSessionActivity(sessionId, activeSeconds(clock, Date.now())).catch(
+          error => console.warn('[session] Actividad sin registrar.', error),
+        ),
+      );
+    }
     if (isExerciseDone(exercise, setsAfter)) {
       track(
         Promise.all([
@@ -337,7 +351,9 @@ export function useSessionRunner({
     setClock(next);
     setRest(currentRest => (currentRest ? freezeRest(currentRest, at) : null));
     if (!dryRun && sessionId) {
-      setSessionPaused(sessionId, next).catch(() => {});
+      setSessionPaused(sessionId, next, activeSeconds(next, at)).catch(error =>
+        console.warn('[session] La pausa no se pudo guardar.', error),
+      );
     }
   }, [clock, dryRun, sessionId]);
 
@@ -350,7 +366,10 @@ export function useSessionRunner({
     setClock(next);
     setRest(currentRest => (currentRest ? thawRest(currentRest, at) : null));
     if (!dryRun && sessionId) {
-      setSessionPaused(sessionId, next).catch(() => {});
+      // Resuming is activity: the row's minutes are refreshed here.
+      setSessionPaused(sessionId, next, activeSeconds(next, at)).catch(error =>
+        console.warn('[session] La reanudación no se pudo guardar.', error),
+      );
     }
   }, [clock, dryRun, sessionId]);
 
@@ -368,6 +387,37 @@ export function useSessionRunner({
 
   const waitForWrites = () => Promise.allSettled([...pendingWrites.current]);
 
+  // Figures shown by STATE_09 and kept for a retry.
+  const buildPayload = (closed: ClockState, at: number): CompletionPayload => {
+    const done = completedExerciseCount(plan, sets);
+    return {
+      sessionId: sessionId ?? 'dev',
+      workoutId: workout?.id ?? null,
+      workoutTitle: workout?.title ?? '',
+      activeSec: activeSeconds(closed, at),
+      pausedTotalSec: closed.pausedTotalSec,
+      caloriesBurned:
+        workout && plan.length > 0
+          ? Math.round((workout.calories * done) / plan.length)
+          : workout?.calories ?? 0,
+      completedExercises: completedExerciseIds(plan, sets),
+      endedAt: new Date(at).toISOString(),
+    };
+  };
+
+  const saveParams = (): SaveForLaterParams | null =>
+    clock && sessionId
+      ? {
+          sessionId,
+          clock,
+          activeSec: activeSeconds(clock, Date.now()),
+          plan,
+          sets,
+        }
+      : null;
+
+  // "Guardar para después". A failure is never silent: STATE_09 appears with
+  // the figures and "Reintentar ahora" (the clock stays frozen meanwhile).
   const saveForLater = useCallback(async () => {
     if (!clock) {
       return;
@@ -376,22 +426,31 @@ export function useSessionRunner({
       onLeave();
       return;
     }
+    const at = Date.now();
+    const frozen = pauseClock(clock, at);
+    const params: SaveForLaterParams = {
+      sessionId,
+      clock: frozen,
+      activeSec: activeSeconds(frozen, at),
+      plan,
+      sets,
+    };
     setBusy('save');
     try {
       await waitForWrites();
-      await saveSessionForLater({
-        sessionId,
-        clock,
-        activeSec: activeSeconds(clock, Date.now()),
-        plan,
-        sets,
-      });
+      await saveSessionForLater(params);
+      setSaveError(null);
       onLeave();
+    } catch (error) {
+      console.warn('[session] No se pudo guardar para después.', error);
+      setClock(frozen);
+      setSaveErrorKind('save');
+      setSaveError(buildPayload(frozen, at));
     } finally {
       setBusy(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clock, dryRun, plan, sessionId, sets]);
+  }, [clock, dryRun, plan, sessionId, sets, workout]);
 
   const discard = useCallback(async () => {
     if (dryRun || !sessionId) {
@@ -433,22 +492,10 @@ export function useSessionRunner({
     }
     const at = Date.now();
     const closed = resumeClock(clock, at);
-    const done = completedExerciseCount(plan, sets);
-    const payload: CompletionPayload = {
-      sessionId: sessionId ?? 'dev',
-      workoutId: workout.id,
-      workoutTitle: workout.title,
-      activeSec: activeSeconds(closed, at),
-      pausedTotalSec: closed.pausedTotalSec,
-      caloriesBurned:
-        plan.length > 0
-          ? Math.round((workout.calories * done) / plan.length)
-          : workout.calories,
-      completedExercises: completedExerciseIds(plan, sets),
-      endedAt: new Date(at).toISOString(),
-    };
+    const payload = buildPayload(closed, at);
     setClock(closed);
     setRest(null);
+    setSaveErrorKind('finish');
     if (dryRun || !sessionId) {
       setSaveError(payload);
       return;
@@ -459,20 +506,31 @@ export function useSessionRunner({
   }, [clock, dryRun, plan, sessionId, sets, workout]);
 
   const retrySave = useCallback(async () => {
-    if (saveError && !dryRun) {
-      await runCompletion(saveError);
+    if (!saveError || dryRun) {
+      return;
     }
+    if (saveErrorKind === 'save') {
+      await saveForLater();
+      return;
+    }
+    await runCompletion(saveError);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dryRun, saveError]);
+  }, [dryRun, saveError, saveErrorKind, saveForLater]);
 
   // "Continuar sin sincronizar": the completion waits in the outbox.
   const continueOffline = useCallback(async () => {
     if (saveError && userId && !dryRun) {
-      await enqueueSessionWrite(userId, { kind: 'complete', payload: saveError });
+      const params = saveErrorKind === 'save' ? saveParams() : null;
+      await enqueueSessionWrite(
+        userId,
+        params
+          ? { kind: 'save', params }
+          : { kind: 'complete', payload: saveError },
+      );
     }
     onLeave();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dryRun, saveError, userId]);
+  }, [dryRun, saveError, saveErrorKind, userId]);
 
   return {
     loadState,
@@ -505,6 +563,7 @@ export function useSessionRunner({
     discard,
     finish,
     saveError,
+    saveErrorKind,
     retrySave,
     continueOffline,
     busy,
