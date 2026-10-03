@@ -1286,3 +1286,27 @@ git commit -m "feat(notifications): v2 notifications with today, milestones and 
 git add docs/migration/MIGRATION_PROGRESS.md
 git commit -m "docs: phase 3 Inicio and Notificaciones" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
+
+---
+
+## 16. Validación en simulador · correcciones (2026-10-02)
+
+Build en Xcode 27 / iOS 27.0 (iPhone 17).
+
+- **Build iOS**
+  - `Podfile` `post_install`: el deployment target de los pods con menos de iOS 15 se sube al mínimo de la app (Xcode 27 los rechaza).
+  - `AppDelegate.swift` + `Info.plist`: ciclo de vida UIScene (`SceneDelegate`), obligatorio con el SDK de iOS 27. Los enlaces `athelete://` llegan por la escena; en arranque en frío se pasan como launch option.
+- **Números display recortados** (onboarding días, hero de Inicio, Quiz)
+  - Con `lineHeight` menor que ~1,2× el tamaño de letra, iOS recorta el glifo: un 5 se leía como un 3.
+  - `theme.v2.typography` aplica `tightLine()`: interlineado seguro + `marginVertical` negativo, de modo que la caja sigue siendo la del prototipo. Se aplica a los tokens `display*` y `title*`, y a los tamaños sobrescritos en `DaysStep`, `HomeHero` y `QuizBanner`.
+- **Bienvenida de ELLIE desplazada**
+  - En Fabric, un `LinearGradient` con padding usado como contenedor se desplaza a sí mismo y a sus hijos por el padding.
+  - `EllieWelcome` y `EllieSurface` (banda de ELLIE en Inicio y Notificaciones) pasan a usar un `View` con padding y el gradiente como fondo absoluto. La Bienvenida va de borde a borde y el contenido respeta el área segura.
+- **"No pudimos guardar tu perfil"**
+  - Supabase devolvía `23514 profiles_training_level_check`: el backend acepta `principiante | intermedio | avanzado` (comprobado contra la base de datos), no los valores en inglés que indica `BACKEND_SUMMARY.md` §1. Se corrigió el mapeo.
+  - `goal = performance`, `preferred_session_minutes` (20/35/45/60), `available_equipment` y los nulos de `gender` / `avatar_key` / `profile_photo_url` se aceptan.
+  - Log del error completo (`code`, `message`, `details`, `hint`) en `__DEV__`. **Backend:** corregir `BACKEND_SUMMARY.md` §1 (valores de `training_level`).
+- **"5 días/sem" en la Bienvenida:** el resumen usa `answers.days`, el mismo valor del paso. El "3" que se veía en el paso era un 5 con la parte de arriba recortada (ver el punto de los números display).
+- **Herramientas dev nuevas**
+  - `athelete://dev/onboarding?step=0…7` y `athelete://dev/welcome[?status=error]`.
+  - En iOS, también como argumento de arranque, sin el diálogo "Open in…": `xcrun simctl launch booted <bundle> -devTool "athelete://dev/welcome?status=error"`.
