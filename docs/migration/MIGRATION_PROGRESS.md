@@ -1454,3 +1454,97 @@ git commit -m "docs: Entrenos module, Core 33 card and backend todo" -m "Co-Auth
   - `favorites` abre el vacío de STATE_06 de forma forzada (`devEmpty`, solo `__DEV__`).
   - `list` acepta `&zone=<key>`.
 - **Limpieza:** el commit `21ac3e1` añadió por error 48 copias de archivos (en `src/features/home/v2/` y `src/features/workouts/`), creadas por un script de verificación. Se quitan en el commit de limpieza.
+
+## 19. Sesión · módulo completo (SESSION_01–07, STATE_09, 2026-10-03)
+
+> **Leer en 2 minutos.** Sesión con datos reales y registro serie a serie (`workout_session_exercises` / `workout_session_sets`), pausa que no cuenta en la duración, descansos con +30 s, Resumen con volumen del servidor y récords detectados, error al guardar sin perder datos y "Retomar" de una sesión guardada otro día. Verificado con capturas Light y Dark (la sesión es escena oscura en ambos modos). `tsc` sin errores, eslint sin errores, `jest` 103/103 (7 nuevos del temporizador y las series).
+
+### 19.1 Qué quedó hecho, por pantalla
+| Pantalla | Ref. | Estado |
+|---|---|---|
+| Sesión activa | SESSION_01 | ✅ Modo foco: cabecera glass (atrás → diálogo, "…" → menú), cronómetro 68 con pulso Ember y pausa 44, segmentos por ejercicio, hechos comprimidos, tarjeta "AHORA · n DE m" con **"Serie 2 de 3"**, **reps y kg editables**, descanso y check 64 que registra la serie; "Después" con miniaturas |
+| En pausa | SESSION_02 | ✅ "SESIÓN EN PAUSA", reloj congelado al 50 %, "En pausa desde hace", progreso, ficha compacta y "Continuar entrenamiento". El descanso en curso también se congela |
+| Menú "…" | SESSION_03 | ✅ Guardar para después · Finalizar entrenamiento ("n de m · se guarda así") · Salir sin guardar (con confirmación) |
+| Descanso entre ejercicios / series | SESSION_03 / 04 | ✅ Anillo 236 Recovery Blue con cuenta atrás, +30 s, Saltar descanso, ficha "Hecho · …" / "Serie 1 de 3 · …" y la siguiente pieza. Usa el descanso planificado |
+| Fin del descanso | SESSION_05 | ✅ Últimos 3 s en Ember (#FF8A5C); en cero, háptica, "Tu turno" 1,5 s y vuelve la tarjeta activa |
+| Salir del entreno | SESSION_06 | ✅ Diálogo Light (blanco) / Dark (#1C1B19): Seguir entrenando · Guardar y salir (`saved`) |
+| Todo hecho | — | ✅ "Seis de seis. Cierra la sesión." + "Finalizar entreno" |
+| Resumen de cierre | SESSION_07 | ✅ Nueva ruta `WorkoutSummary`: hero con check, trío **Duración real · Volumen (servidor) · Series**, "n de m ejercicios", logro desbloqueado (badges de `workout_completed`), banda ELLIE, Listo y "Registrar récord" si `detect_session_prs` devuelve algo |
+| Error al guardar | STATE_09 | ✅ Cifras conservadas, "Reintentar ahora" (sincroniza primero las series pendientes) y "Continuar sin sincronizar" (queda en la cola del teléfono) |
+| Retomar | HOME_04 | ✅ Inicio abre la sesión `saved` exacta (`sessionId`), aunque sea de otro día |
+
+**Datos (BACKEND_SUMMARY §3.5):**
+- al abrir: `workout_session_exercises` con lo planificado (upsert, sin pisar);
+- cada serie: upsert `ON CONFLICT (session_id, exercise_position, set_index) DO UPDATE`;
+- al terminar un ejercicio: su fila pasa a `completed` y se actualiza `completed_exercises` (compatibilidad);
+- pausa: `paused_at` / `paused_total_sec`;
+- "Guardar para después": `status = 'saved'`;
+- "Salir sin guardar": `canceled`;
+- al completar: `workout_completed` (igual que antes) y `detect_session_prs`;
+- al registrar récords: `personal_records` con `source = 'session'` y `session_set_id` (`ON CONFLICT DO NOTHING`) y `personal_record_created` por cada uno.
+
+**Offline:** las series y el cierre que fallan quedan en `@athelete/session-outbox-v1:<userId>` (AsyncStorage) y se reenvían en orden al abrir una sesión o al reintentar. Las dos escrituras son idempotentes.
+
+**Dev** (solo `__DEV__`, sin escrituras):
+- menú "Ver pantallas de Sesión";
+- deep link `athelete://dev/session?screen=active|paused|menu|restExercise|restSet|restEnd|exit|allDone|error|summary|summaryPreview`: la rutina "Total Body Dumbbell" con el estado forzado (`devState`);
+- `summary` abre la última sesión completada o, si no hay, la vista previa.
+
+### 19.2 Decisiones asumidas
+| ID | Decisión |
+|---|---|
+| DA-60 | "Guardar para después" deja `paused_at`: el tiempo fuera cuenta como pausa. Al retomar: `in_progress`, la pausa se suma a `paused_total_sec` y `date` pasa a hoy (cuenta para el día en que se termina) |
+| DA-61 | Resuelve DA-38: "Retomar" = la última `saved` de cualquier día o la `in_progress` de hoy. `canceled` con progreso deja de ser reanudable (se elimina `isResumableSession`). El detalle de rutina también ofrece "Retomar" para una `saved` |
+| DA-62 | Plan: 3 series si la rutina no las indica, descanso 60 s si es 0. Ejercicios por tiempo: la serie registra la duración planificada (sin reps) |
+| DA-63 | kg propuesto = la serie anterior del ejercicio; si no hay, el último peso del usuario para ese ejercicio; si tampoco, vacío (BT-17). Reps propuestas = las planificadas o las de la serie anterior |
+| DA-64 | Duración real = fin − inicio − pausas (en segundos en el Resumen; en minutos en `duration`) |
+| DA-65 | Trío del Resumen: Duración · **Volumen** (kg, del servidor) · **Series**; los ejercicios van en la línea del hero. Sin volumen (sin pesos) → kcal estimadas |
+| DA-66 | "Registrar récord" abre una hoja con los récords detectados (anterior → nuevo) y los registra todos juntos |
+| DA-67 | La imagen de la tarjeta actual es el recorte anatómico de la zona del ejercicio (o la foto de la rutina); las miniaturas, las de la biblioteca. Sin fotos por ejercicio (PLACEHOLDER) |
+| DA-68 | La frase de ELLIE del Resumen es el insight principal de ELLIE (se recarga al abrir) |
+| DA-69 | Salir sin guardar pide confirmación (Alert del sistema) antes de descartar |
+| DA-70 | Sin gesto de volver en Sesión y Resumen: se sale por "Salir del entreno" / "Listo" |
+
+### 19.3 Desviaciones nuevas
+- **D-47** · Tarjeta activa: en lugar de "3 × 12 · series × reps", muestra reps y kg editables de la serie actual y el descanso. La línea bajo el nombre dice "Serie 2 de 3 · 3 × 12".
+- **D-48** · Se quita la acción "deshacer" sobre los ejercicios hechos (fila no interactiva).
+- **D-49** · "Técnica 3D" → "Técnica" (abre el Exercise Detail · MoveKit; el 3D se descartó).
+- **D-50** · Resumen sin "Compartir" (Comunidad pendiente) y sin la variante Apple Health (SESSION_08).
+- **D-51** · Banda de ELLIE del Resumen sin eyebrow (como el prototipo): `EllieSurface` acepta `eyebrow=""`.
+- **D-52** · En el descanso, los segmentos solo marcan lo hecho (no el ejercicio en curso).
+
+### 19.4 Bloqueos y pendientes
+- **Backend** (`BACKEND_TODO.md`): BT-17 peso planificado, BT-18 confirmar volumen y tipos de récord, BT-19 caducidad de `saved`, BT-20 descanso real.
+- **App:** compartir en Comunidad desde el Resumen; Apple Health (SESSION_08); fotos por ejercicio; "deshacer" una serie.
+- **Sin usar desde la v2 (no borrados, comprobado con grep):** `WorkoutSessionExerciseRow`; en `useWorkoutSession`, `persistCompletedExercises`, `completeSession`, `saveSessionForLater` y `resumeSession`, y sus servicios en `fitness.ts` (`persistWorkoutSessionExercises`, `completeWorkoutSession`, `cancelWorkoutSession`, `resumeWorkoutSession`).
+
+### 19.5 Checklist de validación (en el simulador o el dispositivo, Light y Dark)
+- [ ] Detalle de rutina → Empezar: crea la sesión y sus `workout_session_exercises`; el cronómetro corre.
+- [ ] Registrar una serie con reps y kg editados → descanso "entre series" con el descanso planificado; +30 s suma; Saltar vuelve; al llegar a 0 vibra y sale "Tu turno".
+- [ ] Última serie de un ejercicio → descanso "entre ejercicios" y el ejercicio sale en "hechos".
+- [ ] Pausa 1 min → al continuar el cronómetro no suma ese minuto; un descanso en curso se congela.
+- [ ] Atrás → diálogo; "Guardar y salir" → Inicio muestra "Retomar"; al tocarlo vuelve a la misma serie (también al día siguiente).
+- [ ] Menú → Finalizar con ejercicios pendientes → Resumen con "n de m".
+- [ ] Menú → Salir sin guardar → confirmación → Inicio sin "Retomar".
+- [ ] Completar todo → Resumen: duración sin pausas, volumen del servidor, series; "Registrar récord" si hay récord nuevo → registra y deja de aparecer; los puntos llegan una vez.
+- [ ] Modo avión al finalizar → STATE_09; "Reintentar ahora" sin red sigue en error; "Continuar sin sincronizar" → Inicio; al volver la red y abrir una sesión, se sincroniza.
+- [ ] Atajo: menú dev "Ver pantallas de Sesión" o `xcrun simctl launch booted <bundle> -devTool "athelete://dev/session?screen=<key>" -themeMode dark`.
+
+### 19.6 Commits (en este orden; cada uno compila, verificado con `tsc` sobre una copia de HEAD)
+```bash
+# 1 · Modelo y servicios de sesión (series, pausa, guardado, récords, cola offline)
+git add src/features/session/sessionModel.ts __tests__/sessionModel.test.ts src/services/supabase/session.ts src/services/supabase/fitness.ts
+git commit -m "feat(session): per-set session model and services" -m "Plan, set cursor, clock without pauses and rest timer with tests. Supabase: planned exercises, set upserts, pause, saved for later, completion with workout_completed, detect_session_prs and session PRs, offline outbox. Saved sessions of any day are the resumable ones (DA-38)." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 2 · Pantallas de Sesión y Resumen
+git add src/features/session/useSessionRunner.ts src/features/session/v2/SessionViews.tsx src/features/session/v2/ExitDialog.tsx src/screens/workouts/WorkoutSessionScreen.tsx src/screens/workouts/WorkoutSummaryScreen.tsx src/features/gamification/badgeIcons.ts src/screens/home/NotificationsScreen.tsx src/components/v2/EllieSurface.tsx src/types/navigation.ts src/constants/routes.ts src/navigation/RootNavigator.tsx src/screens/tabs/HomeScreen.tsx
+git commit -m "feat(session): v2 workout session, pause, rest and summary" -m "Focus mode with editable reps and kg per set, pause that does not count, rest between sets and exercises with +30 s and Tu turno, exit dialog and menu, save error with retry, summary with real duration, server volume, sets and detected records. Inicio resumes the exact saved session." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 3 · Herramientas dev
+git add src/dev/devSessionScreens.ts src/dev/devWorkoutsScreens.ts src/dev/DevCatalogHost.tsx
+git commit -m "feat(dev): session screen states and deep links" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 4 · Documentación
+git add docs/migration/MIGRATION_PROGRESS.md docs/backend/BACKEND_TODO.md docs/migration/SESSION_CHECKPOINT.md
+git commit -m "docs: Sesión module and backend todo" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```

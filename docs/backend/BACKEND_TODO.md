@@ -3,7 +3,7 @@
 **Para:** backend (Lovable / Supabase) y Nicolás.
 **Mantenido por:** el equipo de la app móvil. Cada vez que la app necesite algo del backend que aún no existe, se añade aquí en lugar de improvisarlo en la app.
 **Fuente de lo que ya existe:** [`BACKEND_SUMMARY.md`](BACKEND_SUMMARY.md).
-**Última actualización:** 2026-10-03.
+**Última actualización:** 2026-10-03 (Sesión).
 
 Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** (la app funciona con un sustituto local o aproximado) · **Baja** (mejora u operación).
 
@@ -27,6 +27,10 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-14 | Entrenos | Técnica estructurada: tempo, fases, pasos con título, consecuencia de cada error, recomendaciones completas | Media | No (se oculta lo que falta) |
 | BT-15 | Entrenos | `workout_templates.type` con valores cerrados | Baja | No (la app normaliza) |
 | BT-16 | Entrenos | Conteos y búsqueda en servidor cuando crezca la biblioteca | Baja | No |
+| BT-17 | Sesión | Peso planificado por ejercicio en las rutinas (`template_exercises`) | Media | No (último peso del usuario o vacío) |
+| BT-18 | Sesión | Confirmar cuándo se calcula `volume_kg` y qué tipos devuelve `detect_session_prs` | Media | No |
+| BT-19 | Sesión | Sesiones `saved` antiguas: caducidad o limpieza | Baja | No |
+| BT-20 | Sesión | `rest_taken_sec` y fases del descanso (opcional) | Baja | No |
 
 ---
 
@@ -182,6 +186,35 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 
 ---
 
+## Sesión
+
+### BT-17 · Peso planificado en las rutinas
+- **Qué falta:** `template_exercises` no tiene peso. `workout_session_exercises.planned_weight_kg` existe, pero no hay de dónde llenarlo.
+- **Hoy la app:** propone en cada serie el peso de la serie anterior del mismo ejercicio. Si no hay, usa el último peso que el usuario registró para ese ejercicio (`workout_session_sets`). Si tampoco hay, deja el campo vacío para que lo escriba.
+- **Propuesta:** `template_exercises.weight_kg` (opcional). La app lo copiará a `planned_weight_kg` y lo usará como propuesta.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-18 · Volumen y récords de sesión: confirmar el contrato
+- **Qué confirmar:**
+  - que `volume_kg` se calcula en el mismo `UPDATE` que pone `status = 'completed'` (la app lo lee en la respuesta y en el Resumen);
+  - que una serie sincronizada después de completar (cola offline) recalcula el volumen;
+  - qué `pr_type` puede devolver `detect_session_prs` (la app muestra `max_weight`, `weight_reps` y `max_reps`) y si cubre los ejercicios por tiempo.
+- **Por qué:** el Resumen muestra el volumen del servidor. Si llega vacío, muestra las kcal estimadas.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-19 · Sesiones guardadas antiguas
+- **Qué falta:** una sesión `saved` se puede retomar cualquier día. Inicio muestra la más reciente; las más antiguas quedan guardadas sin fin.
+- **Propuesta:** decidir una caducidad (p. ej. 14 días → `canceled`) en la tarea programada existente.
+- **Prioridad:** Baja. **No bloquea.**
+
+### BT-20 · Descanso real entre series (opcional)
+- **Qué falta:** `workout_session_sets.rest_taken_sec` existe, pero la app aún no lo escribe; el descanso se puede alargar (+30 s) o saltar.
+- **Propuesta:** si sirve para ELLIE o Progreso, la app puede guardar el descanso real de la serie siguiente. Avisar si se quiere.
+- **Prioridad:** Baja. **No bloquea.**
+
+---
+
 ## Historial
 - 2026-10-02: documento creado con BT-01 a BT-11.
 - 2026-10-03: BT-12 a BT-16 (módulo Entrenos).
+- 2026-10-03: BT-17 a BT-20 (módulo Sesión).
