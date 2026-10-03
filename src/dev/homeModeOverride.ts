@@ -1,11 +1,51 @@
 import { useSyncExternalStore } from 'react';
-import { HOME_MODES, type HomeMode } from '@app/features/home/homePriority';
+import { Platform, Settings } from 'react-native';
+import type { Core33InviteVariant } from '@app/features/core33/core33Invite';
+import type { HomeMode } from '@app/features/home/homePriority';
 
-// Development-only visual override for the Inicio hero ("Ver modos de
-// Inicio" in the dev menu). In-memory, never persisted, never writes data.
-// In production builds `useHomeModeOverride` always returns null.
+// Development-only visual override for Inicio ("Ver modos de Inicio" in the
+// dev menu): hero mode + Core 33 discovery card. In-memory, never persisted,
+// never writes data. In production builds `useHomeModeOverride` returns null.
 
-let override: HomeMode | null = null;
+export type HomeOverride = {
+  mode: HomeMode;
+  // Card forced by the override (null = hidden), ignoring "Ahora no".
+  core33Card: Core33InviteVariant | null;
+  label: string;
+};
+
+const OVERRIDES: HomeOverride[] = [
+  { mode: 'new', core33Card: null, label: 'Usuario nuevo' },
+  {
+    mode: 'new',
+    core33Card: 'invite',
+    label: 'Usuario nuevo + Core 33 invitación',
+  },
+  { mode: 'allDone', core33Card: null, label: 'Todo completado' },
+  { mode: 'workoutDone', core33Card: null, label: 'Entreno hecho' },
+  { mode: 'resume', core33Card: null, label: 'Sesión guardada' },
+  { mode: 'core33', core33Card: null, label: 'Core 33 prioridad' },
+  { mode: 'workout', core33Card: null, label: 'Entreno pendiente' },
+  {
+    mode: 'workout',
+    core33Card: 'again',
+    label: 'Entreno pendiente + empezar otro Core 33',
+  },
+];
+
+// -1 = real data. iOS dev launch argument to start on an override (for
+// screenshots): xcrun simctl launch booted <bundle> -homeOverride 1
+function initialIndex(): number {
+  if (!__DEV__ || Platform.OS !== 'ios') {
+    return -1;
+  }
+  const value = Number(Settings.get('homeOverride'));
+  return Number.isInteger(value) && value >= 0 && value < OVERRIDES.length
+    ? value
+    : -1;
+}
+
+let index = initialIndex();
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void) {
@@ -15,32 +55,22 @@ function subscribe(listener: () => void) {
   };
 }
 
-function getSnapshot() {
-  return override;
+function getSnapshot(): HomeOverride | null {
+  return index >= 0 ? OVERRIDES[index] : null;
 }
 
-// auto → new → allDone → workoutDone → resume → core33 → workout → auto
-export function cycleHomeModeOverride(): HomeMode | null {
+// auto → each override in order → auto
+export function cycleHomeModeOverride(): HomeOverride | null {
   if (!__DEV__) {
     return null;
   }
 
-  const index = override === null ? -1 : HOME_MODES.indexOf(override);
-  override = index + 1 < HOME_MODES.length ? HOME_MODES[index + 1] : null;
+  index = index + 1 < OVERRIDES.length ? index + 1 : -1;
   listeners.forEach(listener => listener());
-  return override;
+  return getSnapshot();
 }
 
-export function useHomeModeOverride(): HomeMode | null {
+export function useHomeModeOverride(): HomeOverride | null {
   const value = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return __DEV__ ? value : null;
 }
-
-export const HOME_MODE_LABELS: Record<HomeMode, string> = {
-  new: 'Usuario nuevo',
-  allDone: 'Todo completado',
-  workoutDone: 'Entreno hecho',
-  resume: 'Sesión guardada',
-  core33: 'Core 33 prioridad',
-  workout: 'Entreno pendiente',
-};

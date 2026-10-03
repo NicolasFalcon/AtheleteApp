@@ -78,6 +78,10 @@ export type HomeOverview = {
   resumable: WorkoutSession | null;
   // At least one completed session ever (new user otherwise).
   hasCompletedEver: boolean;
+  // Finished Core 33 challenges, for the discovery card (HOME_10 / HOME_11).
+  // `lastDay33` = local date of day 33 of the latest one (start + 32 days):
+  // participations have no completion timestamp.
+  core33History: { completedCount: number; lastDay33: string | null };
   challenge:
     | (HabitChallenge & {
         challengeDay: number;
@@ -821,6 +825,7 @@ export async function fetchHomeOverview(params: {
     todayNutritionResult,
     hydrationTodayResult,
     hydrationRecentResult,
+    completedChallengesResult,
   ] = await Promise.all([
     client
       .from('workout_sessions')
@@ -873,6 +878,12 @@ export async function fetchHomeOverview(params: {
       .eq('user_id', params.userId)
       .order('date', { ascending: false })
       .limit(14),
+    client
+      .from('challenge_participations')
+      .select('start_date')
+      .eq('user_id', params.userId)
+      .eq('status', 'completed')
+      .order('start_date', { ascending: false }),
   ]);
 
   if (todaySessionsResult.error) {
@@ -905,6 +916,21 @@ export async function fetchHomeOverview(params: {
 
   if (hydrationRecentResult.error) {
     throw hydrationRecentResult.error;
+  }
+
+  if (completedChallengesResult.error) {
+    throw completedChallengesResult.error;
+  }
+
+  const completedChallenges = (completedChallengesResult.data || []) as Array<{
+    start_date: string;
+  }>;
+  const latestStart = completedChallenges[0]?.start_date ?? null;
+  let lastDay33: string | null = null;
+  if (latestStart) {
+    const day33 = new Date(`${latestStart}T12:00:00`);
+    day33.setDate(day33.getDate() + 32);
+    lastDay33 = getLocalDateKey(day33);
   }
 
   const todayRows = (todaySessionsResult.data || []) as WorkoutSessionRow[];
@@ -1016,6 +1042,10 @@ export async function fetchHomeOverview(params: {
     resumable: resumableRow ? mapWorkoutSession(resumableRow) : null,
     hasCompletedEver:
       (completedEverResult.count ?? 0) > 0 || Boolean(completedTodayRow),
+    core33History: {
+      completedCount: completedChallenges.length,
+      lastDay33,
+    },
     challenge,
     nutritionPlan,
     todayNutritionLog,

@@ -18,3 +18,18 @@ export function useOpenCore33() {
     navigation.navigate(entry.name);
   }, [navigation, status]);
 }
+
+// Single connection point of the Core 33 discovery card (Inicio, HOME_10 /
+// HOME_11: "Descubrir Core 33" / "Empieza otro Core 33").
+// TODO(core33-feature): route through resolveCore33Entry once the v2 Intro
+// (3 moments) and "Explorar retos" screens exist:
+//   - never saw the Intro → Intro → Explorar retos
+//   - saw the Intro, or completed one before → Explorar retos
+// Until then the CTA intentionally does nothing (MIGRATION_PROGRESS §17).
+export function useOpenCore33Discovery() {
+  return useCallback(() => {
+    if (__DEV__) {
+      console.info('[core33] discovery CTA not connected yet (TODO)');
+    }
+  }, []);
+}

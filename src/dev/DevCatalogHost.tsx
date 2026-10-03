@@ -12,20 +12,29 @@ import {
   DevOnboardingWalkthrough,
   type WalkthroughStart,
 } from '@app/dev/DevOnboardingWalkthrough';
+import { cycleHomeModeOverride } from '@app/dev/homeModeOverride';
 import {
-  HOME_MODE_LABELS,
-  cycleHomeModeOverride,
-} from '@app/dev/homeModeOverride';
+  isWorkoutsDevScreen,
+  openNextWorkoutsDevScreen,
+  openWorkoutsDevScreen,
+} from '@app/dev/devWorkoutsScreens';
+import { resetCore33InviteDismissals } from '@app/features/core33/useCore33InviteDismissals';
+import { DevCore33CardPreview } from '@app/dev/DevCore33CardPreview';
 import { V2CatalogScreen } from '@app/dev/V2CatalogScreen';
 
-type DevTool = 'catalog' | 'onboarding';
+type DevTool = 'catalog' | 'onboarding' | 'core33Card';
 
-type DevToolState = { tool: DevTool; start?: WalkthroughStart };
+type DevToolState = {
+  tool: DevTool;
+  start?: WalkthroughStart;
+  darkFirst?: boolean;
+};
 
 const DEV_URLS = {
   catalog: 'athelete://dev/catalog',
   onboarding: 'athelete://dev/onboarding',
   welcome: 'athelete://dev/welcome',
+  core33Card: 'athelete://dev/core33-card',
 } as const;
 
 function queryParam(url: string, key: string): string | null {
@@ -36,12 +45,30 @@ function queryParam(url: string, key: string): string | null {
 // athelete://dev/catalog
 // athelete://dev/onboarding[?step=0…7]
 // athelete://dev/welcome[?status=error]
+// athelete://dev/workouts?screen=<key>: navigates (no overlay).
+function openWorkoutsFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/workouts')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'routines';
+  if (isWorkoutsDevScreen(screen)) {
+    openWorkoutsDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
-  if (!url) {
+  if (!url || openWorkoutsFromUrl(url)) {
     return null;
   }
   if (url.startsWith(DEV_URLS.catalog)) {
     return { tool: 'catalog' };
+  }
+  if (url.startsWith(DEV_URLS.core33Card)) {
+    return {
+      tool: 'core33Card',
+      darkFirst: queryParam(url, 'mode') === 'dark',
+    };
   }
   if (url.startsWith(DEV_URLS.welcome)) {
     return {
@@ -77,12 +104,34 @@ export function DevCatalogHost() {
     );
     // Visual override only: cycles the Inicio hero modes, writes nothing.
     DevSettings.addMenuItem('Ver modos de Inicio', () => {
-      const mode = cycleHomeModeOverride();
+      const override = cycleHomeModeOverride();
       toastRef.current.show(
-        mode
-          ? `Inicio · ${HOME_MODE_LABELS[mode]} (vista dev)`
+        override
+          ? `Inicio · ${override.label} (vista dev)`
           : 'Inicio · modo real',
       );
+    });
+    DevSettings.addMenuItem('Ver pantallas de Entrenos', () => {
+      openNextWorkoutsDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `Entrenos · ${label}` : 'Inicia sesión para ver Entrenos',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    // Clears the "Ahora no" of the Core 33 card (signed-in user); Inicio
+    // shows it again right away.
+    DevSettings.addMenuItem('Restablecer card de Core 33', () => {
+      resetCore33InviteDismissals()
+        .then(done =>
+          toastRef.current.show(
+            done
+              ? 'Card de Core 33 restablecida'
+              : 'Inicia sesión para restablecer la card',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo restablecer la card'));
     });
 
     // iOS launch argument (no "Open in…" prompt), e.g.
@@ -124,6 +173,11 @@ export function DevCatalogHost() {
     <View style={StyleSheet.absoluteFill}>
       {state.tool === 'catalog' ? (
         <V2CatalogScreen onClose={() => setState(null)} />
+      ) : state.tool === 'core33Card' ? (
+        <DevCore33CardPreview
+          darkFirst={state.darkFirst}
+          onClose={() => setState(null)}
+        />
       ) : (
         <DevOnboardingWalkthrough
           start={state.start}

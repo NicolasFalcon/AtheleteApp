@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@app/app/queryClient';
 import { ToastProvider } from '@app/components/v2/Toast';
 import { DevCatalogHost } from '@app/dev/DevCatalogHost';
+import { navigationRef } from '@app/navigation/navigationRef';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { AuthProvider } from '@app/providers/AuthProvider';
 import { ThemeProvider } from '@app/providers/ThemeProvider';
@@ -32,7 +33,7 @@ function AppNavigation({ children }: PropsWithChildren) {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       <ToastProvider>
         {children}
         {__DEV__ ? <DevCatalogHost /> : null}

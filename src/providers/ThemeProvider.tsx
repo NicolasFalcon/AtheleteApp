@@ -7,7 +7,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useColorScheme } from 'react-native';
+import { Platform, Settings, useColorScheme } from 'react-native';
 import {
   createTheme,
   type AppTheme,
@@ -28,11 +28,28 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const THEME_STORAGE_KEY = '@athelete/theme-mode';
 
+// Development only (iOS launch argument, never persisted), for screenshots:
+// xcrun simctl launch booted <bundle> -themeMode dark
+function devThemeOverride(): ThemeMode | null {
+  if (!__DEV__ || Platform.OS !== 'ios') {
+    return null;
+  }
+  try {
+    const value = Settings.get('themeMode');
+    return value === 'light' || value === 'dark' ? value : null;
+  } catch {
+    // No native SettingsManager (tests).
+    return null;
+  }
+}
+
 export function ThemeProvider({children}: PropsWithChildren) {
   const systemMode = useColorScheme() === 'dark' ? 'dark' : 'light';
   const [preferredMode, setPreferredModeState] =
     useState<ThemePreference>('system');
-  const mode = preferredMode === 'system' ? systemMode : preferredMode;
+  const [devOverride] = useState(devThemeOverride);
+  const mode =
+    devOverride ?? (preferredMode === 'system' ? systemMode : preferredMode);
 
   useEffect(() => {
     AsyncStorage.getItem(THEME_STORAGE_KEY)

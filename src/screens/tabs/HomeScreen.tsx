@@ -3,7 +3,12 @@ import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { EllieSurface, StatusBarV2, useThemeV2 } from '@app/components/v2';
 import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
-import { useOpenCore33 } from '@app/features/core33/useOpenCore33';
+import { resolveCore33Invite } from '@app/features/core33/core33Invite';
+import { useCore33InviteDismissals } from '@app/features/core33/useCore33InviteDismissals';
+import {
+  useOpenCore33,
+  useOpenCore33Discovery,
+} from '@app/features/core33/useOpenCore33';
 import {
   DEFAULT_WATER_GOAL_GLASSES,
   allDoneLine,
@@ -23,6 +28,7 @@ import {
   BestMarkCard,
   type BestMark,
 } from '@app/features/home/v2/BestMarkCard';
+import { Core33InviteCard } from '@app/features/home/v2/Core33InviteCard';
 import { DayRingsCard } from '@app/features/home/v2/DayRingsCard';
 import {
   HERO_HEIGHT,
@@ -33,6 +39,7 @@ import { workoutTypeLabel } from '@app/features/home/v2/homeLabels';
 import { QuizBanner } from '@app/features/home/v2/QuizBanner';
 import { WearBannerV2 } from '@app/features/home/v2/WearBannerV2';
 import { WeekCarousel } from '@app/features/home/v2/WeekCarousel';
+import { recommendRoutines } from '@app/features/workouts/workoutsModel';
 import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
 import { NutritionLogModal } from '@app/features/nutrition/components/NutritionLogModal';
 import { useHomeModeOverride } from '@app/dev/homeModeOverride';
@@ -47,7 +54,7 @@ import { useQuizCategories } from '@app/hooks/useQuizCategories';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
-import { getGreeting } from '@app/lib/date';
+import { getGreeting, getLocalDateKey } from '@app/lib/date';
 import { getBestPR, type Workout } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
 
@@ -83,7 +90,10 @@ export function HomeScreen({ navigation }: Props) {
   const quizQuery = useQuizCategories();
   const nutritionActions = useNutritionPlan();
   const openCore33 = useOpenCore33();
-  const modeOverride = useHomeModeOverride();
+  const openCore33Discovery = useOpenCore33Discovery();
+  const homeOverride = useHomeModeOverride();
+  const modeOverride = homeOverride?.mode ?? null;
+  const inviteDismissals = useCore33InviteDismissals(profile?.id);
   const [wearVisible, setWearVisible] = useState(false);
   const [nutritionLogVisible, setNutritionLogVisible] = useState(false);
 
@@ -120,36 +130,10 @@ export function HomeScreen({ navigation }: Props) {
 
   // ── Routines: current recommendation score by goal ──────────────────────
   const workouts = workoutsQuery.data;
-  const recommended = useMemo(() => {
-    const all = workouts || [];
-    const featured = all.filter(
-      workout => workout.sourceType === 'featured_editorial',
-    );
-    const source = featured.length > 0 ? featured : all;
-    const goal = profile?.goal;
-
-    const score = (workout: Workout) => {
-      if (goal === 'lose_weight') {
-        return workout.type === 'cardio' || workout.type === 'hiit' ? 2 : 0;
-      }
-      if (goal === 'gain_muscle') {
-        return workout.type === 'strength' || workout.type === 'fullbody'
-          ? 2
-          : 0;
-      }
-      if (goal === 'performance') {
-        return workout.type === 'hiit' || workout.type === 'cardio' ? 2 : 0;
-      }
-      if (goal === 'improve_health') {
-        return workout.type === 'mobility' || workout.type === 'fullbody'
-          ? 2
-          : 0;
-      }
-      return workout.sourceType === 'featured_editorial' ? 2 : 0;
-    };
-
-    return [...source].sort((a, b) => score(b) - score(a)).slice(0, 8);
-  }, [profile?.goal, workouts]);
+  const recommended = useMemo(
+    () => recommendRoutines(workouts || [], profile?.goal),
+    [profile?.goal, workouts],
+  );
 
   // First session for a new user: shortest beginner routine (DA-42).
   const firstSession = useMemo(() => {
@@ -174,6 +158,23 @@ export function HomeScreen({ navigation }: Props) {
   // Development-only visual override ("Ver modos de Inicio"); null in prod.
   const mode = modeOverride ?? realMode;
   const isNewUser = mode === 'new';
+
+  // Core 33 discovery card (HOME_10 / HOME_11): only without a current
+  // challenge (an active one lives in the hero). The app has no "prepared,
+  // not started" state yet: a participation is active from the start.
+  const core33History = overview?.core33History;
+  const realInvite =
+    overview && inviteDismissals.loaded
+      ? resolveCore33Invite({
+          hasCurrentChallenge: challenge?.status === 'active',
+          completedCount: core33History?.completedCount ?? 0,
+          lastDay33: core33History?.lastDay33 ?? null,
+          dismissals: inviteDismissals.dismissals,
+          today: getLocalDateKey(),
+          now: new Date(),
+        })
+      : null;
+  const core33Invite = homeOverride ? homeOverride.core33Card : realInvite;
 
   const heroWorkoutSource = mode === 'new' ? firstSession : recommended[0];
   const resumable = overview?.resumable ?? null;
@@ -405,6 +406,17 @@ export function HomeScreen({ navigation }: Props) {
             onAddWater={addWater}
             onOpenRing={openRing}
           />
+
+          {core33Invite ? (
+            <Core33InviteCard
+              variant={core33Invite}
+              completedCount={Math.max(core33History?.completedCount ?? 0, 1)}
+              onPress={openCore33Discovery}
+              onDismiss={() =>
+                inviteDismissals.dismiss(core33History?.completedCount ?? 0)
+              }
+            />
+          ) : null}
 
           <EllieSurface
             message={ellieData.heroInsight?.text ?? ELLIE_FALLBACK}

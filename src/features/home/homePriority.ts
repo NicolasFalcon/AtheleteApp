@@ -323,9 +323,14 @@ export function homeDateLine(date: Date, streakDays: number): string {
   const day = `${WEEKDAYS[date.getDay()]} ${date.getDate()} ${
     MONTHS[date.getMonth()]
   }`;
-  return streakDays > 0
-    ? `${day} · Racha de ${streakDays} ${streakDays === 1 ? 'día' : 'días'}`
-    : day;
+  const streak = Number.isFinite(streakDays) ? Math.floor(streakDays) : 0;
+  // No separator without a streak.
+  return [
+    day,
+    streak > 0 ? `Racha de ${streak} ${streak === 1 ? 'día' : 'días'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 // "hoy" or "9 abr".

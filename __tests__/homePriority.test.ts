@@ -217,6 +217,7 @@ describe('formatting', () => {
     expect(homeDateLine(now, 6)).toBe('Jueves 24 sep · Racha de 6 días');
     expect(homeDateLine(now, 1)).toBe('Jueves 24 sep · Racha de 1 día');
     expect(homeDateLine(now, 0)).toBe('Jueves 24 sep');
+    expect(homeDateLine(now, Number.NaN)).toBe('Jueves 24 sep');
   });
 
   it('formats the best mark by record type', () => {
