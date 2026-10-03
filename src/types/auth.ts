@@ -9,8 +9,9 @@ export type OnboardingGoal =
   | 'improve_health'
   | 'performance';
 
-// profiles.training_level
-export type TrainingLevel = 'beginner' | 'intermediate' | 'advanced';
+// profiles.training_level (CHECK profiles_training_level_check, verified
+// against Supabase 2026-10-02; BACKEND_SUMMARY lists the English values).
+export type TrainingLevel = 'principiante' | 'intermedio' | 'avanzado';
 
 export type ProfileGender = 'male' | 'female';
 

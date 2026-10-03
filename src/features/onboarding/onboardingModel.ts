@@ -82,14 +82,14 @@ export const LEVELS: ReadonlyArray<{
   {
     label: 'Principiante',
     subtitle: 'Empiezo o vuelvo tras un tiempo',
-    value: 'beginner',
+    value: 'principiante',
   },
   {
     label: 'Intermedio',
     subtitle: 'Entreno con regularidad',
-    value: 'intermediate',
+    value: 'intermedio',
   },
-  { label: 'Avanzado', subtitle: 'Programo y sigo cargas', value: 'advanced' },
+  { label: 'Avanzado', subtitle: 'Programo y sigo cargas', value: 'avanzado' },
 ];
 
 // `value` is stored in profiles.preferred_session_minutes (5–240); "60+"

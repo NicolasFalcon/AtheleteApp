@@ -74,7 +74,7 @@ describe('onboarding v2 model', () => {
       height: 170,
       trainingDaysPerWeek: 6,
       availableEquipment: ['Peso corporal', 'Mancuernas'],
-      trainingLevel: 'intermediate',
+      trainingLevel: 'intermedio',
       preferredSessionMinutes: 45,
     });
     expect(GOALS[3].value).toBe('performance');
@@ -90,10 +90,10 @@ describe('onboarding v2 model', () => {
 
     expect(
       toOnboardingPayload({ ...base, level: 0, duration: 3 }).data,
-    ).toMatchObject({ trainingLevel: 'beginner', preferredSessionMinutes: 60 });
+    ).toMatchObject({ trainingLevel: 'principiante', preferredSessionMinutes: 60 });
     expect(
       toOnboardingPayload({ ...base, level: 2, duration: 0 }).data,
-    ).toMatchObject({ trainingLevel: 'advanced', preferredSessionMinutes: 20 });
+    ).toMatchObject({ trainingLevel: 'avanzado', preferredSessionMinutes: 20 });
   });
 
   it('refuses to build the payload with missing answers', () => {

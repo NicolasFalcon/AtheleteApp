@@ -30,9 +30,9 @@ function mapGoal(value: string | null): OnboardingGoal | null {
 }
 
 function mapTrainingLevel(value: string | null): TrainingLevel | null {
-  return value === 'beginner' ||
-    value === 'intermediate' ||
-    value === 'advanced'
+  return value === 'principiante' ||
+    value === 'intermedio' ||
+    value === 'avanzado'
     ? value
     : null;
 }
@@ -154,6 +154,14 @@ export async function updateOnboardingProfile(
     .eq('id', userId);
 
   if (error) {
+    if (__DEV__) {
+      console.warn('[onboarding] profiles update failed', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+    }
     throw error;
   }
 }
