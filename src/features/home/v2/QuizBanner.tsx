@@ -8,6 +8,7 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import { formatThousands } from '@app/features/home/homePriority';
+import { tightLine } from '@app/theme/v2';
 
 type QuizBannerProps = {
   loading: boolean;
@@ -130,9 +131,10 @@ const styles = StyleSheet.create({
   mark: {
     position: 'absolute',
     right: -6,
-    top: -34,
+    // lineHeight 180 (no clipping) centres the glyph 15 pt lower.
+    top: -49,
     fontSize: 150,
-    lineHeight: 150,
+    lineHeight: 180,
     fontWeight: '700',
     letterSpacing: -9,
   },
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
   },
   pointsValue: {
     fontSize: 38,
-    lineHeight: 38,
+    ...tightLine(38, 0.95),
   },
   level: {
     gap: 7,

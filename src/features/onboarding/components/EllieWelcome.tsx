@@ -73,17 +73,24 @@ export function EllieWelcome({
   ];
 
   return (
-    <LinearGradient
-      colors={background}
-      locations={[0, 0.48, 1]}
+    // Edge-to-edge (also behind the status bar); the content keeps the safe
+    // area. The gradient is a background layer: on Fabric a padded
+    // LinearGradient used as a container offsets itself by its padding.
+    <View
       style={[
         styles.fill,
         {
+          backgroundColor: colors.bg,
           paddingTop: insets.top,
           paddingBottom: Math.max(insets.bottom, 16) + 18,
         },
       ]}
     >
+      <LinearGradient
+        colors={background}
+        locations={[0, 0.48, 1]}
+        style={StyleSheet.absoluteFill}
+      />
       <StatusBarV2 />
       <View style={styles.center}>
         <Animated.View entering={FadeInDown.duration(600)}>
@@ -185,7 +192,7 @@ export function EllieWelcome({
           />
         </View>
       </Animated.View>
-    </LinearGradient>
+    </View>
   );
 }
 

@@ -41,6 +41,7 @@ import {
   weekPattern,
   type OnboardingAnswers,
 } from '@app/features/onboarding/onboardingModel';
+import { tightLine } from '@app/theme/v2';
 
 type StepProps = {
   answers: OnboardingAnswers;
@@ -592,7 +593,7 @@ const styles = StyleSheet.create({
     fontSize: 112,
     fontWeight: '600',
     letterSpacing: -6.72,
-    lineHeight: 101,
+    ...tightLine(112, 0.9),
   },
   week: {
     flexDirection: 'row',

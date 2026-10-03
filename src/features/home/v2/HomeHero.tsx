@@ -18,6 +18,7 @@ import type { HomeMode } from '@app/features/home/homePriority';
 import { HERO_PHOTO } from '@app/features/home/v2/homePhotos';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { ProfileIdentity } from '@app/types/profileIdentity';
+import { tightLine } from '@app/theme/v2';
 
 export const HERO_HEIGHT = 500;
 
@@ -236,7 +237,7 @@ function BigNumber({
     <View style={styles.bigRow}>
       <TextV2
         variant="displayM"
-        style={{ fontSize: size, lineHeight: size * 0.86 }}
+        style={{ fontSize: size, ...tightLine(size, 0.86) }}
       >
         {String(value)}
       </TextV2>
@@ -599,7 +600,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 34,
-    lineHeight: 34,
+    ...tightLine(34, 1),
   },
   check: {
     alignItems: 'center',
@@ -622,6 +623,6 @@ const styles = StyleSheet.create({
   },
   doneValue: {
     fontSize: 56,
-    lineHeight: 52,
+    ...tightLine(56, 0.9),
   },
 });

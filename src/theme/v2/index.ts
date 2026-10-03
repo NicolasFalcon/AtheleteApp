@@ -77,5 +77,5 @@ export { blurV2, darkShadowsV2, easingV2, lightShadowsV2, motionV2 };
 export { ringV2 } from '@app/theme/v2/shadows';
 export type { ColorsV2, SceneTokens, ShadowsV2 };
 export type { TextStyleV2 } from '@app/theme/v2/typography';
-export { em } from '@app/theme/v2/typography';
+export { em, tightLine } from '@app/theme/v2/typography';
 export { alpha, gradients, palette } from '@app/theme/v2/palette';

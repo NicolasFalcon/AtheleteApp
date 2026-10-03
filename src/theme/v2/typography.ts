@@ -8,9 +8,29 @@ import type { TextStyle } from 'react-native';
 export type TextStyleV2 = Required<
   Pick<TextStyle, 'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing'>
 > &
-  Pick<TextStyle, 'textTransform'> & {
+  Pick<TextStyle, 'textTransform' | 'marginVertical'> & {
     fontVariant: ['tabular-nums'];
   };
+
+// Below ~1.2× the font size iOS (and Android) clip the glyphs of a Text:
+// tops of digits disappear (a 5 reads as a 3). Tight display lines keep a
+// safe line height and pull the box back with a negative vertical margin,
+// so the layout matches the prototype's tight line box without clipping.
+const SAFE_LINE_RATIO = 1.2;
+
+export function tightLine(
+  fontSize: number,
+  lineHeightRatio: number,
+): Pick<TextStyle, 'lineHeight' | 'marginVertical'> {
+  const target = Math.round(fontSize * lineHeightRatio);
+  const safe = Math.ceil(fontSize * SAFE_LINE_RATIO);
+
+  if (target >= safe) {
+    return { lineHeight: target };
+  }
+
+  return { lineHeight: safe, marginVertical: (target - safe) / 2 };
+}
 
 type Weight = '400' | '500' | '600' | '700';
 
@@ -25,10 +45,15 @@ function style(
   trackingEm = 0,
   textTransform?: TextStyle['textTransform'],
 ): TextStyleV2 {
+  const line = tightLine(fontSize, lineHeightRatio);
+
   return {
     fontSize,
     fontWeight,
-    lineHeight: Math.round(fontSize * lineHeightRatio),
+    lineHeight: line.lineHeight as number,
+    ...(line.marginVertical !== undefined
+      ? { marginVertical: line.marginVertical }
+      : {}),
     letterSpacing: em(trackingEm, fontSize),
     fontVariant: ['tabular-nums'],
     ...(textTransform ? { textTransform } : {}),

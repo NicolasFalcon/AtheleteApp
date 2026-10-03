@@ -29,12 +29,15 @@ export function EllieSurface({
   const linen = colors.ellie.linen.slice(0, 2);
 
   return (
-    <LinearGradient
-      colors={linen.length > 1 ? linen : [linen[0], linen[0]]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.band, { paddingHorizontal: layout.gutter }, style]}
-    >
+    <View style={[styles.band, { paddingHorizontal: layout.gutter }, style]}>
+      {/* Background only: on Fabric a padded LinearGradient used as a
+          container offsets itself and its children by the padding. */}
+      <LinearGradient
+        colors={linen.length > 1 ? linen : [linen[0], linen[0]]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
       <EllieOrb size={orbSize} state={orbState} />
       <View style={styles.texts}>
         <Eyebrow color={colors.ellie.textSecondary}>{eyebrow}</Eyebrow>
@@ -52,7 +55,7 @@ export function EllieSurface({
           </PressableScale>
         ) : null}
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
