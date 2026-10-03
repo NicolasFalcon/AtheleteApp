@@ -31,6 +31,7 @@ import { AddExerciseToRoutineScreen } from '@app/screens/workouts/AddExerciseToR
 import { CreateRoutineScreen } from '@app/screens/workouts/CreateRoutineScreen';
 import { ExerciseDetailScreen } from '@app/screens/workouts/ExerciseDetailScreen';
 import { ExerciseListScreen } from '@app/screens/workouts/ExerciseListScreen';
+import { RoutineListScreen } from '@app/screens/workouts/RoutineListScreen';
 import { WorkoutDetailScreen } from '@app/screens/workouts/WorkoutDetailScreen';
 import { WorkoutSessionScreen } from '@app/screens/workouts/WorkoutSessionScreen';
 import type { RootStackParamList } from '@app/types/navigation';
@@ -142,6 +143,10 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.ExerciseList}
             component={ExerciseListScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.RoutineList}
+            component={RoutineListScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.CreateRoutine}

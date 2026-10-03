@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -41,6 +42,12 @@ export function ExerciseRow({
   style,
 }: ExerciseRowProps) {
   const { colors } = useThemeV2();
+  // Sticky: once wrapped it stays wrapped (removing the dot must not make it
+  // fit again and oscillate). Reset when the content changes.
+  const [wrapped, setWrapped] = useState(false);
+  useEffect(() => {
+    setWrapped(false);
+  }, [muscle, equipment, levelLabel]);
 
   return (
     <View style={[styles.row, { borderBottomColor: colors.divider }, style]}>
@@ -56,23 +63,30 @@ export function ExerciseRow({
             {title}
           </TextV2>
           <View style={styles.meta}>
-            <TextV2
-              variant="caption"
-              tone="secondary"
-              numberOfLines={1}
-              style={styles.shrink}
-            >
+            {/* The muscle has priority: never truncated by the rest. If
+                equipment + level do not fit next to it, they wrap to a
+                second line (without the leading dot). */}
+            <TextV2 variant="caption" tone="secondary" numberOfLines={2}>
               {muscle}
             </TextV2>
-            <Dot />
-            <TextV2 variant="caption" tone="secondary" numberOfLines={1}>
-              {equipment}
-            </TextV2>
-            <Dot />
-            <LevelBars value={levelBars} />
-            <TextV2 variant="caption" tone="secondary" numberOfLines={1}>
-              {levelLabel}
-            </TextV2>
+            <View
+              style={styles.metaRest}
+              onLayout={event => {
+                if (!wrapped && event.nativeEvent.layout.y > 4) {
+                  setWrapped(true);
+                }
+              }}
+            >
+              {wrapped ? null : <Dot />}
+              <TextV2 variant="caption" tone="secondary" numberOfLines={1}>
+                {equipment}
+              </TextV2>
+              <Dot />
+              <LevelBars value={levelBars} />
+              <TextV2 variant="caption" tone="secondary" numberOfLines={1}>
+                {levelLabel}
+              </TextV2>
+            </View>
           </View>
         </View>
       </PressableScale>
@@ -201,11 +215,15 @@ const styles = StyleSheet.create({
   },
   meta: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    columnGap: 8,
+    rowGap: 4,
+  },
+  metaRest: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  shrink: {
-    flexShrink: 1,
   },
   dot: {
     width: 3,

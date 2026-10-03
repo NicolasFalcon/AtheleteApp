@@ -66,46 +66,69 @@ export function levelBars(level?: string | null): number {
 }
 
 // ── Rutinas ────────────────────────────────────────────────────────────────
-export type RoutineChip = 'favorites' | 'all' | WorkoutType;
+// The root explores (types + collections); the list lives in RoutineList.
+export type RoutineCollection = 'favorites' | 'mine' | 'all';
+export type RoutineScope =
+  | { type: WorkoutType; collection?: undefined }
+  | { collection: RoutineCollection; type?: undefined };
 
-export const ROUTINE_CHIPS: { key: RoutineChip; label: string }[] = [
-  { key: 'favorites', label: 'Solo favoritos' },
-  { key: 'all', label: 'Todos' },
-  { key: 'strength', label: 'Fuerza' },
-  { key: 'cardio', label: 'Cardio' },
-  { key: 'fullbody', label: 'Full body' },
-  { key: 'hiit', label: 'HIIT' },
-  { key: 'mobility', label: 'Movilidad' },
-];
-
-// "Por tipo" tiles in the prototype order.
+// "Por tipo" cards: every type, then the collections.
 export const TYPE_TILES: WorkoutType[] = [
   'strength',
   'cardio',
   'hiit',
   'mobility',
+  'fullbody',
 ];
+export const COLLECTION_TILES: RoutineCollection[] = ['favorites', 'mine', 'all'];
+
+export const COLLECTION_LABELS: Record<RoutineCollection, string> = {
+  favorites: 'Favoritas',
+  mine: 'Tus rutinas',
+  all: 'Todas las rutinas',
+};
+
+// Created by the user, including the ones ELLIE generated for them.
+export function isMyRoutine(workout: Workout, userId?: string | null): boolean {
+  return (
+    Boolean(userId) &&
+    workout.createdBy === userId &&
+    workout.sourceType !== 'featured_editorial'
+  );
+}
+
+type RoutineContext = { favoriteIds: string[]; userId?: string | null };
+
+function inScope(
+  workout: Workout,
+  scope: RoutineScope,
+  favorites: Set<string>,
+  userId?: string | null,
+): boolean {
+  if (scope.type) {
+    return normalizeWorkoutType(workout.type) === scope.type;
+  }
+  if (scope.collection === 'favorites') {
+    return favorites.has(workout.id);
+  }
+  if (scope.collection === 'mine') {
+    return isMyRoutine(workout, userId);
+  }
+  return true;
+}
 
 export function filterRoutines(
   workouts: Workout[],
-  params: { chip: RoutineChip; query: string; favoriteIds: string[] },
+  params: RoutineContext & { scope: RoutineScope; query: string },
 ): Workout[] {
   const query = params.query.trim().toLowerCase();
   const favorites = new Set(params.favoriteIds);
 
-  return workouts.filter(workout => {
-    if (params.chip === 'favorites' && !favorites.has(workout.id)) {
-      return false;
-    }
-    if (
-      params.chip !== 'favorites' &&
-      params.chip !== 'all' &&
-      normalizeWorkoutType(workout.type) !== params.chip
-    ) {
-      return false;
-    }
-    return !query || workout.title.toLowerCase().includes(query);
-  });
+  return workouts.filter(
+    workout =>
+      inScope(workout, params.scope, favorites, params.userId) &&
+      (!query || workout.title.toLowerCase().includes(query)),
+  );
 }
 
 export function countByType(workouts: Workout[]): Record<WorkoutType, number> {
@@ -125,21 +148,48 @@ export function countByType(workouts: Workout[]): Record<WorkoutType, number> {
   return counts;
 }
 
+export function countByCollection(
+  workouts: Workout[],
+  context: RoutineContext,
+): Record<RoutineCollection, number> {
+  const favorites = new Set(context.favoriteIds);
+  return {
+    favorites: workouts.filter(workout => favorites.has(workout.id)).length,
+    mine: workouts.filter(workout => isMyRoutine(workout, context.userId))
+      .length,
+    all: workouts.length,
+  };
+}
+
 export function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
-export function routineListTitle(chip: RoutineChip): string {
-  if (chip === 'all') {
-    return 'Todas las rutinas';
-  }
-  return ROUTINE_CHIPS.find(item => item.key === chip)?.label ?? 'Rutinas';
+export function routineScopeTitle(scope: RoutineScope): string {
+  return scope.type
+    ? TYPE_LABELS[scope.type]
+    : COLLECTION_LABELS[scope.collection];
 }
 
-export function routineEmptyText(chip: RoutineChip): string {
-  return chip === 'favorites'
-    ? 'Aún no tienes favoritas. Toca el corazón en cualquier rutina.'
-    : `Sin rutinas de ${routineListTitle(chip).toLowerCase()} todavía.`;
+export function routineEmptyText(scope: RoutineScope): string {
+  if (scope.collection === 'favorites') {
+    return 'Toca el corazón en cualquier rutina y la tendrás siempre aquí.';
+  }
+  if (scope.collection === 'mine') {
+    return 'Crea una rutina con “+” o pídesela a ELLIE.';
+  }
+  return scope.type
+    ? `Sin rutinas de ${TYPE_LABELS[scope.type].toLowerCase()} todavía.`
+    : 'Todavía no hay rutinas.';
+}
+
+// Route params → scope (type wins; default: all).
+export function routineScopeFrom(params?: {
+  type?: string;
+  collection?: RoutineCollection;
+}): RoutineScope {
+  const type = normalizeWorkoutType(params?.type);
+  return type ? { type } : { collection: params?.collection ?? 'all' };
 }
 
 // "Principiante · 35 min · 280 kcal"

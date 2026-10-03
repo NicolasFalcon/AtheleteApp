@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Animated,
+  ScrollView,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus } from 'lucide-react-native';
 import {
   IconButton,
   Segmented,
+  StatusBarShield,
   StatusBarV2,
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import {
-  recommendRoutines,
-  type RoutineChip,
-} from '@app/features/workouts/workoutsModel';
+import { recommendRoutines } from '@app/features/workouts/workoutsModel';
 import { ExercisesView } from '@app/features/workouts/v2/ExercisesView';
 import { RoutinesView } from '@app/features/workouts/v2/RoutinesView';
 import { useAuth } from '@app/hooks/useAuth';
@@ -44,18 +49,20 @@ export function WorkoutsScreen({ navigation, route }: Props) {
   const [segment, setSegment] = useState<Segment>(
     route.params?.segment ?? 'routines',
   );
-  const [chip, setChip] = useState<RoutineChip>(
-    route.params?.favoritesOnly ? 'favorites' : 'all',
-  );
   const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY.setValue(event.nativeEvent.contentOffset.y);
+      tabBarMotion.onScroll(event);
+    },
+    [scrollY, tabBarMotion],
+  );
 
   // Tab params (dev screen cycler, deep links).
   useEffect(() => {
     if (route.params?.segment) {
       setSegment(route.params.segment);
-    }
-    if (route.params?.favoritesOnly !== undefined) {
-      setChip(route.params.favoritesOnly ? 'favorites' : 'all');
     }
   }, [route.params]);
 
@@ -86,7 +93,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
       <StatusBarV2 />
       <ScrollView
         ref={scrollRef}
-        onScroll={tabBarMotion.onScroll}
+        onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -120,6 +127,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
             onChange={key => {
               setSegment(key);
               scrollRef.current?.scrollTo({ y: 0, animated: false });
+              scrollY.setValue(0);
             }}
           />
         </View>
@@ -134,14 +142,21 @@ export function WorkoutsScreen({ navigation, route }: Props) {
               workoutsQuery.refetch().catch(() => {});
             }}
             userId={profile?.id}
-            chip={chip}
-            onChipChange={setChip}
             favoriteIds={favorites.favoriteWorkoutIds}
-            onToggleFavorite={id => {
-              favorites.toggleWorkoutFavorite(id).catch(() => {});
-            }}
             onOpenWorkout={workoutId =>
               navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId })
+            }
+            onOpenType={type =>
+              navigation.navigate(APP_ROUTES.RoutineList, { type })
+            }
+            onOpenCollection={collection =>
+              navigation.navigate(APP_ROUTES.RoutineList, { collection })
+            }
+            onSearch={() =>
+              navigation.navigate(APP_ROUTES.RoutineList, {
+                collection: 'all',
+                focusSearch: true,
+              })
             }
           />
         ) : (
@@ -172,6 +187,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
           />
         )}
       </ScrollView>
+      <StatusBarShield scrollY={scrollY} />
     </View>
   );
 }

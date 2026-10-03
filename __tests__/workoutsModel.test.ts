@@ -11,7 +11,10 @@ import {
   pathMeta,
   recommendRoutines,
   routineEmptyText,
-  routineListTitle,
+  routineScopeTitle,
+  routineScopeFrom,
+  countByCollection,
+  isMyRoutine,
   routineMeta,
   schemeChip,
   schemeLabel,
@@ -67,31 +70,51 @@ describe('routines', () => {
     workout('c', { title: 'HIIT de 20', type: 'hiit' }),
   ];
 
-  it('filters by chip, favourites and search', () => {
+  it('filters by type, collection and search', () => {
+    const base = { query: '', favoriteIds: [] as string[], userId: 'u1' };
     expect(
-      filterRoutines(list, { chip: 'all', query: '', favoriteIds: [] }),
+      filterRoutines(list, { ...base, scope: { collection: 'all' } }),
     ).toHaveLength(3);
     expect(
-      filterRoutines(list, {
-        chip: 'strength',
-        query: '',
-        favoriteIds: [],
-      }).map(w => w.id),
+      filterRoutines(list, { ...base, scope: { type: 'strength' } }).map(
+        w => w.id,
+      ),
     ).toEqual(['b']);
     expect(
       filterRoutines(list, {
-        chip: 'favorites',
-        query: '',
+        ...base,
         favoriteIds: ['c'],
+        scope: { collection: 'favorites' },
       }).map(w => w.id),
     ).toEqual(['c']);
     expect(
       filterRoutines(list, {
-        chip: 'all',
+        ...base,
         query: 'total',
-        favoriteIds: [],
+        scope: { collection: 'all' },
       }).map(w => w.id),
     ).toEqual(['a']);
+  });
+
+  it('treats the user and ELLIE routines as "Tus rutinas"', () => {
+    const mine = [
+      workout('m', { createdBy: 'u1', sourceType: 'user' }),
+      workout('e', { createdBy: 'u1', sourceType: 'ellie', createdByAi: true }),
+      workout('o', { createdBy: 'u2', sourceType: 'user' }),
+      workout('f', { createdBy: 'u1', sourceType: 'featured_editorial' }),
+    ];
+    expect(
+      filterRoutines(mine, {
+        scope: { collection: 'mine' },
+        query: '',
+        favoriteIds: [],
+        userId: 'u1',
+      }).map(w => w.id),
+    ).toEqual(['m', 'e']);
+    expect(isMyRoutine(mine[0], null)).toBe(false);
+    expect(
+      countByCollection(mine, { favoriteIds: ['o'], userId: 'u1' }),
+    ).toEqual({ favorites: 1, mine: 2, all: 4 });
   });
 
   it('counts per type and builds titles and meta', () => {
@@ -101,9 +124,17 @@ describe('routines', () => {
       hiit: 1,
       cardio: 0,
     });
-    expect(routineListTitle('all')).toBe('Todas las rutinas');
-    expect(routineListTitle('hiit')).toBe('HIIT');
-    expect(routineEmptyText('favorites')).toContain('favoritas');
+    expect(routineScopeTitle({ collection: 'all' })).toBe('Todas las rutinas');
+    expect(routineScopeTitle({ type: 'hiit' })).toBe('HIIT');
+    expect(routineScopeTitle({ collection: 'mine' })).toBe('Tus rutinas');
+    expect(routineEmptyText({ collection: 'favorites' })).toContain('corazón');
+    expect(routineScopeFrom({ type: 'full_body' })).toEqual({
+      type: 'fullbody',
+    });
+    expect(routineScopeFrom({ collection: 'favorites' })).toEqual({
+      collection: 'favorites',
+    });
+    expect(routineScopeFrom()).toEqual({ collection: 'all' });
     expect(routineMeta(list[0])).toBe('Principiante · 35 min · 280 kcal');
   });
 

@@ -7,7 +7,7 @@ import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
-import type { LibraryExercise, Workout } from '@app/shared';
+import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
 import type {
   QuizQuestionRouteParams,
   QuizResultRouteParams,
@@ -57,10 +57,18 @@ export type ExerciseListRouteParams = {
   focusSearch?: boolean;
 };
 
-// Entrenos tab (WORKOUTS_01 / 02 / 03). Also set by the dev screen cycler.
+// Entrenos · lista de rutinas (D-46): a type or a collection.
+export type RoutineListRouteParams = {
+  type?: WorkoutType;
+  collection?: 'favorites' | 'mine' | 'all';
+  focusSearch?: boolean;
+  // Development only (__DEV__): shows the empty state (STATE_06).
+  devEmpty?: boolean;
+};
+
+// Entrenos tab (WORKOUTS_01 / 03). Also set by the dev screen cycler.
 export type WorkoutsTabParams = {
   segment?: 'routines' | 'exercises';
-  favoritesOnly?: boolean;
 };
 
 export type RoutineBuilderRouteParams = {
@@ -116,6 +124,7 @@ export type AppStackParamList = {
   WorkoutSession: WorkoutSessionRouteParams;
   ExerciseDetail: ExerciseDetailRouteParams;
   ExerciseList: ExerciseListRouteParams | undefined;
+  RoutineList: RoutineListRouteParams | undefined;
   CreateRoutine: RoutineBuilderRouteParams | undefined;
   EditRoutine: EditRoutineRouteParams;
   AddExerciseToRoutine: AddExerciseToRoutineRouteParams;

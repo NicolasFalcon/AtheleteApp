@@ -45,14 +45,16 @@ function queryParam(url: string, key: string): string | null {
 // athelete://dev/catalog
 // athelete://dev/onboarding[?step=0…7]
 // athelete://dev/welcome[?status=error]
-// athelete://dev/workouts?screen=<key>: navigates (no overlay).
+// athelete://dev/workouts?screen=<key>[&zone=<key>]: navigates (no overlay).
 function openWorkoutsFromUrl(url: string | null): boolean {
   if (!url || !url.startsWith('athelete://dev/workouts')) {
     return false;
   }
   const screen = queryParam(url, 'screen') ?? 'routines';
   if (isWorkoutsDevScreen(screen)) {
-    openWorkoutsDevScreen(screen).catch(() => {});
+    openWorkoutsDevScreen(screen, { zone: queryParam(url, 'zone') }).catch(
+      () => {},
+    );
   }
   return true;
 }

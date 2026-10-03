@@ -29,6 +29,7 @@ export * from '@app/components/v2/SectionHeader';
 export * from '@app/components/v2/Segmented';
 export * from '@app/components/v2/Sheet';
 export * from '@app/components/v2/Skeleton';
+export * from '@app/components/v2/StatusBarShield';
 export * from '@app/components/v2/StatusBarV2';
 export * from '@app/components/v2/StepProgress';
 export * from '@app/components/v2/Switch';

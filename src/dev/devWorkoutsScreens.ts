@@ -9,9 +9,11 @@ import {
 // pantallas de Entrenos") and athelete://dev/workouts?screen=<key>.
 export const WORKOUTS_DEV_SCREENS = [
   { key: 'routines', label: 'Rutinas (WORKOUTS_01)' },
+  { key: 'typeList', label: 'Lista de rutinas · Fuerza' },
+  { key: 'favoritesList', label: 'Lista de rutinas · Favoritas' },
   {
     key: 'favorites',
-    label: 'Rutinas · solo favoritos (WORKOUTS_02 / STATE_06)',
+    label: 'Favoritas · vacío (STATE_06, vista dev)',
   },
   { key: 'exercises', label: 'Ejercicios (WORKOUTS_03)' },
   { key: 'list', label: 'Lista filtrada · Pecho + Cable (WORKOUTS_04)' },
@@ -95,6 +97,7 @@ export async function waitForApp(timeoutMs = 20000): Promise<boolean> {
 
 export async function openWorkoutsDevScreen(
   screen: WorkoutsDevScreen,
+  options: { zone?: string | null } = {},
 ): Promise<boolean> {
   if (!__DEV__ || !(await waitForApp())) {
     return false;
@@ -103,21 +106,29 @@ export async function openWorkoutsDevScreen(
 
   switch (screen) {
     case 'routines':
-    case 'favorites':
     case 'exercises':
       nav.navigate('MainTabs', {
         screen: 'Workouts',
-        params: {
-          segment: screen === 'exercises' ? 'exercises' : 'routines',
-          favoritesOnly: screen === 'favorites',
-        },
+        params: { segment: screen },
       });
+      return true;
+    case 'typeList':
+      nav.navigate('RoutineList', { type: 'strength' });
+      return true;
+    case 'favoritesList':
+      nav.navigate('RoutineList', { collection: 'favorites' });
+      return true;
+    case 'favorites':
+      // STATE_06 regardless of the saved favourites (nothing is changed).
+      nav.navigate('RoutineList', { collection: 'favorites', devEmpty: true });
       return true;
     case 'list':
     case 'filters':
+      // ?zone=<key> lists a whole zone (long muscle names), otherwise
+      // Pecho + Cable (WORKOUTS_04).
       nav.navigate('ExerciseList', {
-        zone: 'chest',
-        equipment: 'cable',
+        zone: options.zone ?? 'chest',
+        equipment: options.zone ? undefined : 'cable',
         openFilters: screen === 'filters',
       });
       return true;
