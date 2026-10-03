@@ -71,10 +71,8 @@ export type PaginatedResult<T> = {
 export type HomeOverview = {
   // Latest session completed today (local date).
   completedToday: WorkoutSession | null;
-  // Session to resume: the latest `saved` one (backend status for "Guardar
-  // para después"; the app does not write it yet) or, otherwise, today's
-  // resumable one (`in_progress`, or `canceled` with progress, which is how
-  // the app saves for later today — see isResumableSession).
+  // Session to resume: the latest `saved` one ("Guardar para después", any
+  // day) or, otherwise, today's `in_progress`.
   resumable: WorkoutSession | null;
   // At least one completed session ever (new user otherwise).
   hasCompletedEver: boolean;
@@ -129,7 +127,7 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
+export function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
   return {
     id: row.id,
     workoutId: row.workout_id || '',
@@ -175,17 +173,6 @@ async function cancelWorkoutSessionsByIds(ids: string[]): Promise<void> {
   if (error) {
     throw error;
   }
-}
-
-function isResumableSession(row: WorkoutSessionRow): boolean {
-  const completedExercises = Array.isArray(row.completed_exercises)
-    ? row.completed_exercises.filter(item => typeof item === 'string')
-    : [];
-
-  return (
-    row.status === 'canceled' &&
-    (completedExercises.length > 0 || (row.duration || 0) > 0)
-  );
 }
 
 function calculateSessionDurationMinutes(
@@ -464,24 +451,41 @@ export async function fetchEffectiveWorkoutSession(
     return mapWorkoutSession(todayInProgress[0]);
   }
 
-  const { data: recentRows, error: recentError } = await client
-    .from('workout_sessions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('date', today)
-    .order('created_at', { ascending: false })
-    .limit(20);
+  // "Guardar para después" (any day) comes before today's completed one, so
+  // the routine detail offers "Retomar" (DA-38 resolved: 'saved' replaces the
+  // legacy canceled-with-progress rule).
+  const [savedResult, recentResult] = await Promise.all([
+    client
+      .from('workout_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'saved')
+      .order('created_at', { ascending: false })
+      .limit(1),
+    client
+      .from('workout_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('date', today)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1),
+  ]);
 
-  if (recentError) {
-    throw recentError;
+  if (savedResult.error) {
+    throw savedResult.error;
+  }
+  if (recentResult.error) {
+    throw recentResult.error;
   }
 
-  const todayRows = (recentRows || []) as WorkoutSessionRow[];
-  const resumable = todayRows.find(isResumableSession);
-  const completed = todayRows.find(row => row.status === 'completed');
+  const saved = (savedResult.data || [])[0] as WorkoutSessionRow | undefined;
+  const completed = (recentResult.data || [])[0] as
+    | WorkoutSessionRow
+    | undefined;
 
-  if (resumable) {
-    return mapWorkoutSession(resumable);
+  if (saved) {
+    return mapWorkoutSession(saved);
   }
 
   if (completed) {
@@ -941,9 +945,7 @@ export async function fetchHomeOverview(params: {
     | WorkoutSessionRow
     | undefined;
   const resumableRow =
-    savedRow ||
-    todayRows.find(row => row.status === 'in_progress') ||
-    todayRows.find(isResumableSession);
+    savedRow || todayRows.find(row => row.status === 'in_progress');
 
   let challenge: HomeOverview['challenge'] = null;
   const participation = challengeResult.data?.[0] as
