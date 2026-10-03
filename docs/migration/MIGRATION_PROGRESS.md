@@ -9,6 +9,8 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 
 > **Fase 2 (2026-09-30)**: resumen en 2 minutos, decisiones asumidas, problemas y commits propuestos en **§11**.
 >
+> **Pendientes del backend**: [`docs/backend/BACKEND_TODO.md`](../backend/BACKEND_TODO.md). Todo lo que la app necesite del backend y no exista se anota allí (no se improvisa en la app).
+>
 > **Backend (2026-10-01)**: la fuente de verdad del backend es [`docs/backend/BACKEND_SUMMARY.md`](../backend/BACKEND_SUMMARY.md) (aplicado por Lovable en Supabase). Estado, cambios de la app y pendientes con responsable en **§14**.
 
 ## 0. Estado por fase
@@ -1310,3 +1312,131 @@ Build en Xcode 27 / iOS 27.0 (iPhone 17).
 - **Herramientas dev nuevas**
   - `athelete://dev/onboarding?step=0…7` y `athelete://dev/welcome[?status=error]`.
   - En iOS, también como argumento de arranque, sin el diálogo "Open in…": `xcrun simctl launch booted <bundle> -devTool "athelete://dev/welcome?status=error"`.
+
+---
+
+## 17. Inicio · card de descubrimiento de Core 33 (HOME_10 y HOME_11, 2026-10-02)
+
+**Qué cambió**
+- **`Core33InviteCard`** bajo "Tu día", en dos variantes:
+  - **HOME_10 · invitación**: "33 días. Una intención.", 33 cápsulas con el Día 1 en Ember (respirando) y "Descubrir Core 33".
+  - **HOME_11 · empezar otro**: "Core 33 · N completado(s)", "Elige tu siguiente intención.", los días 1–32 en Ember suave, el 33 en Ember sólido y "Empieza otro Core 33".
+  - Oscura en ambos modos: Light `#141312` con sombra; Dark `#1B1917` con borde interior (HomeDark). Halo Ember radial arriba a la derecha.
+- **Nueva primitiva `DayCapsules`** (`src/components/v2`): retícula de días `empty | soft | full`, 11 por fila, 14 pt, radio 5, hueco 4, día opcional "respirando" y extremos "Día 1 · Día N". La reutilizará Core 33.
+- **Visibilidad**, con datos reales: lógica pura en `features/core33/core33Invite.ts` (4 tests) y datos en `fetchHomeOverview.core33History` (participaciones `completed`).
+  - No aparece si hay un reto activo: vive en el hero.
+  - El estado "elegido pero no iniciado" no existe aún en la app (una participación es activa desde que empieza); cuando exista, entra en `hasCurrentChallenge`.
+  - Variante = "empezar otro" si hay al menos un Core 33 completado; si no, "invitación".
+  - "Empezar otro" aparece desde el día siguiente al día 33. El día 33 se calcula como `start_date + 32`, porque las participaciones no guardan fecha de completado; si alguien completara tarde, la card podría salir el mismo día del completado.
+- **"Ahora no"** (`useCore33InviteDismissals`):
+  - oculta la card sin confirmación;
+  - vuelve a los 14 días;
+  - tras el segundo descarte ya no aparece en Inicio;
+  - el contador se reinicia al completar otro Core 33.
+  - Se persiste en AsyncStorage por usuario (`@athelete/core33-invite-v1:<userId>`).
+- **Menú dev "Ver modos de Inicio"**: entradas nuevas "Usuario nuevo + Core 33 invitación" y "Entreno pendiente + empezar otro Core 33". El override fuerza la card e ignora los descartes.
+  - En iOS se puede arrancar directamente en un override: `-homeOverride <índice>` (1 = invitación, 7 = empezar otro).
+  - Vista previa de la card en Light y Dark: `athelete://dev/core33-card[?mode=dark]`, o `-devTool` con esa URL.
+- **Hero**: la línea de fecha se arma uniendo partes, así que sin racha no hay separador. También tolera valores no numéricos.
+
+**Pendiente**
+- **CTA sin destino (TODO):** un único punto de conexión, `useOpenCore33Discovery()` en `features/core33/useOpenCore33.ts`. Hoy no navega. Cuando existan la Intro (3 momentos) y "Explorar retos", se conecta con la entrada inteligente (`resolveCore33Entry`): nunca vio la Intro → Intro → Explorar; vio la Intro o completó uno → Explorar.
+- **Backend (recomendado):** mover los descartes de la card al perfil (fecha del último descarte, número de descartes y completados al descartar) para que valgan entre dispositivos; hoy son locales.
+- **Backend (opcional):** un `completed_at` en `challenge_participations` permitiría calcular "desde el día siguiente al completado" con exactitud.
+
+**Validar en el simulador** (Light y Dark)
+- Cuenta sin Core 33: la card aparece bajo "Tu día"; "Ahora no" la oculta; no aparece con un reto activo.
+- Tras completar un Core 33: la variante "empezar otro" sale al día siguiente del día 33.
+- La CTA no hace nada (esperado).
+
+**Dev (2026-10-02):** el menú de desarrollo incluye "Restablecer card de Core 33", que borra los descartes guardados del usuario actual. La card vuelve a aparecer en Inicio sin reiniciar la app. Los pendientes de backend de esta card están en `BACKEND_TODO.md` (BT-02, BT-03).
+
+
+## 18. Entrenos · módulo completo (WORKOUTS_01–07, EXERCISE_01–02, 2026-10-03)
+
+> **Leer en 2 minutos.** Todo con datos reales de Supabase y primitivas v2. Verificado con capturas Light y Dark contra `references/`. Estado del código: `tsc` sin errores, eslint sin errores (solo los warnings habituales de estilos dinámicos) y `jest` 95/95.
+
+### 18.1 Qué quedó hecho, por pantalla
+| Pantalla | Ref. | Estado |
+|---|---|---|
+| Entrenos · Rutinas | WORKOUTS_01 | ✅ Hero "Tu próxima sesión", chips por tipo con conteos reales, lista de rutinas y favoritos (corazón) |
+| Rutinas · solo favoritos | WORKOUTS_02 / STATE_06 | ✅ Vacío con "Ver todas" |
+| Entrenos · Ejercicios | WORKOUTS_03 | ✅ Buscador, mosaico de zonas, equipamiento en burbujas, conteos reales |
+| Lista filtrada | WORKOUTS_04 | ✅ Nueva ruta `ExerciseList` (zona, equipamiento, búsqueda, A–Z, favoritos) |
+| Filtros | WORKOUTS_05 | ✅ Hoja con zona, equipamiento y nivel; CTA "Ver N ejercicios" |
+| Detalle de rutina | WORKOUTS_06 | ✅ Hero 470 con cifras, Routine Path, "Trabaja" / "Necesitas", CTA fija (Empezar / Continuar / Retomar · X de Y / Ver sesión), menú "…" del propietario |
+| Nueva rutina (3 pasos) | WORKOUTS_07 | ✅ Identidad → Elegir ejercicios (bandeja ordenable) → Revisar; ajuste por ejercicio en hoja; misma pantalla para Editar |
+| Exercise Detail · MoveKit | EXERCISE_01 | ✅ Light a sangre / Dark caja de luz; prescripción, "tu mejor" → Récords, músculos Ember / Recovery Blue, técnica esencial + completa + errores comunes expandibles, CTA fija "Agregar a rutina" |
+| Pantalla completa | EXERCISE_02 | ✅ Parámetro `fullscreen` y botón en el reproductor; píldora de controles |
+| Estados | — | ✅ Skeleton, error con "Reintentar" (`BlockError`) y vacío en cada pantalla que carga datos |
+
+**MoveKit:** el video es un PLACEHOLDER (`MOVEKIT_POSTER`). Los controles (1× / 0,5×, pantalla completa, play/pausa y segmentos de fase) están visibles; play/pausa está inactivo. Único punto de integración: `src/features/workouts/movekit/MoveKitPlayer.tsx` (`TODO(movekit)`). No se instaló ninguna librería de video.
+
+**Herramientas dev** (solo `__DEV__`): menú "Ver pantallas de Entrenos" (cicla las 11 pantallas), deep link `athelete://dev/workouts?screen=routines|favorites|exercises|list|filters|detail|create1|create2|create3|exercise|fullscreen` y argumentos de lanzamiento iOS `-devTool <url>` / `-themeMode light|dark`. `CreateRoutine` acepta `devStep` (precarga sin guardar).
+
+### 18.2 Decisiones asumidas
+| ID | Decisión |
+|---|---|
+| DA-48 | Se carga la biblioteca completa (rutinas y ejercicios) y se filtra en el dispositivo; sin paginación. Los conteos son reales |
+| DA-49 | Orden "A–Z" en lugar de "Relevancia" (no hay señal de relevancia) |
+| DA-50 | Favoritos de rutinas y ejercicios en AsyncStorage (hooks existentes) → BT-12 |
+| DA-51 | `workout_templates.type` es texto libre (p. ej. `full_body`): se normaliza con `normalizeWorkoutType` / `typeLabel` |
+| DA-52 | "Tu próxima sesión" = rutina recomendada n.º 1 (`recommendRoutines`, mismo score que Inicio) |
+| DA-53 | Miniaturas anatómicas por zona (`bodyPart`) como PLACEHOLDER, recortadas de `anatomia.jpg` (handoff §16); sin la nota "Miniaturas temporales… 3D" |
+| DA-54 | Scan visible sin acción (`TODO`) |
+| DA-55 | Detalle de rutina: se conservan "Trabaja" y "Necesitas" (sin pestañas); `ChevronRight` en lugar de rotate-3d (3D descartado); menú "…" del propietario con un Alert (Editar / Eliminar) |
+| DA-56 | CTA "Retomar · X de Y" para sesiones `saved` o `canceled` con progreso (criterio de DA-38) |
+| DA-57 | Asistente: kcal con `estimateCalories` de la app (no `min × 7` del prototipo); enfoque y tags se infieren (sin campos); al guardar se reemplaza por el detalle (no hay pantalla "Rutina guardada") |
+| DA-58 | Prescripción del detalle de ejercicio = `recommendations.hypertrophy` ("3 × 10"); se oculta si la biblioteca trae "-". "Tu mejor" = mejor récord del ejercicio (peso; si no, reps, tiempo o distancia) |
+| DA-59 | Técnica esencial = `coachingCues` (máx. 3); técnica completa = `howToPerform`. Sin cues, los 3 primeros pasos son la esencial y el resto, la completa |
+
+### 18.3 Desviaciones nuevas
+- **D-39** · Paso 2 del asistente en Dark: footer oscuro coherente (el prototipo lo deja claro, error del prototipo).
+- **D-40** · Filtro del paso 2 por **zona** en lugar de equipamiento (consistente con la lista de ejercicios).
+- **D-41** · Orden de la bandeja con flechas ↑ ↓ en lugar del asa de arrastre (sin librería de gestos nueva).
+- **D-42** · Ajuste de series / reps / tiempo / descanso en una hoja (`ExerciseAdjustSheet`) en lugar de controles en línea.
+- **D-43** · MoveKit sin tempo ("Tempo 2-1-1"), sin la etiqueta de fase de la pantalla completa ("03 Pausa · 1 s abajo") y sin el paso de técnica que se ilumina con el loop: no hay datos de fases (BT-14). Los segmentos muestran un fotograma fijo (fase 2 de 4).
+- **D-44** · Técnica completa sin título por paso y errores comunes sin consecuencia: la biblioteca guarda solo texto (BT-14).
+- **D-45** · CTA deshabilitada del paso 1 en Light algo más clara que la referencia (estilo de D-36).
+
+### 18.4 Bloqueos y pendientes
+- **Backend** (en `BACKEND_TODO.md`): BT-12 favoritos, BT-13 videos MoveKit, BT-14 técnica estructurada (tempo, fases, títulos, consecuencias, recomendaciones "-"), BT-15 `type` libre, BT-16 conteos y paginación.
+- **Diseño / assets:** las 7 miniaturas anatómicas definitivas por zona (hoy recortes PLACEHOLDER), póster MoveKit real y foto de Scan.
+- **Producto:** Scan (definir el flujo y el reconocimiento); "Relevancia" como orden.
+- **App:** "Agregar a rutina" (`AddExerciseToRoutine`) sigue en v1; play/pausa de MoveKit al integrar el video.
+
+### 18.5 Checklist de validación (Light y Dark)
+- [ ] Entrenos · Rutinas: chips con conteos, corazón (persiste al reabrir), hero → detalle, "+" → asistente.
+- [ ] Solo favoritos sin favoritas → vacío y "Ver todas".
+- [ ] Ejercicios: buscar, zona, equipamiento y "Ver todos" abren la lista con el filtro correcto; filtros → "Ver N ejercicios".
+- [ ] Detalle de rutina: Empezar (crea sesión) / Continuar / Retomar; compartir; "…" solo en rutinas propias (Editar / Eliminar); toque en un ejercicio → detalle.
+- [ ] Asistente: nombre obligatorio, tipo, nivel y duración; elegir y ordenar ejercicios; ajustar; Guardar → detalle de la nueva rutina. Editar una rutina propia carga sus datos y "Guardar cambios".
+- [ ] Exercise Detail: favorito, "tu mejor" → Récords, expandir técnica y errores, pantalla completa (abrir y cerrar), "Agregar a rutina".
+- [ ] Sin red: cada pantalla muestra el error y "Reintentar" recupera.
+- [ ] Atajo: menú dev "Ver pantallas de Entrenos" o `xcrun simctl launch booted <bundle> -devTool "athelete://dev/workouts?screen=<key>" -themeMode dark`.
+
+### 18.6 Componentes viejos sin uso (no borrados; comprobado con grep)
+- `src/features/workouts/components/`: CreateRoutineCard, ExerciseBodyPartRail, ExerciseDiscoveryHub, ExerciseFilterGroup, ExerciseFiltersModal, ExerciseLibraryHeader, ExerciseLibraryPanel, ExerciseListItem, ExerciseMediaHero, ExerciseRecommendationCard, FeaturedWorkoutCard, RoutineBuilderHeader, RoutineDiscoveryCard, RoutineDiscoveryPanel, RoutineDiscoverySection, RoutineExerciseLibraryPicker, RoutineExerciseRow, RoutineHeroCard, RoutineMetadataForm, WorkoutListItem, WorkoutQuickFilterChips, WorkoutSearchBar, WorkoutsHeader y WorkoutThumbnail (solo la usan componentes sin uso y `home/components/WorkoutCarousel`, también sin uso).
+- Hooks: `usePaginatedWorkoutLibrary`, `usePaginatedExerciseLibrary`, `useWorkoutDiscovery`.
+- **Siguen en uso:** `WorkoutSegmentedControl` (Progreso, ELLIE) y `WorkoutSessionExerciseRow` (Sesión).
+
+### 18.7 Commits (en este orden; cada uno compila: verificado con `tsc` sobre una copia de HEAD)
+Incluyen también lo pendiente de las tareas anteriores (card de Core 33, BACKEND_TODO, herramientas dev). `HomeScreen` depende del modelo de Entrenos (`recommendRoutines`) y `DevCatalogHost` mezcla las herramientas de Core 33 y Entrenos, por eso la card de Core 33 va después de Entrenos.
+
+```bash
+# 1 · Modelo de Entrenos y primitivas v2
+git add src/components/v2/DayCapsules.tsx src/components/v2/EquipmentBubble.tsx src/components/v2/ExerciseRow.tsx src/components/v2/FilterChip.tsx src/components/v2/RoutinePath.tsx src/components/v2/RoutineRow.tsx src/components/v2/SearchField.tsx src/components/v2/WorkoutHero.tsx src/components/v2/ZoneMosaic.tsx src/components/v2/IconButton.tsx src/components/v2/index.ts src/features/workouts/workoutsModel.ts src/features/workouts/workoutAssets.ts src/assets/v2/workouts __tests__/workoutsModel.test.ts src/features/home/v2/homeLabels.ts
+git commit -m "feat(ui): v2 primitives and model for Entrenos" -m "SearchField, FilterChip, ExerciseRow, RoutineRow, RoutinePath, ZoneMosaic, EquipmentBubble, WorkoutHero, DayCapsules; IconButton studio variant. Pure workouts model (filters, counts, type normalization, recommendations) with tests and placeholder assets." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 2 · Pantallas de Entrenos
+git add src/types/navigation.ts src/constants/routes.ts src/navigation/RootNavigator.tsx src/screens/tabs/WorkoutsScreen.tsx src/screens/workouts/ExerciseListScreen.tsx src/screens/workouts/WorkoutDetailScreen.tsx src/screens/workouts/CreateRoutineScreen.tsx src/screens/workouts/ExerciseDetailScreen.tsx src/features/workouts/v2 src/features/workouts/movekit
+git commit -m "feat(workouts): v2 Entrenos, routine detail, 3-step builder and MoveKit exercise detail" -m "Rutinas / Ejercicios with real counts, filtered exercise list and filters sheet, routine detail with Routine Path, 3-step routine builder, exercise detail with a single MoveKit placeholder integration point and fullscreen param. Error states with retry." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 3 · Card de Core 33 en Inicio + herramientas dev
+git add src/features/core33/core33Invite.ts __tests__/core33Invite.test.ts src/features/core33/useCore33InviteDismissals.ts src/features/core33/useOpenCore33.ts src/features/home/v2/Core33InviteCard.tsx src/features/home/homePriority.ts __tests__/homePriority.test.ts src/services/supabase/fitness.ts src/screens/tabs/HomeScreen.tsx src/dev/homeModeOverride.ts src/dev/DevCore33CardPreview.tsx src/dev/DevCatalogHost.tsx src/dev/devWorkoutsScreens.ts src/navigation/navigationRef.ts src/app/AppProviders.tsx src/providers/ThemeProvider.tsx
+git commit -m "feat(home): Core 33 discovery card and dev screen tools" -m "Invite / start-another card under Tu día with 14-day dismissals. Inicio uses the shared routine recommendation. Dev only: Inicio overrides with the card, card preview, Entrenos screen cycler and deep links, iOS launch arguments for theme and tools." -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+
+# 4 · Documentación
+git add docs/migration/MIGRATION_PROGRESS.md docs/backend/BACKEND_TODO.md
+git commit -m "docs: Entrenos module, Core 33 card and backend todo" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+```

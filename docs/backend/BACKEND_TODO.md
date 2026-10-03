@@ -1,0 +1,187 @@
+# ATHELETE · Pendientes del backend
+
+**Para:** backend (Lovable / Supabase) y Nicolás.
+**Mantenido por:** el equipo de la app móvil. Cada vez que la app necesite algo del backend que aún no existe, se añade aquí en lugar de improvisarlo en la app.
+**Fuente de lo que ya existe:** [`BACKEND_SUMMARY.md`](BACKEND_SUMMARY.md).
+**Última actualización:** 2026-10-03.
+
+Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** (la app funciona con un sustituto local o aproximado) · **Baja** (mejora u operación).
+
+## Resumen
+
+| ID | Feature | Pendiente | Prioridad | ¿Bloquea? |
+|---|---|---|---|---|
+| BT-01 | Core 33 | Catálogo de retos y estados elegido / preparado | Alta | Sí: Intro, Explorar, Detalle y Listo |
+| BT-02 | Core 33 | `completed_at` en `challenge_participations` | Media | No (aproximación con `start_date + 32`) |
+| BT-03 | Core 33 | "Intro vista" y descartes de la card de Inicio en el perfil | Media | No (AsyncStorage local) |
+| BT-04 | Gamificación | Activar el modo `strict` | Media | No |
+| BT-05 | Gamificación | Cerrar `UPDATE` de `profiles.points` e `INSERT` en `user_badges` | Media | No (depende de la web) |
+| BT-06 | ELLIE / Nutrición | Confirmar si `ellie-chat` usa el género para calorías | Baja | No |
+| BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
+| BT-08 | Social | Proceso de moderación (revisión de reportes en 24 h, contacto de soporte) | Alta antes de lanzar Comunidad | Sí, para publicar Comunidad |
+| BT-09 | Storage | Tipos de archivo en `social-photos` y `profile-photos`, 5 MB en `profile-photos` | Media | No (la app valida) |
+| BT-10 | Storage | Verificar la limpieza diaria de fotos (`social-photos-cleanup`, 03:17 UTC) | Baja | No |
+| BT-11 | Documentación | Corregir `training_level` en `BACKEND_SUMMARY.md` | Alta | No (la app ya usa los valores reales) |
+| BT-12 | Entrenos | Favoritos de rutinas y ejercicios en una tabla | Media | No (AsyncStorage local) |
+| BT-13 | Entrenos | Videos MoveKit (MP4 en loop + póster) por ejercicio | Alta para EXERCISE_01 | No (póster PLACEHOLDER) |
+| BT-14 | Entrenos | Técnica estructurada: tempo, fases, pasos con título, consecuencia de cada error, recomendaciones completas | Media | No (se oculta lo que falta) |
+| BT-15 | Entrenos | `workout_templates.type` con valores cerrados | Baja | No (la app normaliza) |
+| BT-16 | Entrenos | Conteos y búsqueda en servidor cuando crezca la biblioteca | Baja | No |
+
+---
+
+## Core 33
+
+### BT-01 · Catálogo de retos y estados elegido / preparado
+- **Qué falta:** hoy Core 33 no tiene catálogo en la base de datos. Hay un único reto con hábitos elegidos de presets en la app (`core33.ts`), y una participación es `active` desde que se crea. No existe "reto elegido pero no iniciado".
+- **Por qué:** el flujo v2 (handoff §8) separa **elegir** de **empezar**:
+  - Explorar retos → Detalle → "Elegir este reto" → "Tu Core 33 está listo" → "Comenzar Día 1".
+  - La entrada inteligente necesita saber si hay un reto preparado.
+- **Quién lo necesita:**
+  - Core 33: Intro, Explorar retos, Detalle de reto, Tu Core 33 está listo, activo y completado;
+  - la entrada única de la app (`resolveCore33Entry`);
+  - la card de Inicio, que no debe mostrarse con un reto preparado;
+  - Progreso · Retos.
+- **Propuesta:**
+  - Tabla `core33_challenges`:
+    - `id uuid PK`, `slug text UNIQUE`, `title`, `category`, `level`, `description`, `cover_path`, `sort_order int`, `is_active bool`;
+    - `habits jsonb`: 3 hábitos fijos `{index, title, pillar}`.
+    - Seed con los 5 retos del handoff:
+      - Construye fuerza;
+      - Muévete cada día;
+      - Recupera mejor;
+      - Palabra cumplida;
+      - Come con intención.
+  - En `challenge_participations`:
+    - `challenge_id uuid NULL → core33_challenges` (NULL = participaciones antiguas con hábitos propios; MIGRATION_PROGRESS §1, decisión 6: los retos activos siguen con su modelo);
+    - `chosen_at timestamptz`, `started_at timestamptz NULL`;
+    - nuevo estado `prepared` en `status` (elegido, no iniciado).
+  - Una sola participación `prepared` o `active` por usuario: índice único parcial `(user_id) WHERE status IN ('prepared','active')`, como protección. Las RPC no usan `ON CONFLICT` contra ese índice.
+  - RPC:
+    - `choose_core33_challenge(_challenge_id)`: crea o reemplaza la participación `prepared`.
+    - `start_core33_challenge()`: `prepared → active`, `start_date = hoy local`, `started_at = now()`.
+    - `cancel_prepared_core33()`.
+- **Prioridad:** Alta. **Bloquea** la migración de Core 33 v2.
+
+### BT-02 · `completed_at` en `challenge_participations`
+- **Qué falta:** las participaciones no guardan cuándo se completaron.
+- **Por qué:** la card "Empieza otro Core 33" de Inicio (HOME_11) debe aparecer **desde el día siguiente** al completado.
+  - Hoy la app aproxima la fecha del día 33 con `start_date + 32`.
+  - Si alguien completa tarde, la card puede salir el mismo día del completado.
+- **Quién lo necesita:** Inicio (card de descubrimiento) y, más adelante, la celebración y el historial de Core 33.
+- **Propuesta:**
+  - `challenge_participations.completed_at timestamptz NULL`;
+  - se rellena al pasar a `completed`, con un trigger o en la RPC que lo cierre;
+  - backfill de las existentes con `start_date + 32 días`.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-03 · "Intro vista" y descartes de la card de Core 33 en el perfil
+- **Qué falta:** dónde guardar, por usuario, si ya vio la Intro de Core 33 y el "Ahora no" de la card de Inicio.
+- **Por qué:**
+  - La Intro se muestra una sola vez.
+  - La card vuelve a los 14 días y deja de mostrarse tras dos descartes; el contador se reinicia al completar un Core 33.
+  - Hoy los descartes están en AsyncStorage (`@athelete/core33-invite-v1:<userId>`), así que no se sincronizan entre dispositivos ni sobreviven a una reinstalación. "Intro vista" todavía no existe.
+- **Quién lo necesita:** la entrada inteligente de Core 33 (Intro o Explorar) y la card de Inicio (HOME_10 / HOME_11).
+- **Propuesta:** en `profiles` (privado, solo el dueño):
+  - `core33_intro_seen_at timestamptz NULL`;
+  - `core33_invite_dismiss_count int NOT NULL DEFAULT 0`;
+  - `core33_invite_dismissed_at timestamptz NULL`;
+  - `core33_invite_dismiss_completed_count int NOT NULL DEFAULT 0` (número de Core 33 completados al descartar, para el reinicio).
+  - Se escribe con `UPDATE` directo (RLS del dueño). No hace falta RPC.
+- **Prioridad:** Media. **No bloquea.**
+
+## Gamificación
+
+### BT-04 · Activar el modo `strict`
+- **Qué falta:** `gamification_config.mode = 'strict'`.
+- **Por qué:** en modo `log` el servidor acepta los puntos que envía la app y eventos desconocidos.
+- **Requisito:** revisar antes la auditoría de `gamification_events.metadata.validation.strict_would` y ajustar el catálogo. La app móvil ya usa los nombres nuevos.
+- **Quién:** backend, con aviso de Nicolás.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-05 · Cerrar `UPDATE` de `profiles.points` e `INSERT` en `user_badges`
+- **Qué falta:** quitar las políticas que permiten al cliente escribir puntos y badges.
+- **Por qué:** solo `award_gamification_event` debe otorgarlos. La app móvil ya no escribe directamente.
+- **Requisito:** actualizar el `GamificationContext` de la **web** para que use solo la RPC.
+- **Prioridad:** Media. **No bloquea** (depende de la web).
+
+## ELLIE / Nutrición
+
+### BT-06 · Género en `ellie-chat`
+- **Qué falta:** confirmar si la edge function `ellie-chat` (planes nutricionales) usa el género para estimar calorías. Su código no está en el repo de la app.
+- **Por qué:** el onboarding v2 ya no pide el género (`gender` puede ser `null`, BK-06).
+- **Propuesta:** si lo usa, la app lo pediría al activar un plan cuando falte, sin añadirlo al onboarding.
+- **Prioridad:** Baja.
+
+## Social
+
+### BT-07 · `exercise_reps` en retos entre amigos
+- **Qué falta:** una decisión de producto. Hoy la métrica está bloqueada entre amigos (solo en el reto oficial).
+- **Prioridad:** Baja. **No bloquea.**
+
+### BT-08 · Proceso de moderación
+- **Qué falta:**
+  - quién revisa la cola (`moderation_queue`) y el compromiso de respuesta en 24 h que pide Apple;
+  - el contacto de soporte publicado en la ficha de la App Store.
+- **Por qué:** guía 1.2 de la App Store (contenido de usuarios).
+- **Prioridad:** Alta **antes de publicar Comunidad**.
+
+## Storage
+
+### BT-09 · Tipos de archivo y tamaño
+- **Qué falta:** restringir JPG/PNG/WebP en `social-photos` y `profile-photos`, y el límite de 5 MB en `profile-photos`, desde Cloud → Storage.
+- **Quién:** Nicolás (manual).
+- **Prioridad:** Media. Mientras tanto la app valida el tipo.
+
+### BT-10 · Verificar la limpieza diaria de fotos
+- **Qué falta:** tras las primeras publicaciones con foto, comprobar que `social-photos-cleanup` (03:17 UTC):
+  - borra las fotos de posts eliminados en un día como mucho;
+  - conserva 30 días las retiradas por moderación.
+- **Prioridad:** Baja.
+
+## Documentación
+
+### BT-11 · `training_level` en `BACKEND_SUMMARY.md`
+- **Qué falta:** el §1 dice `beginner | intermediate | advanced`, pero el CHECK real (`profiles_training_level_check`, comprobado contra Supabase el 2026-10-02) acepta `principiante | intermedio | avanzado`.
+- **Por qué:** con los valores del documento, el guardado del onboarding fallaba (`23514`). La app ya usa los valores reales.
+- **Propuesta:** corregir el §1 (o, si se prefiere el inglés, cambiar el CHECK y avisar para ajustar la app).
+- **Prioridad:** Alta (documentación incorrecta). **No bloquea.**
+
+---
+
+## Entrenos
+
+### BT-12 · Favoritos de rutinas y ejercicios
+- **Qué falta:** no existe una tabla de favoritos. La app los guarda en AsyncStorage (`useFavoriteWorkouts`, `useFavoriteExercises`), así que se pierden al cambiar de dispositivo o reinstalar.
+- **Propuesta:** `user_favorites (user_id, item_type 'workout' | 'exercise', item_id, created_at)`, PK `(user_id, item_type, item_id)`, RLS por `auth.uid()`. Al conectarla, la app migra una vez los favoritos locales.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-13 · Videos MoveKit
+- **Qué falta:** los loops del ejercicio (MP4, cámara fija, sin audio) y un póster (primer fotograma limpio). `exercises.video_url` existe, pero no hay assets MoveKit ni un campo de póster.
+- **Propuesta:** subir los MP4 a Storage (bucket público de solo lectura), rellenar `video_url` y añadir `poster_url`. La app tiene un único punto de integración (`MoveKitPlayer.tsx`). Reproducir video requerirá una dependencia nativa (decisión aparte).
+- **Prioridad:** Alta para EXERCISE_01. **No bloquea** (póster PLACEHOLDER).
+
+### BT-14 · Técnica estructurada del ejercicio
+- **Qué falta** (la biblioteca solo tiene listas de texto):
+  - tempo ("2-1-1") y fases del loop (nombre, duración, paso de técnica asociado), para los segmentos y la etiqueta de fase;
+  - título por paso de la técnica completa (Agarre, Trayectoria, Respiración…);
+  - consecuencia de cada error común ("Pierdes tensión y cargas el esternón.");
+  - recomendaciones completas: muchas filas traen "-" en series / reps (la app oculta la prescripción).
+- **Propuesta:** columnas JSONB en `exercises` (`tempo`, `phases`, `technique_steps [{title, text}]`, `common_mistakes [{title, consequence}]`), manteniendo las listas actuales hasta migrar.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-15 · Tipo de rutina con valores cerrados
+- **Qué falta:** `workout_templates.type` es texto libre (aparecen `full_body`, `fullbody`…).
+- **Propuesta:** CHECK o enum `strength | cardio | fullbody | mobility | hiit` y normalizar los datos existentes. La app ya normaliza (`normalizeWorkoutType`).
+- **Prioridad:** Baja. **No bloquea.**
+
+### BT-16 · Conteos y búsqueda en servidor
+- **Qué falta:** Entrenos carga toda la biblioteca y filtra en el dispositivo (conteos por tipo, zona y equipamiento). Sirve con el tamaño actual.
+- **Propuesta:** cuando la biblioteca crezca, una RPC de conteos y búsqueda paginada.
+- **Prioridad:** Baja. **No bloquea.**
+
+---
+
+## Historial
+- 2026-10-02: documento creado con BT-01 a BT-11.
+- 2026-10-03: BT-12 a BT-16 (módulo Entrenos).
