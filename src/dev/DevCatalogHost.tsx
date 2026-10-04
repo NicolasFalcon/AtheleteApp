@@ -19,6 +19,11 @@ import {
   openWorkoutsDevScreen,
 } from '@app/dev/devWorkoutsScreens';
 import {
+  isProgressDevScreen,
+  openNextProgressDevScreen,
+  openProgressDevScreen,
+} from '@app/dev/devProgressScreens';
+import {
   isSessionDevScreen,
   openNextSessionDevScreen,
   openSessionDevScreen,
@@ -76,8 +81,27 @@ function openSessionFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/progress?screen=<key>: navigates (no overlay).
+function openProgressFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/progress')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'summary';
+  if (isProgressDevScreen(screen)) {
+    openProgressDevScreen(screen, {
+      scroll: Number(queryParam(url, 'scroll')) || undefined,
+    }).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
-  if (!url || openWorkoutsFromUrl(url) || openSessionFromUrl(url)) {
+  if (
+    !url ||
+    openWorkoutsFromUrl(url) ||
+    openSessionFromUrl(url) ||
+    openProgressFromUrl(url)
+  ) {
     return null;
   }
   if (url.startsWith(DEV_URLS.catalog)) {
@@ -135,6 +159,15 @@ export function DevCatalogHost() {
         .then(label =>
           toastRef.current.show(
             label ? `Entrenos · ${label}` : 'Inicia sesión para ver Entrenos',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de Progreso', () => {
+      openNextProgressDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `Progreso · ${label}` : 'Inicia sesión para ver Progreso',
           ),
         )
         .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
