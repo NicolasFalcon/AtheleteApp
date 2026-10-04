@@ -17,6 +17,8 @@ export type CelebrationProps = {
   unit?: string;
   subtitle?: string;
   hint?: string;
+  // Size of the figure (56 by default); smaller for a word such as a medal name.
+  valueSize?: number;
   onClose: () => void;
 };
 
@@ -30,6 +32,7 @@ export function Celebration({
   unit,
   subtitle,
   hint = 'Toca para continuar',
+  valueSize = 56,
   onClose,
 }: CelebrationProps) {
   const ringA = useRef(new Animated.Value(0)).current;
@@ -107,7 +110,11 @@ export function Celebration({
           {eyebrow}
         </TextV2>
         <View style={styles.figure}>
-          <TextV2 variant="displayM" color="#FFFFFF" style={styles.value}>
+          <TextV2
+            variant="displayM"
+            color="#FFFFFF"
+            style={[styles.value, { fontSize: valueSize }]}
+          >
             {value}
           </TextV2>
           {unit ? (

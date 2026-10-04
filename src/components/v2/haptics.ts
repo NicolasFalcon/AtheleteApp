@@ -14,4 +14,5 @@ export const haptics = {
   selection: () => safeTrigger('selection'),
   light: () => safeTrigger('impactLight'),
   success: () => safeTrigger('notificationSuccess'),
+  error: () => safeTrigger('notificationError'),
 };
