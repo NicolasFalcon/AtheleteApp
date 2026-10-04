@@ -24,6 +24,11 @@ import {
   openProgressDevScreen,
 } from '@app/dev/devProgressScreens';
 import {
+  isProfileDevScreen,
+  openNextProfileDevScreen,
+  openProfileDevScreen,
+} from '@app/dev/devProfileScreens';
+import {
   isEllieDevScreen,
   openEllieDevScreen,
   openNextEllieDevScreen,
@@ -112,13 +117,26 @@ function openEllieFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/profile?screen=<key>: navigates (no overlay).
+function openProfileFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/profile')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'profile';
+  if (isProfileDevScreen(screen)) {
+    openProfileDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
   if (
     !url ||
     openWorkoutsFromUrl(url) ||
     openSessionFromUrl(url) ||
     openProgressFromUrl(url) ||
-    openEllieFromUrl(url)
+    openEllieFromUrl(url) ||
+    openProfileFromUrl(url)
   ) {
     return null;
   }
@@ -195,6 +213,15 @@ export function DevCatalogHost() {
         .then(label =>
           toastRef.current.show(
             label ? `ELLIE · ${label}` : 'Inicia sesión para ver ELLIE',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de Perfil', () => {
+      openNextProfileDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `Perfil · ${label}` : 'Inicia sesión para ver Perfil',
           ),
         )
         .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));

@@ -118,6 +118,14 @@ export type RegisterPrRouteParams = {
   showExercisePicker?: boolean;
 };
 
+// Perfil, Editar perfil y Ajustes. Development only: sample data / forced states.
+export type ProfileRouteParams = {
+  devState?: 'data' | 'new' | 'loading' | 'error';
+};
+export type ProfileFormRouteParams = {
+  devState?: 'data' | 'saving' | 'saved' | 'error' | 'invalid' | 'loading' | 'new';
+};
+
 // Achievements (Logros). Development only: sample data and the open sheet.
 export type AchievementsRouteParams = {
   devState?: 'data' | 'loading' | 'error';
@@ -178,8 +186,10 @@ export type MainTabParamList = {
 // Shared screens above the tabs (handoff §6: detail, flows and immersive
 // screens hide the tab bar).
 export type AppStackParamList = {
-  Profile: undefined;
-  EditProfile: undefined;
+  Profile: ProfileRouteParams | undefined;
+  EditProfile: ProfileFormRouteParams | undefined;
+  Settings: ProfileFormRouteParams | undefined;
+  HealthSettings: { devConnected?: boolean } | undefined;
   Achievements: AchievementsRouteParams | undefined;
   Notifications: undefined;
   Core33: undefined;

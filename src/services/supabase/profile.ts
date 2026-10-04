@@ -67,6 +67,7 @@ function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
     core33IntroSeenAt: row.core33_intro_seen_at,
     core33CompletedAt: row.core33_completed_at,
     core33InviteDismissedAt: row.core33_invite_dismissed_at,
+    createdAt: (row as { created_at?: string | null }).created_at ?? null,
   };
 }
 
@@ -181,6 +182,10 @@ export async function updateProfileDetails(
     weight?: number | null;
     height?: number | null;
     trainingDaysPerWeek?: number | null;
+    // CHECK profiles_training_level_check: principiante | intermedio | avanzado.
+    trainingLevel?: TrainingLevel | null;
+    // CHECK: 5–240.
+    preferredSessionMinutes?: number | null;
   },
 ): Promise<void> {
   const client = getSupabaseClient();
@@ -221,6 +226,13 @@ export async function updateProfileDetails(
   }
   if (typeof patch.trainingDaysPerWeek !== 'undefined') {
     payload.training_days_per_week = patch.trainingDaysPerWeek;
+  }
+
+  if (typeof patch.trainingLevel !== 'undefined') {
+    payload.training_level = patch.trainingLevel;
+  }
+  if (typeof patch.preferredSessionMinutes !== 'undefined') {
+    payload.preferred_session_minutes = patch.preferredSessionMinutes;
   }
 
   const { error } = await (client.from('profiles') as any)

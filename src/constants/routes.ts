@@ -37,6 +37,8 @@ export const TAB_ROUTES = {
 export const APP_ROUTES = {
   Profile: 'Profile',
   EditProfile: 'EditProfile',
+  Settings: 'Settings',
+  HealthSettings: 'HealthSettings',
   Achievements: 'Achievements',
   Notifications: 'Notifications',
   Core33: 'Core33',

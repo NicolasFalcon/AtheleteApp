@@ -1,3 +1,5 @@
+import { SettingsScreen } from '@app/screens/profile/SettingsScreen';
+import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen';
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -125,6 +127,14 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.EditProfile}
             component={EditProfileScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.Settings}
+            component={SettingsScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.HealthSettings}
+            component={HealthSettingsScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.Achievements}

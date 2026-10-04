@@ -78,7 +78,8 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   side: {
-    width: 88,
+    // Grows for a wide action ("Guardado ✓"); 88 otherwise.
+    minWidth: 88,
     flexDirection: 'row',
     alignItems: 'center',
   },

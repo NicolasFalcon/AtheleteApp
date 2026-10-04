@@ -1,210 +1,370 @@
-import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { AppHeader, ScreenContainer } from '@app/components';
-import { AppTextInput, Button, Card, Loader } from '@app/components/ui';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
+import { Calendar } from 'lucide-react-native';
+import {
+  BackButton,
+  FilterChip,
+  FormRow,
+  GlassHeader,
+  PressableScale,
+  StatusBarV2,
+  StepperButtons,
+  TextV2,
+  useThemeV2,
+  useToast,
+} from '@app/components/v2';
+import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
+import { LEVELS } from '@app/features/onboarding/onboardingModel';
+import { BirthDateSheet } from '@app/features/profile/v2/BirthDateSheet';
+import {
+  draftFromProfile,
+  formatBirthDate,
+  formatHeight,
+  formatWeight,
+  goalOptions,
+  isDirty,
+  isValid,
+  MINUTES_RANGE,
+  stepDays,
+  stepHeight,
+  stepMinutes,
+  stepWeight,
+  toPatch,
+  validateDraft,
+  type EditDraft,
+} from '@app/features/profile/profileModel';
 import { useAuth } from '@app/hooks/useAuth';
-import { useAppTheme } from '@app/hooks/useAppTheme';
-import { APP_ROUTES } from '@app/constants/routes';
+import { openProfilePhotoLibrary } from '@app/lib/profilePhotoPicker';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import { ROOT_ROUTES } from '@app/constants/routes';
 import { updateProfileDetails } from '@app/services/supabase/profile';
-import type { OnboardingGoal } from '@app/types/auth';
+import { uploadProfilePhoto } from '@app/services/supabase/profile-photo';
+import type { AppScreenProps } from '@app/types/navigation';
 
-const goals: Array<{key: OnboardingGoal; label: string}> = [
-  {key: 'lose_weight', label: 'Perder peso'},
-  {key: 'gain_muscle', label: 'Ganar músculo'},
-  {key: 'maintain', label: 'Mantenerme'},
-  {key: 'improve_health', label: 'Mejorar salud'},
-  {key: 'performance', label: 'Rendimiento'},
-];
+type Props = AppScreenProps<'EditProfile'>;
+type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-export function EditProfileScreen() {
-  const {theme} = useAppTheme();
-  const {profile, refreshProfile} = useAuth();
-  const [name, setName] = useState(profile?.name || '');
-  const [goal, setGoal] = useState<OnboardingGoal>('maintain');
-  const [birthDate, setBirthDate] = useState(profile?.birthDate || '');
-  const [weight, setWeight] = useState(profile?.weight ? String(profile.weight) : '');
-  const [height, setHeight] = useState(profile?.height ? String(profile.height) : '');
-  const [trainingDays, setTrainingDays] = useState(
-    profile?.trainingDaysPerWeek ? String(profile.trainingDaysPerWeek) : '',
-  );
-  const [saving, setSaving] = useState(false);
+const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 
-  useEffect(() => {
-    if (!profile) {
-      return;
+// Editar perfil (PROFILE_02): two groups on the background, the date written
+// out, the units visible. Guardar is active only with changes and valid
+// values; the writes respect the CHECKs of `profiles` (see profileModel).
+export function EditProfileScreen({ navigation, route }: Props) {
+  const { colors, layout } = useThemeV2();
+  const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const { profile: realProfile, refreshProfile } = useAuth();
+  const dev = __DEV__ ? route.params?.devState : undefined;
+
+  const profile = useMemo(() => {
+    if (__DEV__ && (dev === 'data' || dev === 'saving' || dev === 'saved' || dev === 'error' || dev === 'invalid')) {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      return (require('@app/dev/profileFixtures') as typeof import('@app/dev/profileFixtures')).FIXTURE_PROFILE;
     }
+    if (__DEV__ && dev === 'new') {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      return (require('@app/dev/profileFixtures') as typeof import('@app/dev/profileFixtures')).FIXTURE_NEW_PROFILE;
+    }
+    return realProfile;
+  }, [dev, realProfile]);
 
-    setName(profile.name || '');
-    setGoal(profile.goal || 'maintain');
-    setBirthDate(profile.birthDate || '');
-    setWeight(profile.weight ? String(profile.weight) : '');
-    setHeight(profile.height ? String(profile.height) : '');
-    setTrainingDays(profile.trainingDaysPerWeek ? String(profile.trainingDaysPerWeek) : '');
-  }, [profile]);
+  const saved = useMemo(() => (profile ? draftFromProfile(profile) : null), [profile]);
+  const [draft, setDraft] = useState<EditDraft | null>(saved);
+  const [state, setState] = useState<SaveState>('idle');
+  const [message, setMessage] = useState<string | null>(null);
+  const [dateOpen, setDateOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [touched, setTouched] = useState(false);
+  const loadedFor = useRef<string | null>(null);
 
-  const styles = StyleSheet.create({
-    form: {
-      gap: 14,
-    },
-    card: {
-      padding: 18,
-      borderRadius: 28,
-      gap: 14,
-    },
-    sectionTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 16,
-      fontWeight: theme.typography.weights.bold,
-    },
-    goalGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
-    },
-    goalOption: {
-      minHeight: 40,
-      borderRadius: theme.radii.pill,
-      paddingHorizontal: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.background,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-    },
-    goalOptionActive: {
-      backgroundColor: theme.colors.accent,
-      borderColor: theme.colors.accent,
-    },
-    goalLabel: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 13,
-      fontWeight: theme.typography.weights.medium,
-    },
-    goalLabelActive: {
-      color: theme.colors.accentContrast,
-      fontWeight: theme.typography.weights.semibold,
-    },
-    row: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    rowItem: {
-      flex: 1,
-    },
-  });
+  // The draft starts from the stored profile once (and when another loads).
+  useEffect(() => {
+    if (saved && profile && loadedFor.current !== profile.id + (dev ?? '')) {
+      loadedFor.current = profile.id + (dev ?? '');
+      setDraft(
+        dev === 'invalid' ? { ...saved, minutes: 3, name: '' } : saved,
+      );
+      setTouched(dev === 'invalid');
+      setState(dev === 'saving' ? 'saving' : dev === 'saved' ? 'saved' : 'idle');
+      if (dev === 'error') {
+        setState('error');
+        setMessage('No pudimos guardar tus cambios. Revisa tu conexión e inténtalo de nuevo.');
+      }
+    }
+  }, [dev, profile, saved]);
 
-  if (!profile) {
-    return (
-      <ScreenContainer>
-        <Loader label="Cargando perfil..." />
-      </ScreenContainer>
-    );
+  if (!draft || !saved || !profile) {
+    return <View style={[styles.screen, { backgroundColor: colors.bg }]} />;
   }
 
-  const handleSave = async () => {
-    setSaving(true);
-
-    try {
-      await updateProfileDetails(profile.id, {
-        name: name.trim(),
-        goal,
-        birthDate: birthDate.trim() || null,
-        weight: weight ? Number(weight) : null,
-        height: height ? Number(height) : null,
-        trainingDaysPerWeek: trainingDays ? Number(trainingDays) : null,
-      });
-      await refreshProfile();
-    } finally {
-      setSaving(false);
+  const errors = validateDraft(draft);
+  const dirty = isDirty(draft, saved) || dev === 'saved' || dev === 'saving' || dev === 'error';
+  const canSave = dirty && isValid(errors) && state !== 'saving' && state !== 'saved';
+  const set = (patch: Partial<EditDraft>) => {
+    setDraft({ ...draft, ...patch });
+    setTouched(true);
+    if (state === 'error') {
+      setState('idle');
+      setMessage(null);
     }
   };
 
+  const save = async () => {
+    if (!canSave || dev) {
+      return;
+    }
+    setState('saving');
+    setMessage(null);
+    try {
+      await updateProfileDetails(profile.id, toPatch(draft, saved));
+      await refreshProfile();
+      await Promise.allSettled(
+        ['profile', 'home', 'ellie', 'workouts', 'progress'].map(key =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      );
+      setState('saved');
+      setTimeout(() => safeGoBack(navigation, BACK_FALLBACKS), 800);
+    } catch (error) {
+      console.warn('[profile] No se pudo guardar el perfil:', error);
+      setState('error');
+      setMessage('No pudimos guardar tus cambios. Revisa tu conexión e inténtalo de nuevo.');
+    }
+  };
+
+  const changePhoto = async () => {
+    if (uploading || dev) {
+      return;
+    }
+    try {
+      const result = await openProfilePhotoLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        includeBase64: true,
+        maxWidth: 1080,
+        maxHeight: 1080,
+        quality: 0.8,
+      });
+      const asset = result.assets?.[0];
+      if (result.didCancel || !asset?.base64 || !asset.type) {
+        return;
+      }
+      setUploading(true);
+      const path = await uploadProfilePhoto(profile.id, {
+        base64: asset.base64,
+        contentType: asset.type,
+        fileSize: asset.fileSize,
+      });
+      await updateProfileDetails(profile.id, { profilePhotoUrl: path });
+      await refreshProfile();
+      toast.show('Foto actualizada');
+    } catch (error) {
+      toast.show(error instanceof Error ? error.message : 'No pudimos cambiar la foto', { tone: 'error' });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const label =
+    state === 'saving' ? 'Guardando…' : state === 'saved' ? 'Guardado ✓' : 'Guardar';
+  const active = canSave || state === 'saved' || state === 'saving';
+  const show = (field: keyof EditDraft) => (touched ? errors[field] : undefined);
+
   return (
-    <ScreenContainer scrollable contentContainerStyle={styles.form}>
-      <AppHeader
-        showBackButton
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <StatusBarV2 />
+      <GlassHeader
         title="Editar perfil"
-        backFallbacks={[APP_ROUTES.Profile]}
+        left={<BackButton onPress={() => safeGoBack(navigation, BACK_FALLBACKS)} />}
+        right={
+          <PressableScale
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canSave, busy: state === 'saving' }}
+            disabled={!canSave}
+            onPress={save}
+            style={[
+              styles.save,
+              { backgroundColor: active ? colors.cta.primary : colors.surface.muted },
+            ]}
+          >
+            <TextV2 variant="bodyStrong" color={active ? colors.cta.primaryText : colors.text.tertiary}>
+              {label}
+            </TextV2>
+          </PressableScale>
+        }
       />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: layout.gutter, paddingBottom: insets.bottom + 40, gap: 28, paddingTop: 12 }}
+        >
+          <View style={styles.photo}>
+            <ProfileAvatar avatarKey={profile.avatarKey} profilePhotoUrl={profile.profilePhotoUrl} size={72} />
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Cambiar foto de perfil"
+              onPress={changePhoto}
+              style={styles.photoLink}
+            >
+              <TextV2 variant="bodyStrong">{uploading ? 'Subiendo…' : 'Cambiar foto'}</TextV2>
+            </PressableScale>
+          </View>
 
-      <Card style={styles.card}>
-        <Text style={styles.sectionTitle}>Información personal</Text>
-        <AppTextInput
-          label="Nombre"
-          value={name}
-          onChangeText={setName}
-          placeholder="Tu nombre"
-        />
-        <AppTextInput
-          label="Fecha de nacimiento"
-          value={birthDate}
-          onChangeText={setBirthDate}
-          placeholder="YYYY-MM-DD"
-        />
-        <View style={styles.row}>
-          <View style={styles.rowItem}>
-            <AppTextInput
+          <View>
+            <Eyebrow>Información personal</Eyebrow>
+            <FormRow label="Nombre" error={show('name')}>
+              <TextInput
+                accessibilityLabel="Nombre"
+                value={draft.name}
+                onChangeText={name => set({ name })}
+                maxLength={80}
+                autoCapitalize="words"
+                placeholder="Tu nombre"
+                placeholderTextColor={colors.text.tertiary}
+                style={[styles.input, { color: colors.text.primary }]}
+              />
+            </FormRow>
+            <FormRow
+              label="Fecha de nacimiento"
+              error={show('birthDate')}
+              onPress={() => setDateOpen(true)}
+              trailing={<Calendar size={20} color={colors.text.secondary} strokeWidth={1.8} />}
+            >
+              <TextV2 variant="bodyL" style={styles.value}>
+                {formatBirthDate(draft.birthDate)}
+              </TextV2>
+            </FormRow>
+            <FormRow
               label="Peso"
-              value={weight}
-              onChangeText={setWeight}
-              keyboardType="decimal-pad"
-              placeholder="kg"
-            />
-          </View>
-          <View style={styles.rowItem}>
-            <AppTextInput
+              error={show('weight')}
+              trailing={
+                <StepperButtons
+                  label="peso"
+                  onMinus={() => set({ weight: stepWeight(draft.weight, -1) })}
+                  onPlus={() => set({ weight: stepWeight(draft.weight, 1) })}
+                />
+              }
+            >
+              <TextV2 variant="bodyL" style={styles.value}>{formatWeight(draft.weight)}</TextV2>
+            </FormRow>
+            <FormRow
               label="Altura"
-              value={height}
-              onChangeText={setHeight}
-              keyboardType="number-pad"
-              placeholder="cm"
-            />
+              error={show('height')}
+              trailing={
+                <StepperButtons
+                  label="altura"
+                  onMinus={() => set({ height: stepHeight(draft.height, -1) })}
+                  onPlus={() => set({ height: stepHeight(draft.height, 1) })}
+                />
+              }
+            >
+              <TextV2 variant="bodyL" style={styles.value}>{formatHeight(draft.height)}</TextV2>
+            </FormRow>
           </View>
-        </View>
-      </Card>
 
-      <Card style={styles.card}>
-        <Text style={styles.sectionTitle}>Mis objetivos</Text>
-        <View style={styles.goalGrid}>
-          {goals.map(option => {
-            const active = goal === option.key;
-            return (
-              <Pressable
-                key={option.key}
-                onPress={() => setGoal(option.key)}
-                style={({pressed}) => [
-                  styles.goalOption,
-                  active ? styles.goalOptionActive : null,
-                  pressed ? {opacity: 0.9} : null,
-                ]}>
-                <Text
-                  style={[
-                    styles.goalLabel,
-                    active ? styles.goalLabelActive : null,
-                  ]}>
-                  {option.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+          <View style={styles.group}>
+            <Eyebrow>Objetivo</Eyebrow>
+            <View style={styles.chips}>
+              {goalOptions(saved.goal).map(option => (
+                <FilterChip
+                  key={option.value}
+                  size={40}
+                  label={option.label}
+                  selected={draft.goal === option.value}
+                  onPress={() => set({ goal: option.value })}
+                />
+              ))}
+            </View>
+            {show('goal') ? <TextV2 variant="caption" color={colors.ember.deep}>{errors.goal}</TextV2> : null}
+          </View>
 
-        <AppTextInput
-          label="Entrenamiento por semana"
-          value={trainingDays}
-          onChangeText={setTrainingDays}
-          keyboardType="number-pad"
-          placeholder="6"
-        />
-      </Card>
+          <View>
+            <Eyebrow>Tu semana</Eyebrow>
+            <FormRow label="Nivel" error={show('level')}>
+              <View style={styles.chips}>
+                {LEVELS.map(option => (
+                  <FilterChip
+                    key={option.value}
+                    size={40}
+                    label={option.label}
+                    selected={draft.level === option.value}
+                    onPress={() => set({ level: option.value })}
+                  />
+                ))}
+              </View>
+            </FormRow>
+            <FormRow
+              label="Días de entrenamiento"
+              error={show('days')}
+              trailing={
+                <StepperButtons
+                  label="días"
+                  onMinus={() => set({ days: stepDays(draft.days, -1) })}
+                  onPlus={() => set({ days: stepDays(draft.days, 1) })}
+                />
+              }
+            >
+              <TextV2 variant="bodyL" style={styles.value}>
+                {draft.days} {draft.days === 1 ? 'día' : 'días'} por semana
+              </TextV2>
+            </FormRow>
+            <FormRow
+              label="Minutos por sesión"
+              error={show('minutes')}
+              trailing={
+                <StepperButtons
+                  label="minutos"
+                  minusDisabled={draft.minutes <= MINUTES_RANGE.min}
+                  plusDisabled={draft.minutes >= MINUTES_RANGE.max}
+                  onMinus={() => set({ minutes: stepMinutes(draft.minutes, -1) })}
+                  onPlus={() => set({ minutes: stepMinutes(draft.minutes, 1) })}
+                />
+              }
+            >
+              <TextV2 variant="bodyL" style={styles.value}>{draft.minutes} min</TextV2>
+            </FormRow>
+          </View>
 
-      <Button
-        label={saving ? 'Guardando...' : 'Guardar cambios'}
-        onPress={handleSave}
-        disabled={saving}
+          {message ? (
+            <TextV2 variant="meta" color={colors.ember.deep} accessibilityLiveRegion="polite">
+              {message}
+            </TextV2>
+          ) : null}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <BirthDateSheet
+        open={dateOpen}
+        value={draft.birthDate}
+        onClose={() => setDateOpen(false)}
+        onPick={birthDate => set({ birthDate })}
       />
-    </ScreenContainer>
+    </View>
   );
 }
+
+function Eyebrow({ children }: { children: string }) {
+  const { colors } = useThemeV2();
+  return (
+    <TextV2 variant="eyebrow" color={colors.text.secondary} style={styles.eyebrow}>
+      {children}
+    </TextV2>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  flex: { flex: 1 },
+  save: { height: 36, paddingHorizontal: 16, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  photo: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  photoLink: { paddingVertical: 8 },
+  eyebrow: { paddingBottom: 2 },
+  group: { gap: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  input: { fontSize: 20, paddingVertical: 2, paddingHorizontal: 0 },
+  value: { fontWeight: '500' },
+});

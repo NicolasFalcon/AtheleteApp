@@ -59,4 +59,6 @@ export type ProfileRecord = {
   core33IntroSeenAt: string | null;
   core33CompletedAt: string | null;
   core33InviteDismissedAt: string | null;
+  // profiles.created_at ("Atleta desde …" in Perfil).
+  createdAt: string | null;
 };
