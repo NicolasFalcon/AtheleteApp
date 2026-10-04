@@ -1639,6 +1639,8 @@ La base tiene más rutinas de `fuerza` y `cuerpo_completo` que las que muestra E
 Cuenta de prueba: `falcon1989@gmail.com` (id `7d143a1f-bf73-4481-b8d2-03f0b2e73ec5`). La prueba real de Sesión solo llegó a pausar; falta comprobar con escrituras reales:
 
 - [ ] **Series reales** escritas en `workout_session_sets` (la prueba tuvo 3 series atascadas en la cola local y 0 filas en la base; ver el diagnóstico de `workout_session_exercises`, clave foránea `workout_session_sets_exercise_fk`).
+  - **Arreglo aplicado el 2026-10-04 (solo app):** los ejercicios planificados (`workout_session_exercises`) se crean antes de reenviar la cola y antes de cada serie; al terminar o guardar se sincronizan las series pendientes y, si alguna no llega, aparece STATE_09 en vez de dar la sesión por guardada. Un fallo de serie queda en la consola (`[session] Serie sin guardar`).
+  - **Cómo verificarlo con falcon1989:** (1) empezar una rutina, registrar 3 series y terminar. (2) Comprobar en `workout_session_exercises` una fila por ejercicio de la sesión y en `workout_session_sets` las 3 series (con `rest_actual_sec` desde la segunda). (3) Repetir con modo avión: registrar series, terminar → STATE_09; reactivar la red y "Reintentar ahora" → las series y la sesión llegan. (4) La cola local `@athelete/session-outbox-v1:<id>` queda vacía. (5) Si había 3 series atascadas de la prueba anterior, abrir esa sesión y comprobar que se reenvían.
 - [ ] **Favoritos** en `user_favorites` (altas, bajas, reversión con toast al fallar y migración de AsyncStorage).
 - [ ] **`cancel_reason = 'user'`** al "Salir sin guardar".
 - [ ] **"Ahora no" de Core 33** en `profiles.core33_invite_dismissed_at`, y el reset dev a `null`.
@@ -1736,3 +1738,36 @@ git commit -m "feat(progress): v2 Resumen, Retos, Récords and Logros" -m "Evolu
 git add docs/migration/MIGRATION_PROGRESS.md docs/migration/PROGRESS_CHECKPOINT.md docs/backend/BACKEND_TODO.md
 git commit -m "docs: Progreso module, QA pending and backend todo" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 ```
+
+## 23. ELLIE · portada, chat y puntos de entrada (2026-10-04)
+
+Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5). **No se envió ningún mensaje real a ELLIE**: todos los estados se vieron con fixtures (`athelete://dev/ellie?screen=<key>`, menú "Ver pantallas de ELLIE"). La conexión real solo se validó con tsc.
+
+**Hecho**
+- Portada (ELLIE_01): orbe 116, voz (`heroInsight` o saludo), dos respuestas rápidas, "Retomar conversación" (último mensaje del hilo real), "También puedo", escaneo, "Para leer con ELLIE", campo flotante.
+- Chat (ELLIE_02/03, STATE_08): voz sin burbuja, pastilla del usuario, indicador de escritura, estados enviando/enviado/fallido con "Reintentar", sin conexión, error de servidor, límite, tarjeta de plan nutricional (Activar / Otra versión / Ajustar / Por qué), tarjeta de rutina (Guardar / Empezar), teclado sin tapar el campo, scroll al último mensaje, menú "Nueva conversación" (borra el hilo único).
+- Backend reutilizado sin cambios: `ellie-chat`, `chat_messages`, `saveEllieWorkout`, `saveEllieNutritionPlan`. `callEllieChat.onError` recibe además el status HTTP (2.º argumento opcional).
+- Entradas: Inicio (CTA según estado), Progreso ("Analiza mi semana"), Notificaciones (banda y "Activa tu plan nutricional"), Nutrición (vacío/CTA) abren `EllieChat` con el prompt del prototipo (`useOpenEllieChat`, `ELLIE_ASKS`). Onboarding sigue abriendo el tab (primer contacto = portada).
+- Primitivos nuevos: `EllieLinen`, `EllieComposer`. Lógica pura con tests: `chatModel.ts`, `resultParsing.ts`.
+
+**Desviaciones**
+- **DA-89** · Las dos respuestas de la portada son "Ajustar mi rutina de hoy" / "Quiero un plan nutricional" (prompts reales); el diseño muestra una propuesta proactiva ("Sí, ajústalo / Mejor completo") que el backend no ofrece (BT-28).
+- **DA-90** · "Para leer con ELLIE": tres temas fijos con fotos PLACEHOLDER; abren el chat con una pregunta (BT-29).
+- **DA-91** · Escanear una máquina: tarjeta inerte con aviso (como en Entrenos).
+- **DA-92** · Sin lista de conversaciones: una sola conversación; "Nueva conversación" la borra tras confirmar (BT-25).
+- **DA-93** · Sin conexión se detecta al fallar un envío (no hay NetInfo en el proyecto); el límite se deduce de 429/402 (BT-26).
+- **DA-94** · Sin texto progresivo: indicador "escribiendo" hasta recibir la respuesta completa (BT-27).
+- **DA-95** · Resumen de sesión: el diseño no tiene entrada a ELLIE; se deja la banda sin acción.
+- **D-65** · Tarjeta de rutina: foto PLACEHOLDER si la rutina no trae imagen.
+
+**QA real pendiente (lo hace el usuario)**
+1. Abrir ELLIE desde el tab: saludo y "Retomar conversación" con el hilo real.
+2. Tocar una respuesta rápida: llega el mensaje y la respuesta; pastilla pasa de enviando a enviado.
+3. Plan nutricional: aparece la tarjeta; Activar plan (verifica el plan en Nutrición); Otra versión; Ajustar.
+4. Rutina: Guardar y Empezar (abre el detalle de la rutina guardada).
+5. Modo avión: enviar → "No enviado · Reintentar"; reactivar red y reintentar.
+6. Entradas: CTA de Inicio, Progreso, Notificaciones y Nutrición envían su prompt una sola vez.
+7. Teclado: el campo no queda tapado; scroll al último mensaje.
+8. Nueva conversación: confirma y borra el hilo.
+9. Límite (429): comprobar el aviso cuando ocurra.
+

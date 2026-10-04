@@ -36,6 +36,7 @@ import {
   fetchLastWeights,
   fetchSessionDetail,
   flushSessionOutbox,
+  hasPendingSetsForSession,
   markSessionExercise,
   reopenSession,
   saveSessionForLater,
@@ -192,6 +193,14 @@ export function useSessionRunner({
     setLoadState('loading');
     (async () => {
       try {
+        // The planned exercises must exist before any set is replayed: the
+        // sets reference them (workout_session_sets_exercise_fk).
+        await ensureSessionExercises(sessionId, plan).catch(error =>
+          console.warn(
+            '[session] Ejercicios planificados sin guardar:',
+            describeError(error),
+          ),
+        );
         if (userId) {
           await flushSessionOutbox(userId).catch(() => []);
         }
@@ -211,13 +220,6 @@ export function useSessionRunner({
         setSets(detail.sets);
         setClock(detail.clock);
         setLoadState('ready');
-        // Retried before saving or completing (see ensurePlanned).
-        ensureSessionExercises(sessionId, plan).catch(error =>
-          console.warn(
-            '[session] Ejercicios planificados sin guardar:',
-            describeError(error),
-          ),
-        );
         const ids = plan
           .map(exercise => exercise.exerciseId)
           .filter((id): id is string => Boolean(id));
@@ -310,13 +312,20 @@ export function useSessionRunner({
     };
     lastRestSec.current = null; // consumed by this set
     track(
-      upsertSessionSet(write)
+      // Planned exercises first (idempotent): a set without its exercise row
+      // fails the foreign key and would stay in the queue forever.
+      ensureSessionExercises(sessionId, plan)
+        .catch(() => undefined)
+        .then(() => upsertSessionSet(write))
         .then(id =>
           setSets(currentSets =>
             withSet(currentSets, { ...next, id }),
           ),
         )
-        .catch(() => enqueueSessionWrite(userId, { kind: 'set', write })),
+        .catch(error => {
+          console.warn('[session] Serie sin guardar:', describeError(error));
+          return enqueueSessionWrite(userId, { kind: 'set', write });
+        }),
     );
     // Last recorded activity: Inicio counts a running session up to here.
     if (clock) {
@@ -421,6 +430,18 @@ export function useSessionRunner({
     }
   };
 
+  // Exercises first, then the queued sets; if any set of this session is
+  // still not on the server the workout is not reported as saved (STATE_09).
+  const syncBeforeClosing = async () => {
+    await ensurePlanned();
+    if (userId && sessionId && !dryRun) {
+      await flushSessionOutbox(userId);
+      if (await hasPendingSetsForSession(userId, sessionId)) {
+        throw new Error('Hay series sin sincronizar.');
+      }
+    }
+  };
+
   // Figures shown by STATE_09 and kept for a retry.
   const buildPayload = (closed: ClockState, at: number): CompletionPayload => {
     const done = completedExerciseCount(plan, sets);
@@ -472,7 +493,7 @@ export function useSessionRunner({
     setBusy('save');
     try {
       await waitForWrites();
-      await ensurePlanned();
+      await syncBeforeClosing();
       await saveSessionForLater(params);
       setSaveError(null);
       onLeave();
@@ -507,11 +528,8 @@ export function useSessionRunner({
   const runCompletion = async (payload: CompletionPayload) => {
     setBusy('finish');
     try {
-      if (userId) {
-        // Sets that failed before must be on the server first (volume).
-        await flushSessionOutbox(userId);
-      }
-      await ensurePlanned();
+      // Sets that failed before must be on the server first (volume).
+      await syncBeforeClosing();
       const result = await completeSession(payload);
       setSaveError(null);
       onCompleted(result);

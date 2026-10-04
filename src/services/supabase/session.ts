@@ -575,6 +575,17 @@ export async function hasPendingSessionWrites(userId: string): Promise<boolean> 
   return (await readOutbox(userId)).length > 0;
 }
 
+// Sets of this session still waiting in the queue (they would be missing from
+// the saved workout).
+export async function hasPendingSetsForSession(
+  userId: string,
+  sessionId: string,
+): Promise<boolean> {
+  return (await readOutbox(userId)).some(
+    item => item.kind === 'set' && item.write.sessionId === sessionId,
+  );
+}
+
 // Replays the queue; stops at the first failure (still offline). Returns the
 // completions that went through.
 export async function flushSessionOutbox(
