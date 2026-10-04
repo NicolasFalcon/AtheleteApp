@@ -1,418 +1,445 @@
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ChevronRight, Trophy } from 'lucide-react-native';
-import { AppHeader, ScreenContainer } from '@app/components';
-import { Button, Card, Chip, EmptyState, Loader } from '@app/components/ui';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Plus, Trophy } from 'lucide-react-native';
+import {
+  BackButton,
+  Button,
+  Celebration,
+  GlassHeader,
+  GlassSurface,
+  IconButton,
+  Skeleton,
+  SkeletonGroup,
+  StatusBarV2,
+  TextV2,
+  useThemeV2,
+  useToast,
+} from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
-import { PrHistoryList } from '@app/features/pr/components/PrHistoryList';
-import { ProgressBarChart } from '@app/features/progress/components/ProgressBarChart';
+import { BlockError } from '@app/features/home/v2/BlockError';
+import {
+  formatRecord,
+  groupRecords,
+  type RecordHistoryRow,
+} from '@app/features/progress/recordsModel';
+import {
+  RecordHistory,
+  RecordPlate,
+  RecordsGrid,
+} from '@app/features/progress/v2/RecordViews';
+import {
+  RegisterRecordSheet,
+  type RecordExercise,
+} from '@app/features/progress/v2/RegisterRecordSheet';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
-import { useAppTheme } from '@app/hooks/useAppTheme';
-import {
-  formatPRValue,
-  getBestPR,
-  getPRMainValue,
-  prTypeLabels,
-  type PersonalRecord,
-  type PRType,
-} from '@app/shared';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import { SceneScope } from '@app/providers/ThemeProvider';
+import type { PRInsert } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'PersonalRecords'>;
 
-function formatHistoryDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString('es-CL', {
-    day: 'numeric',
-    month: 'short',
-  });
-}
+const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 
-export function PersonalRecordsScreen({navigation, route}: Props) {
-  const {theme} = useAppTheme();
+// Récords v2: the list of marks (one card per exercise) and, with an
+// exercise, the record detail (RECORDS_01) with its history and the
+// "Registrar récord" sheet (RECORDS_02). Manual records only; a mark detected
+// in a session shows as such in the history.
+export function PersonalRecordsScreen({ navigation, route }: Props) {
+  const { colors, layout } = useThemeV2();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const toast = useToast();
   const exerciseId = route.params?.exerciseId;
-  const initialExerciseName = route.params?.exerciseName;
-  const [activeType, setActiveType] = useState<PRType | null>(null);
-  const recordsQuery = usePersonalRecords(exerciseId);
+  const dev = __DEV__ ? route.params?.devState : undefined;
+  const recordsQuery = usePersonalRecords();
   const exercisesQuery = useExerciseLibrary();
 
-  const styles = StyleSheet.create({
-    summaryCard: {
-      gap: theme.spacing.md,
-    },
-    summaryTopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.md,
-    },
-    summaryLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-    },
-    summaryValue: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.titleSm,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: -0.5,
-    },
-    summaryMeta: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      lineHeight: 20,
-    },
-    typeRail: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: theme.spacing.xs,
-    },
-    chartShell: {
-      gap: theme.spacing.sm,
-    },
-    chartTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.semibold,
-    },
-    groupList: {
-      gap: theme.spacing.md,
-    },
-    groupCard: {
-      gap: theme.spacing.sm,
-    },
-    groupHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.md,
-    },
-    groupTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.body,
-      fontWeight: theme.typography.weights.semibold,
-      flex: 1,
-    },
-    groupValue: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.bodySm,
-      fontWeight: theme.typography.weights.semibold,
-    },
-    groupMeta: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-      lineHeight: 18,
-    },
-    groupFooter: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: theme.spacing.md,
-    },
-    groupCount: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: theme.typography.sizes.caption,
-    },
-  });
-
-  const allExercises = useMemo(
-    () => exercisesQuery.data || [],
-    [exercisesQuery.data],
+  const [sheetOpen, setSheetOpen] = useState(
+    __DEV__ ? Boolean(route.params?.devSheet) : false,
   );
-  const resolvedExerciseName =
-    initialExerciseName ||
-    allExercises.find(item => item.id === exerciseId)?.name ||
-    'Ejercicio';
-
-  const groupedRecords = useMemo(() => {
-    const groups = new Map<
-      string,
-      {exerciseName: string; records: PersonalRecord[]; latest: PersonalRecord}
-    >();
-
-    recordsQuery.records.forEach(record => {
-      const exerciseName =
-        allExercises.find(item => item.id === record.exerciseId)?.name ||
-        'Ejercicio';
-      const current = groups.get(record.exerciseId);
-
-      if (!current) {
-        groups.set(record.exerciseId, {
-          exerciseName,
-          records: [record],
-          latest: record,
-        });
-        return;
-      }
-
-      current.records.push(record);
-
-      if (record.recordedAt.localeCompare(current.latest.recordedAt) > 0) {
-        current.latest = record;
-      }
-    });
-
-    return Array.from(groups.entries())
-      .map(([key, value]) => ({
-        exerciseId: key,
-        exerciseName: value.exerciseName,
-        records: value.records,
-        latest: value.latest,
-      }))
-      .sort((left, right) =>
-        right.latest.recordedAt.localeCompare(left.latest.recordedAt),
-      );
-  }, [allExercises, recordsQuery.records]);
-
-  const types = useMemo(
-    () => [...new Set(recordsQuery.records.map(record => record.prType))] as PRType[],
-    [recordsQuery.records],
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<{
+    value: string;
+    unit: string;
+    subtitle: string;
+  } | null>(
+    __DEV__ && route.params?.devCelebration
+      ? { value: '205', unit: 'kg × 1', subtitle: 'Peso muerto rumano' }
+      : null,
   );
-  const resolvedType =
-    activeType && types.includes(activeType)
-      ? activeType
-      : types[0] || 'weight_reps';
-  const filteredRecords = useMemo(
+
+  const now = useMemo(() => new Date(), []);
+  const fixture = useMemo(() => {
+    if (!__DEV__ || dev !== 'data') {
+      return null;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
+  }, [dev]);
+
+  const records = useMemo(
     () =>
-      [...recordsQuery.records]
-        .filter(record => record.prType === resolvedType)
-        .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt)),
-    [recordsQuery.records, resolvedType],
+      fixture
+        ? fixture.progressFixture(now).records
+        : dev === 'empty'
+        ? []
+        : recordsQuery.records,
+    [dev, fixture, now, recordsQuery.records],
   );
-  const bestRecord = getBestPR(recordsQuery.records, resolvedType);
-  const chartPoints = useMemo(
+  const library = exercisesQuery.data;
+  const groups = useMemo(
     () =>
-      [...filteredRecords]
-        .reverse()
-        .map(record => ({
-          id: record.id,
-          label: formatHistoryDate(record.recordedAt),
-          tooltipTitle: formatPRValue(record),
-          tooltipLines: [
-            new Date(record.recordedAt).toLocaleDateString('es-CL', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            }),
-            record.notes || prTypeLabels[record.prType],
-          ],
-          primaryValue: getPRMainValue(record),
-        })),
-    [filteredRecords],
+      groupRecords(
+        records,
+        id =>
+          fixture
+            ? fixture.FIXTURE_EXERCISE_NAMES[id] ?? 'Ejercicio'
+            : library?.find(item => item.id === id)?.name ??
+              route.params?.exerciseName ??
+              'Ejercicio',
+        now,
+      ),
+    [fixture, library, now, records, route.params?.exerciseName],
   );
 
-  const openRegister = () => {
-    navigation.navigate(APP_ROUTES.RegisterPr, {
-      exerciseId,
-      exerciseName: resolvedExerciseName,
-      showExercisePicker: !exerciseId,
-    });
+  const loading =
+    dev === 'loading' ||
+    (!dev && (recordsQuery.isLoading || exercisesQuery.isLoading));
+  const failed =
+    dev === 'error' ||
+    (!dev && Boolean(recordsQuery.error || exercisesQuery.error));
+  const group = exerciseId
+    ? groups.find(item => item.exerciseId === exerciseId) ?? null
+    : null;
+  const sheetExercise: RecordExercise | null = exerciseId
+    ? {
+        id: exerciseId,
+        name:
+          group?.exerciseName ??
+          route.params?.exerciseName ??
+          library?.find(item => item.id === exerciseId)?.name ??
+          'Ejercicio',
+      }
+    : null;
+
+  const back = () => safeGoBack(navigation, BACK_FALLBACKS);
+  const retry = () => {
+    recordsQuery.refetch().catch(() => {});
+    exercisesQuery.refetch().catch(() => {});
   };
 
-  const openExerciseHistory = (
-    nextExerciseId: string,
-    nextExerciseName: string,
+  const save = async (
+    insert: PRInsert,
+    beatsBest: boolean,
+    exercise: RecordExercise,
   ) => {
-    navigation.navigate(APP_ROUTES.PersonalRecords, {
-      exerciseId: nextExerciseId,
-      exerciseName: nextExerciseName,
-    });
+    setSaveError(null);
+    try {
+      if (!dev) {
+        // personal_records (source 'manual') and `personal_record_created`,
+        // idempotent by the record id.
+        await recordsQuery.addRecord(insert);
+      }
+      setSheetOpen(false);
+      const shown = formatRecord({
+        prType: insert.prType,
+        valueWeight: insert.valueWeight ?? null,
+        valueReps: insert.valueReps ?? null,
+        valueDurationSec: insert.valueDurationSec ?? null,
+        valueDistanceM: insert.valueDistanceM ?? null,
+      });
+      if (beatsBest) {
+        setCelebration({
+          value: shown.value,
+          unit: shown.unit,
+          subtitle: exercise.name,
+        });
+      } else {
+        toast.show('Récord guardado');
+      }
+    } catch (error) {
+      console.warn('[records] No se pudo guardar el récord.', error);
+      setSaveError('No pudimos guardar el récord. Inténtalo otra vez.');
+    }
   };
 
-  const handleDelete = (recordId: string) => {
+  const confirmDelete = (row: RecordHistoryRow) => {
+    if (row.source === 'session' || dev) {
+      return;
+    }
     Alert.alert(
-      'Eliminar PR',
-      'Esta marca se eliminará de tu historial. ¿Quieres continuar?',
+      'Eliminar este récord',
+      'Se quita de tu historial. Esto no se puede deshacer.',
       [
-        {text: 'Cancelar', style: 'cancel'},
+        { text: 'Cancelar', style: 'cancel' },
         {
           text: 'Eliminar',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await recordsQuery.deleteRecord(recordId);
-            } catch (error) {
-              Alert.alert(
-                'No pudimos eliminar el PR',
-                error instanceof Error
-                  ? error.message
-                  : 'Inténtalo nuevamente.',
+          onPress: () => {
+            recordsQuery
+              .deleteRecord(row.record.id)
+              .catch(() =>
+                toast.show('No pudimos eliminarlo', { tone: 'error' }),
               );
-            }
           },
         },
       ],
     );
   };
 
-  if (recordsQuery.isLoading || exercisesQuery.isLoading) {
+  const sheet = (
+    <RegisterRecordSheet
+      open={sheetOpen}
+      onClose={() => setSheetOpen(false)}
+      exercise={sheetExercise}
+      exercises={library ?? []}
+      records={records}
+      saving={recordsQuery.isAddingRecord}
+      error={saveError}
+      onSave={(insert, beats, exercise) => {
+        save(insert, beats, exercise).catch(() => {});
+      }}
+    />
+  );
+  const celebrationView = (
+    <Celebration
+      visible={Boolean(celebration)}
+      icon={Trophy}
+      eyebrow="Nuevo récord"
+      value={celebration?.value ?? ''}
+      unit={celebration?.unit}
+      subtitle={celebration?.subtitle}
+      onClose={() => setCelebration(null)}
+    />
+  );
+
+  // ── Loading / error ─────────────────────────────────────────────────────
+  if (loading || failed) {
     return (
-      <ScreenContainer>
-        <Loader label="Cargando récords..." />
-      </ScreenContainer>
-    );
-  }
-
-  if (recordsQuery.records.length === 0) {
-    return (
-      <ScreenContainer scrollable>
-        <AppHeader
-          showBackButton
-          title="Récords personales"
-          backFallbacks={[ROOT_ROUTES.MainTabs]}
-        />
-        <EmptyState
-          title="Aún no tienes PRs registrados"
-          description="Registra tu primera marca para empezar a seguir progreso por ejercicio, ver mejores marcas y consultar tu historial."
-        />
-        <Button label="Registrar primer PR" onPress={openRegister} />
-      </ScreenContainer>
-    );
-  }
-
-  if (!exerciseId) {
-    const latestRecord = recordsQuery.latestRecord;
-    const latestExerciseName =
-      latestRecord &&
-      (allExercises.find(item => item.id === latestRecord.exerciseId)?.name ||
-        'Ejercicio');
-
-    return (
-      <ScreenContainer scrollable>
-        <AppHeader
-          showBackButton
-          title="Récords personales"
-          backFallbacks={[ROOT_ROUTES.MainTabs]}
-        />
-
-        <Card style={styles.summaryCard}>
-          <View style={styles.summaryTopRow}>
-            <View>
-              <Text style={styles.summaryLabel}>PR más reciente</Text>
-              <Text style={styles.summaryValue}>
-                {latestRecord ? formatPRValue(latestRecord) : 'Sin datos'}
-              </Text>
-            </View>
-            <Trophy color={theme.colors.textPrimary} size={22} strokeWidth={2} />
-          </View>
-          <Text style={styles.summaryMeta}>
-            {latestRecord && latestExerciseName
-              ? `${latestExerciseName} · ${new Date(
-                  latestRecord.recordedAt,
-                ).toLocaleDateString('es-CL', {
-                  day: 'numeric',
-                  month: 'short',
-                })}`
-              : 'Todavía no tienes marcas registradas.'}
-          </Text>
-          <Text style={styles.summaryMeta}>
-            {groupedRecords.length} ejercicio
-            {groupedRecords.length === 1 ? '' : 's'} con PRs y{' '}
-            {recordsQuery.records.length} registro
-            {recordsQuery.records.length === 1 ? '' : 's'} en total.
-          </Text>
-        </Card>
-
-        <View style={styles.groupList}>
-          {groupedRecords.map(group => (
-            <Pressable
-              key={group.exerciseId}
-              onPress={() => openExerciseHistory(group.exerciseId, group.exerciseName)}
-              style={({pressed}) => [pressed ? {opacity: 0.9} : null]}>
-              <Card style={styles.groupCard}>
-                <View style={styles.groupHeader}>
-                  <Text style={styles.groupTitle}>{group.exerciseName}</Text>
-                  <ChevronRight
-                    color={theme.colors.textSecondary}
-                    size={16}
-                    strokeWidth={2}
+      <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+        <StatusBarV2 />
+        <GlassHeader title="Récords" left={<BackButton onPress={back} />} />
+        <View style={[styles.body, { paddingHorizontal: layout.gutter }]}>
+          {failed ? (
+            <BlockError
+              message="No pudimos cargar tus récords."
+              onRetry={retry}
+            />
+          ) : (
+            <SkeletonGroup>
+              <View style={styles.skeletonGrid}>
+                {[0, 1, 2, 3].map(index => (
+                  <Skeleton
+                    key={index}
+                    height={196}
+                    radius={24}
+                    style={styles.skeletonCard}
                   />
-                </View>
-                <Text style={styles.groupValue}>{formatPRValue(group.latest)}</Text>
-                <View style={styles.groupFooter}>
-                  <Text style={styles.groupMeta}>
-                    Último registro {formatHistoryDate(group.latest.recordedAt)}
-                  </Text>
-                  <Text style={styles.groupCount}>
-                    {group.records.length} PR{group.records.length === 1 ? '' : 's'}
-                  </Text>
-                </View>
-              </Card>
-            </Pressable>
-          ))}
+                ))}
+              </View>
+            </SkeletonGroup>
+          )}
         </View>
-
-        <Button label="Registrar nuevo PR" onPress={openRegister} />
-      </ScreenContainer>
+      </View>
     );
   }
 
-  return (
-    <ScreenContainer scrollable>
-      <AppHeader
-        showBackButton
-        title="Récords personales"
-        backFallbacks={[ROOT_ROUTES.MainTabs]}
-      />
-
-      {bestRecord ? (
-        <Card style={styles.summaryCard}>
-          <View style={styles.summaryTopRow}>
-            <View>
-              <Text style={styles.summaryLabel}>Mejor marca</Text>
-              <Text style={styles.summaryValue}>{formatPRValue(bestRecord)}</Text>
-            </View>
-            <Trophy color={theme.colors.textPrimary} size={22} strokeWidth={2} />
-          </View>
-          <Text style={styles.summaryMeta}>
-            {prTypeLabels[resolvedType]} ·{' '}
-            {new Date(bestRecord.recordedAt).toLocaleDateString('es-CL', {
-              day: 'numeric',
-              month: 'long',
-              year: 'numeric',
-            })}
-          </Text>
-          {types.length > 1 ? (
-            <View style={styles.typeRail}>
-              {types.map(type => (
-                <Chip
-                  key={type}
-                  selected={type === resolvedType}
-                  onPress={() => setActiveType(type)}>
-                  {prTypeLabels[type]}
-                </Chip>
-              ))}
+  // ── Detail (RECORDS_01) ─────────────────────────────────────────────────
+  if (exerciseId) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+        <StatusBarV2 style="light" />
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 140 }}
+        >
+          {group ? (
+            <RecordPlate group={group} top={insets.top + 58} width={width} />
+          ) : (
+            <SceneScope>
+              <View
+                style={[styles.emptyPlate, { paddingTop: insets.top + 58 }]}
+              >
+                <TextV2 variant="eyebrow" color="#A8A6A1">
+                  Mejor marca
+                </TextV2>
+                <TextV2 variant="section" color="#FFFFFF">
+                  {sheetExercise?.name}
+                </TextV2>
+                <TextV2 variant="body" color="#D8D6D1" style={styles.emptyLine}>
+                  Todavía no tienes una marca en este ejercicio.
+                </TextV2>
+              </View>
+            </SceneScope>
+          )}
+          {group ? (
+            <View
+              style={[styles.history, { paddingHorizontal: layout.gutter }]}
+            >
+              <RecordHistory rows={group.history} onLongPress={confirmDelete} />
             </View>
           ) : null}
-        </Card>
-      ) : null}
-
-      {chartPoints.length >= 2 ? (
-        <Card style={styles.chartShell}>
-          <Text style={styles.chartTitle}>Progreso</Text>
-          <ProgressBarChart
-            points={chartPoints}
-            primaryColor={theme.colors.accent}
+        </ScrollView>
+        <SceneScope>
+          <View style={[styles.back, { top: insets.top + 4 }]}>
+            <BackButton onPress={back} variant="glass" />
+          </View>
+        </SceneScope>
+        <GlassSurface
+          kind="nav"
+          style={[
+            styles.footer,
+            {
+              paddingBottom: Math.max(insets.bottom, 16) + 4,
+              borderTopColor: colors.divider,
+            },
+          ]}
+        >
+          <Button
+            label="Registrar nuevo récord"
+            onPress={() => {
+              setSaveError(null);
+              setSheetOpen(true);
+            }}
           />
-        </Card>
-      ) : null}
+        </GlassSurface>
+        {sheet}
+        {celebrationView}
+      </View>
+    );
+  }
 
-      <PrHistoryList
-        title={prTypeLabels[resolvedType]}
-        records={filteredRecords}
-        onDelete={handleDelete}
+  // ── List ────────────────────────────────────────────────────────────────
+  const cardWidth = Math.floor((width - layout.gutter * 2 - 12) / 2);
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <StatusBarV2 />
+      <GlassHeader
+        title="Récords"
+        left={<BackButton onPress={back} />}
+        right={
+          <IconButton
+            icon={Plus}
+            accessibilityLabel="Registrar récord"
+            onPress={() => {
+              setSaveError(null);
+              setSheetOpen(true);
+            }}
+          />
+        }
       />
-
-      <Button label="Registrar nuevo PR" onPress={openRegister} />
-    </ScreenContainer>
+      {groups.length === 0 ? (
+        <View style={styles.empty}>
+          <View
+            style={[
+              styles.emptyIcon,
+              { backgroundColor: colors.surface.muted },
+            ]}
+          >
+            <Trophy size={28} color={colors.text.secondary} strokeWidth={2} />
+          </View>
+          <TextV2 variant="section" align="center">
+            Tu primera marca aparecerá aquí
+          </TextV2>
+          <TextV2
+            variant="body"
+            tone="secondary"
+            align="center"
+            style={styles.emptyText}
+          >
+            Registra un récord o supéralo en una sesión y lo verás con su
+            historial.
+          </TextV2>
+          <Button
+            label="Registrar récord"
+            variant="secondary"
+            size="md"
+            onPress={() => {
+              setSaveError(null);
+              setSheetOpen(true);
+            }}
+          />
+        </View>
+      ) : (
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.listContent,
+            {
+              paddingHorizontal: layout.gutter,
+              paddingBottom: insets.bottom + 40,
+            },
+          ]}
+        >
+          <TextV2 variant="meta" tone="secondary">
+            {groups.length === 1 ? '1 récord' : `${groups.length} récords`}
+          </TextV2>
+          <RecordsGrid
+            groups={groups}
+            cardWidth={cardWidth}
+            onOpen={item =>
+              navigation.navigate(APP_ROUTES.PersonalRecords, {
+                exerciseId: item.exerciseId,
+                exerciseName: item.exerciseName,
+                devState: dev,
+              })
+            }
+          />
+        </ScrollView>
+      )}
+      {sheet}
+      {celebrationView}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  body: { paddingTop: 16 },
+  skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  skeletonCard: { width: '47%', flexGrow: 1 },
+  emptyPlate: {
+    backgroundColor: '#141312',
+    paddingHorizontal: 20,
+    paddingBottom: 36,
+    gap: 8,
+  },
+  emptyLine: { marginTop: 8 },
+  history: { paddingTop: 30 },
+  back: { position: 'absolute', left: 16 },
+  footer: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  listContent: { paddingTop: 16, gap: 14 },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: 110,
+    paddingHorizontal: 28,
+    gap: 18,
+  },
+  emptyIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: { maxWidth: 300 },
+});

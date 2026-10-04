@@ -1,223 +1,186 @@
-import { useMemo, useState } from 'react';
-import { Medal } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { AppHeader, ScreenContainer } from '@app/components';
-import { EmptyState, Loader } from '@app/components/ui';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  AchievementBadgeGrid,
-  type AchievementFilter,
-} from '@app/features/profile/components/AchievementBadgeGrid';
+  BackButton,
+  GlassHeader,
+  Skeleton,
+  SkeletonGroup,
+  StatusBarV2,
+  useThemeV2,
+} from '@app/components/v2';
+import { ROOT_ROUTES } from '@app/constants/routes';
+import { BlockError } from '@app/features/home/v2/BlockError';
+import {
+  buildBadgeStats,
+  buildShelves,
+  type ShelfItem,
+} from '@app/features/progress/badgesModel';
+import { currentStreak } from '@app/features/progress/progressModel';
+import {
+  BadgeSheet,
+  CollectionHeader,
+  ShelfRow,
+} from '@app/features/progress/v2/AchievementViews';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
-import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useProgressSummary } from '@app/hooks/useProgressSummary';
+import { safeGoBack } from '@app/navigation/safeGoBack';
 import { ALL_BADGES } from '@app/shared';
-import { APP_ROUTES } from '@app/constants/routes';
+import type { AppScreenProps } from '@app/types/navigation';
 
-const FILTERS: Array<{ id: AchievementFilter; label: string }> = [
-  { id: 'all', label: 'Todos' },
-  { id: 'earned', label: 'Desbloqueados' },
-  { id: 'locked', label: 'Bloqueados' },
-];
+type Props = AppScreenProps<'Achievements'>;
 
-export function AchievementsScreen() {
-  const { theme } = useAppTheme();
+const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
+
+// Logros v2 (ACHIEVEMENTS_01 / 02): the collection count, one shelf per
+// category with the medals (locked ones with a progress ring) and the detail
+// sheet. Badges come from user_badges; the progress is measured from the
+// sessions, the hydration and Core 33.
+export function AchievementsScreen({ navigation, route }: Props) {
+  const { colors, layout } = useThemeV2();
+  const insets = useSafeAreaInsets();
+  const dev = __DEV__ ? route.params?.devState : undefined;
   const overviewQuery = useProfileOverview();
-  const [filter, setFilter] = useState<AchievementFilter>('all');
+  const summary = useProgressSummary();
+  const now = useMemo(() => new Date(), []);
 
-  const badges = overviewQuery.data?.badges || [];
-  const earnedCount = badges.length;
-  const totalBadges = ALL_BADGES.length;
-  const progressPct = Math.round((earnedCount / totalBadges) * 100);
-  const progressById = useMemo(
-    () => ({
-      streak_7_days: {
-        current: Math.min(7, overviewQuery.data?.currentStreak || 0),
-        target: 7,
-      },
-      core33_finisher: {
-        current: Math.min(
-          33,
-          overviewQuery.data?.challenge?.completedDays || 0,
-        ),
-        target: 33,
-      },
-    }),
-    [overviewQuery.data?.challenge?.completedDays, overviewQuery.data?.currentStreak],
-  );
+  const sample = useMemo(() => {
+    if (!__DEV__ || dev !== 'data') {
+      return null;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fixtures =
+      require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
+    return fixtures.progressFixture(now);
+  }, [dev, now]);
 
-  const styles = StyleSheet.create({
-    content: {
-      gap: theme.spacing.md,
-      paddingBottom: theme.spacing.xl,
-    },
-    summary: {
-      borderRadius: theme.radii.md,
-      padding: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      shadowColor: '#000000',
-      ...theme.elevations.card,
-    },
-    summaryIcon: {
-      width: 58,
-      height: 58,
-      borderRadius: 29,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.surfaceMuted,
-      borderWidth: 5,
-      borderColor: theme.colors.accent,
-    },
-    summaryCopy: {
-      flex: 1,
-    },
-    summaryTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 16,
-      fontWeight: theme.typography.weights.bold,
-    },
-    summaryDescription: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 12,
-      lineHeight: 17,
-      marginTop: 3,
-    },
-    progressTrack: {
-      height: 5,
-      marginTop: 10,
-      borderRadius: 3,
-      overflow: 'hidden',
-      backgroundColor: theme.colors.surfaceMuted,
-    },
-    progressFill: {
-      height: '100%',
-      borderRadius: 3,
-      backgroundColor: theme.colors.accent,
-    },
-    filters: {
-      flexDirection: 'row',
-      padding: 4,
-      borderRadius: theme.radii.pill,
-      backgroundColor: theme.colors.surfaceMuted,
-      gap: 4,
-    },
-    filterButton: {
-      flex: 1,
-      minHeight: 38,
-      borderRadius: theme.radii.pill,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 6,
-    },
-    filterButtonActive: {
-      backgroundColor: theme.colors.accent,
-    },
-    filterLabel: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 11,
-      fontWeight: theme.typography.weights.medium,
-    },
-    filterLabelActive: {
-      color: theme.colors.accentContrast,
-      fontWeight: theme.typography.weights.semibold,
-    },
-  });
+  const overview = overviewQuery.data;
+  const overviewData = summary.overviewQuery.data;
+  const sessionsData = summary.sessions;
 
-  if (overviewQuery.isLoading) {
-    return (
-      <ScreenContainer>
-        <Loader label="Cargando logros..." />
-      </ScreenContainer>
+  const result = useMemo(() => {
+    const earned = sample ? sample.badges : overview?.badges ?? [];
+    const sessions = sample ? sample.sessions : sessionsData;
+    const stats = buildBadgeStats({
+      sessions,
+      streakDays: sample
+        ? currentStreak(sample.sessions, now)
+        : overview?.currentStreak ?? 0,
+      hydrationLogs: sample
+        ? sample.hydration
+        : overviewData?.hydrationLogs ?? [],
+      goalGlasses: sample ? 14 : overviewData?.dailyWaterGoal ?? 14,
+      challengeDays: sample
+        ? sample.challenge.completedDays
+        : overview?.challenge?.completedDays ?? 0,
+      today: now,
+    });
+    return buildShelves(earned, stats);
+  }, [now, overview, overviewData, sample, sessionsData]);
+
+  const [selected, setSelected] = useState<ShelfItem | null>(null);
+
+  // Development only: open a medal's sheet once (first earned / first locked).
+  const devSheet = __DEV__ ? route.params?.devSheet : undefined;
+  const devOpened = useRef(false);
+  useEffect(() => {
+    if (!devSheet || devOpened.current) {
+      return;
+    }
+    const all = result.shelves.flatMap(shelf => shelf.items);
+    const target =
+      devSheet === 'locked'
+        ? all.find(item => !item.earned && item.progress)
+        : all.find(item => item.earned);
+    if (target) {
+      // iOS does not present a modal during the screen's push animation.
+      const timer = setTimeout(() => {
+        devOpened.current = true;
+        setSelected(target);
+      }, 900);
+      return () => clearTimeout(timer);
+    }
+  }, [devSheet, result.shelves]);
+
+  const loading =
+    dev === 'loading' ||
+    (!dev && (overviewQuery.isLoading || summary.isLoading));
+  const failed =
+    dev === 'error' || (!dev && Boolean(overviewQuery.error || summary.error));
+  const retry = () => {
+    overviewQuery.refetch().catch(() => {});
+    summary.refetchAll().catch(() => {});
+  };
+
+  let content: React.ReactNode;
+  if (failed) {
+    content = (
+      <BlockError message="No pudimos cargar tus logros." onRetry={retry} />
     );
-  }
-
-  if (overviewQuery.error) {
-    return (
-      <ScreenContainer>
-        <AppHeader
-          showBackButton
-          title="Logros"
-          backFallbacks={[APP_ROUTES.Profile]}
+  } else if (loading) {
+    content = (
+      <SkeletonGroup>
+        <View style={styles.skeleton}>
+          <Skeleton width={120} height={72} radius={14} />
+          <Skeleton width="80%" height={14} radius={7} />
+          <Skeleton height={3} radius={2} />
+          {[0, 1].map(shelf => (
+            <View key={shelf} style={styles.skeletonShelf}>
+              <Skeleton width={140} height={20} radius={10} />
+              <View style={styles.skeletonMedals}>
+                {[0, 1, 2].map(index => (
+                  <Skeleton key={index} width={82} height={92} radius={20} />
+                ))}
+              </View>
+            </View>
+          ))}
+        </View>
+      </SkeletonGroup>
+    );
+  } else {
+    content = (
+      <>
+        <CollectionHeader
+          earned={result.earnedCount}
+          total={ALL_BADGES.length}
         />
-        <EmptyState
-          title="No pudimos cargar tus logros"
-          description="Vuelve a intentarlo en un momento."
-          actionLabel="Reintentar"
-          onAction={() => overviewQuery.refetch()}
-        />
-      </ScreenContainer>
+        {result.shelves.map(shelf => (
+          <ShelfRow key={shelf.key} shelf={shelf} onOpen={setSelected} />
+        ))}
+      </>
     );
   }
 
   return (
-    <ScreenContainer scrollable contentContainerStyle={styles.content}>
-      <AppHeader
-        showBackButton
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <StatusBarV2 />
+      <GlassHeader
         title="Logros"
-        backFallbacks={[APP_ROUTES.Profile]}
+        left={
+          <BackButton onPress={() => safeGoBack(navigation, BACK_FALLBACKS)} />
+        }
       />
-
-      <View style={styles.summary}>
-        <View style={styles.summaryIcon}>
-          <Medal
-            color={theme.colors.textPrimary}
-            size={24}
-            strokeWidth={2}
-          />
-        </View>
-        <View style={styles.summaryCopy}>
-          <Text style={styles.summaryTitle}>
-            {earnedCount}/{totalBadges} badges desbloqueados
-          </Text>
-          <Text style={styles.summaryDescription}>
-            Sigue así, cada paso suma.
-          </Text>
-          <View style={styles.progressTrack}>
-            <View
-              style={[styles.progressFill, { width: `${progressPct}%` }]}
-            />
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.filters}>
-        {FILTERS.map(option => {
-          const active = filter === option.id;
-
-          return (
-            <Pressable
-              key={option.id}
-              onPress={() => setFilter(option.id)}
-              style={({ pressed }) => [
-                styles.filterButton,
-                active ? styles.filterButtonActive : null,
-                pressed ? { opacity: 0.82 } : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.filterLabel,
-                  active ? styles.filterLabelActive : null,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <AchievementBadgeGrid
-        badges={badges}
-        filter={filter}
-        progressById={progressById}
-      />
-    </ScreenContainer>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingHorizontal: layout.gutter,
+            paddingBottom: insets.bottom + 40,
+          },
+        ]}
+      >
+        {content}
+      </ScrollView>
+      <BadgeSheet item={selected} onClose={() => setSelected(null)} />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  content: { paddingTop: 16, gap: 26 },
+  skeleton: { gap: 18, paddingTop: 8 },
+  skeletonShelf: { gap: 16, paddingTop: 12 },
+  skeletonMedals: { flexDirection: 'row', gap: 14 },
+});
