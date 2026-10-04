@@ -56,6 +56,7 @@ import {
   RecordsBlock,
   TrainingWeekBlock,
 } from '@app/features/progress/v2/SummaryBlocks';
+import { DEFAULT_WATER_GOAL_GLASSES } from '@app/features/nutrition/nutritionModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useProgressSummary } from '@app/hooks/useProgressSummary';
@@ -174,7 +175,7 @@ export function ProgressScreen({ navigation, route }: Props) {
       records: sample ? sample.records : forced ? [] : recordsData,
       hasPlan: sample ? true : Boolean(overview?.nutritionPlan),
       goalProtein: sample ? 168 : overview?.nutritionPlan?.targetProtein,
-      goalGlasses: sample ? 14 : overview?.dailyWaterGoal ?? 14,
+      goalGlasses: sample ? DEFAULT_WATER_GOAL_GLASSES : overview?.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES,
     }),
     [forced, overview, recordsData, sample, sessionsData],
   );

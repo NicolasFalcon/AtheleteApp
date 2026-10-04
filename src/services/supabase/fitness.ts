@@ -20,6 +20,10 @@ import {
   type WorkoutExercise,
   type WorkoutSession,
 } from '@app/shared';
+import {
+  DEFAULT_WATER_GOAL_GLASSES,
+  GLASS_ML,
+} from '@app/features/nutrition/nutritionModel';
 import { getSupabaseClient } from '@app/services/supabase/client';
 import type { Database, Json } from '@app/types/supabase';
 
@@ -1077,8 +1081,10 @@ export async function fetchHomeOverview(params: {
     ? mapDailyNutritionLog(todayNutritionResult.data[0] as DailyNutritionLogRow)
     : null;
 
-  const goalGlasses = params.dailyWaterGoal || 14;
-  const goalMl = goalGlasses * 250;
+  // daily_water_goal is a number of glasses: goal (ml) = glasses × 250, the
+  // rule the server uses for the hydration badges too.
+  const goalGlasses = params.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES;
+  const goalMl = goalGlasses * GLASS_ML;
   const todayHydration =
     (hydrationTodayResult.data?.[0] as DailyHydrationLogRow) || null;
   const todayMl = todayHydration?.water_ml || 0;

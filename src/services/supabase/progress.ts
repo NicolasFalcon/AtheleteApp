@@ -9,6 +9,7 @@ import {
   type NutritionPlan,
   type WorkoutSession,
 } from '@app/shared';
+import {DEFAULT_WATER_GOAL_GLASSES} from '@app/features/nutrition/nutritionModel';
 import {getSupabaseClient} from '@app/services/supabase/client';
 import type {Database, Json} from '@app/types/supabase';
 
@@ -296,6 +297,6 @@ export async function fetchProgressOverview(params: {
     hydrationLogs,
     habitLogs,
     challenge,
-    dailyWaterGoal: params.dailyWaterGoal || 14,
+    dailyWaterGoal: params.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES,
   };
 }
