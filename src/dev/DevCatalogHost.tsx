@@ -29,6 +29,11 @@ import {
   openNextCore33DevScreen,
 } from '@app/dev/devCore33Screens';
 import {
+  isQuizDevScreen,
+  openNextQuizDevScreen,
+  openQuizDevScreen,
+} from '@app/dev/devQuizScreens';
+import {
   isNutritionDevScreen,
   openNextNutritionDevScreen,
   openNutritionDevScreen,
@@ -163,6 +168,18 @@ function openCore33FromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/quiz?screen=<key>: navigates (no overlay).
+function openQuizFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/quiz')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'data';
+  if (isQuizDevScreen(screen)) {
+    openQuizDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
   if (
     !url ||
@@ -172,7 +189,8 @@ function toolFromUrl(url: string | null): DevToolState | null {
     openEllieFromUrl(url) ||
     openProfileFromUrl(url) ||
     openNutritionFromUrl(url) ||
-    openCore33FromUrl(url)
+    openCore33FromUrl(url) ||
+    openQuizFromUrl(url)
   ) {
     return null;
   }
@@ -258,6 +276,15 @@ export function DevCatalogHost() {
         .then(label =>
           toastRef.current.show(
             label ? `Core 33 · ${label}` : 'Inicia sesión para ver Core 33',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de Quiz', () => {
+      openNextQuizDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `Quiz · ${label}` : 'Inicia sesión para ver Quiz',
           ),
         )
         .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
