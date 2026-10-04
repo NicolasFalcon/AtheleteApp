@@ -57,6 +57,7 @@ export const APP_ROUTES = {
   EditRoutine: 'EditRoutine',
   AddExerciseToRoutine: 'AddExerciseToRoutine',
   QuizLanding: 'QuizLanding',
+  QuizChallenge: 'QuizChallenge',
   QuizQuestion: 'QuizQuestion',
   QuizResult: 'QuizResult',
   PersonalRecords: 'PersonalRecords',

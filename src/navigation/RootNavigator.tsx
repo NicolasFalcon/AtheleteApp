@@ -31,6 +31,7 @@ import { AchievementsScreen } from '@app/screens/profile/AchievementsScreen';
 import { EditProfileScreen } from '@app/screens/profile/EditProfileScreen';
 import { BodyScienceArticleDetailScreen } from '@app/screens/progress/BodyScienceArticleDetailScreen';
 import { BodyScienceScreen } from '@app/screens/progress/BodyScienceScreen';
+import { QuizChallengeScreen } from '@app/screens/quiz/QuizChallengeScreen';
 import { QuizQuestionScreen } from '@app/screens/quiz/QuizQuestionScreen';
 import { QuizResultScreen } from '@app/screens/quiz/QuizResultScreen';
 import { ProfileScreen } from '@app/screens/tabs/ProfileScreen';
@@ -201,12 +202,18 @@ export function RootNavigator() {
             component={QuizLandingScreen}
           />
           <Stack.Screen
+            name={APP_ROUTES.QuizChallenge}
+            component={QuizChallengeScreen}
+          />
+          <Stack.Screen
             name={APP_ROUTES.QuizQuestion}
             component={QuizQuestionScreen}
+            options={{ gestureEnabled: false }}
           />
           <Stack.Screen
             name={APP_ROUTES.QuizResult}
             component={QuizResultScreen}
+            options={{ gestureEnabled: false }}
           />
           <Stack.Screen
             name={APP_ROUTES.PersonalRecords}
