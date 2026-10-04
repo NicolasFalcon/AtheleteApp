@@ -1633,3 +1633,106 @@ La base tiene más rutinas de `fuerza` y `cuerpo_completo` que las que muestra E
 - La consulta es `workout_templates` con `created_by = yo OR is_public = true OR created_by IS NULL`, sin límite ni rango, y después `dedupeFeaturedTemplates` (quita duplicados de rutinas destacadas por `source`).
 - Sin ningún filtro, esa cuenta ya ve solo **34 rutinas** (todas de sistema, públicas, `created_by` NULL): Fuerza (`fuerza`) 2 y Full body (`cuerpo_completo`) 6. El filtro de la app da las mismas 34 y ninguna tiene `source`, así que el deduplicado no quita nada.
 - La diferencia con el conteo de la base (16 y 8) viene de lo que la seguridad por filas (RLS) no deja ver a esta cuenta: rutinas privadas de otros usuarios u otras filas no visibles. No se cambió nada.
+
+## 21. QA pendiente de Sesión (anotado el 2026-10-03, sin investigar todavía)
+
+Cuenta de prueba: `falcon1989@gmail.com` (id `7d143a1f-bf73-4481-b8d2-03f0b2e73ec5`). La prueba real de Sesión solo llegó a pausar; falta comprobar con escrituras reales:
+
+- [ ] **Series reales** escritas en `workout_session_sets` (la prueba tuvo 3 series atascadas en la cola local y 0 filas en la base; ver el diagnóstico de `workout_session_exercises`, clave foránea `workout_session_sets_exercise_fk`).
+- [ ] **Favoritos** en `user_favorites` (altas, bajas, reversión con toast al fallar y migración de AsyncStorage).
+- [ ] **`cancel_reason = 'user'`** al "Salir sin guardar".
+- [ ] **"Ahora no" de Core 33** en `profiles.core33_invite_dismissed_at`, y el reset dev a `null`.
+- [ ] **Evento `personal_record_created` del 2026-10-03 a la 01:16 sin récord de sesión asociado:** ¿fue un récord manual? Revisar `personal_records` (`source`, `session_set_id`) de ese día.
+
+## 22. Progreso · Resumen, Récords y Logros (2026-10-03)
+
+> **Leer en 2 minutos.** El tab Progreso (Resumen y Retos), los Récords y los Logros pasan a v2, fieles a las referencias (PROGRESS_01–04, STATE_03, RECORDS_01–02, ACHIEVEMENTS_01–02, OVERLAY_01) en Light y Dark. Cuenta de prueba: `falcon1989@gmail.com` (id `7d143a1f-bf73-4481-b8d2-03f0b2e73ec5`). `tsc` y eslint sin errores, `jest` 140/140 (nuevos: `progressModel`, `recordsBadges`). Checkpoint: `PROGRESS_CHECKPOINT.md` (COMPLETADO).
+
+### 22.1 Qué quedó hecho
+| Pantalla | Ref. | Estado |
+|---|---|---|
+| Resumen · semana | PROGRESS_01 | ✅ Hero "Fuerza total · desde enero" (+N %, curva), Semana/Mes, trío Sesiones · Entreno · Racha, frase de comparación, cápsulas de la semana, Nutrición (proteína) e Hidratación (días al objetivo), banda de ELLIE y "Tus marcas" |
+| Resumen · mes | PROGRESS_02 | ✅ Calendario de minutos por día con leyenda Menos–Más |
+| Resumen · vacío | PROGRESS_04 | ✅ "Tu evolución empieza aquí", curva discontinua, cápsulas vacías (es el estado real de `falcon1989`) |
+| Cargando / error | STATE_03 | ✅ Skeleton con hero y hoja; error con "Reintentar" |
+| Retos | PROGRESS_03 | ✅ Hero con los 33 puntos de Core 33 (o "Descubrir Core 33"), racha actual / mejor racha, Completados |
+| Récords · lista | — | ✅ Una tarjeta por ejercicio (2 columnas), vacío, cargando, error |
+| Récord personal | RECORDS_01 | ✅ Placa oscura (cifra, "NUEVO", delta desde la primera marca, curva a sangre) e Historial con diferencia y origen (**De una sesión** / **Manual**) |
+| Registrar récord | RECORDS_02 | ✅ Hoja con los 5 `pr_type` y su unidad, pasos, comparación con la mejor marca y notas; sin ejercicio, empieza por un buscador |
+| Nuevo récord | OVERLAY_01 | ✅ Celebración (hexágono Ember, cifra) si supera la mejor marca |
+| Logros | ACHIEVEMENTS_01 | ✅ "7 / 12", barra Ember y 4 repisas (Constancia, Retos, Fuerza, Hábitos y conocimiento) |
+| Detalle de logro | ACHIEVEMENTS_02 | ✅ Hoja conseguido (con fecha) o bloqueado (con "3 de 7" y aro de progreso) |
+
+**Datos:** minutos = duración activa sin pausas (`ended_at − started_at − paused_total_sec`, la misma regla que el anillo de Inicio); volumen = `volume_kg` del servidor (NULL no cuenta); récords de `personal_records` con `source` y `session_set_id`; logros de `user_badges`.
+
+**Escritura (una sola):** "Guardar récord" inserta en `personal_records` con `source = 'manual'` y otorga `personal_record_created` con el id del récord como referencia (idempotente). Los récords de una sesión los registra el Resumen de sesión (`source = 'session'`).
+
+**Primitivos nuevos** (`src/components/v2/`): `ProgressCurve`, `WeeklyCapsules`, `HeatCalendar`, `RecordCard`, `StepperField`, `Celebration`; `HexMedal` rehecho (aro Ember alrededor del icono, igual que el diseño).
+
+**Dev** (solo `__DEV__`): menú "Ver pantallas de Progreso" y `athelete://dev/progress?screen=<key>[&scroll=N]` con `summary | data | month | empty | loading | error | retos | records | recordsEmpty | recordsLoading | recordsError | recordDetail | recordSheet | recordCelebration | achievements | achievementSheet | achievementLocked | achievementsEmpty | achievementsLoading | achievementsError`. Los estados "con datos" usan datos de ejemplo (`progressFixtures.ts`); no se lee ni se escribe nada.
+
+### 22.2 Decisiones asumidas
+| ID | Decisión |
+|---|---|
+| DA-77 | Los minutos de Progreso son la duración activa sin pausas de las sesiones `completed` (cada fila una vez); los totales suman segundos y se redondean a minutos |
+| DA-78 | El hero usa el volumen medio por sesión y mes desde enero. Si hay menos de 2 meses con `volume_kg`, pasa a una variante de constancia ("Constancia · desde …": sesiones y minutos). Sin sesiones este año: estado vacío |
+| DA-79 | Meta semanal: sesiones = `profiles.training_days_per_week` (por defecto 3) y minutos = sesiones × `preferred_session_minutes` (por defecto 35) |
+| DA-80 | "Racha" = días seguidos con una sesión completada, que acaba hoy o ayer; "Mejor racha" = el tramo más largo del historial cargado |
+| DA-81 | La frase del mes compara los días activos con los meses anteriores del año ("Tu mes más constante desde junio"); la de la semana, con la semana pasada hasta el mismo día |
+| DA-82 | Récords: una tarjeta por ejercicio con el tipo de su marca más reciente; la mejor marca es la de mayor valor (a igual peso, más repeticiones). "NUEVO" = registrada hoy |
+| DA-83 | Registrar récord: el valor inicial es la mejor marca + 5 kg; pasos de 2,5 kg, 1 rep, 5 s y 10 m. "Supera tu mejor marca por …" solo compara dentro del mismo tipo |
+| DA-84 | Un récord manual se elimina con pulsación larga en el historial; los de sesión están protegidos |
+| DA-85 | Los 12 badges de la app se reparten en las 4 repisas: Constancia (primer entreno, semana constante, racha 7, hidratación ×3, ×7, semana hidratada), Retos (Core 33), Fuerza (primer PR, primera rutina propia), Hábitos y conocimiento (nutrición, Quiz Master, primer quiz) |
+| DA-86 | El progreso de un logro se mide en el dispositivo (racha, semana, Core 33, hidratación de 30 días); los de una sola vez no muestran progreso (BT-24) |
+| DA-87 | No hay "nivel" en la referencia ni en la app: no se muestra. Los puntos ya viven en Perfil |
+| DA-88 | Se descargan las sesiones desde el 1 de enero o 120 días atrás (lo más antiguo), para el hero y la racha (BT-23) |
+
+### 22.3 Desviaciones nuevas
+- **D-57** · Resumen · Mes: el trío es Sesiones · Entreno · Días activos (como el prototipo, no la captura PROGRESS_02, que repite el trío de la semana).
+- **D-58** · La banda de ELLIE usa el patrón de Inicio (voz y "Hablar con ELLIE →") en vez de solo la flecha.
+- **D-59** · Sin la fila de Apple Health ni el peso corporal (PROGRESS_05 está fuera de alcance).
+- **D-60** · La curva de un récord dibuja las marcas reales (hasta 6): con pocas marcas tiene menos nodos que la captura.
+- **D-61** · Logros: las repisas no alternan la banda de fondo de la captura.
+- **D-62** · Retos: sin "Próximo reto" (no hay catálogo, BT-01) y sin el icono de llama en "Racha actual". Completados lista solo el Core 33 terminado.
+- **D-63** · Se añade una pantalla de lista de récords (el diseño solo tiene el carrusel y el detalle).
+- **D-64** · `HexMedal` cambia de aspecto en todas partes (Notificaciones, Resumen de sesión, Retos) para igualar el diseño.
+
+### 22.4 Bloqueos y pendientes
+- **Backend** (`BACKEND_TODO.md`): BT-23 agregados de entrenos; BT-24 progreso de logros; dependen de BT-01 (catálogo) y BT-02 (`completed_at`) los "Próximo reto" y el historial de retos.
+- **Sin probar escribiendo:** guardar un récord (celebración y puntos), borrar un récord manual y el vínculo con un récord de sesión; la cuenta de prueba no tiene sesiones ni récords.
+- **Sin usar desde la v2 (no borrados, comprobado con grep):** `features/progress/components/` (ActiveChallengeCard, AiAnalysisCard, BodyScienceProgressCard, HydrationProgressCard, NutritionProgressCard, PersonalRecordsCard, ProgressBarChart, ProgressChartCard, ProgressChartTooltip, ProgressRangeSwitch, ProgressSegmentedControl, TrainingProgressCard); `features/pr/components/` (ExercisePrSummaryCard, PrForm, PrHistoryItem, PrHistoryList); `features/profile/components/AchievementBadgeGrid.tsx`. `BadgeGridCard` sigue en uso (Perfil).
+
+### 22.5 Checklist de validación (Light y Dark, con `falcon1989`)
+- [ ] Progreso → Resumen vacío: hero "Tu evolución empieza aquí", cápsulas vacías, "Tu primera marca aparecerá aquí".
+- [ ] Tras completar un entreno: aparece en la semana con los minutos activos (sin pausas), el hero y el trío se actualizan al volver al tab, y la racha suma.
+- [ ] Mes: el día entrenado se pinta según los minutos; la leyenda coincide.
+- [ ] Hidratación y Nutrición de la semana reflejan los registros; tocar abre el plan.
+- [ ] Récords: "Registrar récord" desde Inicio, desde Progreso y desde el detalle; los 5 tipos con su unidad; "Supera tu mejor marca por …" correcto.
+- [ ] Guardar un récord que supera la mejor marca: celebración y +25 puntos una sola vez (repetir no suma); uno que no la supera: toast.
+- [ ] Un récord detectado en una sesión aparece como "De una sesión"; uno manual, como "Manual" (y se puede eliminar con pulsación larga).
+- [ ] Logros: la colección cuenta los badges de `user_badges`; el progreso de los bloqueados avanza con la racha, la semana y la hidratación; la hoja muestra la fecha o el avance.
+- [ ] Sin red: Resumen, Récords y Logros muestran el error y "Reintentar" recupera.
+- [ ] Atajo: menú dev "Ver pantallas de Progreso" o `-devTool "athelete://dev/progress?screen=<key>" -themeMode dark`.
+
+### 22.6 Commits (en este orden; sin `git add -A`)
+```bash
+# 1 · Lógica pura, datos y tipos
+git add src/features/progress/progressModel.ts src/features/progress/recordsModel.ts src/features/progress/badgesModel.ts __tests__/progressModel.test.ts __tests__/recordsBadges.test.ts __tests__/homePriority.test.ts __tests__/notificationsModel.test.ts src/services/supabase/trainingHistory.ts src/services/supabase/fitness.ts src/shared/domain/types.ts src/shared/domain/personal-records.ts src/hooks/usePersonalRecords.ts src/hooks/useProgressSummary.ts src/lib/queryInvalidation.ts src/types/navigation.ts
+git commit -m "feat(progress): aggregates, records and badges models with tests" -m "Weekly and monthly minutes without pauses (same rule as the Inicio ring), server volume, streaks, hero, records grouping and formatting per pr_type, badge shelves and progress. Records carry source and session set; manual records are written with source manual." -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+# 2 · Primitivos v2
+git add src/components/v2/ProgressCurve.tsx src/components/v2/WeeklyCapsules.tsx src/components/v2/HeatCalendar.tsx src/components/v2/RecordCard.tsx src/components/v2/StepperField.tsx src/components/v2/Celebration.tsx src/components/v2/HexMedal.tsx src/components/v2/index.ts
+git commit -m "feat(ui): v2 progress primitives and redesigned HexMedal" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+# 3 · Herramientas dev (antes de las pantallas: usan los datos de ejemplo)
+git add src/dev/devProgressScreens.ts src/dev/progressFixtures.ts src/dev/DevCatalogHost.tsx
+git commit -m "feat(dev): progress screen states and deep links" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+# 4 · Pantallas de Progreso, Récords y Logros
+git add src/features/progress/v2 src/screens/tabs/ProgressScreen.tsx src/screens/home/PersonalRecordsScreen.tsx src/screens/pr/RegisterPrScreen.tsx src/screens/profile/AchievementsScreen.tsx
+git commit -m "feat(progress): v2 Resumen, Retos, Récords and Logros" -m "Evolution hero, week and month, nutrition and hydration, ELLIE and marks; record list and detail with history and origin; Registrar récord sheet for the five pr_types with a celebration on a new best; achievement shelves with progress rings and detail sheet. Loading, empty and error states." -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+
+# 5 · Documentación
+git add docs/migration/MIGRATION_PROGRESS.md docs/migration/PROGRESS_CHECKPOINT.md docs/backend/BACKEND_TODO.md
+git commit -m "docs: Progreso module, QA pending and backend todo" -m "Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
+```

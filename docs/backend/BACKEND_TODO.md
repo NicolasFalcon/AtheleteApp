@@ -33,6 +33,8 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-20 | Sesión | ~~`rest_taken_sec` y fases del descanso (opcional)~~ | — | **Resuelto** (2026-10-03) |
 | BT-21 | Entrenos / Sesión | Estructurar `exercises.recommended_sets_reps` (hoy texto libre con 444 valores fuera de "N x M") | Media | No (la app lo lee con un parser tolerante) |
 | BT-22 | Core 33 | `profiles.core33_invite_dismiss_count` para recuperar el tope de 2 descartes de la tarjeta de Inicio | Baja | No (la tarjeta vuelve cada 14 días, D-54) |
+| BT-23 | Progreso | Agregados de entrenos en el servidor (minutos activos por día, volumen medio por sesión y mes) | Baja | No (la app agrega en el dispositivo) |
+| BT-24 | Logros | Progreso de logros y racha de hidratación completa desde el servidor | Media | No (la app lo mide con 30 días de hidratación) |
 
 ---
 
@@ -219,6 +221,16 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Qué hará la app cuando exista:** incrementarlo en cada "Ahora no", ocultar la tarjeta definitivamente al llegar a 2 y reiniciarlo al completar otro Core 33 (un descarte anterior al día 33 del último reto terminado deja de contar, como hoy). La regla de 14 días no cambia.
 - **Prioridad:** Baja. **No bloquea.**
 
+### BT-23 · Agregados de entrenos para Progreso
+- **Qué falta:** el Resumen de Progreso descarga todas las sesiones completadas desde el 1 de enero (o 120 días atrás) y las agrega en el dispositivo: minutos activos por día (`ended_at − started_at − paused_total_sec`, la misma regla que el anillo de Inicio) y volumen medio por sesión y mes (`volume_kg`).
+- **Propuesta:** (a) una columna generada `workout_sessions.active_seconds` con esa regla, para que la app y el servidor coincidan; (b) una vista o RPC `get_progress_summary(_from date)` que devuelva por día: sesiones, `active_seconds` y, por mes, el promedio de `volume_kg` (sin contar NULL).
+- **Prioridad:** Baja (rendimiento y coherencia). **No bloquea.**
+
+### BT-24 · Progreso de logros desde el servidor
+- **Qué falta:** la app mide el avance hacia los logros con lo que tiene: racha de entrenos, días de Core 33 y 30 días de hidratación. Por eso una racha de hidratación mayor a 30 días se corta, y `quiz_master`, `first_custom_workout` y los logros de una sola vez (`first_*`) no muestran progreso.
+- **Propuesta:** una RPC `get_badge_progress()` que devuelva por badge `{badge_id, current, target}` para el usuario (rachas completas, quizzes perfectos, rutinas propias), y una categoría por badge (`constancia | retos | fuerza | habitos`) en `badges` para que la app no la mantenga a mano.
+- **Prioridad:** Media. **No bloquea.**
+
 ---
 
 ## Historial
@@ -228,3 +240,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-03: BT-18 resuelto.
 - 2026-10-03: lote de backend aplicado: BT-03, BT-12, BT-15, BT-17, BT-19 y BT-20 resueltos; BT-21 nuevo (estructurar `recommended_sets_reps`).
 - 2026-10-03: BT-22 (contador de descartes de la tarjeta de Core 33).
+- 2026-10-03: BT-23 y BT-24 (módulo Progreso).
