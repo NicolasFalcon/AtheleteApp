@@ -15,7 +15,13 @@ import {
   recommendedChallenge,
   findChallenge,
 } from '@app/features/core33/core33Catalog';
-import { buildCore33DayView, flipHabit, startGuard } from '@app/features/core33/core33Model';
+import {
+  buildCore33DayView,
+  core33DayReference,
+  core33ParticipationReference,
+  flipHabit,
+  startGuard,
+} from '@app/features/core33/core33Model';
 
 const challenge = (startDate: string) =>
   ({ id: 'c', userId: 'u', status: 'active', startDate, habits: [] } as never);
@@ -215,5 +221,14 @@ describe('starting a challenge', () => {
     expect(startGuard([])).toBe('ok');
     expect(startGuard([{ status: 'completed' }, { status: 'abandoned' }])).toBe('ok');
     expect(startGuard([{ status: 'completed' }, { status: 'active' }])).toBe('alreadyActive');
+  });
+});
+
+describe('gamification references (server catalogue)', () => {
+  it('day closed: participation_id:YYYY-MM-DD; completed and streak: participation_id', () => {
+    const id = '6f1c2e0a-9d3b-4c55-8a10-2b7e5f9d4c11';
+    expect(core33DayReference(id, '2026-10-04')).toBe(`${id}:2026-10-04`);
+    expect(core33DayReference(id, '2026-10-04')).toMatch(/^[0-9a-f-]{36}:\d{4}-\d{2}-\d{2}$/);
+    expect(core33ParticipationReference(id)).toBe(id);
   });
 });

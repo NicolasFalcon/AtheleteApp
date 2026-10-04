@@ -7,7 +7,11 @@ import {
   type HabitChallenge,
   type HabitCategory,
 } from '@app/shared';
-import { startGuard } from '@app/features/core33/core33Model';
+import {
+  core33DayReference,
+  core33ParticipationReference,
+  startGuard,
+} from '@app/features/core33/core33Model';
 import {
   findChallenge,
   habitsForChallenge,
@@ -395,7 +399,7 @@ export async function toggleCore33Habit(params: {
     result.dayClosed = true;
     await awardGamificationEvent({
       eventType: 'core33_day_completed',
-      referenceId: `${params.challenge.id}:${params.date}`,
+      referenceId: core33DayReference(params.challenge.id, params.date),
       points: CORE33_DAY_COMPLETED_POINTS,
       metadata: {
         challengeId: params.challenge.id,
@@ -408,7 +412,7 @@ export async function toggleCore33Habit(params: {
     if (streak >= 7) {
       await awardGamificationEvent({
         eventType: 'core33_streak_7',
-        referenceId: params.challenge.id,
+        referenceId: core33ParticipationReference(params.challenge.id),
         badgeIds: ['streak_7_days'],
         metadata: {
           challengeId: params.challenge.id,
@@ -436,7 +440,7 @@ export async function toggleCore33Habit(params: {
       // are granted once even if this runs twice.
       await awardGamificationEvent({
         eventType: 'core33_completed',
-        referenceId: params.challenge.id,
+        referenceId: core33ParticipationReference(params.challenge.id),
         points: CORE33_COMPLETED_POINTS,
         badgeIds: ['core33_finisher'],
         metadata: {

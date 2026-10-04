@@ -164,6 +164,15 @@ export function startGuard(
     : 'ok';
 }
 
+// `reference_id` of the Core 33 gamification events (the server catalogue,
+// BACKEND_SUMMARY §6/§8): one per participation and day (reference_kind
+// participation_date, once per reference, daily limit 1) and one per
+// participation (reference_kind challenge_participation).
+export const core33DayReference = (participationId: string, date: string) =>
+  `${participationId}:${date}`;
+export const core33ParticipationReference = (participationId: string) =>
+  participationId;
+
 // A tap on a habit: the logs of the day with that habit flipped.
 export function flipHabit(
   logs: boolean[] | undefined,

@@ -304,7 +304,9 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Propuesta:** índice único parcial `(user_id) WHERE status = 'active'` (si BT-01 se aplica, ya queda cubierto), columnas `challenge_slug text NULL` y `abandoned_at timestamptz NULL`, y una RPC `start_core33_challenge(_slug text)` que abandone la activa y cree la nueva atómicamente.
 - **Prioridad:** Baja. **No bloquea.**
 
-### BT-37 · Confirmar los valores de `challenge_participations.status` y el formato de `habits`
+### BT-37 · Confirmar los valores de `challenge_participations.status` y el formato de `habits` · ✅ resuelto (2026-10-04)
+- **Confirmado por backend** (sin cambios en la app): valores de `challenge_participations.status`, formato de `habits` y referencias de los eventos. La app envía `core33_day_completed` con `participation_id:YYYY-MM-DD` (`reference_kind = participation_date`, una vez por referencia, `daily_limit` 1), `core33_streak_7` y `core33_completed` con el `participation_id` (`reference_kind = challenge_participation`). Los formatos están fijados en `core33DayReference` / `core33ParticipationReference` (con test).
+
 - **Qué falta:** el tipo generado solo dice `status: string` y `habits: Json`; ni los tipos ni los documentos dicen si hay un CHECK, ni el formato exacto que escribe la web. La app escribe `active`, `completed` y `abandoned` (este último ya lo escribía la versión anterior de la app al empezar otro reto) y guarda los hábitos como `[{id, category, name}]` con ids `core33:<reto>:<n>`. `habit_logs` se indexa por `habit_index` (no por id de hábito), y la gamificación referencia el `participation_id` y la fecha: los ids de los hábitos no los usa nadie.
 - **Qué hace falta:** confirmar (a) que `status` admite `abandoned` (si no, indicar el valor equivalente), (b) que ningún proceso de la web lee `habits[].id` ni `habits[].category` con otro formato. Si (a) no se cumple, "Dejar este reto" fallará con un aviso y habrá que cambiar el valor en `restartCore33Challenge`.
 - **Prioridad:** Media. **No bloquea** (el error se muestra al usuario y no se pierde nada).
@@ -335,3 +337,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-04: BT-35 y BT-36 (módulo Core 33); BT-01 y BT-02 reclasificados (ya no bloquean).
 - 2026-10-04: BT-37 (valores de `status` y formato de `habits` de Core 33, por confirmar).
 - 2026-10-04: BT-34 resuelto (meta de agua = `daily_water_goal` × 250 ml); DP-01 añadida (decisión de producto: meta por defecto 14 o 10 vasos).
+- 2026-10-04: BT-37 resuelto.

@@ -261,7 +261,7 @@ Referencias: `HOME_10`, `HOME_11`, `CORE33_01..06`, `OVERLAY_01`. Cuenta falcon1
 | 9.8 | Día perdido (dejar un día sin cerrar, p. ej. con una cuenta cuyo reto empezó días atrás). | Hero: "Llevas N días sin cerrar. El reto termina cuando cierres 33."; la racha vuelve a 0; el reto **no** termina. | — |
 | 9.9 | **Racha de 7 días:** cerrar 7 días seguidos. ⚠⭐ | Medalla `streak_7_days` una sola vez. | Evento `core33_streak_7` (referencia = id de la participación) y `user_badges`. |
 | 9.10 | **Completar el día 33** (cuenta ya en el día 33). ⚠⭐🗑 (+500 puntos y medalla `core33_finisher`; el reto pasa a completado) | Celebración (OVERLAY_01); la pantalla pasa a "Reto completado" y "Explorar otro Core 33". Inicio: "Empieza otro Core 33" aparece **desde el día siguiente**. | `challenge_participations.status = 'completed'`; `profiles.core33_completed_at` con fecha y `core33_invite_dismiss_count = 0`; eventos `core33_completed` y `user_badges.core33_finisher` **una sola vez**. |
-| 9.11 | "Dejar este reto": menú "…" → confirmar. ⚠🗑 | Vuelve a Explorar retos. Si el servidor rechazara `abandoned` (BT-37), la app lo avisa y el reto sigue activo. | `challenge_participations.status` de esa fila (anota el valor real que quedó). |
+| 9.11 | "Dejar este reto": menú "…" → confirmar. ⚠🗑 | Vuelve a Explorar retos. Si el servidor rechazara `abandoned`, la app lo avisa y el reto sigue activo (BT-37 está confirmado por backend: no debería ocurrir). | `challenge_participations.status` de esa fila (anota el valor real que quedó). |
 | 9.12 | Zona horaria: con el teléfono en otra zona, el día del reto cambia a medianoche local. | — | — |
 
 **Consulta Lovable (solo lectura) · Bloque 9**
@@ -272,7 +272,7 @@ SOLO LECTURA (SELECT). Para user_id = '<UID>':
 3) gamification_events de core33_day_completed, core33_streak_7 y core33_completed (reference_id, points, created_at); confirma que no hay duplicados por reference_id.
 4) user_badges con badge_id IN ('streak_7_days','core33_finisher').
 5) profiles: core33_intro_seen_at, core33_completed_at, core33_invite_dismissed_at, core33_invite_dismiss_count.
-6) ¿Qué valores admite challenge_participations.status (CHECK)? ¿Hay algún proceso de la web que lea habits[].id o habits[].category? (BT-37)
+6) Confirma que el reference_id de core33_day_completed es '<participation_id>:<YYYY-MM-DD>' (reference_kind participation_date) y el de core33_completed '<participation_id>' (challenge_participation), y que no hay duplicados.
 ```
 
 ---

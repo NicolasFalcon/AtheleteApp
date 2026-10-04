@@ -38,7 +38,7 @@ Mapeo dato → fuente
 
 ## Verificación previa al commit (2026-10-04, solo lectura)
 - falcon1989 no tiene participaciones, eventos de Core 33 ni logros de Core 33: no hay filas reales de la web con las que comparar. El repositorio no contiene código de la web. Los tipos y `BACKEND_SUMMARY.md` dicen: `habits` jsonb, `habit_logs(participation_id, date, habit_index, completed)`, eventos `core33_day_completed` (`participación:fecha`), `core33_streak_7` y `core33_completed` (`participation_id`).
-- El `status` y el formato de `habits` quedan por confirmar (BT-37).
+- BT-37 resuelto (confirmado por backend): `status`, formato de `habits` y referencias de los eventos (`participation_id:fecha` y `participation_id`), fijadas en `core33DayReference` / `core33ParticipationReference`.
 - Un solo reto activo: el servicio lo comprueba antes de crear (D-73).
 - Capturas Light/Dark completas de todos los estados.
 
