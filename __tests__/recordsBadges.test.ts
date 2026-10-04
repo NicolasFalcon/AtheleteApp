@@ -1,9 +1,6 @@
 import {
-  buildBadgeStats,
   buildShelves,
-  badgeProgress,
-  hydrationStreak,
-  SHELVES,
+  parseBadgeProgress,
 } from '../src/features/progress/badgesModel';
 import {
   compareDraft,
@@ -136,75 +133,64 @@ describe('records', () => {
   });
 });
 
-describe('badges', () => {
-  it('puts the 12 badges of the app on the four shelves exactly once', () => {
-    const ids = SHELVES.flatMap(shelf => shelf.ids);
-    expect(ids).toHaveLength(12);
-    expect(new Set(ids).size).toBe(12);
-    expect(ids.slice().sort()).toEqual(ALL_BADGES.map(badge => badge.id).sort());
+describe('badges (get_badge_progress, BT-24)', () => {
+  const rows = parseBadgeProgress([
+    { badge_id: 'first_workout', category: 'constancia', current: 1, target: 1, earned: true, earned_at: '2026-01-12T10:00:00' },
+    { badge_id: 'streak_7_days', category: 'constancia', current: 3, target: 7, earned: false },
+    { badge_id: 'core33_finisher', category: 'retos', current: 20, target: 33, earned: false },
+    { badge_id: 'first_pr', category: 'fuerza', current: 1, target: 1, earned: true },
+    { badge_id: 'quiz_master', category: 'habitos', current: 0, target: 6, earned: false },
+    { badge_id: 'nutrition_activated', category: 'habitos', current: 1, target: 1, earned: true, title: 'Plan activado', icon: 'utensils' },
+    { badge_id: 'brand_new', category: 'surprise', current: 0, target: 0, earned: false, title: 'Nueva', icon: 'does-not-exist' },
+    { category: 'retos' },
+  ]);
+
+  it('reads the rows (list or { badges }) and drops those without an id', () => {
+    expect(rows).toHaveLength(7);
+    expect(parseBadgeProgress({ badges: [{ badge_id: 'a', earned: true }] })).toHaveLength(1);
+    expect(parseBadgeProgress(null)).toEqual([]);
   });
 
-  const stats = {
-    streakDays: 3,
-    workoutsThisWeek: 2,
-    challengeDays: 20,
-    hydrationStreak: 2,
-    hydrationDaysThisWeek: 4,
-  };
-
-  it('measures the progress towards the next badge', () => {
-    expect(badgeProgress('streak_7_days', stats)).toEqual({ current: 3, target: 7, ratio: 3 / 7 });
-    expect(badgeProgress('core33_finisher', stats)?.current).toBe(20);
-    expect(badgeProgress('week_consistency', stats)?.target).toBe(3);
-    expect(badgeProgress('weekly_hydration_master', stats)?.current).toBe(4);
-    // Never above the target; badges done once have no progress.
-    expect(badgeProgress('streak_7_days', { ...stats, streakDays: 30 })?.ratio).toBe(1);
-    expect(badgeProgress('first_workout', stats)).toBeNull();
+  it('groups by the category of the server, in the order of the design', () => {
+    const result = buildShelves(rows, { first_pr: '2026-01-10T10:00:00' });
+    expect(result.shelves.map(shelf => shelf.key)).toEqual(['constancia', 'retos', 'fuerza', 'habitos', 'otros']);
+    expect(result.shelves[0].items.map(item => item.badge.id)).toEqual(['first_workout', 'streak_7_days']);
+    expect(result.shelves[0].earnedCount).toBe(1);
   });
 
-  it('builds the shelves with earned dates and "n de m" for locked ones', () => {
-    const result = buildShelves(
-      [
-        { id: 'first_workout', earnedAt: '2026-01-12T10:00:00' },
-        { id: 'first_pr', earnedAt: '2026-01-10T10:00:00' },
-        { id: 'not_a_badge', earnedAt: '2026-01-10T10:00:00' },
-      ],
-      stats,
+  it('counts N / total from the data, 13 with nutrition_activated', () => {
+    const thirteen = parseBadgeProgress(
+      Array.from({ length: 13 }, (_, index) => ({
+        badge_id: `b${index}`,
+        category: 'constancia',
+        current: 0,
+        target: 5,
+        earned: index < 7,
+      })),
     );
-    expect(result.total).toBe(12);
-    expect(result.earnedCount).toBe(2); // unknown ids do not count
-    const constancia = result.shelves[0];
-    expect(constancia.earnedCount).toBe(1);
-    expect(constancia.items[0]).toMatchObject({ earned: true, sub: '12 ene' });
-    expect(constancia.items[2]).toMatchObject({ earned: false, sub: '3 de 7' });
+    const result = buildShelves(thirteen);
+    expect(result.total).toBe(13);
+    expect(result.earnedCount).toBe(7);
+  });
+
+  it('shows dates when earned and "n de m" when locked', () => {
+    const result = buildShelves(rows, { first_pr: '2026-01-10T10:00:00' });
+    expect(result.shelves[0].items[0]).toMatchObject({ earned: true, sub: '12 ene', progress: null });
+    expect(result.shelves[0].items[1]).toMatchObject({ earned: false, sub: '3 de 7' });
+    expect(result.shelves[0].items[1].progress?.ratio).toBeCloseTo(3 / 7);
     expect(result.shelves[1].items[0].sub).toBe('20 de 33');
     expect(result.shelves[2].items[0]).toMatchObject({ earned: true, sub: '10 ene' });
-    expect(result.shelves[3].items[0]).toMatchObject({ earned: false, sub: '', progress: null });
+    expect(result.shelves[3].items[0]).toMatchObject({ earned: false, sub: '0 de 6' });
   });
 
-  it('counts the hydration streak and the week for the stats', () => {
-    const logs = [
-      { date: '2026-10-03', waterMl: 3500 },
-      { date: '2026-10-02', waterMl: 3750 },
-      { date: '2026-10-01', waterMl: 1000 },
-      { date: '2026-09-30', waterMl: 3500 },
-    ];
-    expect(hydrationStreak(logs, 14, today)).toBe(2);
-    // Today not met yet: the streak ends yesterday.
-    expect(hydrationStreak(logs.slice(1), 14, today)).toBe(1);
-    const built = buildBadgeStats({
-      sessions: [],
-      streakDays: 0,
-      hydrationLogs: logs,
-      goalGlasses: 14,
-      challengeDays: 5,
-      today,
+  it('uses the row data for a badge the app does not know and keeps unknown categories', () => {
+    const result = buildShelves(rows);
+    const other = result.shelves.find(shelf => shelf.key === 'otros');
+    expect(other?.items[0]).toMatchObject({
+      badge: { id: 'brand_new', title: 'Nueva', icon: 'does-not-exist' },
+      progress: null,
     });
-    expect(built).toMatchObject({
-      hydrationStreak: 2,
-      hydrationDaysThisWeek: 3, // Wed 30, Fri 2, Sat 3
-      workoutsThisWeek: 0,
-      challengeDays: 5,
-    });
+    const activated = result.shelves[3].items.find(item => item.badge.id === 'nutrition_activated');
+    expect(activated?.badge.title).toBe('Plan activado');
   });
 });

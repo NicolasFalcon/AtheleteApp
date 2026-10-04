@@ -143,3 +143,44 @@ export async function signOut(): Promise<AuthResult> {
 
   return {error: normalizeAuthError(error)};
 }
+
+// BT-30: asks the Edge Function `delete-account` to delete the signed-in
+// user's data and, last, the auth user. POST without a body; the user is
+// identified only by their JWT, which supabase-js adds. Returns the HTTP
+// status and body (status null: no answer) for mapDeleteAccountResponse.
+export async function requestAccountDeletion(): Promise<{
+  status: number | null;
+  body: unknown;
+}> {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    return {status: null, body: null};
+  }
+
+  const {data, error} = await client.functions.invoke('delete-account', {
+    method: 'POST',
+  });
+
+  if (!error) {
+    return {status: 200, body: data};
+  }
+
+  // FunctionsHttpError: the response of the function is in `context`.
+  const response = (error as {context?: unknown}).context as
+    | {status?: number; json?: () => Promise<unknown>}
+    | undefined;
+
+  if (response && typeof response.status === 'number') {
+    const body = await response.json?.().catch(() => null);
+    return {status: response.status, body: body ?? null};
+  }
+
+  return {status: null, body: null};
+}
+
+// Local sign-out that does not need the server (the user may be gone).
+export async function signOutLocal(): Promise<void> {
+  const client = getSupabaseClient();
+  await client?.auth.signOut({scope: 'local'});
+}

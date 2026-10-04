@@ -1,3 +1,8 @@
+import { Core33Screen } from '@app/screens/core33/Core33Screen';
+import { Core33IntroScreen } from '@app/screens/core33/Core33IntroScreen';
+import { Core33ExploreScreen } from '@app/screens/core33/Core33ExploreScreen';
+import { Core33DetailScreen } from '@app/screens/core33/Core33DetailScreen';
+import { Core33ReadyScreen } from '@app/screens/core33/Core33ReadyScreen';
 import { SettingsScreen } from '@app/screens/profile/SettingsScreen';
 import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen';
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
@@ -26,7 +31,6 @@ import { AchievementsScreen } from '@app/screens/profile/AchievementsScreen';
 import { EditProfileScreen } from '@app/screens/profile/EditProfileScreen';
 import { BodyScienceArticleDetailScreen } from '@app/screens/progress/BodyScienceArticleDetailScreen';
 import { BodyScienceScreen } from '@app/screens/progress/BodyScienceScreen';
-import { ChallengeScreen } from '@app/screens/progress/ChallengeScreen';
 import { QuizQuestionScreen } from '@app/screens/quiz/QuizQuestionScreen';
 import { QuizResultScreen } from '@app/screens/quiz/QuizResultScreen';
 import { ProfileScreen } from '@app/screens/tabs/ProfileScreen';
@@ -144,7 +148,15 @@ export function RootNavigator() {
             name={APP_ROUTES.Notifications}
             component={NotificationsScreen}
           />
-          <Stack.Screen name={APP_ROUTES.Core33} component={ChallengeScreen} />
+          <Stack.Screen name={APP_ROUTES.Core33} component={Core33Screen} />
+          <Stack.Screen name={APP_ROUTES.Core33Intro} component={Core33IntroScreen} />
+          <Stack.Screen name={APP_ROUTES.Core33Explore} component={Core33ExploreScreen} />
+          <Stack.Screen name={APP_ROUTES.Core33Detail} component={Core33DetailScreen} />
+          <Stack.Screen
+            name={APP_ROUTES.Core33Ready}
+            component={Core33ReadyScreen}
+            options={{ gestureEnabled: false }}
+          />
           <Stack.Screen
             name={APP_ROUTES.WorkoutDetail}
             component={WorkoutDetailScreen}

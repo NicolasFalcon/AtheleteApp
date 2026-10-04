@@ -32,6 +32,12 @@ export type OnboardingData = {
   preferredSessionMinutes?: number;
 };
 
+export type NotificationPrefs = {
+  workouts: boolean;
+  hydration: boolean;
+  updates: boolean;
+};
+
 export type ProfileRecord = {
   id: string;
   name: string;
@@ -59,6 +65,10 @@ export type ProfileRecord = {
   core33IntroSeenAt: string | null;
   core33CompletedAt: string | null;
   core33InviteDismissedAt: string | null;
+  // "Ahora no" count of the discovery card (BT-22): 2 hides it for good.
+  core33InviteDismissCount: number;
   // profiles.created_at ("Atleta desde …" in Perfil).
   createdAt: string | null;
+  // profiles.notification_prefs (BT-31).
+  notificationPrefs: NotificationPrefs;
 };

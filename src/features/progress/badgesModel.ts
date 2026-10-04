@@ -1,142 +1,78 @@
-import {
-  buildHydrationWeek,
-  buildWeek,
-  MONTH_ABBR,
-  weekKeys,
-} from '@app/features/progress/progressModel';
-import { toGlasses } from '@app/features/home/homePriority';
-import { getLocalDateKey } from '@app/lib/date';
-import {
-  ALL_BADGES,
-  type BadgeDefinition,
-  type BadgeId,
-  type HydrationLog,
-  type WorkoutSession,
-} from '@app/shared';
+import { MONTH_ABBR } from '@app/features/progress/progressModel';
+import { ALL_BADGES } from '@app/shared';
 
-// Logros (ACHIEVEMENTS_01 / 02): the 12 badges of the app on the four shelves
-// of the design, with the progress towards the ones that can be measured.
+// Logros (ACHIEVEMENTS_01 / 02): the badges on the shelves of the design.
+// Everything measurable comes from the server (BT-24): the category of each
+// badge and its progress (current / target / earned) are the answer of
+// rpc('get_badge_progress'); nothing is kept by hand in the app.
 
-export type ShelfKey = 'constancia' | 'retos' | 'fuerza' | 'habitos';
+export type ShelfKey = 'constancia' | 'retos' | 'fuerza' | 'habitos' | 'otros';
 
-export const SHELVES: { key: ShelfKey; title: string; ids: BadgeId[] }[] = [
-  {
-    key: 'constancia',
-    title: 'Constancia',
-    ids: [
-      'first_workout',
-      'week_consistency',
-      'streak_7_days',
-      'hydration_3_days',
-      'hydration_7_days',
-      'weekly_hydration_master',
-    ],
-  },
-  { key: 'retos', title: 'Retos', ids: ['core33_finisher'] },
-  { key: 'fuerza', title: 'Fuerza', ids: ['first_pr', 'first_custom_workout'] },
-  {
-    key: 'habitos',
-    title: 'Hábitos y conocimiento',
-    ids: ['nutrition_started', 'quiz_master', 'first_quiz'],
-  },
+// Order and title of the shelves (presentation only). A category the app
+// does not know goes to "Otros" instead of being lost.
+const SHELF_ORDER: { key: ShelfKey; title: string }[] = [
+  { key: 'constancia', title: 'Constancia' },
+  { key: 'retos', title: 'Retos' },
+  { key: 'fuerza', title: 'Fuerza' },
+  { key: 'habitos', title: 'Hábitos y conocimiento' },
+  { key: 'otros', title: 'Otros' },
 ];
 
-export type BadgeStats = {
-  streakDays: number;
-  workoutsThisWeek: number;
-  challengeDays: number;
-  hydrationStreak: number;
-  hydrationDaysThisWeek: number;
+export type BadgeInfo = {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
 };
 
-// Consecutive days at the water goal, ending today (or yesterday if today has
-// not reached it yet).
-export function hydrationStreak(
-  logs: HydrationLog[],
-  goalGlasses: number,
-  today: Date,
-): number {
-  const goal = Math.max(1, goalGlasses);
-  const met = new Set(
-    logs.filter(log => toGlasses(log.waterMl) >= goal).map(log => log.date),
-  );
-  let streak = 0;
-  for (let offset = 0; offset < 120; offset += 1) {
-    const date = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate() - offset,
-      12,
-    );
-    if (met.has(getLocalDateKey(date))) {
-      streak += 1;
-    } else if (offset > 0) {
-      break;
-    }
-  }
-  return streak;
-}
+// One row of get_badge_progress.
+export type BadgeProgressRow = {
+  badgeId: string;
+  category: string | null;
+  current: number;
+  target: number;
+  earned: boolean;
+  earnedAt?: string;
+  title?: string;
+  description?: string;
+  icon?: string;
+};
 
-export function buildBadgeStats(input: {
-  sessions: WorkoutSession[];
-  streakDays: number;
-  hydrationLogs: HydrationLog[];
-  goalGlasses: number;
-  challengeDays: number;
-  today: Date;
-}): BadgeStats {
-  const week = buildHydrationWeek(
-    input.hydrationLogs,
-    input.goalGlasses,
-    weekKeys(input.today),
-    getLocalDateKey(input.today),
-  );
-  return {
-    streakDays: input.streakDays,
-    workoutsThisWeek: buildWeek(input.sessions, input.today).sessions,
-    challengeDays: input.challengeDays,
-    hydrationStreak: hydrationStreak(
-      input.hydrationLogs,
-      input.goalGlasses,
-      input.today,
-    ),
-    hydrationDaysThisWeek: week.daysMet,
-  };
+const asNumber = (value: unknown): number => {
+  const n = typeof value === 'string' ? Number(value) : value;
+  return typeof n === 'number' && Number.isFinite(n) ? n : 0;
+};
+const asString = (value: unknown): string | undefined =>
+  typeof value === 'string' && value ? value : undefined;
+
+// Tolerant reading: the RPC may answer the list directly or inside
+// `{ badges: [...] }`; rows without an id are dropped.
+export function parseBadgeProgress(raw: unknown): BadgeProgressRow[] {
+  const list = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === 'object' && Array.isArray((raw as { badges?: unknown }).badges)
+    ? ((raw as { badges: unknown[] }).badges)
+    : [];
+  return list
+    .filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === 'object')
+    .map(row => ({
+      badgeId: asString(row.badge_id) ?? asString(row.id) ?? '',
+      category: asString(row.category) ?? null,
+      current: Math.max(0, asNumber(row.current)),
+      target: Math.max(0, asNumber(row.target)),
+      earned: row.earned === true,
+      earnedAt: asString(row.earned_at),
+      title: asString(row.title),
+      description: asString(row.description),
+      icon: asString(row.icon),
+    }))
+    .filter(row => row.badgeId !== '');
 }
 
 export type BadgeProgress = { current: number; target: number; ratio: number };
 
-function progress(current: number, target: number): BadgeProgress {
-  const clamped = Math.min(target, Math.max(0, current));
-  return { current: clamped, target, ratio: clamped / target };
-}
-
-// Progress towards a locked badge; null when it has no measurable goal (it is
-// unlocked by doing it once).
-export function badgeProgress(
-  id: BadgeId,
-  stats: BadgeStats,
-): BadgeProgress | null {
-  switch (id) {
-    case 'week_consistency':
-      return progress(stats.workoutsThisWeek, 3);
-    case 'streak_7_days':
-      return progress(stats.streakDays, 7);
-    case 'core33_finisher':
-      return progress(stats.challengeDays, 33);
-    case 'hydration_3_days':
-      return progress(stats.hydrationStreak, 3);
-    case 'hydration_7_days':
-      return progress(stats.hydrationStreak, 7);
-    case 'weekly_hydration_master':
-      return progress(stats.hydrationDaysThisWeek, 5);
-    default:
-      return null;
-  }
-}
-
 export type ShelfItem = {
-  badge: BadgeDefinition;
+  badge: BadgeInfo;
   earned: boolean;
   earnedAt?: string;
   progress: BadgeProgress | null;
@@ -159,41 +95,60 @@ export function shortBadgeDate(iso?: string): string {
   return `${date.getDate()} ${MONTH_ABBR[date.getMonth()]}`;
 }
 
+// The shelves from the RPC rows. `earnedAt` (user_badges) fills the date when
+// the row does not carry it. The count "N / total" comes from the rows.
 export function buildShelves(
-  earned: { id: string; earnedAt?: string }[],
-  stats: BadgeStats,
+  rows: BadgeProgressRow[],
+  earnedAt: Record<string, string | undefined> = {},
 ): { shelves: Shelf[]; earnedCount: number; total: number } {
-  const earnedById = new Map(earned.map(item => [item.id, item.earnedAt]));
-  const known = new Set(ALL_BADGES.map(badge => badge.id as string));
+  const items = rows.map(row => {
+    const known = ALL_BADGES.find(badge => badge.id === row.badgeId);
+    const when = row.earnedAt ?? earnedAt[row.badgeId];
+    const progress: BadgeProgress | null =
+      !row.earned && row.target > 0
+        ? {
+            current: Math.min(row.target, row.current),
+            target: row.target,
+            ratio: Math.min(row.target, row.current) / row.target,
+          }
+        : null;
+    const item: ShelfItem & { category: ShelfKey } = {
+      badge: {
+        id: row.badgeId,
+        title: row.title ?? known?.title ?? row.badgeId,
+        description: row.description ?? known?.description ?? '',
+        icon: row.icon ?? known?.icon ?? '',
+      },
+      earned: row.earned,
+      earnedAt: row.earned ? when : undefined,
+      progress,
+      sub: row.earned
+        ? shortBadgeDate(when)
+        : progress
+        ? `${progress.current} de ${progress.target}`
+        : '',
+      category: SHELF_ORDER.some(shelf => shelf.key === row.category)
+        ? (row.category as ShelfKey)
+        : 'otros',
+    };
+    return item;
+  });
 
-  const shelves = SHELVES.map<Shelf>(shelf => {
-    const items = shelf.ids.map<ShelfItem>(id => {
-      const badge = ALL_BADGES.find(item => item.id === id) as BadgeDefinition;
-      const isEarned = earnedById.has(id);
-      const prog = isEarned ? null : badgeProgress(id, stats);
-      return {
-        badge,
-        earned: isEarned,
-        earnedAt: earnedById.get(id),
-        progress: prog,
-        sub: isEarned
-          ? shortBadgeDate(earnedById.get(id))
-          : prog
-          ? `${prog.current} de ${prog.target}`
-          : '',
-      };
-    });
+  const shelves = SHELF_ORDER.map<Shelf>(shelf => {
+    const own = items
+      .filter(item => item.category === shelf.key)
+      .map(({ category: _category, ...item }) => item);
     return {
       key: shelf.key,
       title: shelf.title,
-      earnedCount: items.filter(item => item.earned).length,
-      items,
+      earnedCount: own.filter(item => item.earned).length,
+      items: own,
     };
-  });
+  }).filter(shelf => shelf.items.length > 0);
 
   return {
     shelves,
-    earnedCount: [...earnedById.keys()].filter(id => known.has(id)).length,
-    total: ALL_BADGES.length,
+    earnedCount: items.filter(item => item.earned).length,
+    total: items.length,
   };
 }

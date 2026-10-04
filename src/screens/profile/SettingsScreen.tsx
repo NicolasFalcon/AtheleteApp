@@ -42,7 +42,16 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useProfilePreferences } from '@app/hooks/useProfilePreferences';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { sendPasswordReset } from '@app/services/supabase/auth';
+import {
+  mapDeleteAccountResponse,
+  type DeleteAccountOutcome,
+} from '@app/features/profile/deleteAccountModel';
+import { clearLocalUserData } from '@app/lib/localUserData';
+import {
+  requestAccountDeletion,
+  sendPasswordReset,
+  signOutLocal,
+} from '@app/services/supabase/auth';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'Settings'>;
@@ -72,6 +81,9 @@ export function SettingsScreen({ navigation, route }: Props) {
   const dev = __DEV__ ? route.params?.devState : undefined;
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
+  // Eliminar cuenta (BT-30): the result of the last attempt.
+  const [deleting, setDeleting] = useState(false);
+  const [deleteOutcome, setDeleteOutcome] = useState<DeleteAccountOutcome | null>(null);
 
   const profile = useMemo(() => {
     if (__DEV__ && dev) {
@@ -104,6 +116,41 @@ export function SettingsScreen({ navigation, route }: Props) {
     setConfirm(null);
     // iOS does not present a modal while another is dismissing.
     setTimeout(() => setConfirm(next), 350);
+  };
+
+  // Signs out even if the server no longer knows the user.
+  const finishSession = async () => {
+    try {
+      await signOut();
+    } catch {
+      await signOutLocal();
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (deleting || dev) {
+      return;
+    }
+    setDeleting(true);
+    setDeleteOutcome(null);
+    const userId = profile?.id;
+    try {
+      const outcome = mapDeleteAccountResponse(await requestAccountDeletion());
+      setDeleteOutcome(outcome);
+      if (outcome.kind === 'deleted') {
+        if (userId) {
+          await clearLocalUserData(userId).catch(() => {});
+        }
+        await finishSession();
+      } else if (outcome.kind === 'unauthorized') {
+        await finishSession();
+      }
+    } catch (error) {
+      console.warn('[account] No se pudo eliminar la cuenta:', error);
+      setDeleteOutcome(mapDeleteAccountResponse({ status: null, body: null }));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const icon = (Icon: typeof Target) => (
@@ -201,7 +248,9 @@ export function SettingsScreen({ navigation, route }: Props) {
                 <SwitchV2
                   accessibilityLabel={item.title}
                   value={preferences.notifications[item.key]}
-                  onValueChange={value => preferences.updateNotifications({ [item.key]: value })}
+                  onValueChange={value =>
+                    !dev && preferences.updateNotifications({ [item.key]: value })
+                  }
                 />
               }
             />
@@ -227,7 +276,10 @@ export function SettingsScreen({ navigation, route }: Props) {
             title="Eliminar cuenta"
             destructive
             divider={false}
-            onPress={() => setConfirm('delete1')}
+            onPress={() => {
+              setDeleteOutcome(null);
+              setConfirm('delete1');
+            }}
           />
         </SettingsSection>
       </ScrollView>
@@ -295,26 +347,35 @@ export function SettingsScreen({ navigation, route }: Props) {
 
       <Sheet
         open={confirm === 'delete2'}
-        onClose={() => setConfirm(null)}
+        onClose={() => !deleting && setConfirm(null)}
         title="¿Seguro que quieres eliminarla?"
         footer={
-          <Button
-            label="Eliminar mi cuenta"
-            loading={busy}
-            loadingLabel="Eliminando"
-            onPress={() =>
-              run(async () => {
-                // BT-30: there is no account deletion on the backend yet.
-                throw new Error('La eliminación de cuenta aún no está disponible. Escríbenos y la gestionamos.');
-              })
-            }
-            style={styles.flex}
-          />
+          deleteOutcome?.kind === 'lastAdmin' ? (
+            <Button label="Entendido" variant="outline" onPress={() => setConfirm(null)} style={styles.flex} />
+          ) : (
+            <Button
+              label={deleteOutcome?.kind === 'retry' ? 'Reintentar' : 'Eliminar mi cuenta'}
+              loading={deleting}
+              loadingLabel="Eliminando…"
+              onPress={deleteAccount}
+              style={styles.flex}
+            />
+          )
         }
       >
         <TextV2 variant="body" tone="secondary">
           Última confirmación: tu cuenta y todos sus datos se eliminarán de forma permanente.
         </TextV2>
+        {deleteOutcome && (deleteOutcome.kind === 'lastAdmin' || deleteOutcome.kind === 'retry') ? (
+          <TextV2
+            variant="meta"
+            color={colors.ember.deep}
+            style={styles.deleteMessage}
+            accessibilityLiveRegion="polite"
+          >
+            {deleteOutcome.message}
+          </TextV2>
+        ) : null}
       </Sheet>
     </View>
   );
@@ -325,5 +386,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   icon: { opacity: 0.75 },
   appearance: { gap: 12, paddingVertical: 14, borderBottomWidth: 1 },
+  deleteMessage: { marginTop: 12 },
   appearanceHead: { flexDirection: 'row', alignItems: 'center', gap: 14 },
 });

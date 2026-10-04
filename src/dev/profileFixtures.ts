@@ -28,7 +28,9 @@ export const FIXTURE_PROFILE: ProfileRecord = {
   core33IntroSeenAt: null,
   core33CompletedAt: null,
   core33InviteDismissedAt: null,
+  core33InviteDismissCount: 0,
   createdAt: '2026-01-12T10:00:00.000Z',
+  notificationPrefs: { workouts: true, hydration: true, updates: false },
 };
 
 // Signed up but never finished the onboarding: nothing to show yet.

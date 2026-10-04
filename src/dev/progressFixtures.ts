@@ -221,3 +221,45 @@ export function progressFixture(today: Date) {
     ],
   };
 }
+
+// Development only: rows like those of rpc('get_badge_progress') (13 badges,
+// seven earned) for the Logros / Perfil samples.
+export function badgeRowsFixture(now: Date) {
+  const year = now.getFullYear();
+  const earned = (id: string, category: string, month: number, day: number, title: string, icon: string) => ({
+    badgeId: id,
+    category,
+    current: 1,
+    target: 1,
+    earned: true,
+    earnedAt: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T10:00:00`,
+    title,
+    description: '',
+    icon,
+  });
+  const locked = (id: string, category: string, current: number, target: number, title: string, icon: string) => ({
+    badgeId: id,
+    category,
+    current,
+    target,
+    earned: false,
+    title,
+    description: '',
+    icon,
+  });
+  return [
+    earned('first_workout', 'constancia', 1, 12, 'Primer entreno', 'dumbbell'),
+    earned('hydration_3_days', 'constancia', 3, 2, 'Hidratación x3', 'droplets'),
+    locked('week_consistency', 'constancia', 2, 3, 'Semana constante', 'calendar'),
+    locked('streak_7_days', 'constancia', 6, 7, 'Racha de 7 días', 'flame'),
+    locked('hydration_7_days', 'constancia', 3, 7, 'Hidratación x7', 'droplets'),
+    locked('weekly_hydration_master', 'constancia', 4, 5, 'Semana hidratada', 'waves'),
+    locked('core33_finisher', 'retos', 11, 33, 'Core 33 completado', 'trophy'),
+    earned('first_pr', 'fuerza', 1, 10, 'Primer récord', 'trophy'),
+    earned('first_custom_workout', 'fuerza', 5, 2, 'Primera rutina propia', 'wrench'),
+    earned('nutrition_started', 'habitos', 2, 19, 'Nutrición en marcha', 'utensils'),
+    earned('nutrition_activated', 'habitos', 2, 20, 'Plan activado', 'utensils'),
+    earned('first_quiz', 'habitos', 6, 14, 'Primer Quiz', 'file-pen'),
+    locked('quiz_master', 'habitos', 3, 6, 'Quiz Master', 'brain'),
+  ];
+}

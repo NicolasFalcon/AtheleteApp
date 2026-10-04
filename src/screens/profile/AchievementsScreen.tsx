@@ -11,21 +11,14 @@ import {
 } from '@app/components/v2';
 import { ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import {
-  buildBadgeStats,
-  buildShelves,
-  type ShelfItem,
-} from '@app/features/progress/badgesModel';
-import { currentStreak } from '@app/features/progress/progressModel';
+import { buildShelves, type ShelfItem } from '@app/features/progress/badgesModel';
 import {
   BadgeSheet,
   CollectionHeader,
   ShelfRow,
 } from '@app/features/progress/v2/AchievementViews';
-import { useProfileOverview } from '@app/hooks/useProfileOverview';
-import { useProgressSummary } from '@app/hooks/useProgressSummary';
+import { useBadgeShelves } from '@app/hooks/useBadgeShelves';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { ALL_BADGES } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'Achievements'>;
@@ -34,16 +27,16 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 
 // Logros v2 (ACHIEVEMENTS_01 / 02): the collection count, one shelf per
 // category with the medals (locked ones with a progress ring) and the detail
-// sheet. Badges come from user_badges; the progress is measured from the
-// sessions, the hydration and Core 33.
+// sheet. Category, progress and earned come from get_badge_progress (BT-24);
+// the dates of earning from user_badges.
 export function AchievementsScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const dev = __DEV__ ? route.params?.devState : undefined;
-  const overviewQuery = useProfileOverview();
-  const summary = useProgressSummary();
+  const badges = useBadgeShelves();
   const now = useMemo(() => new Date(), []);
 
+  // Development: sample rows like those of get_badge_progress.
   const sample = useMemo(() => {
     if (!__DEV__ || dev !== 'data') {
       return null;
@@ -51,32 +44,10 @@ export function AchievementsScreen({ navigation, route }: Props) {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const fixtures =
       require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
-    return fixtures.progressFixture(now);
+    return buildShelves(fixtures.badgeRowsFixture(now));
   }, [dev, now]);
 
-  const overview = overviewQuery.data;
-  const overviewData = summary.overviewQuery.data;
-  const sessionsData = summary.sessions;
-
-  const result = useMemo(() => {
-    const earned = sample ? sample.badges : overview?.badges ?? [];
-    const sessions = sample ? sample.sessions : sessionsData;
-    const stats = buildBadgeStats({
-      sessions,
-      streakDays: sample
-        ? currentStreak(sample.sessions, now)
-        : overview?.currentStreak ?? 0,
-      hydrationLogs: sample
-        ? sample.hydration
-        : overviewData?.hydrationLogs ?? [],
-      goalGlasses: sample ? 14 : overviewData?.dailyWaterGoal ?? 14,
-      challengeDays: sample
-        ? sample.challenge.completedDays
-        : overview?.challenge?.completedDays ?? 0,
-      today: now,
-    });
-    return buildShelves(earned, stats);
-  }, [now, overview, overviewData, sample, sessionsData]);
+  const result = sample ?? badges;
 
   const [selected, setSelected] = useState<ShelfItem | null>(null);
 
@@ -102,14 +73,10 @@ export function AchievementsScreen({ navigation, route }: Props) {
     }
   }, [devSheet, result.shelves]);
 
-  const loading =
-    dev === 'loading' ||
-    (!dev && (overviewQuery.isLoading || summary.isLoading));
-  const failed =
-    dev === 'error' || (!dev && Boolean(overviewQuery.error || summary.error));
+  const loading = dev === 'loading' || (!dev && badges.isLoading);
+  const failed = dev === 'error' || (!dev && Boolean(badges.error));
   const retry = () => {
-    overviewQuery.refetch().catch(() => {});
-    summary.refetchAll().catch(() => {});
+    badges.refetchAll().catch(() => {});
   };
 
   let content: React.ReactNode;
@@ -142,7 +109,7 @@ export function AchievementsScreen({ navigation, route }: Props) {
       <>
         <CollectionHeader
           earned={result.earnedCount}
-          total={ALL_BADGES.length}
+          total={result.total}
         />
         {result.shelves.map(shelf => (
           <ShelfRow key={shelf.key} shelf={shelf} onOpen={setSelected} />

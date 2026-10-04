@@ -7,6 +7,8 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
 export type GlassHeaderProps = {
   title?: string;
+  // Small line under the title (Nutrición · "Hoy · ganar músculo").
+  subtitle?: string;
   left?: ReactNode;
   right?: ReactNode;
   // Transparent over a hero: only the floating glass buttons are visible.
@@ -19,6 +21,7 @@ export type GlassHeaderProps = {
 // Navigation bar: back button · centred 17/600 title · optional action.
 export function GlassHeader({
   title,
+  subtitle,
   left,
   right,
   transparent = false,
@@ -38,14 +41,21 @@ export function GlassHeader({
       ]}
     >
       <View style={styles.side}>{left}</View>
-      <TextV2
-        variant="cta"
-        align="center"
-        numberOfLines={1}
-        style={styles.title}
-      >
-        {title}
-      </TextV2>
+      <View style={styles.title}>
+        <TextV2 variant="cta" align="center" numberOfLines={1}>
+          {title}
+        </TextV2>
+        {subtitle ? (
+          <TextV2
+            variant="caption"
+            tone="secondary"
+            align="center"
+            numberOfLines={1}
+          >
+            {subtitle}
+          </TextV2>
+        ) : null}
+      </View>
       <View style={[styles.side, styles.right]}>{right}</View>
     </View>
   );

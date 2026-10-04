@@ -1,8 +1,13 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { trainingSinceKey } from '@app/features/progress/progressModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useProgressData } from '@app/hooks/useProgressData';
-import { fetchTrainingHistory } from '@app/services/supabase/trainingHistory';
+import {
+  emptySummary,
+  summaryToSessions,
+} from '@app/features/progress/summaryAdapter';
+import { fetchProgressSummary } from '@app/services/supabase/progressSummary';
 
 // Everything the Progreso Resumen reads: the existing overview (nutrition,
 // hydration, challenge), personal records, the exercise library and the
@@ -15,13 +20,18 @@ export function useProgressSummary() {
   const trainingQuery = useQuery({
     queryKey: ['progress', 'training', userId, since],
     enabled: Boolean(userId),
-    queryFn: () => fetchTrainingHistory(userId!, since),
+    queryFn: () => fetchProgressSummary(since),
   });
+  // The model takes sessions: the aggregates are expressed as such.
+  const sessions = useMemo(
+    () => summaryToSessions(trainingQuery.data ?? emptySummary),
+    [trainingQuery.data],
+  );
 
   return {
     ...progress,
     trainingQuery,
-    sessions: trainingQuery.data ?? [],
+    sessions,
     isLoading: progress.isLoading || trainingQuery.isLoading,
     error: progress.error || trainingQuery.error || null,
     refetchAll: () =>

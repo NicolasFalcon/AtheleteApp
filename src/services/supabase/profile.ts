@@ -3,6 +3,7 @@ import { normalizeAvatarKey } from '@app/assets/avatars';
 import { normalizeProfilePhotoReference } from '@app/services/supabase/profile-photo';
 import type {
   OnboardingData,
+  NotificationPrefs,
   OnboardingGoal,
   ProfileGender,
   ProfileRecord,
@@ -41,6 +42,30 @@ function mapGender(value: string | null): ProfileGender | null {
   return value === 'male' || value === 'female' ? value : null;
 }
 
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  workouts: true,
+  hydration: true,
+  updates: false,
+};
+
+// profiles.notification_prefs (jsonb): missing or non-boolean keys fall back
+// to the defaults of the column.
+export function parseNotificationPrefs(value: unknown): NotificationPrefs {
+  const source =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  const read = (key: keyof NotificationPrefs) =>
+    typeof source[key] === 'boolean'
+      ? (source[key] as boolean)
+      : DEFAULT_NOTIFICATION_PREFS[key];
+  return {
+    workouts: read('workouts'),
+    hydration: read('hydration'),
+    updates: read('updates'),
+  };
+}
+
 function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
   return {
     id: row.id,
@@ -67,6 +92,8 @@ function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
     core33IntroSeenAt: row.core33_intro_seen_at,
     core33CompletedAt: row.core33_completed_at,
     core33InviteDismissedAt: row.core33_invite_dismissed_at,
+    core33InviteDismissCount: row.core33_invite_dismiss_count ?? 0,
+    notificationPrefs: parseNotificationPrefs(row.notification_prefs),
     createdAt: (row as { created_at?: string | null }).created_at ?? null,
   };
 }
@@ -270,11 +297,54 @@ async function setCore33Column(
   }
 }
 
-// "Ahora no" of the Inicio discovery card (null clears it: dev reset).
-export const setCore33InviteDismissedAt = (
+async function updateOwnProfile(
   userId: string,
-  value: string | null,
-) => setCore33Column(userId, 'core33_invite_dismissed_at', value);
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const client = getSupabaseClient();
+
+  if (!client) {
+    throw new Error('Supabase is not configured.');
+  }
+
+  const { error } = await (client.from('profiles') as any)
+    .update(payload)
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+// "Ahora no" of the Inicio discovery card: the date and the counter go in one
+// write (BT-22). `currentCount` is what the profile has now.
+export const dismissCore33Invite = (
+  userId: string,
+  currentCount: number,
+  at = new Date(),
+) =>
+  updateOwnProfile(userId, {
+    core33_invite_dismissed_at: at.toISOString(),
+    core33_invite_dismiss_count: Math.max(0, currentCount) + 1,
+  });
+
+// Development only ("Restablecer card de Core 33"): count 0 and no date.
+export const resetCore33InviteDismissals = (userId: string) =>
+  updateOwnProfile(userId, {
+    core33_invite_dismissed_at: null,
+    core33_invite_dismiss_count: 0,
+  });
+
+// Called when a Core 33 is completed (toggleCore33Habit), so the discovery
+// card starts over with a clean counter.
+export const resetCore33InviteCounter = (userId: string) =>
+  updateOwnProfile(userId, { core33_invite_dismiss_count: 0 });
+
+// BT-31: the three switches of Ajustes.
+export const saveNotificationPrefs = (
+  userId: string,
+  prefs: NotificationPrefs,
+) => updateOwnProfile(userId, { notification_prefs: prefs });
 
 // For the Core 33 module (Intro seen / challenge completed).
 export const markCore33IntroSeen = (userId: string, at = new Date()) =>

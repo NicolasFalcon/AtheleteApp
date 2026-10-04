@@ -1,3 +1,8 @@
+import {
+  formatThousands,
+  ratio,
+  toGlasses,
+} from '@app/features/nutrition/nutritionModel';
 import { getPRMainValue, type PersonalRecord, type PRType } from '@app/shared';
 
 // Inicio v2 hero modes (Home.dc.html · renderVals), in priority order:
@@ -147,14 +152,12 @@ export function hasCompletedEver(
   return (completedCount ?? 0) > 0 || completedToday;
 }
 
-// ── Water: profiles.daily_water_goal is stored in 250 ml glasses ──────────
-export const GLASS_ML = 250;
-export const DEFAULT_WATER_GOAL_GLASSES = 14;
-
-// Same rounding as fetchHomeOverview.todayGlasses.
-export function toGlasses(ml: number): number {
-  return Math.round(Math.max(0, ml) / GLASS_ML);
-}
+// ── Water and totals: one model (features/nutrition/nutritionModel) ───────
+export {
+  DEFAULT_WATER_GOAL_GLASSES,
+  GLASS_ML,
+  toGlasses,
+} from '@app/features/nutrition/nutritionModel';
 
 // ── Tu día ─────────────────────────────────────────────────────────────────
 export type DayRingKind = 'core33' | 'workout' | 'nutrition' | 'hydration';
@@ -183,9 +186,7 @@ export type DayRingsInput = {
 const clamp01 = (value: number) =>
   Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0;
 
-export function formatThousands(value: number): string {
-  return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-}
+export { formatThousands } from '@app/features/nutrition/nutritionModel';
 
 export function buildDayRings({
   mode,
@@ -234,7 +235,7 @@ export function buildDayRings({
       value: formatThousands(nutrition.calories),
       unit: 'kcal',
       progress: nutrition.hasPlan
-        ? clamp01(nutrition.calories / Math.max(nutrition.targetCalories, 1))
+        ? ratio(nutrition.calories, nutrition.targetCalories)
         : 0,
       done:
         nutrition.hasPlan &&

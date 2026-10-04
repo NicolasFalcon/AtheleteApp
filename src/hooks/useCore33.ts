@@ -1,17 +1,20 @@
+import {useCallback} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import {invalidateCore33Queries} from '@app/lib/queryInvalidation';
 import {useAuth} from '@app/hooks/useAuth';
+import type {Core33ChallengeId} from '@app/features/core33/core33Catalog';
 import {
   fetchCore33State,
   restartCore33Challenge,
   startCore33Challenge,
-  toggleCore33Habit,
-  type Core33HabitSelection,
 } from '@app/services/supabase/core33';
+import {markCore33IntroSeen} from '@app/services/supabase/profile';
 
+// State of Core 33 (active or last completed participation with its logs) and
+// its writes. The habit taps live in useCore33Day (optimistic and queued).
 export function useCore33() {
   const queryClient = useQueryClient();
-  const {profile} = useAuth();
+  const {profile, refreshProfile} = useAuth();
 
   const stateQuery = useQuery({
     queryKey: ['core33', profile?.id],
@@ -20,14 +23,14 @@ export function useCore33() {
   });
 
   const startMutation = useMutation({
-    mutationFn: async (habits: Core33HabitSelection) => {
+    mutationFn: async (challengeId: Core33ChallengeId) => {
       if (!profile?.id) {
         throw new Error('No hay sesión activa.');
       }
 
       await startCore33Challenge({
         userId: profile.id,
-        habits,
+        challengeId,
       });
     },
     onSuccess: async () => {
@@ -39,33 +42,10 @@ export function useCore33() {
     },
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: async (params: {date: string; habitIndex: number}) => {
-      if (!profile?.id || !stateQuery.data?.challenge) {
-        throw new Error('No hay un reto activo.');
-      }
-
-      await toggleCore33Habit({
-        userId: profile.id,
-        challenge: stateQuery.data.challenge,
-        habitLogs: stateQuery.data.habitLogs,
-        date: params.date,
-        habitIndex: params.habitIndex,
-      });
-    },
-    onSuccess: async () => {
-      if (!profile?.id) {
-        return;
-      }
-
-      await invalidateCore33Queries(queryClient, profile.id);
-    },
-  });
-
-  const restartMutation = useMutation({
+  const abandonMutation = useMutation({
     mutationFn: async () => {
       if (!profile?.id || !stateQuery.data?.challenge) {
-        throw new Error('No hay un reto para reiniciar.');
+        throw new Error('No hay un reto para dejar.');
       }
 
       await restartCore33Challenge({
@@ -82,13 +62,26 @@ export function useCore33() {
     },
   });
 
+  // The first time the user leaves the Intro (continues or skips it).
+  const markIntroSeen = useCallback(async () => {
+    if (!profile?.id || profile.core33IntroSeenAt) {
+      return;
+    }
+
+    try {
+      await markCore33IntroSeen(profile.id);
+      await refreshProfile();
+    } catch (error) {
+      console.warn('[core33] No se pudo guardar la intro vista.', error);
+    }
+  }, [profile?.core33IntroSeenAt, profile?.id, refreshProfile]);
+
   return {
     stateQuery,
     startChallenge: startMutation.mutateAsync,
     isStarting: startMutation.isPending,
-    toggleHabit: toggleMutation.mutateAsync,
-    isToggling: toggleMutation.isPending,
-    restartChallenge: restartMutation.mutateAsync,
-    isRestarting: restartMutation.isPending,
+    abandonChallenge: abandonMutation.mutateAsync,
+    isAbandoning: abandonMutation.isPending,
+    markIntroSeen,
   };
 }

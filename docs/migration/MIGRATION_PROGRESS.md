@@ -1803,3 +1803,91 @@ Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5)
 7. Eliminar cuenta: ambas confirmaciones, y el aviso final (BT-30).
 8. Usuario sin onboarding (cuenta nueva): "Completa tu perfil" y Editar con valores por defecto.
 
+## 25. Nutrición · hoy, registro e hidratación (NUTRI_01–03, 2026-10-04)
+
+Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5). **Sin escrituras de prueba**: se vio con datos de ejemplo (`athelete://dev/nutrition?screen=<key>`, menú "Ver pantallas de Nutrición"); las escrituras reales solo se validaron con tsc.
+
+**Hecho**
+- **Nutrición** (`screens/nutrition/NutritionPlanScreen.tsx`, ruta `NutritionPlan`): indicador de 270° de kcal, tres columnas de macros, depósito de agua con "+1 vaso", tarjeta de ELLIE ("Ajustar con ELLIE") y "Registrar comida" fijo. Sin plan: indicador sin meta y "Crear con ELLIE". Estados: cargando, error con reintento, sin plan y sin registros, objetivos cumplidos.
+- **Registrar nutrición** (`features/nutrition/v2/NutritionLogSheet.tsx`): lo registrado se suma a los totales del día (atajos +250/+500/+750, calorías escritas y macros de 5 en 5 g). Guardando y error dentro de la hoja. Funciona con y sin plan. Misma escritura y misma adherencia que v1 (`upsertTodayNutritionLog`); `nutrition_logged` sigue enviándose una vez por día.
+- **Hidratación** (`hooks/useHydration.ts`): el vaso aparece al instante en Nutrición e Inicio, las escrituras se encolan (toques rápidos no se pisan) y se revierte si falla. `hydration_logged` lo envía `addHydrationAmount` en cada llamada (las medallas se evalúan igual); no se duplica.
+- **Modelo único** (`features/nutrition/nutritionModel.ts`, 9 tests): totales, progreso, vasos, litros, textos, hoja y adherencia. `homePriority` (anillos de Inicio) y `progressModel` (proteína e hidratación de Progreso) usan sus mismas funciones (`toGlasses`, `ratio`, `formatThousands`); un test comprueba que Nutrición, anillos de Inicio y Progreso dan los mismos números. Tras escribir se invalidan las consultas de Inicio, ELLIE, Perfil y Progreso.
+- Primitivos nuevos: `ArcGauge`, `MacroColumn`, `WaterTank`; `GlassHeader` admite `subtitle`.
+- Inicio: el anillo de Nutrición abre Nutrición con la hoja de registro (`openLog`), el de Hidratación abre Nutrición, y su "+1" usa `useHydration`. El modal v1 de Inicio deja de usarse.
+- ELLIE: "Crear con ELLIE" → "Quiero un plan nutricional"; "Ajustar con ELLIE" → "Ajusta mi plan nutricional" (nuevo `ELLIE_ASKS.adjustNutrition`). Plan activado por ELLIE sigue siendo `nutrition_plans.is_active`.
+
+**Desviaciones**
+- **DA-102** · El diseño no tiene lista de comidas, búsqueda de alimentos ni detalle del plan: el registro es el total del día, igual que el backend. Las pantallas v1 de comidas / estructura / guías quedan sin uso (BT-32 para el registro por alimento).
+- **DA-103** · El escáner de comida no tiene entrada en las referencias de Nutrición: no se añadió (módulo Scan, BT-33).
+- **DA-104** · Solo se pueden sumar vasos (el diseño solo tiene "+1 vaso"); no hay forma de quitar uno.
+- **DA-105** · La hoja de registro también está disponible sin plan (el diseño muestra "Consumido hoy" en ese caso); la adherencia solo se calcula con plan.
+- **DA-106** · En Dark el arco del indicador conserva la pista clara del prototipo; el depósito usa los mismos azules en ambos modos y "+1 vaso" es translúcido.
+- **D-68** · El subtítulo es "Hoy · {objetivo del perfil}". Los valores de la hoja se limitan a 5.000 kcal y 500 g por registro.
+
+**QA real pendiente (lo hace el usuario con falcon1989)**
+1. Sin plan: Nutrición muestra "Sin plan activo" y "Crear con ELLIE" abre el chat con su prompt (se envía al llegar).
+2. Con plan (actívalo desde ELLIE): indicador y macros coinciden con `nutrition_plans` y con `daily_nutrition_logs` de hoy.
+3. Registrar comida: +250 y +10 g de proteína → Guardar; comprobar `daily_nutrition_logs` (suma, adherencia) y que Inicio y Progreso muestran lo mismo. Repetir el mismo día: no duplica puntos (`nutrition_logged`).
+4. Error: en modo avión, Guardar deja la hoja abierta con el aviso.
+5. Agua: +1 vaso responde al instante; 5 toques rápidos suman 5 en `daily_hydration_logs`; llegar a la meta otorga la medalla de hidratación una sola vez por regla del servidor.
+6. Inicio: tocar el anillo de Nutrición abre la hoja; "+1" del anillo de agua se refleja en Nutrición.
+7. Progreso: proteína media e hidratación semanal coinciden tras registrar.
+
+## 26. Lote de backend integrado (BT-22, BT-23, BT-24, BT-30, BT-31 · 2026-10-04)
+
+Sin cambios en la base, sin `npx supabase`. Los tipos de `src/types/supabase.ts` se actualizaron a mano. La columna de fin de `workout_sessions` es `ended_at`; la app no usa `completed_at` para el fin de una sesión (los `completed_at` que quedan son de series, ejercicios de la sesión y quiz).
+
+**Hecho**
+- **BT-30 · Eliminar cuenta:** `requestAccountDeletion` (`functions.invoke('delete-account', POST)`) → `mapDeleteAccountResponse` (200 → eliminada; 409 `last_admin` → aviso sin cerrar sesión; 401 → cerrar sesión; 500 o sin conexión → "Reintentar"). Con 200 se limpian las claves locales del usuario (cola offline, marcas de migración, preferencias antiguas, favoritos antiguos) y se cierra sesión (con un cierre local si el servidor ya no conoce al usuario). Doble confirmación y estado "Eliminando…".
+- **BT-22 · Core 33 (resuelve D-54):** "Ahora no" guarda fecha y contador (+1); con 2 descartes la tarjeta no vuelve; la regla de 14 días y "un descarte anterior al día 33 del último reto no cuenta" siguen. `resetCore33InviteCounter` queda con `TODO(core33)` para completar un Core 33. El reset dev pone el contador a 0 y la fecha a null.
+- **BT-31 · Notificaciones:** los 3 interruptores leen y escriben `profiles.notification_prefs` con cambio inmediato y vuelta atrás con aviso. Migración única desde AsyncStorage (se sube y se borra la clave).
+- **BT-23 · Progreso · Resumen:** `get_progress_summary(_from, _tz)` con la zona del dispositivo; se deja de descargar sesiones. La respuesta se expresa como la entrada del modelo (`summaryToSessions`): días, minutos, rachas, sesiones por mes y volumen medio por mes salen de la RPC. Todo lo que muestra el Resumen viene de ella; el anillo de Inicio de hoy sigue local.
+- **BT-24 · Logros:** `get_badge_progress()` para current / target / earned / category. Se borraron las categorías, los targets y `buildBadgeStats`. Contador "N / total" desde los datos; un badge sin icono usa el genérico; una categoría desconocida va a una repisa "Otros".
+
+**Supuestos que conviene confirmar con el primer QA** (no tengo el JSON real de las RPC):
+- `get_progress_summary` → `{days:[{date, sessions, active_seconds}], months:[{month:'YYYY-MM', avg_volume_kg, sessions}]}` (como se pidió).
+- `get_badge_progress` → lista (o `{badges:[…]}`) de `{badge_id, category, current, target, earned, earned_at?, title?, description?, icon?}`. Si no trae título/descripción/icono se usan los de `ALL_BADGES` y, si no, el id y el icono genérico. La fecha de logro sale de `user_badges` si la fila no la trae.
+- Los dos parsers son tolerantes (números como texto, listas ausentes, filas sin id).
+
+**QA real pendiente (falcon1989)**
+1. Eliminar cuenta: usar una cuenta desechable, NO falcon1989. Comprobar 200 (vuelve a Auth, claves locales borradas), el aviso de última administradora (409) sin cerrar sesión y "Reintentar" en un 500.
+2. Core 33: "Ahora no" dos veces (cambiando `core33_invite_dismissed_at` si hace falta esperar los 14 días) → la tarjeta no vuelve. Reset dev: contador 0 y fecha null.
+3. Ajustes: activar/desactivar los tres interruptores y comprobar `profiles.notification_prefs`; en modo avión el interruptor vuelve atrás con aviso. Si había valores antiguos en el teléfono, se suben una vez.
+4. Progreso · Resumen (semana y mes): minutos por día, sesiones, racha y curva de volumen coinciden con tus sesiones (zona horaria del teléfono). Comparar con el anillo de Inicio de hoy.
+5. Logros y vitrina del Perfil: 13 logros, categorías y progreso de la RPC; "N / 13".
+
+## 27. Core 33 · descubrimiento, intro, retos, día a día y final (2026-10-04)
+
+Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5). **Sin escrituras de prueba**: se vio con datos de ejemplo (`athelete://dev/core33?screen=<key>`, menú "Ver pantallas de Core 33"); las escrituras reales solo se validaron con tsc.
+
+**Hecho**
+- **Entrada única** (`core33Entry.ts`, `useOpenCore33`, `useOpenCore33Discovery`): reto activo o completado → pantalla del día; nunca vio la intro → Intro → Explorar; vio la intro o ya completó uno → Explorar. La tarjeta de invitación de Inicio y el "Descubrir" de Progreso usan `useOpenCore33Discovery`. Perfil, Ajustes y Notificaciones ya pasaban por `useOpenCore33`.
+- **Intro** (3 momentos, `core33_intro_seen_at` al salir o saltar), **Explorar retos**, **Detalle**, **Tu Core 33 está listo** (empezar con estados guardando y error) y **el día** (número grande de días cerrados, 33 cápsulas, rachas, "Hoy" con 3 hábitos, final con "Explorar otro Core 33"). Celebración al completar el día 33 (`Celebration`).
+- **Hábitos optimistas** (`useCore33Day`): el toque se ve al instante, las escrituras van en cola (el cierre del día se detecta una sola vez aunque se toquen dos seguidos) y un fallo devuelve el hábito con un aviso.
+- **Final:** al completar el día 33 se escribe `core33_completed_at` y se reinicia el contador de descartes (`resetCore33InviteCounter`, quitado el `TODO(core33)`). Los eventos `core33_completed` / `core33_finisher` salen una sola vez por la `reference_id` de la participación.
+- **Modelo único:** `shared/domain/core33.ts` (lo usan Inicio, Progreso, Perfil y ELLIE) cuenta el día por fechas (no por milisegundos) y con la zona horaria; añade días perdidos. `core33Model.ts` arma la vista del día. 21 tests nuevos.
+- Primitivo nuevo: `CapsuleGrid`. `startCore33Challenge` recibe el reto del catálogo.
+
+**Desviaciones**
+- **DA-107** · Catálogo de 5 retos en la app (`core33Catalog.ts`); el elegido se guarda en `habits` con ids `core33:<reto>:<n>` y las categorías `training|health|mind` por posición (BT-01 baja a Media).
+- **DA-108** · "Elegir este reto" → "Listo" no persiste el reto preparado: "Empezar más tarde" no guarda nada. Antes de BT-01 no hay estado "preparado".
+- **DA-109** · Fotos de los retos PLACEHOLDER (barra, movilidad, cuerdas); Recupera mejor y Come con intención usan su figura (7:30, 3·14·2).
+- **DA-110** · Sin entrada a ELLIE en Core 33 (el diseño no la tiene).
+- **D-69** · **Días perdidos** (no están en el diseño): no terminan el reto; el día del reto avanza por calendario, el número grande son los días cerrados y el reto termina al cerrar 33 (regla ya existente del backend). Solo cortan la racha; el hero muestra "Llevas N días sin cerrar. El reto termina cuando cierres 33."
+- **D-70** · **Dejar el reto** (no está en el diseño): menú "…" del día → "Dejar este reto" con confirmación; la participación queda `abandoned` y se vuelve a Explorar retos.
+- **D-71** · Inicio calcula el día 33 del último reto con `profiles.core33_completed_at` cuando es posterior a `start_date + 32`, así completar tarde no muestra la tarjeta "Empieza otro" el mismo día.
+- **D-73** · **Un solo reto activo (hasta BT-36):** empezar un reto ya no abandona el activo. El servicio lo vuelve a comprobar justo antes de crear y, si hay uno activo, lanza `Core33AlreadyActiveError`; "Listo" muestra "Ya tienes un Core 33 activo…" y el botón pasa a "Ir a mi reto". El activo solo se deja desde "Dejar este reto".
+- **D-72** · La pantalla v1 `ChallengeScreen` se retiró del repositorio (la ruta `Core33` apunta a la nueva y el hook cambió de API); las vistas v1 de `features/core33/components` quedan sin uso. "Próximo reto" e historial: el backend no los soporta (BT-01 / BT-02); Progreso · Retos sigue listando los completados.
+
+**QA real pendiente (falcon1989)**
+1. Tarjeta de invitación → Intro (primera vez) → Explorar → Detalle → Listo → "Comenzar Día 1": se crea la participación en `challenge_participations` (3 hábitos `core33:<reto>:<n>`) y se abre el día. Comprobar `profiles.core33_intro_seen_at`. Segunda vez: la tarjeta lleva a Explorar.
+2. Error al empezar (modo avión): el botón avisa y deja reintentar.
+3. Día a día: marcar y desmarcar hábitos (`habit_logs`); marcar los tres seguidos y rápido cierra el día una sola vez (`core33_day_completed` y puntos una vez). Un fallo de red devuelve el hábito con un aviso.
+4. Inicio (hero y anillos) y Progreso · Retos muestran el mismo día, días cerrados y racha que la pantalla del día.
+5. Día perdido: dejar un día sin cerrar → "Llevas N días sin cerrar…" y la racha vuelve a 0.
+6. Completar el día 33 (con una cuenta de prueba que ya esté en el día 33): celebración, `status completed`, `core33_completed_at`, `core33_invite_dismiss_count = 0`, medalla `core33_finisher` una sola vez.
+7. Dejar el reto: confirma, queda `abandoned` y vuelve a Explorar.
+8. Zona horaria: con el teléfono en otra zona, el día del reto cambia a medianoche local.
+9. Empezar con un reto ya activo (otro dispositivo o estado antiguo): "Listo" avisa y lleva al reto activo; no se crea una segunda participación.
+10. "Dejar este reto": si el servidor rechaza `status = 'abandoned'` (BT-37), la app muestra el aviso y el reto sigue activo; comprobar el valor en la fila.
+

@@ -24,6 +24,16 @@ import {
   openProgressDevScreen,
 } from '@app/dev/devProgressScreens';
 import {
+  isCore33DevScreen,
+  openCore33DevScreen,
+  openNextCore33DevScreen,
+} from '@app/dev/devCore33Screens';
+import {
+  isNutritionDevScreen,
+  openNextNutritionDevScreen,
+  openNutritionDevScreen,
+} from '@app/dev/devNutritionScreens';
+import {
   isProfileDevScreen,
   openNextProfileDevScreen,
   openProfileDevScreen,
@@ -129,6 +139,30 @@ function openProfileFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/nutrition?screen=<key>: navigates (no overlay).
+function openNutritionFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/nutrition')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'real';
+  if (isNutritionDevScreen(screen)) {
+    openNutritionDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
+// athelete://dev/core33?screen=<key>: navigates (no overlay).
+function openCore33FromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/core33')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'day17';
+  if (isCore33DevScreen(screen)) {
+    openCore33DevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
   if (
     !url ||
@@ -136,7 +170,9 @@ function toolFromUrl(url: string | null): DevToolState | null {
     openSessionFromUrl(url) ||
     openProgressFromUrl(url) ||
     openEllieFromUrl(url) ||
-    openProfileFromUrl(url)
+    openProfileFromUrl(url) ||
+    openNutritionFromUrl(url) ||
+    openCore33FromUrl(url)
   ) {
     return null;
   }
@@ -213,6 +249,24 @@ export function DevCatalogHost() {
         .then(label =>
           toastRef.current.show(
             label ? `ELLIE · ${label}` : 'Inicia sesión para ver ELLIE',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de Core 33', () => {
+      openNextCore33DevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `Core 33 · ${label}` : 'Inicia sesión para ver Core 33',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de Nutrición', () => {
+      openNextNutritionDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `Nutrición · ${label}` : 'Inicia sesión para ver Nutrición',
           ),
         )
         .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));

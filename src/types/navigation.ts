@@ -7,6 +7,7 @@ import type {
   NativeStackNavigationProp,
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
+import type { Core33ChallengeId } from '@app/features/core33/core33Catalog';
 import type { DevSessionState } from '@app/features/session/useSessionRunner';
 import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
 import type {
@@ -126,6 +127,21 @@ export type ProfileFormRouteParams = {
   devState?: 'data' | 'saving' | 'saved' | 'error' | 'invalid' | 'loading' | 'new';
 };
 
+// Core 33 (day screen). Development only: sample states, nothing is read or
+// written.
+export type Core33RouteParams = {
+  devState?:
+    | 'none'
+    | 'day1'
+    | 'day17'
+    | 'missed'
+    | 'day33'
+    | 'completed'
+    | 'celebration'
+    | 'loading'
+    | 'error';
+};
+
 // Achievements (Logros). Development only: sample data and the open sheet.
 export type AchievementsRouteParams = {
   devState?: 'data' | 'loading' | 'error';
@@ -134,6 +150,9 @@ export type AchievementsRouteParams = {
 
 export type NutritionPlanRouteParams = {
   openLog?: boolean;
+  // Development only: sample data / forced states (nothing is read or written).
+  devState?: 'plan' | 'goalMet' | 'noPlan' | 'empty' | 'loading' | 'error';
+  devSheet?: 'log' | 'logSaving' | 'logError';
 };
 
 // Progreso tab. Also set by the dev screen cycler (__DEV__).
@@ -192,7 +211,15 @@ export type AppStackParamList = {
   HealthSettings: { devConnected?: boolean } | undefined;
   Achievements: AchievementsRouteParams | undefined;
   Notifications: undefined;
-  Core33: undefined;
+  Core33: Core33RouteParams | undefined;
+  Core33Intro: { devStep?: 0 | 1 | 2 } | undefined;
+  Core33Explore: undefined;
+  Core33Detail: { challengeId: Core33ChallengeId };
+  Core33Ready: {
+    challengeId: Core33ChallengeId;
+    devStarting?: boolean;
+    devAlreadyActive?: boolean;
+  };
   WorkoutDetail: WorkoutDetailRouteParams;
   WorkoutSession: WorkoutSessionRouteParams;
   WorkoutSummary: WorkoutSummaryRouteParams;

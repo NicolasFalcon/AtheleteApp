@@ -19,11 +19,9 @@ import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
 import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import {
-  buildBadgeStats,
   buildShelves,
   type ShelfItem,
 } from '@app/features/progress/badgesModel';
-import { currentStreak } from '@app/features/progress/progressModel';
 import { BadgeSheet } from '@app/features/progress/v2/AchievementViews';
 import { formatRecord } from '@app/features/progress/recordsModel';
 import {
@@ -92,18 +90,9 @@ export function ProfileScreen({ navigation, route }: Props) {
   // Medals: from the real data or the dev sample.
   const shelves = useMemo(() => {
     if (sample) {
-      const data = sample.data;
-      return buildShelves(
-        data?.badges ?? [],
-        buildBadgeStats({
-          sessions: data?.sessions ?? [],
-          streakDays: data ? currentStreak(data.sessions, now) : 0,
-          hydrationLogs: data?.hydration ?? [],
-          goalGlasses: 14,
-          challengeDays: data?.challenge.completedDays ?? 0,
-          today: now,
-        }),
-      );
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const fixtures = require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
+      return buildShelves(sample.data ? fixtures.badgeRowsFixture(now) : []);
     }
     return badges;
   }, [badges, now, sample]);

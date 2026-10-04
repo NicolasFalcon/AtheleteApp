@@ -37,18 +37,22 @@ export type Database = {
       }
       badges: {
         Row: {
+          // 'constancia' | 'retos' | 'fuerza' | 'habitos' (BT-24)
+          category: string | null
           description: string
           icon: string
           id: string
           title: string
         }
         Insert: {
+          category?: string | null
           description: string
           icon: string
           id: string
           title: string
         }
         Update: {
+          category?: string | null
           description?: string
           icon?: string
           id?: string
@@ -681,6 +685,7 @@ export type Database = {
           birth_date: string | null
           core33_completed_at: string | null
           core33_intro_seen_at: string | null
+          core33_invite_dismiss_count: number
           core33_invite_dismissed_at: string | null
           created_at: string
           daily_calorie_goal: number | null
@@ -698,6 +703,7 @@ export type Database = {
           id: string
           injury_notes: string | null
           name: string
+          notification_prefs: Json
           onboarding_completed: boolean
           points: number
           preferred_session_minutes: number | null
@@ -715,6 +721,7 @@ export type Database = {
           birth_date?: string | null
           core33_completed_at?: string | null
           core33_intro_seen_at?: string | null
+          core33_invite_dismiss_count?: number
           core33_invite_dismissed_at?: string | null
           created_at?: string
           daily_calorie_goal?: number | null
@@ -732,6 +739,7 @@ export type Database = {
           id: string
           injury_notes?: string | null
           name?: string
+          notification_prefs?: Json
           onboarding_completed?: boolean
           points?: number
           preferred_session_minutes?: number | null
@@ -749,6 +757,7 @@ export type Database = {
           birth_date?: string | null
           core33_completed_at?: string | null
           core33_intro_seen_at?: string | null
+          core33_invite_dismiss_count?: number
           core33_invite_dismissed_at?: string | null
           created_at?: string
           daily_calorie_goal?: number | null
@@ -766,6 +775,7 @@ export type Database = {
           id?: string
           injury_notes?: string | null
           name?: string
+          notification_prefs?: Json
           onboarding_completed?: boolean
           points?: number
           preferred_session_minutes?: number | null
@@ -1825,6 +1835,11 @@ export type Database = {
       }
     }
     Functions: {
+      get_badge_progress: { Args: Record<PropertyKey, never>; Returns: Json }
+      get_progress_summary: {
+        Args: { _from: string; _tz: string }
+        Returns: Json
+      }
       add_manual_contribution: {
         Args: { _amount: number; _challenge_id: string }
         Returns: Json

@@ -404,4 +404,5 @@ export const ELLIE_ASKS = {
   adjustToday: { text: 'Ajusta mi rutina de hoy a 30 minutos', mode: 'generate_workout' },
   recovery: { text: 'Quiero mejorar mi recuperación' },
   week: { text: 'Analiza mi semana' },
+  adjustNutrition: { text: 'Ajusta mi plan nutricional', mode: 'generate_nutrition' },
 } as const satisfies Record<string, { text: string; mode?: EllieMode }>;

@@ -226,3 +226,20 @@ export async function upsertTodayNutritionLog(
 
   return log;
 }
+
+// Water of today in ml (0 when nothing was logged yet). Read only.
+export async function fetchTodayWaterMl(userId: string): Promise<number> {
+  const client = getClient();
+  const { data, error } = await client
+    .from('daily_hydration_logs')
+    .select('water_ml')
+    .eq('user_id', userId)
+    .eq('date', getLocalDateKey())
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data as { water_ml: number | null } | null)?.water_ml ?? 0) as number;
+}

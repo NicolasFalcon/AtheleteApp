@@ -59,4 +59,34 @@ describe('Core 33 discovery card', () => {
       resolveCore33Invite({ ...again, dismissedAt: daysAgo(1) }),
     ).toBeNull();
   });
+
+  it('hides the card for good after two "Ahora no" (BT-22)', () => {
+    // First dismissal: the 14 days apply, then the card comes back.
+    expect(
+      resolveCore33Invite({ ...base, dismissedAt: daysAgo(20), dismissCount: 1 }),
+    ).toBe('invite');
+    // Second dismissal: never again, however long it has been.
+    expect(
+      resolveCore33Invite({ ...base, dismissedAt: daysAgo(3), dismissCount: 2 }),
+    ).toBeNull();
+    expect(
+      resolveCore33Invite({ ...base, dismissedAt: daysAgo(200), dismissCount: 2 }),
+    ).toBeNull();
+    // Rows from before the counter (0) keep the 14-day rule.
+    expect(
+      resolveCore33Invite({ ...base, dismissedAt: daysAgo(20), dismissCount: 0 }),
+    ).toBe('invite');
+  });
+
+  it('forgets the count once another Core 33 was finished after the dismissals', () => {
+    const again = { ...base, completedCount: 1, lastDay33: '2026-09-30' };
+    // Two dismissals, the last one before day 33 of the latest challenge.
+    expect(
+      resolveCore33Invite({ ...again, dismissedAt: daysAgo(3), dismissCount: 2 }),
+    ).toBe('again');
+    // Two dismissals after it ended: hidden.
+    expect(
+      resolveCore33Invite({ ...again, dismissedAt: daysAgo(1), dismissCount: 2 }),
+    ).toBeNull();
+  });
 });

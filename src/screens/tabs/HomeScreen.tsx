@@ -45,14 +45,13 @@ import { WearBannerV2 } from '@app/features/home/v2/WearBannerV2';
 import { WeekCarousel } from '@app/features/home/v2/WeekCarousel';
 import { recommendRoutines } from '@app/features/workouts/workoutsModel';
 import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
-import { NutritionLogModal } from '@app/features/nutrition/components/NutritionLogModal';
 import { useHomeModeOverride } from '@app/dev/homeModeOverride';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
 import { useNotificationsOverview } from '@app/hooks/useNotificationsOverview';
-import { useNutritionPlan } from '@app/hooks/useNutritionPlan';
+import { useHydration } from '@app/hooks/useHydration';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { useQuizCategories } from '@app/hooks/useQuizCategories';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
@@ -92,14 +91,13 @@ export function HomeScreen({ navigation }: Props) {
   const ellieData = useEllieData();
   const notifications = useNotificationsOverview();
   const quizQuery = useQuizCategories();
-  const nutritionActions = useNutritionPlan();
+  const { addGlass } = useHydration();
   const openCore33 = useOpenCore33();
   const openCore33Discovery = useOpenCore33Discovery();
   const homeOverride = useHomeModeOverride();
   const modeOverride = homeOverride?.mode ?? null;
   const inviteDismissals = useCore33InviteDismissals();
   const [wearVisible, setWearVisible] = useState(false);
-  const [nutritionLogVisible, setNutritionLogVisible] = useState(false);
 
   // Refresh everything when coming back to Inicio (not on the first mount).
   const firstFocus = useRef(true);
@@ -168,13 +166,26 @@ export function HomeScreen({ navigation }: Props) {
   // challenge (an active one lives in the hero). The app has no "prepared,
   // not started" state yet: a participation is active from the start.
   const core33History = overview?.core33History;
+  // Day 33 of the latest finished challenge: start + 32 days (approximation)
+  // or, when later, the day the profile says it was completed
+  // (profiles.core33_completed_at): completing late no longer shows the card
+  // the same day.
+  const completedKey = profile?.core33CompletedAt
+    ? getLocalDateKey(new Date(profile.core33CompletedAt))
+    : null;
+  const approxDay33 = core33History?.lastDay33 ?? null;
+  const latestDay33 =
+    completedKey && (!approxDay33 || completedKey > approxDay33)
+      ? completedKey
+      : approxDay33;
   const realInvite =
     overview && inviteDismissals.loaded
       ? resolveCore33Invite({
           hasCurrentChallenge: challenge?.status === 'active',
           completedCount: core33History?.completedCount ?? 0,
-          lastDay33: core33History?.lastDay33 ?? null,
+          lastDay33: latestDay33,
           dismissedAt: inviteDismissals.dismissedAt,
+          dismissCount: inviteDismissals.dismissCount,
           today: getLocalDateKey(),
           now: new Date(),
         })
@@ -271,12 +282,13 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   const addWater = () => {
-    homeQuery.addHydration(250).catch(() => {
+    // Immediate: the glass shows up in the ring before the write returns.
+    addGlass(() =>
       Alert.alert(
         'No pudimos registrar el agua',
         'Inténtalo nuevamente en unos segundos.',
-      );
-    });
+      ),
+    );
   };
 
   const openRing = (kind: DayRingKind) => {
@@ -292,30 +304,13 @@ export function HomeScreen({ navigation }: Props) {
         }
         return;
       case 'nutrition':
-        if (overview?.nutritionPlan) {
-          setNutritionLogVisible(true);
-        } else {
-          navigation.navigate(APP_ROUTES.NutritionPlan);
-        }
+        // Registrar nutrición opens over the Nutrición screen (with or
+        // without a plan: the sheet adds to the day's totals).
+        navigation.navigate(APP_ROUTES.NutritionPlan, { openLog: true });
         return;
       case 'hydration':
         navigation.navigate(APP_ROUTES.NutritionPlan);
         return;
-    }
-  };
-
-  const handleSaveNutritionLog = async (
-    input: Parameters<typeof nutritionActions.saveTodayLog>[0],
-  ) => {
-    try {
-      await nutritionActions.saveTodayLog(input);
-      setNutritionLogVisible(false);
-      homeQuery.refetch().catch(() => {});
-    } catch (error) {
-      Alert.alert(
-        'No pudimos guardar tu nutrición',
-        error instanceof Error ? error.message : 'Inténtalo nuevamente.',
-      );
     }
   };
 
@@ -420,7 +415,9 @@ export function HomeScreen({ navigation }: Props) {
             <Core33InviteCard
               variant={core33Invite}
               completedCount={Math.max(core33History?.completedCount ?? 0, 1)}
-              onPress={openCore33Discovery}
+              onPress={() =>
+                openCore33Discovery(core33History?.completedCount ?? 0)
+              }
               onDismiss={() =>
                 inviteDismissals.dismiss()
               }
@@ -487,16 +484,6 @@ export function HomeScreen({ navigation }: Props) {
         visible={wearVisible}
         onClose={() => setWearVisible(false)}
       />
-      {overview?.nutritionPlan ? (
-        <NutritionLogModal
-          visible={nutritionLogVisible}
-          plan={overview.nutritionPlan}
-          todayLog={overview.todayNutritionLog}
-          saving={nutritionActions.isSavingTodayLog}
-          onClose={() => setNutritionLogVisible(false)}
-          onSave={handleSaveNutritionLog}
-        />
-      ) : null}
     </View>
   );
 }

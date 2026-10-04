@@ -1,268 +1,313 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Plus, Sparkles } from 'lucide-react-native';
+import {
+  ArcGauge,
+  BackButton,
+  Button,
+  EllieSurface,
+  GlassHeader,
+  GlassSurface,
+  MacroColumn,
+  Skeleton,
+  SkeletonGroup,
+  StatusBarV2,
+  TextV2,
+  useThemeV2,
+  useToast,
+  WaterTank,
+} from '@app/components/v2';
+import { ROOT_ROUTES } from '@app/constants/routes';
 import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
 import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRoute } from '@react-navigation/native';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BlockError } from '@app/features/home/v2/BlockError';
 import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
-import { AppHeader } from '@app/components';
-import { Button, Loader } from '@app/components/ui';
-import { ROOT_ROUTES } from '@app/constants/routes';
-import { NutritionEmptyState } from '@app/features/nutrition/components/NutritionEmptyState';
-import { NutritionDailySummaryCard } from '@app/features/nutrition/components/NutritionDailySummaryCard';
-import { NutritionGuidelinesCard } from '@app/features/nutrition/components/NutritionGuidelinesCard';
-import { NutritionLogModal } from '@app/features/nutrition/components/NutritionLogModal';
-import { NutritionMacroGrid } from '@app/features/nutrition/components/NutritionMacroGrid';
-import { NutritionPlanActions } from '@app/features/nutrition/components/NutritionPlanActions';
-import { NutritionPlanSummaryCard } from '@app/features/nutrition/components/NutritionPlanSummaryCard';
-import { NutritionStructureCard } from '@app/features/nutrition/components/NutritionStructureCard';
-import {
-  buildMealStructure,
-  buildNutritionGuidelines,
-  buildNutritionSummary,
-} from '@app/features/nutrition/nutritionPlanContent';
+  adherenceScore,
+  buildDayTotals,
+  ellieLine,
+  formatThousands,
+  kcalLine,
+  waterLine,
+  type LogTotals,
+} from '@app/features/nutrition/nutritionModel';
+import { NutritionLogSheet } from '@app/features/nutrition/v2/NutritionLogSheet';
+import { goalLabel } from '@app/features/profile/profileModel';
 import { useAuth } from '@app/hooks/useAuth';
-import { useNutritionPlan } from '@app/hooks/useNutritionPlan';
-import { useAppTheme } from '@app/hooks/useAppTheme';
-import type { NutritionPlanRouteParams } from '@app/types/navigation';
+import { useHydration } from '@app/hooks/useHydration';
+import { useNutritionDay } from '@app/hooks/useNutritionDay';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import type { AppScreenProps } from '@app/types/navigation';
 
-const goalLabels: Record<string, string> = {
-  lose_weight: 'Perder peso',
-  gain_muscle: 'Ganar músculo',
-  maintain: 'Mantenerme',
-  improve_health: 'Mejorar salud',
-  performance: 'Rendimiento',
-};
+type Props = AppScreenProps<'NutritionPlan'>;
 
-export function NutritionPlanScreen() {
-  const route = useRoute();
-  const {theme} = useAppTheme();
-  const {profile} = useAuth();
+const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
+
+// Nutrición (NUTRI_01 / 02): the 270° indicator of kcal, the three macro
+// columns, the water tank and the ELLIE card, with "Registrar comida" fixed
+// at the bottom. Without a plan the indicator has no goal and ELLIE creates
+// one. The totals come from the shared model (nutritionModel).
+export function NutritionPlanScreen({ navigation, route }: Props) {
+  const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const nutritionPlan = useNutritionPlan();
-  const [logModalVisible, setLogModalVisible] = useState(false);
-  const consumedOpenLogParam = useRef(false);
+  const toast = useToast();
+  const { profile } = useAuth();
+  const openEllieChat = useOpenEllieChat();
+  const day = useNutritionDay();
+  const { addGlass } = useHydration();
+  const dev = __DEV__ ? route.params?.devState : undefined;
+  const devSheet = __DEV__ ? route.params?.devSheet : undefined;
 
-  const goalLabel = profile?.goal
-    ? goalLabels[profile.goal] || 'Sin objetivo'
-    : 'Sin objetivo';
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [devGlasses, setDevGlasses] = useState(0);
+  const consumedOpenLog = useRef(false);
 
-  const content = useMemo(() => {
-    if (!nutritionPlan.data?.plan) {
+  // The Inicio ring opens the screen with the sheet up.
+  useEffect(() => {
+    if (route.params?.openLog && !consumedOpenLog.current && !day.isLoading) {
+      consumedOpenLog.current = true;
+      setSheetOpen(true);
+    }
+  }, [day.isLoading, route.params?.openLog]);
+
+  // Development: the sheet after the push animation (iOS).
+  useEffect(() => {
+    if (!devSheet) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setSheetOpen(true);
+      setSaving(devSheet === 'logSaving');
+      setSaveError(
+        devSheet === 'logError'
+          ? 'No pudimos guardar tu nutrición. Revisa tu conexión e inténtalo de nuevo.'
+          : null,
+      );
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [devSheet]);
+
+  const sample = useMemo(() => {
+    if (!__DEV__ || !dev || dev === 'loading' || dev === 'error') {
       return null;
     }
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fx = require('@app/dev/nutritionFixtures') as typeof import('@app/dev/nutritionFixtures');
+    const hasPlan = dev === 'plan' || dev === 'goalMet';
+    const log = dev === 'goalMet' ? fx.FX_LOG_MET : dev === 'empty' ? null : fx.FX_LOG;
+    const plan = hasPlan ? fx.FX_PLAN : null;
+    return { plan, log, waterMl: dev === 'empty' ? 0 : fx.FX_WATER_ML };
+  }, [dev]);
 
-    const plan = nutritionPlan.data.plan;
+  const totals = useMemo(
+    () =>
+      sample
+        ? buildDayTotals({
+            plan: sample.plan,
+            log: sample.log,
+            waterMl: sample.waterMl + devGlasses * 250,
+            goalGlasses: profile?.dailyWaterGoal,
+          })
+        : day.totals,
+    [day.totals, devGlasses, profile?.dailyWaterGoal, sample],
+  );
+  const plan = sample ? sample.plan : day.plan;
+  const todayLog = sample ? sample.log : day.todayLog;
 
-    return {
-      summary: buildNutritionSummary({
-        plan,
-        goalLabel,
-        trainingDaysPerWeek: profile?.trainingDaysPerWeek,
-      }),
-      sourceLabel:
-        plan.source === 'ellie' || plan.createdByAi
-          ? 'PLAN ACTIVO DESDE ELLIE'
-          : 'PLAN NUTRICIONAL ACTIVO',
-      meals: buildMealStructure(plan.targetCalories, goalLabel),
-      guidelines: buildNutritionGuidelines({
-        plan,
-        goalLabel,
-        trainingDaysPerWeek: profile?.trainingDaysPerWeek,
-        dailyWaterGoal: profile?.dailyWaterGoal,
-      }),
-    };
-  }, [
-    goalLabel,
-    nutritionPlan.data?.plan,
-    profile?.dailyWaterGoal,
-    profile?.trainingDaysPerWeek,
-  ]);
+  const loading = dev === 'loading' || (!dev && day.isLoading);
+  const failed = dev === 'error' || (!dev && Boolean(day.error));
 
-  const styles = StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    content: {
-      paddingHorizontal: theme.spacing.md,
-      paddingTop: theme.spacing.sm,
-      paddingBottom: insets.bottom + theme.spacing.lg,
-      gap: theme.spacing.md,
-    },
-    caloriesWrap: {
-      gap: 2,
-      marginTop: 2,
-    },
-    calories: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 34,
-      fontWeight: theme.typography.weights.bold,
-      letterSpacing: -1,
-    },
-    caloriesUnit: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
-      fontWeight: theme.typography.weights.medium,
-    },
-    errorCard: {
-      borderRadius: 26,
-      padding: 20,
-      backgroundColor: theme.colors.surface,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.border,
-      gap: 14,
-    },
-    errorTitle: {
-      color: theme.colors.textPrimary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 18,
-      fontWeight: theme.typography.weights.bold,
-    },
-    errorText: {
-      color: theme.colors.textSecondary,
-      fontFamily: theme.typography.fontFamily,
-      fontSize: 14,
-      lineHeight: 21,
-    },
-  });
-
-  const openEllieChat = useOpenEllieChat();
-  const openEllie = () => {
-    openEllieChat(ELLIE_ASKS.nutritionPlan);
-  };
-
-  useEffect(() => {
-    const params = route.params as NutritionPlanRouteParams | undefined;
-    if (
-      params?.openLog &&
-      nutritionPlan.data?.plan &&
-      !consumedOpenLogParam.current
-    ) {
-      consumedOpenLogParam.current = true;
-      setLogModalVisible(true);
+  const save = async (next: LogTotals) => {
+    if (dev) {
+      setSheetOpen(false);
+      return;
     }
-  }, [nutritionPlan.data?.plan, route.params]);
-
-  const handleDeactivate = async () => {
+    setSaving(true);
+    setSaveError(null);
     try {
-      await nutritionPlan.deactivatePlan();
-      Alert.alert(
-        'Plan cancelado',
-        'Tu cuenta volvió al estado sin plan nutricional activo.',
-      );
+      await day.saveTodayLog({
+        calories: next.calories,
+        protein: next.protein,
+        carbs: next.carbs,
+        fats: next.fats,
+        ...(adherenceScore(plan, next) !== null
+          ? { adherence: adherenceScore(plan, next) as number }
+          : {}),
+      });
+      setSheetOpen(false);
+      toast.show('Comida registrada');
     } catch (error) {
-      Alert.alert(
-        'No pudimos cancelar el plan',
-        error instanceof Error
-          ? error.message
-          : 'Inténtalo de nuevo en unos minutos.',
-      );
+      console.warn('[nutrition] No se pudo registrar:', error);
+      setSaveError('No pudimos guardar tu nutrición. Revisa tu conexión e inténtalo de nuevo.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleSaveTodayLog = async (input: Parameters<typeof nutritionPlan.saveTodayLog>[0]) => {
-    try {
-      await nutritionPlan.saveTodayLog(input);
-      setLogModalVisible(false);
-      Alert.alert(
-        'Nutrición registrada',
-        'Tu registro de hoy ya está sincronizado con Inicio, Progreso y ELLIE.',
-      );
-    } catch (error) {
-      Alert.alert(
-        'No pudimos guardar tu nutrición',
-        error instanceof Error
-          ? error.message
-          : 'Inténtalo de nuevo en unos minutos.',
-      );
+  const addWater = () => {
+    if (dev) {
+      setDevGlasses(count => count + 1);
+      return;
     }
+    addGlass(() => toast.show('No pudimos sumar el vaso', { tone: 'error' }));
   };
 
-  if (!profile || nutritionPlan.isLoading) {
-    return (
-      <SafeAreaView edges={['top']} style={styles.safeArea}>
-        <Loader label="Cargando plan nutricional..." />
-      </SafeAreaView>
-    );
-  }
+  const subtitle = profile?.goal ? `Hoy · ${goalLabel(profile.goal).toLowerCase()}` : 'Hoy';
+  const gaugeLabel = totals.hasPlan ? 'Consumido' : 'Hoy';
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
+      <StatusBarV2 />
+      <GlassHeader
+        title="Nutrición"
+        subtitle={subtitle}
+        left={<BackButton onPress={() => safeGoBack(navigation, BACK_FALLBACKS)} />}
+      />
       <ScrollView
-        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
-        <AppHeader
-          showBackButton
-          title="Plan de nutrición"
-          backFallbacks={[ROOT_ROUTES.MainTabs]}
-        />
-
-        {nutritionPlan.error ? (
-          <View style={styles.errorCard}>
-            <Text style={styles.errorTitle}>No pudimos cargar tu plan</Text>
-            <Text style={styles.errorText}>
-              Revisa la conexión con Supabase o vuelve a intentarlo en unos minutos.
-            </Text>
-            <Button label="Ir a ELLIE" onPress={openEllie} fullWidth={false} />
-          </View>
-        ) : !nutritionPlan.data?.plan || !content ? (
-          <NutritionEmptyState onAskEllie={openEllie} />
+        contentContainerStyle={{
+          paddingHorizontal: layout.gutter,
+          paddingTop: 8,
+          paddingBottom: insets.bottom + 130,
+          gap: 30,
+        }}
+      >
+        {failed ? (
+          <BlockError
+            message="No pudimos cargar tu nutrición."
+            onRetry={() => day.refetch().catch(() => {})}
+          />
+        ) : loading ? (
+          <SkeletonGroup>
+            <View style={styles.skeleton}>
+              <Skeleton width={250} height={200} radius={125} />
+              <Skeleton height={120} radius={20} />
+              <Skeleton height={190} radius={28} />
+            </View>
+          </SkeletonGroup>
         ) : (
           <>
-            <View style={styles.caloriesWrap}>
-              <Text style={styles.calories}>
-                {nutritionPlan.data.plan.targetCalories.toLocaleString('es-CL')}{' '}
-                <Text style={styles.caloriesUnit}>kcal / día</Text>
-              </Text>
+            <View style={styles.gauge}>
+              <ArcGauge progress={totals.kcal.progress} empty={!totals.hasPlan && totals.kcal.consumed === 0}>
+                <TextV2 variant="eyebrow" tone="secondary">
+                  {gaugeLabel}
+                </TextV2>
+                <TextV2 variant="title28" style={styles.kcal}>
+                  {formatThousands(totals.kcal.consumed)}
+                </TextV2>
+                <TextV2 variant="body" tone="secondary">
+                  {totals.kcal.target
+                    ? `de ${formatThousands(totals.kcal.target)} kcal`
+                    : 'kcal consumidas'}
+                </TextV2>
+              </ArcGauge>
+              <TextV2
+                variant="bodyL"
+                align={totals.hasPlan ? 'center' : 'left'}
+                style={[styles.kcalLine, !totals.hasPlan && styles.kcalLineStart]}
+              >
+                {kcalLine(totals)}
+              </TextV2>
+              {!totals.hasPlan ? (
+                <Button
+                  label="Crear con ELLIE"
+                  icon={Sparkles}
+                  iconPosition="start"
+                  size="md"
+                  fullWidth={false}
+                  onPress={() => openEllieChat(ELLIE_ASKS.nutritionPlan)}
+                  style={styles.create}
+                />
+              ) : null}
             </View>
 
-            <NutritionMacroGrid
-              calories={nutritionPlan.data.plan.targetCalories}
-              protein={nutritionPlan.data.plan.targetProtein}
-              carbs={nutritionPlan.data.plan.targetCarbs}
-              fats={nutritionPlan.data.plan.targetFats}
-            />
+            {totals.hasPlan ? (
+              <View style={styles.macros}>
+                {totals.macros.map(macro => (
+                  <MacroColumn
+                    key={macro.key}
+                    label={macro.label}
+                    value={macro.value}
+                    goal={macro.goal ?? 0}
+                    pct={macro.pct}
+                  />
+                ))}
+              </View>
+            ) : null}
 
-            <NutritionPlanSummaryCard
-              summary={content.summary}
-              sourceLabel={content.sourceLabel}
-              todayLog={nutritionPlan.data.todayLog}
-            />
+            <View style={styles.water}>
+              <View style={styles.waterHead}>
+                <TextV2 variant="section">Hidratación</TextV2>
+                <TextV2 variant="meta" tone="secondary">
+                  {waterLine(totals)}
+                </TextV2>
+              </View>
+              <WaterTank
+                glasses={totals.water.glasses}
+                goal={totals.water.goalGlasses}
+                progress={totals.water.progress}
+                onAdd={addWater}
+              />
+            </View>
 
-            <NutritionDailySummaryCard
-              plan={nutritionPlan.data.plan}
-              todayLog={nutritionPlan.data.todayLog}
-              onLogPress={() => setLogModalVisible(true)}
-            />
-
-            <NutritionStructureCard meals={content.meals} />
-
-            <NutritionGuidelinesCard guidelines={content.guidelines} />
-
-            <NutritionPlanActions
-              onAskEllie={openEllie}
-              onDeactivate={handleDeactivate}
-              isDeactivating={nutritionPlan.isDeactivating}
-            />
+            {totals.hasPlan ? (
+              <EllieSurface
+                eyebrow=""
+                message={ellieLine(totals)}
+                orbSize={36}
+                action={{
+                  label: 'Ajustar con ELLIE',
+                  onPress: () => openEllieChat(ELLIE_ASKS.adjustNutrition),
+                }}
+                style={{ marginHorizontal: -layout.gutter }}
+              />
+            ) : null}
           </>
         )}
       </ScrollView>
-      {nutritionPlan.data?.plan ? (
-        <NutritionLogModal
-          visible={logModalVisible}
-          plan={nutritionPlan.data.plan}
-          todayLog={nutritionPlan.data.todayLog}
-          saving={nutritionPlan.isSavingTodayLog}
-          onClose={() => setLogModalVisible(false)}
-          onSave={handleSaveTodayLog}
+
+      <GlassSurface
+        kind="nav"
+        style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 12), paddingHorizontal: layout.gutter }]}
+      >
+        <Button
+          label="Registrar comida"
+          icon={Plus}
+          iconPosition="start"
+          disabled={loading || failed}
+          onPress={() => {
+            setSaveError(null);
+            setSheetOpen(true);
+          }}
+          fullWidth
         />
-      ) : null}
-    </SafeAreaView>
+      </GlassSurface>
+
+      <NutritionLogSheet
+        open={sheetOpen}
+        onClose={() => !saving && setSheetOpen(false)}
+        totals={totals}
+        todayLog={todayLog}
+        saving={saving}
+        error={saveError}
+        onSave={save}
+      />
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  skeleton: { gap: 24, alignItems: 'center' },
+  gauge: { alignItems: 'center', gap: 6 },
+  kcal: { fontSize: 48, lineHeight: 50, fontWeight: '600', letterSpacing: -1.9 },
+  kcalLine: { marginTop: -26 },
+  kcalLineStart: { alignSelf: 'stretch' },
+  create: { marginTop: 12, alignSelf: 'center' },
+  macros: { flexDirection: 'row', gap: 14 },
+  water: { gap: 14 },
+  waterHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 12 },
+});

@@ -7,7 +7,17 @@ import {
   type HabitChallenge,
   type HabitCategory,
 } from '@app/shared';
+import { startGuard } from '@app/features/core33/core33Model';
+import {
+  findChallenge,
+  habitsForChallenge,
+  type Core33ChallengeId,
+} from '@app/features/core33/core33Catalog';
 import { getSupabaseClient } from '@app/services/supabase/client';
+import {
+  markCore33Completed,
+  resetCore33InviteCounter,
+} from '@app/services/supabase/profile';
 import { awardGamificationEvent } from '@app/services/supabase/gamification';
 import type { Database, Json } from '@app/types/supabase';
 
@@ -257,31 +267,51 @@ export async function fetchCore33State(userId: string): Promise<Core33State> {
   return buildCore33State(participation, (logs || []) as HabitLogRow[]);
 }
 
+// Thrown when the user already has an active challenge.
+export class Core33AlreadyActiveError extends Error {
+  constructor() {
+    super('Ya tienes un Core 33 activo.');
+    this.name = 'Core33AlreadyActiveError';
+  }
+}
+
+// Starts the chosen challenge today: a participation is created with the 3
+// habits of the catalogue (stored in `habits` with ids
+// `core33:<challenge>:<n>`). It never abandons another one: with an active
+// challenge it throws Core33AlreadyActiveError, checked on the server right
+// before creating (the cached state may be stale).
 export async function startCore33Challenge(params: {
   userId: string;
-  habits: Core33HabitSelection;
+  challengeId: Core33ChallengeId;
 }): Promise<void> {
   const client = getClient();
-  const today = getLocalDateKey();
+  const challenge = findChallenge(params.challengeId);
 
-  await (client.from('challenge_participations') as any)
-    .update({ status: 'abandoned' })
+  if (!challenge) {
+    throw new Error('Ese reto no existe.');
+  }
+
+  const { data: current, error: checkError } = await client
+    .from('challenge_participations')
+    .select('status')
     .eq('user_id', params.userId)
     .eq('status', 'active');
 
-  const habitsJson = CORE33_HABIT_PRESETS.map(pillar => ({
-    id: `${pillar.key}-${Date.now()}`,
-    category: pillar.category,
-    name: params.habits[pillar.key],
-  }));
+  if (checkError) {
+    throw checkError;
+  }
+
+  if (startGuard((current ?? []) as { status: string }[]) === 'alreadyActive') {
+    throw new Core33AlreadyActiveError();
+  }
 
   const { error } = await (
     client.from('challenge_participations') as any
   ).insert({
     user_id: params.userId,
     status: 'active',
-    start_date: today,
-    habits: habitsJson,
+    start_date: getLocalDateKey(),
+    habits: habitsForChallenge(challenge),
   });
 
   if (error) {
@@ -289,6 +319,7 @@ export async function startCore33Challenge(params: {
   }
 }
 
+// Gives up the active challenge (it stays in the history as abandoned).
 export async function restartCore33Challenge(params: {
   userId: string;
   challengeId: string;
@@ -304,17 +335,30 @@ export async function restartCore33Challenge(params: {
   }
 }
 
+export type Core33ToggleResult = {
+  // This tap closed the day.
+  dayClosed: boolean;
+  // This tap closed day 33 and completed the challenge.
+  challengeCompleted: boolean;
+};
+
+// `habitLogs` are the logs BEFORE this tap (the caller serialises taps and
+// keeps them up to date), so closing the day is detected exactly once.
 export async function toggleCore33Habit(params: {
   userId: string;
   challenge: NonNullable<Core33State['challenge']>;
   habitLogs: Record<string, boolean[]>;
   date: string;
   habitIndex: number;
-}): Promise<void> {
+}): Promise<Core33ToggleResult> {
   const client = getClient();
+  const result: Core33ToggleResult = {
+    dayClosed: false,
+    challengeCompleted: false,
+  };
 
   if (params.challenge.status === 'completed') {
-    return;
+    return result;
   }
 
   const totalHabits = params.challenge.totalHabits || 3;
@@ -348,6 +392,7 @@ export async function toggleCore33Habit(params: {
   }
 
   if (!previousDayCompleted && nextDayCompleted) {
+    result.dayClosed = true;
     await awardGamificationEvent({
       eventType: 'core33_day_completed',
       referenceId: `${params.challenge.id}:${params.date}`,
@@ -387,6 +432,8 @@ export async function toggleCore33Habit(params: {
         throw updateError;
       }
 
+      // One event per participation (referenceId): the medal and the points
+      // are granted once even if this runs twice.
       await awardGamificationEvent({
         eventType: 'core33_completed',
         referenceId: params.challenge.id,
@@ -398,6 +445,18 @@ export async function toggleCore33Habit(params: {
           challengeDay,
         },
       });
+
+      // The profile remembers it and the invite card starts over (BT-22).
+      // Best effort: the challenge is already completed.
+      await Promise.all([
+        markCore33Completed(params.userId),
+        resetCore33InviteCounter(params.userId),
+      ]).catch(profileError =>
+        console.warn('[core33] No se pudo actualizar el perfil.', profileError),
+      );
+      result.challengeCompleted = true;
     }
   }
+
+  return result;
 }

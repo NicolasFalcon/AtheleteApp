@@ -4,11 +4,11 @@
 
 export type Core33InviteVariant = 'invite' | 'again';
 
-// "Ahora no" hides the card for 14 days. The date is
-// profiles.core33_invite_dismissed_at (one timestamp: the earlier "at most
-// two dismissals" counter cannot be derived from it, so the card comes back
-// every 14 days until the user acts, D-54).
+// "Ahora no" hides the card for 14 days (profiles.core33_invite_dismissed_at)
+// and, at the second dismissal, for good (profiles.core33_invite_dismiss_count,
+// BT-22: D-54 is resolved). Both reset when another Core 33 is completed.
 export const INVITE_SNOOZE_DAYS = 14;
+export const INVITE_MAX_DISMISSALS = 2;
 
 export type Core33InviteInput = {
   // Active or prepared (chosen, not started) challenge: Core 33 lives in the
@@ -17,6 +17,7 @@ export type Core33InviteInput = {
   completedCount: number;
   lastDay33: string | null; // YYYY-MM-DD of day 33 of the latest finished one
   dismissedAt: string | null; // ISO, profiles.core33_invite_dismissed_at
+  dismissCount?: number; // profiles.core33_invite_dismiss_count
   today: string; // YYYY-MM-DD (local)
   now: Date;
 };
@@ -34,6 +35,7 @@ export function resolveCore33Invite({
   completedCount,
   lastDay33,
   dismissedAt,
+  dismissCount = 0,
   today,
   now,
 }: Core33InviteInput): Core33InviteVariant | null {
@@ -51,6 +53,12 @@ export function resolveCore33Invite({
 
   const dismissalCounts =
     dismissedAt && !(lastDay33 && localDateKey(dismissedAt) <= lastDay33);
+
+  // Two "Ahora no" and the card never comes back (until another Core 33 is
+  // completed and the counter goes back to 0).
+  if (dismissalCounts && dismissCount >= INVITE_MAX_DISMISSALS) {
+    return null;
+  }
 
   if (dismissalCounts && dismissedAt) {
     const elapsedDays =

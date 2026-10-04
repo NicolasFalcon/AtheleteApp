@@ -20,6 +20,10 @@ export async function invalidatePersonalRecordQueries(
     queryClient.invalidateQueries({
       queryKey: ['progress', 'overview', userId],
     }),
+    // Medals measured by the server (BT-24).
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'badges', userId],
+    }),
   ]);
 }
 
@@ -55,6 +59,10 @@ export async function invalidateWorkoutQueries(
     queryClient.invalidateQueries({
       queryKey: ['progress', 'overview', userId],
     }),
+    // Medals measured by the server (BT-24).
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'badges', userId],
+    }),
     queryClient.invalidateQueries({
       queryKey: ['progress', 'training', userId],
     }),
@@ -81,6 +89,10 @@ export async function invalidateQuizQueries(
     queryClient.invalidateQueries({
       queryKey: ['progress', 'overview', userId],
     }),
+    // Medals measured by the server (BT-24).
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'badges', userId],
+    }),
   ]);
 }
 
@@ -104,6 +116,10 @@ export async function invalidateNutritionPlanQueries(
     queryClient.invalidateQueries({
       queryKey: ['progress', 'overview', userId],
     }),
+    // Medals measured by the server (BT-24).
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'badges', userId],
+    }),
   ]);
 }
 
@@ -126,6 +142,10 @@ export async function invalidateCore33Queries(
     }),
     queryClient.invalidateQueries({
       queryKey: ['progress', 'overview', userId],
+    }),
+    // Medals measured by the server (BT-24).
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'badges', userId],
     }),
   ]);
 }
