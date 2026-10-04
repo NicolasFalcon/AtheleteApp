@@ -1,3 +1,4 @@
+import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet } from 'react-native';
@@ -116,6 +117,11 @@ export function RootNavigator() {
           />
           {/* Shared screens above the tabs (one registration each). */}
           <Stack.Screen name={APP_ROUTES.Profile} component={ProfileScreen} />
+          <Stack.Screen
+            name={APP_ROUTES.EllieChat}
+            component={EllieChatScreen}
+            options={{ gestureEnabled: false }}
+          />
           <Stack.Screen
             name={APP_ROUTES.EditProfile}
             component={EditProfileScreen}

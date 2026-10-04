@@ -1,3 +1,5 @@
+import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
+import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -19,7 +21,7 @@ import {
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
-import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES } from '@app/constants/routes';
 import {
   useOpenCore33,
   useOpenCore33Discovery,
@@ -78,6 +80,7 @@ export function ProgressScreen({ navigation, route }: Props) {
   const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const ellie = useEllieData();
+  const openEllieChat = useOpenEllieChat();
   const openCore33 = useOpenCore33();
   const openCore33Discovery = useOpenCore33Discovery();
   const summary = useProgressSummary();
@@ -138,7 +141,7 @@ export function ProgressScreen({ navigation, route }: Props) {
     if (!__DEV__ || dev !== 'data') {
       return null;
     }
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+     
     return require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
   }, [dev]);
   const sample = useMemo(
@@ -370,7 +373,7 @@ export function ProgressScreen({ navigation, route }: Props) {
           message={ellie.heroInsight?.text ?? ELLIE_FALLBACK}
           action={{
             label: 'Hablar con ELLIE',
-            onPress: () => navigation.navigate(TAB_ROUTES.Ellie),
+            onPress: () => openEllieChat(ELLIE_ASKS.week),
           }}
           style={{ marginHorizontal: -layout.gutter }}
         />

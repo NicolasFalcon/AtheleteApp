@@ -4,6 +4,8 @@ export * from '@app/components/v2/Button';
 export * from '@app/components/v2/Celebration';
 export * from '@app/components/v2/ChoiceTile';
 export * from '@app/components/v2/DayCapsules';
+export * from '@app/components/v2/EllieComposer';
+export * from '@app/components/v2/EllieLinen';
 export * from '@app/components/v2/EllieOrb';
 export * from '@app/components/v2/EllieSurface';
 export * from '@app/components/v2/EquipmentBubble';

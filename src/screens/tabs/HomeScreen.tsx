@@ -1,3 +1,5 @@
+import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
+import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -159,6 +161,7 @@ export function HomeScreen({ navigation }: Props) {
     : null;
   // Development-only visual override ("Ver modos de Inicio"); null in prod.
   const mode = modeOverride ?? realMode;
+  const openEllieChat = useOpenEllieChat();
   const isNewUser = mode === 'new';
 
   // Core 33 discovery card (HOME_10 / HOME_11): only without a current
@@ -428,7 +431,12 @@ export function HomeScreen({ navigation }: Props) {
             message={ellieData.heroInsight?.text ?? ELLIE_FALLBACK}
             action={{
               label: 'Hablar con ELLIE',
-              onPress: () => navigation.navigate(TAB_ROUTES.Ellie),
+              onPress: () =>
+                openEllieChat(
+                  mode === 'workoutDone' || mode === 'allDone'
+                    ? ELLIE_ASKS.recovery
+                    : ELLIE_ASKS.adjustToday,
+                ),
             }}
             orbSize={48}
             style={{ marginHorizontal: -layout.gutter }}

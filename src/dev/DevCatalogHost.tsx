@@ -24,6 +24,11 @@ import {
   openProgressDevScreen,
 } from '@app/dev/devProgressScreens';
 import {
+  isEllieDevScreen,
+  openEllieDevScreen,
+  openNextEllieDevScreen,
+} from '@app/dev/devEllieScreens';
+import {
   isSessionDevScreen,
   openNextSessionDevScreen,
   openSessionDevScreen,
@@ -95,12 +100,25 @@ function openProgressFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/ellie?screen=<key>: navigates (no overlay).
+function openEllieFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/ellie')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'home';
+  if (isEllieDevScreen(screen)) {
+    openEllieDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
   if (
     !url ||
     openWorkoutsFromUrl(url) ||
     openSessionFromUrl(url) ||
-    openProgressFromUrl(url)
+    openProgressFromUrl(url) ||
+    openEllieFromUrl(url)
   ) {
     return null;
   }
@@ -168,6 +186,15 @@ export function DevCatalogHost() {
         .then(label =>
           toastRef.current.show(
             label ? `Progreso · ${label}` : 'Inicia sesión para ver Progreso',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de ELLIE', () => {
+      openNextEllieDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label ? `ELLIE · ${label}` : 'Inicia sesión para ver ELLIE',
           ),
         )
         .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));

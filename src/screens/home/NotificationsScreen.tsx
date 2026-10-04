@@ -1,3 +1,5 @@
+import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
+import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { useCallback, useMemo, useRef } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -92,6 +94,7 @@ export function NotificationsScreen({ navigation }: Props) {
   );
 
   // Notificaciones sits above the tabs: go back down to MainTabs on a tab.
+  const openEllieChat = useOpenEllieChat();
   const openTab = (screen: keyof MainTabParamList) => {
     navigation.navigate(ROOT_ROUTES.MainTabs, { screen });
   };
@@ -111,7 +114,7 @@ export function NotificationsScreen({ navigation }: Props) {
         navigation.navigate(APP_ROUTES.NutritionPlan);
         return;
       case 'ellie':
-        openTab(TAB_ROUTES.Ellie);
+        openEllieChat();
         return;
       case 'progress':
         openTab(TAB_ROUTES.Progress);
@@ -221,7 +224,7 @@ export function NotificationsScreen({ navigation }: Props) {
           }
           action={{
             label: 'Hablar con ELLIE',
-            onPress: () => openTab(TAB_ROUTES.Ellie),
+            onPress: () => openEllieChat(),
           }}
           orbSize={40}
           style={{ marginHorizontal: -layout.gutter }}
@@ -246,7 +249,7 @@ export function NotificationsScreen({ navigation }: Props) {
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Activa tu plan nutricional"
-            onPress={() => openTab(TAB_ROUTES.Ellie)}
+            onPress={() => openEllieChat(ELLIE_ASKS.nutritionPlan)}
             style={[
               styles.config,
               {

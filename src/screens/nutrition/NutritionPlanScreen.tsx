@@ -1,5 +1,7 @@
+import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
+import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   SafeAreaView,
@@ -7,7 +9,7 @@ import {
 } from 'react-native-safe-area-context';
 import { AppHeader } from '@app/components';
 import { Button, Loader } from '@app/components/ui';
-import { ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { ROOT_ROUTES } from '@app/constants/routes';
 import { NutritionEmptyState } from '@app/features/nutrition/components/NutritionEmptyState';
 import { NutritionDailySummaryCard } from '@app/features/nutrition/components/NutritionDailySummaryCard';
 import { NutritionGuidelinesCard } from '@app/features/nutrition/components/NutritionGuidelinesCard';
@@ -24,10 +26,7 @@ import {
 import { useAuth } from '@app/hooks/useAuth';
 import { useNutritionPlan } from '@app/hooks/useNutritionPlan';
 import { useAppTheme } from '@app/hooks/useAppTheme';
-import type {
-  NutritionPlanRouteParams,
-  RootNavigation,
-} from '@app/types/navigation';
+import type { NutritionPlanRouteParams } from '@app/types/navigation';
 
 const goalLabels: Record<string, string> = {
   lose_weight: 'Perder peso',
@@ -38,7 +37,6 @@ const goalLabels: Record<string, string> = {
 };
 
 export function NutritionPlanScreen() {
-  const navigation = useNavigation<RootNavigation>();
   const route = useRoute();
   const {theme} = useAppTheme();
   const {profile} = useAuth();
@@ -133,8 +131,9 @@ export function NutritionPlanScreen() {
     },
   });
 
+  const openEllieChat = useOpenEllieChat();
   const openEllie = () => {
-    navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Ellie });
+    openEllieChat(ELLIE_ASKS.nutritionPlan);
   };
 
   useEffect(() => {

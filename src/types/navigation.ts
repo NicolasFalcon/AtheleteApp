@@ -138,10 +138,39 @@ export type ProgressTabParams = {
   devScroll?: number;
 };
 
+// ELLIE tab (portada). Development only: a forced state.
+export type EllieTabParams = {
+  devState?: 'empty' | 'data' | 'loading' | 'error';
+};
+
+// ELLIE conversation (its own screen, no tab bar). `prompt` is sent once on
+// arrival, like the prototype's askEllie(prompt).
+export type EllieChatRouteParams = {
+  prompt?: string;
+  mode?: 'generate_workout' | 'generate_nutrition';
+  // Open with the composer focused (no prompt).
+  focusInput?: boolean;
+  // Development only (__DEV__): fixture conversation, no network, no writes.
+  devState?:
+    | 'first'
+    | 'chat'
+    | 'thinking'
+    | 'plan'
+    | 'planActivating'
+    | 'planError'
+    | 'planActive'
+    | 'routine'
+    | 'offline'
+    | 'server'
+    | 'limit'
+    | 'loading'
+    | 'historyError';
+};
+
 export type MainTabParamList = {
   Home: undefined;
   Workouts: WorkoutsTabParams | undefined;
-  Ellie: undefined;
+  Ellie: EllieTabParams | undefined;
   Progress: ProgressTabParams | undefined;
   Community: undefined;
 };
@@ -166,6 +195,7 @@ export type AppStackParamList = {
   QuizLanding: undefined;
   QuizQuestion: QuizQuestionRouteParams;
   QuizResult: QuizResultRouteParams;
+  EllieChat: EllieChatRouteParams | undefined;
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;
   NutritionPlan: NutritionPlanRouteParams | undefined;

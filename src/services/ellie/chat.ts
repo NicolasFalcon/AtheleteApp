@@ -25,7 +25,8 @@ export async function callEllieChat(params: {
   onDelta: (text: string) => void;
   onDone: () => void;
   onToolResult: (result: EllieGenerationResult) => void;
-  onError: (error: string) => void;
+  // `status`: HTTP status when the server answered (not when fetch failed).
+  onError: (error: string, status?: number) => void;
 }) {
   try {
     const response = await fetch(getChatUrl(), {
@@ -47,6 +48,7 @@ export async function callEllieChat(params: {
         typeof data.error === 'string'
           ? data.error
           : `No pudimos conectar con ELLIE (${response.status}).`,
+        response.status,
       );
       return;
     }
