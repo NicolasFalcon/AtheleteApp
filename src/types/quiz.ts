@@ -5,8 +5,28 @@ export type QuizCategoryPreview = {
   description: string | null;
   icon: string;
   questionCount: number;
+  // Percentage (0-100) of the best attempt.
   bestScore?: number;
+  // Hits of the best attempt, and the questions it had ("8" of "10").
+  bestCorrect?: number;
+  bestTotal?: number;
   attemptsCount: number;
+};
+
+// A saved round, as listed in "Últimas rondas" and used for the week.
+export type QuizAttemptSummary = {
+  id: string;
+  categoryId: string;
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  pointsEarned: number;
+  completedAt: string;
+};
+
+export type QuizOverview = {
+  categories: QuizCategoryPreview[];
+  attempts: QuizAttemptSummary[];
 };
 
 export type QuizQuestion = {
@@ -39,20 +59,66 @@ export type QuizAttemptAnswer = {
   pointsEarned: number;
 };
 
+export type QuizDevState = 'data' | 'new' | 'perfect' | 'empty' | 'loading' | 'error';
+
+export type QuizLandingRouteParams =
+  | {
+      // Development only: sample data / forced state (nothing is read).
+      devState?: QuizDevState;
+    }
+  | undefined;
+
+export type QuizChallengeRouteParams = {
+  categoryId: string;
+  categoryName: string;
+  categoryIcon: string;
+  devState?: 'record' | 'new';
+};
+
 export type QuizQuestionRouteParams = {
   categoryId: string;
   categoryName: string;
   categoryIcon: string;
+  // Development only: freezes the round at a sample moment.
+  devState?:
+    | 'new'
+    | 'correct'
+    | 'incorrect'
+    | 'streak'
+    | 'loading'
+    | 'error'
+    | 'empty';
 };
 
 export type QuizResultRouteParams = {
   categoryId: string;
   categoryName: string;
   categoryIcon: string;
+  attemptId: string;
+  answers: QuizAttemptAnswer[];
   correctCount: number;
   totalQuestions: number;
+  // Points computed by the app (streak included); the server has the last word.
   pointsEarned: number;
   score: number;
   isPerfect: boolean;
-  unlockedBadges?: string[];
+  bestStreak: number;
+  // Texts of the questions that were missed ("Repasemos esto").
+  missed: string[];
+  // Best attempt of the category before this round (null on the first one).
+  previousBest: {
+    score: number;
+    correctCount: number;
+    totalQuestions: number;
+  } | null;
+  // Development only: shows a saved / saving / failed result with sample data.
+  devState?:
+    | 'low'
+    | 'mid'
+    | 'perfect'
+    | 'record'
+    | 'saving'
+    | 'error'
+    | 'firstQuiz'
+    | 'master';
 };

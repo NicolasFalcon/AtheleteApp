@@ -1,9 +1,16 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
+import {
+  bestAttempt,
+  completesQuizMaster,
+  selectQuizRound,
+} from '@app/features/quiz/quizModel';
 import { awardGamificationEvent } from '@app/services/supabase/gamification';
 import type {
   QuizAttempt,
   QuizAttemptAnswer,
+  QuizAttemptSummary,
   QuizCategoryPreview,
+  QuizOverview,
   QuizQuestion,
 } from '@app/types/quiz';
 
@@ -25,10 +32,6 @@ function getClient() {
   return client;
 }
 
-function shuffle<T>(items: T[]) {
-  return [...items].sort(() => Math.random() - 0.5);
-}
-
 function mapQuestion(row: any): QuizQuestion {
   return {
     id: row.id,
@@ -44,9 +47,24 @@ function mapQuestion(row: any): QuizQuestion {
   };
 }
 
-export async function fetchQuizCategories(
+function mapAttemptSummary(row: any): QuizAttemptSummary {
+  return {
+    id: row.id,
+    categoryId: row.category_id,
+    score: typeof row.score === 'number' ? row.score : 0,
+    correctCount: typeof row.correct_count === 'number' ? row.correct_count : 0,
+    totalQuestions:
+      typeof row.total_questions === 'number' ? row.total_questions : 0,
+    pointsEarned: typeof row.points_earned === 'number' ? row.points_earned : 0,
+    completedAt: row.completed_at,
+  };
+}
+
+// Active categories with the user's best attempt, and the saved rounds
+// (newest first) for the week and "Últimas rondas". Read only.
+export async function fetchQuizOverview(
   userId?: string,
-): Promise<QuizCategoryPreview[]> {
+): Promise<QuizOverview> {
   const client = getClient();
 
   const { data: categories, error: categoryError } = await (client as any)
@@ -68,42 +86,53 @@ export async function fetchQuizCategories(
     throw questionError;
   }
 
-  let attempts: any[] = [];
+  let attempts: QuizAttemptSummary[] = [];
 
   if (userId) {
     const { data: rawAttempts, error: attemptError } = await (client as any)
       .from('quiz_attempts')
-      .select('*')
-      .eq('user_id', userId);
+      .select(
+        'id, category_id, score, correct_count, total_questions, points_earned, completed_at',
+      )
+      .eq('user_id', userId)
+      .order('completed_at', { ascending: false });
 
     if (attemptError) {
       throw attemptError;
     }
 
-    attempts = rawAttempts || [];
+    attempts = ((rawAttempts || []) as any[]).map(mapAttemptSummary);
   }
 
-  return ((categories || []) as any[]).map(category => {
-    const categoryAttempts = attempts.filter(
-      attempt => attempt.category_id === category.id,
-    );
+  return {
+    attempts,
+    categories: ((categories || []) as any[]).map(category => {
+      const best = bestAttempt(
+        attempts.filter(attempt => attempt.categoryId === category.id),
+      );
 
-    return {
-      id: category.id,
-      name: category.name,
-      slug: category.slug,
-      description: category.description,
-      icon: category.icon,
-      questionCount: ((questions || []) as any[]).filter(
-        question => question.category_id === category.id,
-      ).length,
-      bestScore:
-        categoryAttempts.length > 0
-          ? Math.max(...categoryAttempts.map(attempt => attempt.score))
-          : undefined,
-      attemptsCount: categoryAttempts.length,
-    };
-  });
+      return {
+        id: category.id,
+        name: category.name,
+        slug: category.slug,
+        description: category.description,
+        icon: category.icon,
+        questionCount: ((questions || []) as any[]).filter(
+          question => question.category_id === category.id,
+        ).length,
+        bestScore: best?.score,
+        bestCorrect: best?.correctCount,
+        bestTotal: best?.totalQuestions,
+        attemptsCount: best?.attemptsCount ?? 0,
+      };
+    }),
+  };
+}
+
+export async function fetchQuizCategories(
+  userId?: string,
+): Promise<QuizCategoryPreview[]> {
+  return (await fetchQuizOverview(userId)).categories;
 }
 
 export async function fetchQuizQuestions(
@@ -121,41 +150,7 @@ export async function fetchQuizQuestions(
     throw error;
   }
 
-  const rows = ((data || []) as any[]).map(mapQuestion);
-  const grouped = {
-    easy: rows.filter(row => row.difficulty === 'easy'),
-    medium: rows.filter(row => row.difficulty === 'medium'),
-    hard: rows.filter(row => row.difficulty === 'hard'),
-  };
-
-  const picks = [
-    ...shuffle(grouped.easy).slice(0, 3),
-    ...shuffle(grouped.medium).slice(0, 4),
-    ...shuffle(grouped.hard).slice(0, 3),
-  ];
-
-  const remaining = shuffle(
-    rows.filter(row => !picks.some(pick => pick.id === row.id)),
-  );
-
-  while (picks.length < 10 && remaining.length > 0) {
-    const next = remaining.shift();
-    if (next) {
-      picks.push(next);
-    }
-  }
-
-  const difficultyOrder: Record<string, number> = {
-    easy: 0,
-    medium: 1,
-    hard: 2,
-  };
-
-  return picks.sort(
-    (left, right) =>
-      (difficultyOrder[left.difficulty] ?? 1) -
-      (difficultyOrder[right.difficulty] ?? 1),
-  );
+  return selectQuizRound(((data || []) as any[]).map(mapQuestion));
 }
 
 async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
@@ -181,17 +176,15 @@ async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
   const allCategoryIds = ((categories || []) as Array<{ id: string }>).map(
     item => item.id,
   );
-  const perfectCategories = new Set(
-    ((attempts || []) as Array<{ category_id: string; score: number }>)
-      .filter(item => item.score === 100)
-      .map(item => item.category_id),
-  );
-
-  perfectCategories.add(categoryId);
 
   if (
-    allCategoryIds.length > 0 &&
-    allCategoryIds.every(id => perfectCategories.has(id))
+    completesQuizMaster(
+      allCategoryIds,
+      ((attempts || []) as Array<{ category_id: string; score: number }>).map(
+        item => ({ categoryId: item.category_id, score: item.score }),
+      ),
+      { categoryId, score: 100 },
+    )
   ) {
     // Once per user: no reference (the server enforces it).
     const awardResult = await awardGamificationEvent({
@@ -199,7 +192,7 @@ async function maybeUnlockQuizMaster(userId: string, categoryId: string) {
       badgeIds: ['quiz_master'],
       metadata: {
         categoryId,
-        perfectCategoryCount: perfectCategories.size,
+        perfectCategoryCount: allCategoryIds.length,
       },
     });
 
@@ -224,6 +217,11 @@ export async function submitQuizAttempt(params: {
   // saved attempt, not from what the app sends). null when nothing was
   // granted now (duplicate retry or reward failure).
   pointsAwarded: number | null;
+  // Total points of the user after the award (server), null when unknown.
+  totalPoints: number | null;
+  // true when the attempt was saved but the reward call failed: retrying the
+  // same attempt id is safe (the server answers `duplicate` if it went through).
+  rewardPending: boolean;
 }> {
   const client = getClient();
 
@@ -295,6 +293,8 @@ export async function submitQuizAttempt(params: {
 
   const unlockedBadges: string[] = [];
   let pointsAwarded: number | null = null;
+  let totalPoints: number | null = null;
+  let rewardPending = false;
   try {
     const attemptAward = await awardGamificationEvent({
       eventType: 'quiz_completed',
@@ -314,6 +314,10 @@ export async function submitQuizAttempt(params: {
       pointsAwarded = attemptAward.pointsAwarded;
     }
 
+    if (attemptAward.totalPoints > 0) {
+      totalPoints = attemptAward.totalPoints;
+    }
+
     if (attemptAward.badgesUnlocked.includes('first_quiz')) {
       unlockedBadges.push('first_quiz');
     }
@@ -329,6 +333,7 @@ export async function submitQuizAttempt(params: {
       }
     }
   } catch (gamificationError) {
+    rewardPending = true;
     console.warn(
       '[quiz-submit] El intento se guardó, pero la recompensa quedó pendiente.',
       gamificationError,
@@ -348,5 +353,7 @@ export async function submitQuizAttempt(params: {
     },
     unlockedBadges,
     pointsAwarded,
+    totalPoints,
+    rewardPending,
   };
 }

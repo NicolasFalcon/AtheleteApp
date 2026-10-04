@@ -1,3 +1,4 @@
+import { quizMasterProgress } from '@app/features/quiz/quizModel';
 import {
   formatThousands,
   ratio,
@@ -333,30 +334,15 @@ export function prCurve(
 }
 
 // ── Quiz: progress towards the Quiz Master badge ───────────────────────────
-// There is no level system in the app; the closest real progression is the
-// share of active categories with a perfect (100) best score.
+// Same rule as the Quiz portada (quizModel): share of active categories with
+// a perfect (100) best score.
 export function quizMastery(categories: Array<{ bestScore?: number }>): {
   mastered: number;
   total: number;
   progress: number;
   line: string;
 } {
-  const total = categories.length;
-  const mastered = categories.filter(
-    category => category.bestScore === 100,
-  ).length;
-
-  return {
-    mastered,
-    total,
-    progress: total > 0 ? mastered / total : 0,
-    line:
-      total === 0
-        ? 'Aún no hay categorías disponibles'
-        : mastered >= total
-        ? 'Quiz Master desbloqueado'
-        : `${mastered} de ${total} categorías al 100 %`,
-  };
+  return quizMasterProgress(categories);
 }
 
 // ── Formatting ─────────────────────────────────────────────────────────────

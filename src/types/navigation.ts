@@ -11,6 +11,8 @@ import type { Core33ChallengeId } from '@app/features/core33/core33Catalog';
 import type { DevSessionState } from '@app/features/session/useSessionRunner';
 import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
 import type {
+  QuizChallengeRouteParams,
+  QuizLandingRouteParams,
   QuizQuestionRouteParams,
   QuizResultRouteParams,
 } from '@app/types/quiz';
@@ -229,7 +231,8 @@ export type AppStackParamList = {
   CreateRoutine: RoutineBuilderRouteParams | undefined;
   EditRoutine: EditRoutineRouteParams;
   AddExerciseToRoutine: AddExerciseToRoutineRouteParams;
-  QuizLanding: undefined;
+  QuizLanding: QuizLandingRouteParams;
+  QuizChallenge: QuizChallengeRouteParams;
   QuizQuestion: QuizQuestionRouteParams;
   QuizResult: QuizResultRouteParams;
   EllieChat: EllieChatRouteParams | undefined;
