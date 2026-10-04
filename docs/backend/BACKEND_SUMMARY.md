@@ -251,3 +251,26 @@ En strict: se ignoran los puntos enviados por la app, se rechazan eventos descon
 - Core 33 "Ahora no": `core33_invite_dismissed_at`. `core33_intro_seen_at` y `core33_completed_at` quedan para el módulo Core 33.
 - Tarjetas y listas de rutinas por tipo: las 9 `routine_category` se agrupan en las 5 tarjetas del diseño (NULL → solo en "Todas").
 - Series y reps: `exercises.recommended_sets_reps` se lee con un parser tolerante (ver BT-21 en `BACKEND_TODO.md`).
+
+## 8. Lote del 4 de octubre de 2026
+
+### Tablas, columnas y funciones nuevas
+- **`profiles.core33_invite_dismiss_count`** `integer NOT NULL DEFAULT 0`, `>= 0`: veces que se descartó la tarjeta de Core 33 de Inicio.
+- **`profiles.notification_prefs`** `jsonb NOT NULL`, por defecto `{"workouts": true, "hydration": true, "updates": false}`.
+- **`badges.category`** `text` NULL: `constancia | retos | fuerza | habitos`.
+- **RPC `get_progress_summary(_from date, _tz text)`**: por día `{date, sessions, active_seconds}` y por mes `{month, avg_volume_kg, sessions}` de las sesiones completadas del usuario (la columna de fin es `workout_sessions.ended_at`).
+- **RPC `get_badge_progress()`**: por badge `current`, `target`, `earned` y `category`.
+- **Edge Function `delete-account`**: POST sin body con el JWT del propio usuario; borra sus datos y fotos y, al final, el usuario de auth. Idempotente. Respuestas: 200 `{ok:true}`, 409 `last_admin`, 401, 500 `{ok:false, step}`.
+
+### Qué hace la app con esto
+- Core 33 "Ahora no": suma 1 al contador y actualiza la fecha; con 2 descartes la tarjeta no vuelve (la regla de 14 días se mantiene).
+- Ajustes: los 3 interruptores leen y escriben `notification_prefs`.
+- Progreso · Resumen: usa `get_progress_summary` con la zona horaria del dispositivo.
+- Logros y vitrina del Perfil: usan `get_badge_progress` (13 logros, incluye `nutrition_activated`).
+- Eliminar cuenta: llama a `delete-account` y, con 200, limpia lo local y cierra sesión.
+
+### Meta de agua (BT-34, 4 de octubre de 2026)
+- Las medallas de hidratación del servidor y `get_badge_progress` usan como meta **`profiles.daily_water_goal × 250 ml`** (por defecto 14 vasos = 3.500 ml), comparada con `daily_hydration_logs.water_ml`.
+- `daily_water_goal` sigue siendo un número de **vasos de 250 ml** (no hay columna en ml).
+- La app (Nutrición, Inicio, Progreso y ELLIE) calcula la misma meta con `GLASS_ML` y `DEFAULT_WATER_GOAL_GLASSES`. Pendiente de producto: valor por defecto 14 u 10 vasos (DP-01 en `BACKEND_TODO.md`).
+
