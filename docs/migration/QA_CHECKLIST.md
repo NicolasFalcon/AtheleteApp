@@ -1,6 +1,6 @@
 # ATHELETE · Checklist de QA real (recorrido completo)
 
-Reúne los checklists de QA real de `MIGRATION_PROGRESS.md` (§12, §15, §18 a §27) en un solo recorrido, sin duplicados y en el orden del usuario:
+Reúne los checklists de QA real de `MIGRATION_PROGRESS.md` (§12, §15, §18 a §27, incluido el lote de backend BT-22, BT-23, BT-24, BT-30, BT-31 y BT-34) en un solo recorrido, sin duplicados y en el orden del usuario:
 
 **registro → onboarding → Inicio → Entrenos → Sesión → Progreso → ELLIE → Nutrición → Core 33 → Perfil y Ajustes → eliminar cuenta**
 
@@ -171,15 +171,16 @@ Referencias: `PROGRESS_01..04`, `RECORDS_01..02`, `ACHIEVEMENTS_01..02`. Cuenta 
 | # | Hacer | Esperar | Base |
 |---|---|---|---|
 | 6.1 | Resumen vacío (cuenta D o sin datos): hero "Tu evolución empieza aquí", cápsulas vacías, "Tu primera marca aparecerá aquí". | — | — |
-| 6.2 | Tras completar un entreno (Bloque 5): abrir Progreso → Resumen. | Aparece en la semana con los **minutos activos (sin pausas)**; hero y trío se actualizan al volver al tab; la racha suma. Todo viene de `get_progress_summary` con la zona horaria del teléfono. | La RPC `get_progress_summary(_from, _tz)` devuelve para el día las mismas sesiones y `active_seconds`. |
+| 6.2 | Tras completar un entreno (Bloque 5): abrir Progreso → Resumen. | Aparece en la semana con los **minutos activos (sin pausas)**; hero y trío se actualizan al volver al tab; la racha suma. Todo viene de `get_progress_summary` (BT-23) con la zona horaria del teléfono. | La RPC `get_progress_summary(_from, _tz)` devuelve para el día las mismas sesiones y `active_seconds`. |
 | 6.3 | Semana vs mes: el día entrenado se pinta según los minutos y la leyenda coincide. | Comparar los minutos de hoy con el anillo de Entreno de Inicio. | — |
 | 6.4 | Hidratación y Nutrición de la semana: reflejan los registros; tocar abre el plan. | Coinciden con el Bloque 8 (mismas cifras). | — |
 | 6.5 | Récords: "Registrar récord" desde Inicio, desde Progreso y desde el detalle; los 5 tipos con su unidad; "Supera tu mejor marca por …" correcto. | — | — |
 | 6.6 | Guardar un récord que **supera** la mejor marca. ⚠⭐ (+25 puntos **una sola vez**) | Celebración. Repetir el mismo no suma. | `personal_records` + evento `personal_record_created` (referencia = id del récord). |
 | 6.7 | Guardar un récord que **no** la supera. | Toast, sin celebración. | Fila en `personal_records`; sin puntos nuevos. |
 | 6.8 | Un récord detectado en sesión aparece como "De una sesión"; uno manual como "Manual". Eliminar un manual con pulsación larga. ⚠🗑 | Solo los manuales se pueden eliminar. | `personal_records.source`; la fila desaparece. |
-| 6.9 | Logros: la colección ("N / 13") sale de `get_badge_progress`; repisas por categoría; los bloqueados con su avance ("3 de 7"); la hoja muestra la fecha o el avance. | 13 logros (incluye `nutrition_activated`); un logro sin icono usa el genérico; una categoría desconocida va a "Otros". | `user_badges` (medallas conseguidas y fecha). Si el JSON real de la RPC difiere de lo supuesto, anótalo (ver `MIGRATION_PROGRESS` §26). |
+| 6.9 | Logros (BT-24): la colección ("N / 13") sale de `get_badge_progress`; repisas por categoría; los bloqueados con su avance ("3 de 7"); la hoja muestra la fecha o el avance. | 13 logros (incluye `nutrition_activated`); un logro sin icono usa el genérico; una categoría desconocida va a "Otros". | `user_badges` (medallas conseguidas y fecha). Si el JSON real de la RPC difiere de lo supuesto, anótalo (ver `MIGRATION_PROGRESS` §26). |
 | 6.10 | Sin red: Resumen, Récords y Logros muestran el error y "Reintentar" recupera. | — | — |
+| 6.11 | **Medallas de hidratación (BT-34):** en Logros, abrir `hydration_3_days`, `hydration_7_days` y `weekly_hydration_master` (bloqueadas). ⚠⭐ (la medalla se otorga una sola vez) | El avance ("n de m") cuenta días con `water_ml` ≥ `daily_water_goal` × 250 ml (por defecto 14 vasos = 3.500 ml). Un día con 13 vasos (3.250 ml) **no** cuenta; con 14, sí. Coincide con "Días con N vasos" de Progreso y con el anillo de Inicio. | `get_badge_progress()` (hydration: `current` y `target`) comparado con `daily_hydration_logs.water_ml` y `profiles.daily_water_goal`. |
 
 **Consulta Lovable (solo lectura) · Bloque 6**
 ```
@@ -187,6 +188,7 @@ SOLO LECTURA (SELECT / llamadas a RPC de lectura con el JWT del usuario). Para u
 1) get_progress_summary(_from => date_trunc('year', now())::date, _tz => 'America/Santiago'): devuélveme el JSON completo (days y months) y compáralo con workout_sessions completadas (date, sessions, active_seconds = ended_at - started_at - paused_total_sec, volume_kg).
 2) get_badge_progress(): JSON completo (badge_id, category, current, target, earned, y qué otras claves trae) y user_badges (badge_id, earned_at).
 3) personal_records (source, session_set_id, recorded_at, pr_type, values) y gamification_events de personal_record_created con su reference_id y points.
+4) Hidratación (BT-34): profiles.daily_water_goal, la meta en ml = daily_water_goal * 250 (por defecto 14 * 250 = 3500) y, de daily_hydration_logs de los últimos 14 días, qué días cumplen water_ml >= meta. Compáralo con el avance de hydration_3_days, hydration_7_days y weekly_hydration_master en get_badge_progress().
 ```
 (Cambia la zona horaria por la del teléfono de pruebas.)
 
@@ -230,7 +232,7 @@ Referencias: `NUTRI_01..03`. Cuenta falcon1989.
 | 8.3 | **Registrar comida:** "+250 kcal" y "+10 g" de proteína → Guardar. ⚠⭐ (+10 puntos `nutrition_logged`, **una vez por día**) | Se suma a los totales; Inicio y Progreso muestran lo mismo. Repetir el mismo día **no duplica puntos**. | `daily_nutrition_logs` (calorías y macros sumados, `adherence`); un solo evento `nutrition_logged` (referencia = fecha). |
 | 8.4 | Error al guardar (modo avión). | La hoja se queda abierta con el aviso y deja reintentar. | Sin cambios en la base. |
 | 8.5 | **Agua:** "+1 vaso" 5 veces seguidas y rápido. | Responde al instante; el contador sube en Nutrición **y** en el anillo de Inicio; sin retrocesos. | `daily_hydration_logs.water_ml` de hoy suma 5 × 250. |
-| 8.6 | Llegar a la meta de agua del día (por defecto 14 vasos). ⚠⭐ | La medalla de hidratación llega **una sola vez** por la regla del servidor; "objetivo cumplido". | `user_badges` (`hydration_3_days`, `hydration_7_days` o `weekly_hydration_master` cuando corresponda); eventos `hydration_logged` por llamada, puntos solo la primera vez del día. |
+| 8.6 | Llegar a la meta de agua del día (por defecto 14 vasos). ⚠⭐ | La medalla de hidratación llega **una sola vez** por la regla del servidor; "objetivo cumplido". **Meta (BT-34):** `daily_water_goal` × 250 ml (14 vasos = 3.500 ml): la app marca "cumplido" justo cuando el servidor cuenta el día (13 vasos = 3.250 ml no cuenta; 14 sí). | `user_badges` (`hydration_3_days`, `hydration_7_days` o `weekly_hydration_master` cuando corresponda); eventos `hydration_logged` por llamada, puntos solo la primera vez del día. |
 | 8.7 | Modo avión al sumar un vaso. | El vaso vuelve atrás y sale un toast de error. | Sin cambios. |
 | 8.8 | Inicio: el anillo de Nutrición abre la hoja de registro; el "+1" del anillo de agua se refleja en Nutrición. Progreso: proteína media e hidratación semanal coinciden tras registrar. | Los números coinciden en las **tres** pantallas (Nutrición, Inicio, Progreso). | — |
 
@@ -238,7 +240,7 @@ Referencias: `NUTRI_01..03`. Cuenta falcon1989.
 ```
 SOLO LECTURA (SELECT). Para user_id = '<UID>', fecha de hoy:
 1) daily_nutrition_logs de hoy (calories, protein, carbs, fats, adherence) y nutrition_plans con is_active = true.
-2) daily_hydration_logs de hoy (water_ml) y profiles.daily_water_goal.
+2) daily_hydration_logs de hoy (water_ml), profiles.daily_water_goal y la meta en ml = daily_water_goal * 250; indica si water_ml >= meta (BT-34) y si coincide con "objetivo cumplido" en la app.
 3) gamification_events de hoy de tipo nutrition_logged y hydration_logged (reference_id, points, created_at): confirma que nutrition_logged tiene UNA fila por día con puntos.
 4) user_badges de hidratación y su earned_at.
 ```
@@ -251,7 +253,7 @@ Referencias: `HOME_10`, `HOME_11`, `CORE33_01..06`, `OVERLAY_01`. Cuenta falcon1
 
 | # | Hacer | Esperar | Base |
 |---|---|---|---|
-| 9.1 | Inicio sin Core 33 → tarjeta de invitación (HOME_10). "Ahora no". | La tarjeta desaparece; vuelve a los 14 días; tras el **segundo** descarte no vuelve (el contador se reinicia al completar otro Core 33). | `profiles.core33_invite_dismissed_at` con fecha y `core33_invite_dismiss_count` +1 (0 → 1 → 2). |
+| 9.1 | (BT-22) Inicio sin Core 33 → tarjeta de invitación (HOME_10). "Ahora no". ⚠ (el segundo descarte la oculta para siempre) | La tarjeta desaparece; vuelve a los 14 días; tras el **segundo** descarte no vuelve (el contador se reinicia al completar otro Core 33). | `profiles.core33_invite_dismissed_at` con fecha y `core33_invite_dismiss_count` +1 (0 → 1 → 2). |
 | 9.2 | Menú dev "Restablecer card de Core 33". | La tarjeta vuelve a aparecer. | `core33_invite_dismissed_at = NULL` y `core33_invite_dismiss_count = 0`. |
 | 9.3 | "Descubrir Core 33" **la primera vez** → Intro (3 momentos) → "Explorar retos". Probar "Saltar". | Intro con 3 segmentos; al salir se marca como vista. Segunda vez: la tarjeta lleva directo a Explorar. | `profiles.core33_intro_seen_at` con fecha. |
 | 9.4 | Explorar retos → Detalle (Construye fuerza; probar Recupera mejor) → "Elegir este reto" → "Tu Core 33 está listo". | "Encaja con tu objetivo" según el objetivo del perfil; "Elegirlo no empieza el Día 1". "Empezar más tarde" **no** guarda nada. | Sin fila nueva en `challenge_participations`. |
@@ -289,7 +291,7 @@ Referencias: `PROFILE_01..03`, `HEALTH_02..03`, `ACHIEVEMENTS`. Cuenta falcon198
 | 10.4 | Error de guardado: con modo avión, Guardar. | Aviso y deja reintentar; sin cambios. | Sin cambios. |
 | 10.5 | Cambiar foto. | Sube a `profile-photos/<UID>/avatar`; se ve en Perfil y en el avatar de Inicio (puede tardar un refresco). | Objeto en el bucket `profile-photos`; `profiles.profile_photo_url`. |
 | 10.6 | Ajustes: Apariencia (Claro/Oscuro/Sistema) cambia el tema al instante y se recuerda. | — | — |
-| 10.7 | Los 3 interruptores de notificaciones: cambiar, cerrar y reabrir la app. Con modo avión, el interruptor **vuelve atrás** con aviso. Si había valores antiguos en el teléfono, se suben una sola vez. | Se recuerdan entre sesiones y dispositivos. | `profiles.notification_prefs` = `{workouts, hydration, updates}`. |
+| 10.7 | (BT-31) Los 3 interruptores de notificaciones: cambiar, cerrar y reabrir la app. Con modo avión, el interruptor **vuelve atrás** con aviso. Si había valores antiguos en el teléfono, se suben una sola vez. | Se recuerdan entre sesiones y dispositivos. | `profiles.notification_prefs` = `{workouts, hydration, updates}`. |
 | 10.8 | Filas deshabilitadas: Comunidad ("Próximamente") y Apple Health (placeholder: "Conectar" solo avisa). | No navegan a nada real. | — |
 | 10.9 | Cambiar contraseña. | Llega el correo con el enlace de recuperación. | — |
 | 10.10 | Cerrar sesión (confirmación). | Vuelve a Auth; se puede volver a entrar. | — |
@@ -303,7 +305,7 @@ SOLO LECTURA (SELECT). Para id = '<UID>':
 
 ---
 
-## Bloque 11 · Eliminar cuenta (solo cuenta D)
+## Bloque 11 · Eliminar cuenta (solo cuenta D, BT-30)
 
 ⚠🗑 **Irreversible. Nunca con falcon1989.** Usa D, ya con datos creados en los bloques anteriores (una sesión, una comida, un reto, una foto) para comprobar que se borra todo.
 
@@ -345,3 +347,15 @@ Antes de borrar: devuelve los conteos. Después de borrar: vuelve a ejecutar y c
 | 9 | §17, §20.5, §21, §26 punto 2, §27 |
 | 10 | §24, §26 puntos 3 |
 | 11 | §24 punto 7, §26 punto 1 |
+
+## Cobertura del lote de backend (BT resueltos)
+
+| BT | Qué se comprueba | Dónde |
+|---|---|---|
+| BT-22 | Contador de descartes de la tarjeta de Core 33 (2 la ocultan para siempre; reset dev a 0) | 9.1, 9.2, 9.10 |
+| BT-23 | Resumen de Progreso desde `get_progress_summary` con la zona horaria del teléfono | 6.2, 6.3, consulta del bloque 6 |
+| BT-24 | Logros y vitrina desde `get_badge_progress` (13 logros, categorías, avance) | 6.9, 10.1, consulta del bloque 6 |
+| BT-30 | Eliminar cuenta con `delete-account` (200, 409, 500, 401, idempotencia) | Bloque 11 |
+| BT-31 | Interruptores de notificaciones en `profiles.notification_prefs` y migración local | 10.7 |
+| BT-34 | Meta de agua = `daily_water_goal` × 250 ml (14 vasos = 3.500 ml) en app, medallas y `get_badge_progress` | 3.4, 6.11, 8.5, 8.6, consultas de los bloques 6 y 8 |
+
