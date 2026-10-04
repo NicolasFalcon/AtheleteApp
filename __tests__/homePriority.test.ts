@@ -196,6 +196,9 @@ describe('helpers', () => {
       notes: null,
       recordedAt: `2026-09-${String(day).padStart(2, '0')}T10:00:00Z`,
       createdAt: '',
+      source: 'manual',
+      workoutSessionId: null,
+      sessionSetId: null,
     });
 
     const curve = prCurve([record(100, 20), record(90, 10)], 'max_weight');
@@ -250,6 +253,9 @@ describe('formatting', () => {
       notes: null,
       recordedAt: new Date(2026, 3, 9, 10).toISOString(),
       createdAt: '',
+      source: 'manual',
+      workoutSessionId: null,
+      sessionSetId: null,
     };
 
     expect(bestMarkParts(base, now)).toEqual({

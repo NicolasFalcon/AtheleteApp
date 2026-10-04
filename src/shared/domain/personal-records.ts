@@ -18,6 +18,11 @@ export type PersonalRecord = {
   notes: string | null;
   recordedAt: string;
   createdAt: string;
+  // personal_records.source: 'manual' (registered by hand) or 'session'
+  // (detected in a session, linked by session_set_id).
+  source: 'manual' | 'session';
+  workoutSessionId: string | null;
+  sessionSetId: string | null;
 };
 
 export type PRInsert = {

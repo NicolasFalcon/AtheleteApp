@@ -106,6 +106,10 @@ export type AddExerciseToRoutineRouteParams = {
 export type PersonalRecordsRouteParams = {
   exerciseId?: LibraryExercise['id'];
   exerciseName?: string;
+  // Development only (__DEV__): sample / empty data and the open sheet.
+  devState?: 'data' | 'empty' | 'loading' | 'error';
+  devSheet?: boolean;
+  devCelebration?: boolean;
 };
 
 export type RegisterPrRouteParams = {
@@ -114,15 +118,31 @@ export type RegisterPrRouteParams = {
   showExercisePicker?: boolean;
 };
 
+// Achievements (Logros). Development only: sample data and the open sheet.
+export type AchievementsRouteParams = {
+  devState?: 'data' | 'loading' | 'error';
+  devSheet?: boolean | 'locked';
+};
+
 export type NutritionPlanRouteParams = {
   openLog?: boolean;
+};
+
+// Progreso tab. Also set by the dev screen cycler (__DEV__).
+export type ProgressTabParams = {
+  segment?: 'summary' | 'challenges';
+  period?: 'week' | 'month';
+  // Development only: force a state; 'data' uses sample data (no reads).
+  devState?: 'data' | 'empty' | 'loading' | 'error';
+  // Development only: scroll offset (to review the lower sections).
+  devScroll?: number;
 };
 
 export type MainTabParamList = {
   Home: undefined;
   Workouts: WorkoutsTabParams | undefined;
   Ellie: undefined;
-  Progress: undefined;
+  Progress: ProgressTabParams | undefined;
   Community: undefined;
 };
 
@@ -131,7 +151,7 @@ export type MainTabParamList = {
 export type AppStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
-  Achievements: undefined;
+  Achievements: AchievementsRouteParams | undefined;
   Notifications: undefined;
   Core33: undefined;
   WorkoutDetail: WorkoutDetailRouteParams;

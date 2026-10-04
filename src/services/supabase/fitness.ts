@@ -152,6 +152,7 @@ export function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
     endedAt: row.ended_at,
     pausedAt: row.paused_at,
     pausedTotalSec: row.paused_total_sec ?? 0,
+    volumeKg: row.volume_kg,
     completedExercises: Array.isArray(row.completed_exercises)
       ? row.completed_exercises.filter(
           (item): item is string => typeof item === 'string',

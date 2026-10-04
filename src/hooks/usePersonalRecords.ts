@@ -20,6 +20,9 @@ function mapPersonalRecordRow(row: any): PersonalRecord {
     notes: row.notes,
     recordedAt: row.recorded_at,
     createdAt: row.created_at,
+    source: row.source === 'session' ? 'session' : 'manual',
+    workoutSessionId: row.workout_session_id ?? null,
+    sessionSetId: row.session_set_id ?? null,
   };
 }
 
@@ -83,6 +86,8 @@ export function usePersonalRecords(exerciseId?: string) {
           value_distance_m: pr.valueDistanceM ?? null,
           unit: pr.unit ?? 'kg',
           notes: pr.notes ?? null,
+          // Registered by hand (session records come from detect_session_prs).
+          source: 'manual',
           recorded_at: pr.recordedAt ?? new Date().toISOString(),
         })
         .select('id, exercise_id, pr_type')

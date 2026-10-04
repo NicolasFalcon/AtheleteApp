@@ -92,6 +92,9 @@ export type WorkoutSession = {
   // Pause bookkeeping (v2 session): the active time excludes pauses.
   pausedAt?: string | null;
   pausedTotalSec?: number;
+  // workout_sessions.volume_kg: computed by the server on completion; null
+  // when the session has no weighted sets (never 0).
+  volumeKg?: number | null;
   completedExercises: string[];
   totalExercises: number;
   createdAt?: string;

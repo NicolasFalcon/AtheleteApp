@@ -55,6 +55,9 @@ export async function invalidateWorkoutQueries(
     queryClient.invalidateQueries({
       queryKey: ['progress', 'overview', userId],
     }),
+    queryClient.invalidateQueries({
+      queryKey: ['progress', 'training', userId],
+    }),
   ]);
 }
 

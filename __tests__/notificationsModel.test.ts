@@ -71,6 +71,9 @@ describe('notifications model', () => {
       notes: null,
       recordedAt: new Date(2026, 8, 23, 10).toISOString(),
       createdAt: '',
+      source: 'manual',
+      workoutSessionId: null,
+      sessionSetId: null,
     };
 
     const milestones = buildMilestones({
