@@ -105,8 +105,9 @@ export type QuizResultRouteParams = {
   bestStreak: number;
   // Texts of the questions that were missed ("Repasemos esto").
   missed: string[];
-  // Best attempt of the category before this round (null on the first one).
-  previousBest: {
+  // Development only: sample best before this round (the real one comes from
+  // the server when the round is saved).
+  devPreviousBest?: {
     score: number;
     correctCount: number;
     totalQuestions: number;

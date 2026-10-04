@@ -32,7 +32,7 @@ function result(
     isPerfect: false,
     bestStreak: 4,
     missed: MISSED.slice(0, 2),
-    previousBest: { score: 80, correctCount: 8, totalQuestions: 10 },
+    devPreviousBest: { score: 80, correctCount: 8, totalQuestions: 10 },
     ...patch,
   };
 }
@@ -60,7 +60,7 @@ const SCREENS = [
   { key: 'resultRecord', label: 'Resultado · nuevo récord', route: 'QuizResult', params: result({ correctCount: 9, score: 90, pointsEarned: 190, bestStreak: 7, missed: MISSED.slice(0, 1), devState: 'record' }) },
   { key: 'resultSaving', label: 'Resultado · guardando', route: 'QuizResult', params: result({ devState: 'saving' }) },
   { key: 'resultError', label: 'Resultado · error con reintento', route: 'QuizResult', params: result({ devState: 'error' }) },
-  { key: 'resultFirstQuiz', label: 'Resultado · celebración Primer Quiz', route: 'QuizResult', params: result({ previousBest: null, devState: 'firstQuiz' }) },
+  { key: 'resultFirstQuiz', label: 'Resultado · celebración Primer Quiz', route: 'QuizResult', params: result({ devPreviousBest: null, devState: 'firstQuiz' }) },
   { key: 'resultMaster', label: 'Resultado · celebración Quiz Master', route: 'QuizResult', params: result({ correctCount: 10, score: 100, pointsEarned: 255, bestStreak: 10, isPerfect: true, missed: [], devState: 'master' }) },
 ] as const;
 

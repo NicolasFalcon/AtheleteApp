@@ -222,6 +222,13 @@ export async function submitQuizAttempt(params: {
   // true when the attempt was saved but the reward call failed: retrying the
   // same attempt id is safe (the server answers `duplicate` if it went through).
   rewardPending: boolean;
+  // Best attempt of the category read from the server just before saving this
+  // one (this attempt excluded): what "nuevo récord" is compared with.
+  previousBest: {
+    score: number;
+    correctCount: number;
+    totalQuestions: number;
+  } | null;
 }> {
   const client = getClient();
 
@@ -234,6 +241,37 @@ export async function submitQuizAttempt(params: {
       `El intento está incompleto: ${params.answers.length} de ${params.totalQuestions} respuestas.`,
     );
   }
+
+  // Read before inserting so the new attempt cannot be its own record; the
+  // attempt id is excluded so a retry after a saved insert gives the same answer.
+  const { data: earlier, error: earlierError } = await (
+    client.from('quiz_attempts') as any
+  )
+    .select('score, correct_count, total_questions')
+    .eq('user_id', params.userId)
+    .eq('category_id', params.categoryId)
+    .neq('id', params.attemptId);
+
+  if (earlierError) {
+    throw new Error(
+      `No se pudo leer tu mejor marca. ${earlierError.message ?? ''}`.trim(),
+    );
+  }
+
+  const previous = bestAttempt(
+    ((earlier || []) as any[]).map(row => ({
+      score: row.score,
+      correctCount: row.correct_count,
+      totalQuestions: row.total_questions,
+    })),
+  );
+  const previousBest = previous
+    ? {
+        score: previous.score,
+        correctCount: previous.correctCount,
+        totalQuestions: previous.totalQuestions,
+      }
+    : null;
 
   const score = Math.round((params.correctCount / params.totalQuestions) * 100);
   const attemptPayload = {
@@ -355,5 +393,6 @@ export async function submitQuizAttempt(params: {
     pointsAwarded,
     totalPoints,
     rewardPending,
+    previousBest,
   };
 }

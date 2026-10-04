@@ -35,8 +35,16 @@ import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'QuizResult'>;
 
+type QuizAttemptBest = {
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+};
+
 type SaveView = {
   status: 'saving' | 'error' | 'saved';
+  // Best of the category read from the server before saving (null: none).
+  previousBest: QuizAttemptBest | null;
   points: number | null;
   total: number | null;
   badges: string[];
@@ -66,7 +74,6 @@ export function QuizResultScreen({ navigation, route }: Props) {
   const { correctCount, totalQuestions, categoryName } = params;
   const tier = resultTier(correctCount, totalQuestions);
   const copy = resultCopy(tier, correctCount, totalQuestions, categoryName);
-  const record = isNewRecord(correctCount, totalQuestions, params.previousBest);
 
   const save = useCallback(() => {
     submit.mutate({
@@ -94,16 +101,18 @@ export function QuizResultScreen({ navigation, route }: Props) {
         status: dev === 'saving' ? 'saving' : dev === 'error' ? 'error' : 'saved',
         points: params.pointsEarned,
         total: 4860,
+        previousBest: params.devPreviousBest ?? null,
         badges: dev === 'firstQuiz' ? ['first_quiz'] : dev === 'master' ? ['first_quiz', 'quiz_master'] : [],
         rewardPending: false,
       };
     }
     if (submit.isError) {
-      return { status: 'error', points: null, total: null, badges: [], rewardPending: false };
+      return { status: 'error', previousBest: null, points: null, total: null, badges: [], rewardPending: false };
     }
     if (submit.data) {
       return {
         status: 'saved',
+        previousBest: submit.data.previousBest,
         // The server's points; the saved attempt's when it granted none now.
         points: submit.data.pointsAwarded ?? submit.data.attempt.pointsEarned,
         total: submit.data.totalPoints,
@@ -111,7 +120,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
         rewardPending: submit.data.rewardPending,
       };
     }
-    return { status: 'saving', points: null, total: null, badges: [], rewardPending: false };
+    return { status: 'saving', previousBest: null, points: null, total: null, badges: [], rewardPending: false };
   }, [dev, params.pointsEarned, submit.data, submit.isError]);
 
   const saved = view.status === 'saved';
@@ -170,9 +179,14 @@ export function QuizResultScreen({ navigation, route }: Props) {
     );
   const close = () => leave(() => navigation.popTo(APP_ROUTES.QuizLanding));
 
-  const prev = params.previousBest;
+  // "Nuevo récord" is known once the server has answered (it compares with the
+  // best read from the server just before saving, not with a cached list).
+  const prev = view.previousBest;
+  const record = saved && isNewRecord(correctCount, totalQuestions, prev);
   const eyebrow = record
     ? null
+    : !saved
+    ? categoryName
     : `${categoryName} · ${
         prev ? `récord ${prev.correctCount}/${prev.totalQuestions}` : 'sin récord aún'
       }`;

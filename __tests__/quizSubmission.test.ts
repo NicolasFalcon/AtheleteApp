@@ -40,15 +40,21 @@ function createAttemptRow() {
 
 function mockAttemptInsert(
   results: Array<{data: unknown; error: unknown}>,
+  earlier: Array<Record<string, number>> = [],
 ) {
   const single = jest.fn();
   results.forEach(result => single.mockResolvedValueOnce(result));
   const select = jest.fn(() => ({single}));
   const insert = jest.fn((_payload: Record<string, unknown>) => ({select}));
-  const from = jest.fn(() => ({insert}));
+  // select('score…').eq(user).eq(category).neq(id): the best before this one.
+  const neq = jest.fn(() => Promise.resolve({data: earlier, error: null}));
+  const eqCategory = jest.fn(() => ({neq}));
+  const eqUser = jest.fn(() => ({eq: eqCategory}));
+  const selectEarlier = jest.fn(() => ({eq: eqUser}));
+  const from = jest.fn(() => ({insert, select: selectEarlier}));
 
   mockedGetSupabaseClient.mockReturnValue({from} as any);
-  return {insert};
+  return {insert, neq};
 }
 
 describe('submitQuizAttempt', () => {
@@ -131,6 +137,66 @@ describe('submitQuizAttempt', () => {
     expect(result.pointsAwarded).toBe(40);
     expect(result.unlockedBadges).toEqual(['first_quiz']);
     warn.mockRestore();
+  });
+
+  test('lee la mejor marca anterior del servidor, sin contar este intento', async () => {
+    const {neq} = mockAttemptInsert(
+      [{data: createAttemptRow(), error: null}],
+      [
+        {score: 70, correct_count: 7, total_questions: 10},
+        {score: 90, correct_count: 9, total_questions: 10},
+      ],
+    );
+    mockedAwardGamificationEvent.mockResolvedValue({
+      awarded: true,
+      alreadyProcessed: false,
+      reason: null,
+      pointsAwarded: 40,
+      badgesUnlocked: [],
+      totalPoints: 140,
+    });
+
+    const result = await submitQuizAttempt({
+      attemptId: createAttemptRow().id,
+      userId: 'user-1',
+      categoryId: 'category-1',
+      correctCount: 1,
+      totalQuestions: 1,
+      pointsEarned: 35,
+      answers,
+    });
+
+    expect(neq).toHaveBeenCalledWith('id', createAttemptRow().id);
+    expect(result.previousBest).toEqual({
+      score: 90,
+      correctCount: 9,
+      totalQuestions: 10,
+    });
+    expect(result.totalPoints).toBe(140);
+  });
+
+  test('sin intentos anteriores no hay mejor marca previa', async () => {
+    mockAttemptInsert([{data: createAttemptRow(), error: null}]);
+    mockedAwardGamificationEvent.mockResolvedValue({
+      awarded: true,
+      alreadyProcessed: false,
+      reason: null,
+      pointsAwarded: 40,
+      badgesUnlocked: [],
+      totalPoints: 40,
+    });
+
+    const result = await submitQuizAttempt({
+      attemptId: createAttemptRow().id,
+      userId: 'user-1',
+      categoryId: 'category-1',
+      correctCount: 1,
+      totalQuestions: 1,
+      pointsEarned: 35,
+      answers,
+    });
+
+    expect(result.previousBest).toBeNull();
   });
 
   test('rechaza localmente un submit incompleto antes de tocar Supabase', async () => {

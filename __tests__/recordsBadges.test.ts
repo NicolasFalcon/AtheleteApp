@@ -14,7 +14,7 @@ import {
   recordDelta,
   recordSource,
 } from '../src/features/progress/recordsModel';
-import { ALL_BADGES, type PersonalRecord } from '../src/shared';
+import type { PersonalRecord } from '../src/shared';
 
 const today = new Date(2026, 9, 3, 12);
 let seq = 0;

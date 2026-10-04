@@ -35,7 +35,7 @@ import {
   RoundMessage,
   StreakChip,
 } from '@app/features/quiz/v2/RoundParts';
-import { useQuizOverview, useQuizQuestions } from '@app/hooks/useQuiz';
+import { useQuizQuestions } from '@app/hooks/useQuiz';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import { createQuizAttemptId } from '@app/services/supabase/quiz';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -62,28 +62,8 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
   const dev = __DEV__ ? route.params.devState : undefined;
   const attemptIdRef = useRef(createQuizAttemptId());
   const questionsQuery = useQuizQuestions(categoryId, attemptIdRef.current);
-  const overviewQuery = useQuizOverview();
   const [confirmExit, setConfirmExit] = useState(false);
   const leavingRef = useRef(false);
-
-  // Best attempt before this round, frozen at the first data (the portada
-  // refetches only after the round is saved).
-  const previousRef = useRef<{
-    score: number;
-    correctCount: number;
-    totalQuestions: number;
-  } | null | undefined>(undefined);
-  const category = overviewQuery.data?.categories.find(item => item.id === categoryId);
-  if (previousRef.current === undefined && overviewQuery.data) {
-    previousRef.current =
-      category && category.bestScore !== undefined
-        ? {
-            score: category.bestScore,
-            correctCount: category.bestCorrect ?? 0,
-            totalQuestions: category.bestTotal ?? 0,
-          }
-        : null;
-  }
 
   // Development: a round frozen at a sample moment (nothing is read).
   const fixtures = useMemo(() => {
@@ -183,7 +163,6 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
       isPerfect: summary.isPerfect,
       bestStreak: summary.bestStreak,
       missed: summary.missed,
-      previousBest: previousRef.current ?? null,
     });
   };
 

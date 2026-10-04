@@ -1915,13 +1915,13 @@ Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5)
 - **DA-115** · "Repasemos esto" muestra el texto de las preguntas falladas (no hay campo de tema, BT-40).
 - **DA-116** · El guardado ocurre en la pantalla de Resultado (no al pulsar "Ver resultado") para tener guardando / error con reintento; el bono de 25 puntos por ronda perfecta ya existía y se mantiene.
 - **DA-117** · Una categoría con menos de 10 preguntas juega con las que tenga; "perfecto" y los niveles se miden por proporción (≥ 60 % = medio).
-- **DA-118** · El récord es el mejor `score` (porcentaje) de `quiz_attempts`; "nuevo récord" exige superarlo.
+- **DA-118** · El récord es el mejor `score` (porcentaje) de `quiz_attempts`; "nuevo récord" exige superarlo y se compara con el mejor intento **leído del servidor justo antes de guardar** (una consulta en `submitQuizAttempt`, excluyendo el propio intento), no con la caché de la portada. La pastilla aparece cuando el guardado responde.
 - **D-74** · **Quiz Master en la portada** (no está en el diseño): fila con una barra de un segmento por categoría y la línea "N de M categorías al 100 %".
 - **D-75** · **Últimas rondas** con datos reales (el prototipo trae dos de ejemplo); sin rondas, la sección no aparece.
 - **D-76** · El halo de la ronda y del resultado es un degradado lineal vertical (el prototipo usa radial); las ondas del resultado son anillos animados.
 - **D-77** · Ronda y resultado son escena en Light y Dark (valores de Light, como D-04, D-05, D-06, D-18, D-19, D-20).
 
-**Bloqueos y pendientes**: BT-38 (puntos con racha), BT-39 (que el servidor decida `quiz_master`), BT-40 (tema, nivel, foto y desafío del día). Si la portada se abre sin que el resumen de Quiz haya cargado, "Nuevo récord" puede mostrarse en la primera ronda de una categoría ya jugada (el récord previo se toma del resumen cacheado).
+**Bloqueos y pendientes**: BT-38 (**alta**: el servidor debe calcular los puntos del quiz), BT-39 (verificado: el servidor **no** otorga `quiz_master` solo; la app sigue enviando `quiz_master_unlocked` tras comprobar la regla), BT-40 (tema, nivel, foto y desafío del día).
 
 **Checklist de QA real (falcon1989)**: `QA_CHECKLIST.md` · Bloque 9b (13 pasos: portada, ronda, segundo plano, guardado y reintento, récord, niveles, repetir, Primer Quiz, Quiz Master, Logros, error sin red y puntos con racha).
 
