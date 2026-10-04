@@ -231,6 +231,31 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Propuesta:** una RPC `get_badge_progress()` que devuelva por badge `{badge_id, current, target}` para el usuario (rachas completas, quizzes perfectos, rutinas propias), y una categoría por badge (`constancia | retos | fuerza | habitos`) en `badges` para que la app no la mantenga a mano.
 - **Prioridad:** Media. **No bloquea.**
 
+### BT-25 · Varias conversaciones con ELLIE
+- **Qué falta:** `chat_messages` guarda un único hilo por usuario (`user_id, role, content, created_at`). "Nueva conversación" solo puede borrar el hilo entero (`clearEllieChatHistory`); no hay lista de conversaciones ni títulos.
+- **Propuesta:** tabla `ellie_conversations (id, user_id, title, created_at, updated_at)` y `chat_messages.conversation_id` (nullable para el hilo antiguo, que pasaría a ser la conversación inicial). La función `ellie-chat` no cambia: la app sigue enviando los mensajes de la conversación activa.
+- **Prioridad:** Media. **No bloquea** (el diseño no tiene lista de conversaciones).
+
+### BT-26 · Límite de uso de ELLIE visible
+- **Qué falta:** la app no conoce la cuota de mensajes: solo ve el status HTTP (429/402 se leen como "límite alcanzado") y un `{error}` de texto. No puede avisar "te quedan N mensajes" ni cuándo se renueva.
+- **Propuesta:** que `ellie-chat` devuelva `X-RateLimit-Remaining` y `X-RateLimit-Reset` (y en el 429 un cuerpo `{error, code:'rate_limit', resetAt}`), o una RPC `get_ellie_usage()`.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-27 · Streaming real de la respuesta
+- **Qué falta:** React Native lee la respuesta completa (`response.text()`); no hay texto que aparezca mientras ELLIE escribe, solo el indicador de "escribiendo".
+- **Propuesta:** exponer la respuesta SSE de forma que se pueda leer por trozos (o aceptar `react-native-sse`/`expo/fetch`), sin cambiar el servidor.
+- **Prioridad:** Baja.
+
+### BT-28 · Tarjeta de recomendación y propuesta proactiva
+- **Qué falta:** la función solo devuelve `generate_workout_plan`, `generate_nutrition_plan` o texto. El diseño muestra además una tarjeta de recomendación (p. ej. "Movilidad de cadera") y, en la portada, una propuesta proactiva con respuesta "Sí, ajústalo / Mejor completo".
+- **Propuesta:** una herramienta `recommend_content` (`{title, subtitle, kind, target}`) y un endpoint o campo en el contexto que devuelva la propuesta del día con sus dos respuestas.
+- **Prioridad:** Baja.
+
+### BT-29 · Artículos para "Para leer con ELLIE"
+- **Qué falta:** no existe fuente de artículos (título, categoría, minutos, imagen). La portada usa tres temas fijos que abren el chat con una pregunta.
+- **Propuesta:** tabla `ellie_reads (id, title, category, minutes, image_url, prompt, active)`.
+- **Prioridad:** Baja.
+
 ---
 
 ## Historial
@@ -241,3 +266,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-03: lote de backend aplicado: BT-03, BT-12, BT-15, BT-17, BT-19 y BT-20 resueltos; BT-21 nuevo (estructurar `recommended_sets_reps`).
 - 2026-10-03: BT-22 (contador de descartes de la tarjeta de Core 33).
 - 2026-10-03: BT-23 y BT-24 (módulo Progreso).
+- 2026-10-04: BT-25 a BT-29 (módulo ELLIE).
