@@ -256,6 +256,16 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Propuesta:** tabla `ellie_reads (id, title, category, minutes, image_url, prompt, active)`.
 - **Prioridad:** Baja.
 
+### BT-30 · Eliminar cuenta (requisito de Apple)
+- **Qué falta:** no existe ningún flujo de borrado de cuenta en el backend (ni función, ni RPC). La app tiene la UI (Ajustes → Cuenta → "Eliminar cuenta", con doble confirmación), pero la acción final solo avisa de que aún no está disponible. Apple (App Store 5.1.1(v)) lo exige para apps con creación de cuenta.
+- **Propuesta:** una Edge Function `delete-account` (con service role, autenticada por el JWT del usuario) que borre: la foto de `profile-photos/<user_id>/avatar`, las filas del usuario en todas las tablas (o `ON DELETE CASCADE` desde `profiles`) y por último `auth.users`. La app solo llamaría a la función y cerraría sesión. Conviene devolver `{ok:true}` y que sea idempotente.
+- **Prioridad:** Alta (bloquea la revisión de App Store). **No bloquea el QA.**
+
+### BT-31 · Preferencias de notificaciones en el servidor
+- **Qué falta:** los tres interruptores de Ajustes (entreno, hidratación, novedades de ELLIE) se guardan solo en el teléfono (AsyncStorage) y no programan ni cancelan nada: no hay push ni recordatorios locales.
+- **Propuesta:** columna `profiles.notification_prefs jsonb` (`{workouts, hydration, updates}`) y, cuando exista el envío, que lea esa preferencia (push) o que la app programe recordatorios locales a partir de `training_days_per_week`.
+- **Prioridad:** Media. **No bloquea.**
+
 ---
 
 ## Historial
@@ -267,3 +277,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-03: BT-22 (contador de descartes de la tarjeta de Core 33).
 - 2026-10-03: BT-23 y BT-24 (módulo Progreso).
 - 2026-10-04: BT-25 a BT-29 (módulo ELLIE).
+- 2026-10-04: BT-30 y BT-31 (módulo Perfil y Ajustes).

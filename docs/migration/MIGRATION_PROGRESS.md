@@ -1771,3 +1771,35 @@ Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5)
 8. Nueva conversación: confirma y borra el hilo.
 9. Límite (429): comprobar el aviso cuando ocurra.
 
+## 24. Perfil + Ajustes (PROFILE_01–03, HEALTH_02–03, 2026-10-04)
+
+Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5). **Sin escrituras de prueba**: las pantallas se vieron con fixtures (`athelete://dev/profile?screen=<key>`, menú "Ver pantallas de Perfil") y las escrituras reales solo se validaron con tsc.
+
+**Hecho**
+- **Perfil** (`screens/tabs/ProfileScreen.tsx`, ruta `Profile` desde el avatar): retrato a sangre de 460 pt con Editar y Ajustes, cifras (sesiones, racha, puntos), Vitrina (3 últimas medallas + la siguiente en progreso → Logros v2), Tu trayectoria (medallas, récords y primera sesión), plan 2 × 2 y enlace a Ajustes. Estados: cargando, error con reintento y "Completa tu perfil" para quien no terminó el onboarding.
+- **Editar perfil** (`screens/profile/EditProfileScreen.tsx`): foto, nombre, fecha de nacimiento (selector del sistema), peso, altura, objetivo, nivel, días y minutos por sesión. Validaciones del modelo (`profileModel.ts`) = CHECK de `profiles` (nivel `principiante|intermedio|avanzado`, minutos 5–240, objetivos del onboarding incluido `performance`). Guardar solo con cambios y valores válidos; estados guardando / guardado ✓ / error. Solo se escribe lo que cambió (`updateProfileDetails`, ampliada con `trainingLevel` y `preferredSessionMinutes`). Mapeos reutilizados del onboarding.
+- **Ajustes** (`screens/profile/SettingsScreen.tsx`): Mi plan, Comunidad, Integraciones, Preferencias (Apariencia Claro/Oscuro/Sistema con el ThemeProvider y tres interruptores) y Cuenta (correo, cambiar contraseña, cerrar sesión, eliminar cuenta).
+- **Apple Health** (`HealthSettingsScreen`): pantalla de referencia como placeholder.
+- Primitivos nuevos: `FormRow` y `StepperButtons`. `GlassHeader` admite una acción ancha (`minWidth` en lugar de `width`).
+- Datos nuevos: `ProfileRecord.createdAt`, `fetchProfileStats`/`useProfileStats`, `useBadgeShelves`, `useProfilePhotoUri`.
+
+**Desviaciones**
+- **DA-96** · Comunidad ("Amigos y retos", "Privacidad social") queda deshabilitada con "Próximamente" hasta el módulo Comunidad.
+- **DA-97** · Apple Health: pantalla placeholder; "Conectar" solo avisa que llegará pronto (no hay HealthKit). Siempre "Sin conectar".
+- **DA-98** · Editar perfil añade foto, Nivel y Minutos por sesión (no aparecen en PROFILE_02, pedidos en el módulo). Peso con paso de 0,5 kg.
+- **DA-99** · Cambiar contraseña reutiliza el flujo de recuperación existente: envía el enlace al correo (no se pide la contraseña actual en la app). El diseño no tiene esta fila.
+- **DA-100** · Eliminar cuenta: UI con doble confirmación; la acción final avisa de que no está disponible (BT-30). Fila no presente en el diseño.
+- **DA-101** · Los interruptores de notificaciones solo guardan la preferencia en el teléfono (BT-31). No hay selector de unidades: el diseño no lo incluye (peso en kg, altura en cm).
+- **D-66** · El retrato usa una foto PLACEHOLDER (`hero-entreno`) si el usuario no tiene foto; con foto se muestra la suya.
+- **D-67** · La trayectoria muestra como máximo 5 hitos (medallas con fecha, récords y primera sesión).
+
+**QA real pendiente (lo hace el usuario con falcon1989)**
+1. Perfil desde el avatar de Inicio: nombre, objetivo, días, cifras y vitrina coinciden con tus datos; tocar la vitrina abre Logros.
+2. Editar → cambiar peso/nivel/minutos/objetivo → Guardar: comprobar `profiles` (`weight`, `training_level`, `preferred_session_minutes`, `goal`) y que Perfil, Inicio y Entrenos lo reflejan. Probar el límite: minutos 5 y 240 guardan; valores fuera de rango no se pueden elegir.
+3. Cambiar foto: sube a `profile-photos/<id>/avatar`, se ve en Perfil y en el avatar de Inicio (puede tardar un refresco).
+4. Error de guardado: con modo avión, Guardar muestra el aviso y deja reintentar.
+5. Ajustes: Apariencia cambia el tema al instante; interruptores se recuerdan al reabrir.
+6. Cambiar contraseña: llega el correo con el enlace. Cerrar sesión: pide confirmación y vuelve a Auth.
+7. Eliminar cuenta: ambas confirmaciones, y el aviso final (BT-30).
+8. Usuario sin onboarding (cuenta nueva): "Completa tu perfil" y Editar con valores por defecto.
+
