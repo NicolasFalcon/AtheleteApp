@@ -1891,3 +1891,38 @@ Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5)
 9. Empezar con un reto ya activo (otro dispositivo o estado antiguo): "Listo" avisa y lleva al reto activo; no se crea una segunda participación.
 10. "Dejar este reto": si el servidor rechaza `status = 'abandoned'` (BT-37), la app muestra el aviso y el reto sigue activo; comprobar el valor en la fila.
 
+
+## 28. Quiz · portada, inicio de desafío, ronda y resultado (2026-10-04)
+
+Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5). **Sin escrituras de prueba**: las escrituras reales (`quiz_attempts`, `quiz_completed`, `quiz_master_unlocked`) solo se validaron con tsc y tests de lógica. **Sin capturas Light/Dark**: el binario instalado en el simulador es anterior a Reanimated nativo (se cierra al arrancar) y las pantallas dev exigen sesión iniciada; hay que hacerlas tras recompilar. Plan y mapeo dato → fuente: `QUIZ_CHECKPOINT.md`.
+
+**Hecho**
+- **Portada** (QUIZ_01): puntos, semana de juego, desafío del día, desafíos con el récord en un anillo, progreso a Quiz Master y últimas rondas, con skeleton, error con reintento y vacío.
+- **Inicio de desafío** (QUIZ_02, nueva ruta `QuizChallenge`), **ronda** (QUIZ_03–06: respuesta con un toque, +N flotante, racha ×2/×3 que enciende barra y fondo, respuesta correcta y explicación si existe, salir con confirmación también con el gesto atrás) y **resultado** (QUIZ_07–09: anillo, mensaje por nivel, puntos / racha / total, "Repasemos esto", "Otra ronda" y "Siguiente desafío").
+- **Guardado en el Resultado**: guarda al llegar (guardando, error con reintento, aviso si el intento se guardó pero la recompensa quedó pendiente). El `id` del intento es estable, así que reintentar no duplica filas ni eventos. Salir sin guardar pide confirmación.
+- **Celebración** (`Celebration`) por cada medalla de `new_badges` de la respuesta del servidor (`first_quiz`, `quiz_master`); la regla de Quiz Master que decide si se envía el evento vive en `completesQuizMaster` (modelo puro).
+- **Estado estable en segundo plano**: la ronda vive en un reducer y las preguntas no se vuelven a pedir (sin refetch, una entrada de caché por ronda; "Otra ronda" sortea otras).
+- **Modelo puro** `features/quiz/quizModel.ts` (racha, puntos, resumen, mejor intento, récord, Quiz Master, selección y barajado de la ronda, semana, desafío del día, historial); `quizMastery` de Inicio delega en él. 31 tests nuevos.
+- **Primitivos v2 nuevos**: `ProgressRing`, `SegmentMeter`, `AnswerTile`; `Celebration.valueSize`; `haptics.error`.
+- **Conexiones**: Inicio (banner) y Notificaciones ya abrían `QuizLanding`; Logros lee `get_badge_progress` (se invalida al guardar). El diseño no tiene entrada desde Progreso, Retos, Logros ni ELLIE.
+- **Dev**: menú "Ver pantallas de Quiz" y `athelete://dev/quiz?screen=<clave>` (24 estados con datos de ejemplo, sin leer ni escribir).
+
+**Desviaciones**
+- **DA-111** · La racha ×2/×3 se calcula en la app y viaja en `points_earned` / `answers[].pointsEarned`; el Resultado muestra `points_added` del servidor (BT-38).
+- **DA-112** · "NIVEL N" no tiene datos: la etiqueta de la card es el estado real (SIN JUGAR · N RONDAS · COMPLETADA).
+- **DA-113** · "Desafío del día" derivado: rota por día entre las categorías no completadas (BT-40).
+- **DA-114** · Las fotos de las categorías son PLACEHOLDER (overhead, barra, movilidad) con el tratamiento del handoff horneado (`assets/v2/photos/quiz`), elegidas por palabra clave del slug; las desconocidas rotan.
+- **DA-115** · "Repasemos esto" muestra el texto de las preguntas falladas (no hay campo de tema, BT-40).
+- **DA-116** · El guardado ocurre en la pantalla de Resultado (no al pulsar "Ver resultado") para tener guardando / error con reintento; el bono de 25 puntos por ronda perfecta ya existía y se mantiene.
+- **DA-117** · Una categoría con menos de 10 preguntas juega con las que tenga; "perfecto" y los niveles se miden por proporción (≥ 60 % = medio).
+- **DA-118** · El récord es el mejor `score` (porcentaje) de `quiz_attempts`; "nuevo récord" exige superarlo.
+- **D-74** · **Quiz Master en la portada** (no está en el diseño): fila con una barra de un segmento por categoría y la línea "N de M categorías al 100 %".
+- **D-75** · **Últimas rondas** con datos reales (el prototipo trae dos de ejemplo); sin rondas, la sección no aparece.
+- **D-76** · El halo de la ronda y del resultado es un degradado lineal vertical (el prototipo usa radial); las ondas del resultado son anillos animados.
+- **D-77** · Ronda y resultado son escena en Light y Dark (valores de Light, como D-04, D-05, D-06, D-18, D-19, D-20).
+
+**Bloqueos y pendientes**: BT-38 (puntos con racha), BT-39 (que el servidor decida `quiz_master`), BT-40 (tema, nivel, foto y desafío del día). Si la portada se abre sin que el resumen de Quiz haya cargado, "Nuevo récord" puede mostrarse en la primera ronda de una categoría ya jugada (el récord previo se toma del resumen cacheado).
+
+**Checklist de QA real (falcon1989)**: `QA_CHECKLIST.md` · Bloque 9b (13 pasos: portada, ronda, segundo plano, guardado y reintento, récord, niveles, repetir, Primer Quiz, Quiz Master, Logros, error sin red y puntos con racha).
+
+**Componentes v1 sin uso (no borrados)**: `features/quiz/components/QuizAnswerOption`, `QuizCategoryCard`, `QuizProgressHeader`, `QuizScoreSummaryCard`; `features/home/components/QuizPromoCard`.

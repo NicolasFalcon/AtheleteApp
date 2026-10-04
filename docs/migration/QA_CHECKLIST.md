@@ -2,7 +2,7 @@
 
 Reúne los checklists de QA real de `MIGRATION_PROGRESS.md` (§12, §15, §18 a §27, incluido el lote de backend BT-22, BT-23, BT-24, BT-30, BT-31 y BT-34) en un solo recorrido, sin duplicados y en el orden del usuario:
 
-**registro → onboarding → Inicio → Entrenos → Sesión → Progreso → ELLIE → Nutrición → Core 33 → Perfil y Ajustes → eliminar cuenta**
+**registro → onboarding → Inicio → Entrenos → Sesión → Progreso → ELLIE → Nutrición → Core 33 → Quiz → Perfil y Ajustes → eliminar cuenta**
 
 > Sin cambios de código. Documento mantenido junto a `MIGRATION_PROGRESS.md`; cuando se resuelva un paso, marca la casilla.
 
@@ -21,8 +21,8 @@ Reúne los checklists de QA real de `MIGRATION_PROGRESS.md` (§12, §15, §18 a 
 - **Consulta Lovable:** al final de cada bloque hay un texto para pegar en Lovable. **Solo lectura**: Lovable debe responder con `SELECT`, sin `INSERT`, `UPDATE`, `DELETE`, DDL ni funciones que escriban, y sin mostrar tokens ni contraseñas. Sustituye `<UID>` por el id de la cuenta (falcon1989 o D).
 
 **Atajos de desarrollo** (opcionales, solo en builds dev)
-- Menús dev: "Ver modos de Inicio", "Ver pantallas de Entrenos / Sesión / Progreso / ELLIE / Nutrición / Core 33 / Perfil", "Restablecer card de Core 33".
-- Arrancar en una pantalla: `xcrun simctl launch booted <bundle> -devTool "athelete://dev/<módulo>?screen=<clave>" -themeMode dark|light` (módulos: `workouts`, `session`, `progress`, `ellie`, `nutrition`, `core33`, `profile`).
+- Menús dev: "Ver modos de Inicio", "Ver pantallas de Entrenos / Sesión / Progreso / ELLIE / Nutrición / Core 33 / Quiz / Perfil", "Restablecer card de Core 33".
+- Arrancar en una pantalla: `xcrun simctl launch booted <bundle> -devTool "athelete://dev/<módulo>?screen=<clave>" -themeMode dark|light` (módulos: `workouts`, `session`, `progress`, `ellie`, `nutrition`, `core33`, `quiz`, `profile`).
 - Los datos de ejemplo de esos atajos **no escriben nada**; este checklist es para datos reales.
 
 ---
@@ -275,6 +275,37 @@ SOLO LECTURA (SELECT). Para user_id = '<UID>':
 4) user_badges con badge_id IN ('streak_7_days','core33_finisher').
 5) profiles: core33_intro_seen_at, core33_completed_at, core33_invite_dismissed_at, core33_invite_dismiss_count.
 6) Confirma que el reference_id de core33_day_completed es '<participation_id>:<YYYY-MM-DD>' (reference_kind participation_date) y el de core33_completed '<participation_id>' (challenge_participation), y que no hay duplicados.
+```
+
+---
+
+## Bloque 9b · Quiz
+
+Referencias: `QUIZ_01` a `QUIZ_09`. Cuenta falcon1989. Sin escrituras de prueba hechas por el desarrollo: **este bloque es el primer QA real de las escrituras del Quiz**. Atajo (datos de ejemplo, no escribe): menú dev "Ver pantallas de Quiz" o `-devTool "athelete://dev/quiz?screen=<clave>"` (`data`, `new`, `homePerfect`, `empty`, `loading`, `error`, `start`, `question`, `correct`, `incorrect`, `streak`, `roundError`, `resultLow`, `resultMid`, `resultPerfect`, `resultRecord`, `resultSaving`, `resultError`, `resultFirstQuiz`, `resultMaster`).
+
+| # | Hacer | Esperar | Base |
+|---|---|---|---|
+| 9b.1 | Inicio → banner Quiz. Ver la portada (Light y Dark): puntos, semana, desafío del día, desafíos con el récord en el anillo, Quiz Master, últimas rondas. | Puntos = `profiles.points`; cada card dice SIN JUGAR / N RONDAS / COMPLETADA y su línea ("Récord 8/10 · a por el 9"). | `quiz_categories`, `quiz_attempts` (la semana y las rondas salen de `completed_at`). |
+| 9b.2 | Tocar un desafío → inicio de desafío → "Empezar". | Récord de la categoría y reglas de la racha; sin preguntas, "Sin preguntas todavía" inactivo. | `quiz_questions` activas de la categoría. |
+| 9b.3 | Jugar una ronda: responder con un toque (sin confirmar). Acertar 3 seguidas, luego fallar una. | Correcta: Ember, +N sube, vibración; racha ×2 (barra y fondo se encienden); fallo: sacudida, respuesta correcta y explicación si existe; la racha vuelve a 0. | — |
+| 9b.4 | A mitad de ronda: pasar la app a segundo plano 30 s y volver; luego tocar la X, el gesto atrás y "Seguir jugando". | La ronda sigue en la misma pregunta con las mismas respuestas. Salir pide confirmación; "Salir" vuelve a la portada y no guarda nada. | Sin fila nueva en `quiz_attempts`. |
+| 9b.5 | Terminar la ronda. ⚠⭐ (primera vez: Primer Quiz) | Resultado con anillo, mensaje según el nivel, puntos / mejor racha / total; "Guardando tu ronda…" y luego los puntos del servidor. Si es el primer quiz: celebración de **Primer Quiz**. | Una fila en `quiz_attempts` (`score`, `correct_count`, `total_questions`, `points_earned`, `answers`); evento `quiz_completed` con `reference_id` = id del intento; medalla `first_quiz` una sola vez. |
+| 9b.6 | Sin red (modo avión) justo al terminar. | "No pudimos guardar tu ronda" con "Reintentar"; "Otra ronda" y "Siguiente" piden confirmar la salida sin guardar. Con red, "Reintentar" guarda. | Una sola fila y un solo evento aunque se reintente (mismo id de intento). |
+| 9b.7 | Superar el récord de una categoría. | Pastilla "NUEVO RÉCORD"; la portada muestra el nuevo récord. Si no se supera, línea "NUTRICIÓN · récord 8/10". | — |
+| 9b.8 | Ronda de 6–9 aciertos y de menos de 6. | Medio: una onda; bajo: sin ondas y "Repasemos esto" con las preguntas falladas. Perfecto: resplandor y tres ondas. | — |
+| 9b.9 | "Otra ronda" y "Siguiente desafío · X". | Otra ronda: preguntas nuevas (otro orden y otras opciones). Siguiente: inicio de desafío de la siguiente categoría. | — |
+| 9b.10 | Completar el 100 % en **todas** las categorías activas. ⚠⭐ (Quiz Master, una sola vez) | Con la última ronda perfecta, celebración de **Quiz Master**; la barra de Quiz Master de la portada queda completa. Una ronda perfecta más no repite la celebración. | Evento `quiz_master_unlocked` sin referencia; medalla `quiz_master` una sola vez. |
+| 9b.11 | Logros: Primer Quiz y Quiz Master. | Medalla y avance salen de `get_badge_progress` (p. ej. "2 de 3"). | `user_badges`. |
+| 9b.12 | Sin red: abrir la portada. | Error con "Reintentar" que recupera. | — |
+| 9b.13 | Comprobar los puntos: la ronda con racha ×2/×3 (BT-38). | Los puntos del Resultado son los de `points_added`; anotar si difieren de la suma de la ronda. | `gamification_events.points` y `quiz_attempts.points_earned`. |
+
+**Consulta Lovable (solo lectura) · Bloque 9b**
+```
+SOLO LECTURA (SELECT). Para user_id = '<UID>', desde <HORA_INICIO>:
+1) quiz_attempts: id, category_id, score, correct_count, total_questions, points_earned, completed_at y el conteo de answers.
+2) gamification_events de tipo quiz_completed y quiz_master_unlocked (reference_id, points, metadata->'validation').
+3) user_badges con badge_id en ('first_quiz','quiz_master') y su fecha.
+4) Duplicados: attempts con el mismo id (debe ser 0) y eventos quiz_completed repetidos por reference_id (debe ser 0).
 ```
 
 ---

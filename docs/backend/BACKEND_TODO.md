@@ -322,6 +322,22 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 
 ---
 
+## Quiz
+
+### BT-38 · Confirmar cómo calcula los puntos `quiz_completed` con la racha ×2 / ×3
+- **Qué falta:** el diseño de la ronda multiplica cada acierto por ×2 (desde 3 seguidos) y ×3 (desde 5). La app calcula el total (`points_earned` del intento y `pointsEarned` de cada respuesta en `answers`, más 25 si la ronda es perfecta) y lo guarda en `quiz_attempts`; `quiz_completed` otorga lo que el servidor deduce del intento guardado. No consta si el servidor usa `points_earned` tal cual, lo recalcula desde `answers` (sin racha) o lo limita.
+- **Qué hace falta:** confirmar la fórmula y el tope. Si recalcula sin racha, o bien se acepta la racha en el servidor (p. ej. validando `answers[].pointsEarned` ≤ 3 × `points_reward`), o bien se retira la racha del diseño. La pantalla de Resultado muestra los puntos de la respuesta (`points_added`), así que siempre enseña lo que concede el servidor.
+- **Prioridad:** Media. **No bloquea.**
+
+### BT-39 · Que el servidor decida `quiz_master` a partir de `quiz_completed`
+- **Qué falta:** hoy la app comprueba en el cliente que todas las categorías activas tienen un intento al 100 % y, solo entonces, envía `quiz_master_unlocked` (una vez por usuario). En modo `log` el servidor acepta ese evento sin comprobar la regla; la medalla depende de que la app lo calcule bien.
+- **Propuesta:** que `award_gamification_event('quiz_completed', …)` devuelva `quiz_master` en `new_badges` cuando el intento guardado completa todas las categorías activas al 100 % (la misma regla que `get_badge_progress`), y retirar la llamada extra. La celebración de la app ya sale de `new_badges`, no cambiaría nada más.
+- **Prioridad:** Baja. **No bloquea.**
+
+### BT-40 · Datos del diseño que el Quiz no tiene (opcionales)
+- **Qué falta:** (a) un **tema** por pregunta (`quiz_questions.topic`) para "Repasemos esto" (hoy la app muestra el texto de las preguntas falladas); (b) **nivel** y **foto** por categoría (`quiz_categories.level`, `image_url`) para "NIVEL 3" y la portada (hoy: etiqueta con el estado real y fotos de ejemplo por palabra clave del slug); (c) un **desafío del día** elegido por el servidor (hoy la app rota entre las categorías no completadas).
+- **Prioridad:** Baja. **No bloquea.**
+
 ## Historial
 - 2026-10-02: documento creado con BT-01 a BT-11.
 - 2026-10-03: BT-12 a BT-16 (módulo Entrenos).
@@ -338,3 +354,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-04: BT-37 (valores de `status` y formato de `habits` de Core 33, por confirmar).
 - 2026-10-04: BT-34 resuelto (meta de agua = `daily_water_goal` × 250 ml); DP-01 añadida (decisión de producto: meta por defecto 14 o 10 vasos).
 - 2026-10-04: BT-37 resuelto.
+- 2026-10-04: BT-38 a BT-40 (módulo Quiz).
