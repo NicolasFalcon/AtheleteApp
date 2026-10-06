@@ -16,7 +16,7 @@ import { BlockError } from '@app/features/home/v2/BlockError';
 import {
   EQUIPMENT_IMAGES,
   SCAN_IMAGE,
-  ZONE_IMAGES,
+  MUSCLE_IMAGES,
 } from '@app/features/workouts/workoutAssets';
 import {
   countBy,
@@ -122,7 +122,7 @@ export function ExercisesView({
                 items={ZONES.map(zone => ({
                   ...zone,
                   count: zoneCounts[zone.key],
-                  image: ZONE_IMAGES[zone.key],
+                  image: MUSCLE_IMAGES[zone.key],
                   onPress: () => onOpenZone(zone.key),
                 }))}
               />

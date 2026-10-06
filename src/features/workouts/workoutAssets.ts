@@ -23,6 +23,18 @@ export const ZONE_IMAGES: Record<ZoneKey, ImageSourcePropType> = {
   glutes: require('@app/assets/v2/workouts/zone-glutes.png'),
 };
 
+// Zone-grid images (Ejercicios · Por zona): full-bleed, no text or borders.
+// Static requires only; the tile crops them with resizeMode "cover".
+export const MUSCLE_IMAGES: Record<ZoneKey, ImageSourcePropType> = {
+  chest: require('@app/assets/images/musculos_atheleteapp/musculo_pecho.png'),
+  back: require('@app/assets/images/musculos_atheleteapp/musculo_espalda.png'),
+  shoulders: require('@app/assets/images/musculos_atheleteapp/musculo_hombros.png'),
+  arms: require('@app/assets/images/musculos_atheleteapp/musculo_brazos.png'),
+  core: require('@app/assets/images/musculos_atheleteapp/musculo_core.png'),
+  legs: require('@app/assets/images/musculos_atheleteapp/musculo_piernas.png'),
+  glutes: require('@app/assets/images/musculos_atheleteapp/musculo_gluteos.png'),
+};
+
 const THUMBS: Record<ZoneKey | 'default', ImageSourcePropType> = {
   chest: require('@app/assets/v2/workouts/thumb-chest.jpg'),
   back: require('@app/assets/v2/workouts/thumb-back.jpg'),

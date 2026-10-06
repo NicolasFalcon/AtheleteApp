@@ -6,7 +6,13 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, {
+  Defs,
+  LinearGradient,
+  RadialGradient,
+  Rect,
+  Stop,
+} from 'react-native-svg';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 
@@ -17,8 +23,8 @@ export type ZoneTileItem = {
   column: 1 | 2;
   span: 1 | 2;
   dot?: boolean; // Ember point (Pecho, the protagonist)
-  // Anatomical crop with the prototype filter and left fade baked in
-  // (PLACEHOLDER until the definitive assets, handoff §15).
+  // Full-bleed anatomical image without text or borders; the dark
+  // bottom-left fade is drawn by the tile.
   image: ImageSourcePropType;
   onPress: () => void;
 };
@@ -88,9 +94,30 @@ function ZoneTile({ item }: { item: ZoneTileItem }) {
           fill={`url(#zone-${item.key})`}
         />
       </Svg>
-      <View style={styles.imageBox}>
-        <Image source={item.image} resizeMode="cover" style={styles.fill} />
-      </View>
+      <Image source={item.image} resizeMode="cover" style={styles.fill} />
+      {/* Dark fade from the bottom-left corner so the label stays legible */}
+      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <LinearGradient
+            id={`fade-${item.key}`}
+            x1="0"
+            y1="1"
+            x2="0.75"
+            y2="0.25"
+          >
+            <Stop offset="0" stopColor="#000000" stopOpacity="0.85" />
+            <Stop offset="0.55" stopColor="#000000" stopOpacity="0.35" />
+            <Stop offset="1" stopColor="#000000" stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x="0"
+          y="0"
+          width="100%"
+          height="100%"
+          fill={`url(#fade-${item.key})`}
+        />
+      </Svg>
       {item.dot ? (
         <View style={styles.dot}>
           <View style={styles.dotHalo} />
@@ -126,14 +153,10 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: 'hidden',
   },
-  imageBox: {
+  fill: {
     position: 'absolute',
     top: 0,
-    right: 0,
-    bottom: 0,
-    width: '70%',
-  },
-  fill: {
+    left: 0,
     width: '100%',
     height: '100%',
   },
