@@ -17,7 +17,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-04 | Gamificación | Activar el modo `strict` | Media | No |
 | BT-05 | Gamificación | Cerrar `UPDATE` de `profiles.points` e `INSERT` en `user_badges` | Media | No (depende de la web) |
 | BT-06 | ELLIE / Nutrición | Confirmar si `ellie-chat` usa el género para calorías | Baja | No |
-| BT-41 | Perfil | `profiles_gender_check` debe aceptar `other` (opción "Otro" del onboarding) | Media | No (se guarda NULL) |
+| BT-41 | Perfil | ~~`profiles_gender_check` debe aceptar `other`~~ | — | **Resuelto** (2026-10-06) |
 | BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
 | BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
 | BT-08 | Social | Proceso de moderación (revisión de reportes en 24 h, contacto de soporte) | Alta antes de lanzar Comunidad | Sí, para publicar Comunidad |
@@ -341,9 +341,12 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Qué falta:** (a) un **tema** por pregunta (`quiz_questions.topic`) para "Repasemos esto" (hoy la app muestra el texto de las preguntas falladas); (b) **nivel** y **foto** por categoría (`quiz_categories.level`, `image_url`) para "NIVEL 3" y la portada (hoy: etiqueta con el estado real y fotos de ejemplo por palabra clave del slug); (c) un **desafío del día** elegido por el servidor (hoy la app rota entre las categorías no completadas).
 - **Prioridad:** Baja. **No bloquea.**
 
-### BT-41 · "Otro" en `profiles.gender`
+### BT-41 · "Otro" en `profiles.gender` · ✅ resuelto (2026-10-06)
+- **Aplicado por backend:** el CHECK acepta `NULL`, `'male'`, `'female'` y `'other'`. La app guarda "Otro" como `'other'` (`GENDER_OTHER_STORED = true`).
+
+- **Pedido original:**
 - **Qué falta:** `profiles_gender_check` (migración web `20260611090000`) solo admite `NULL`, `'male'` y `'female'`. El onboarding y Editar perfil ofrecen Mujer / Hombre / Otro.
-- **Mientras tanto:** la app guarda "Otro" como `NULL` (`GENDER_OTHER_STORED = false` en `genderModel.ts`); para la estimación de kcal y para ELLIE equivale a vacío.
+
 - **Propuesta:** cambiar el CHECK a `gender IS NULL OR gender IN ('male','female','other')`, sin tocar RLS. Cuando esté aplicado, poner `GENDER_OTHER_STORED = true`.
 - **Prioridad:** Media. **No bloquea.**
 

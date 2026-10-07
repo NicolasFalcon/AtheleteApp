@@ -2,10 +2,9 @@ import type { ProfileGender } from '@app/types/auth';
 
 // profiles.gender (TEXT, nullable). The CHECK profiles_gender_check from the
 // web migration 20260611090000 only accepts 'male' | 'female' (or NULL). The
-// third option "Otro" is stored as 'other' once backend extends that CHECK
-// (BT-41). Until then it is kept in the app but written as NULL, so the
-// profile update never fails on the constraint.
-export const GENDER_OTHER_STORED = false;
+// third option "Otro" is stored as 'other' since backend extended the CHECK
+// (BT-41, resolved 2026-10-06). Set the flag to false to write it as NULL.
+export const GENDER_OTHER_STORED = true;
 
 export const GENDER_OPTIONS: ReadonlyArray<{
   value: ProfileGender;

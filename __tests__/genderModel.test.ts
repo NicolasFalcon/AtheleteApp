@@ -1,5 +1,6 @@
 import {
   GENDER_OPTIONS,
+  GENDER_OTHER_STORED,
   estimateBmr,
   genderFromDb,
   genderLabel,
@@ -25,11 +26,12 @@ describe('gender model', () => {
     expect(genderFromDb(null)).toBeNull();
   });
 
-  it('writes only what the CHECK accepts until "other" is allowed', () => {
+  it('stores "other" now that the CHECK accepts it', () => {
+    expect(GENDER_OTHER_STORED).toBe(true);
     expect(genderToDb('male')).toBe('male');
     expect(genderToDb('female')).toBe('female');
-    expect(genderToDb('other')).toBeNull();
-    expect(genderToDb('other', true)).toBe('other');
+    expect(genderToDb('other')).toBe('other');
+    expect(genderToDb('other', false)).toBeNull();
     expect(genderToDb(null, true)).toBeNull();
   });
 
