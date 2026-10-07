@@ -45,6 +45,7 @@ import {
   type CreateDraft,
 } from '@app/features/social/challengeModel';
 import type { ChallengeMetric } from '@app/features/social/challengeTypes';
+import { handleOf } from '@app/features/social/socialMappers';
 import { activityLine, firstName, joinWithAnd } from '@app/features/social/socialModel';
 import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
 import { safeGoBack } from '@app/navigation/safeGoBack';
@@ -332,7 +333,7 @@ export function SocialCreateChallengeScreen({ navigation, route }: Props) {
                     <View style={styles.flex}>
                       <TextV2 variant="cta">{item.profile.name}</TextV2>
                       <TextV2 variant="meta" tone="secondary">
-                        {item.lastActivity ? activityLine(item.lastActivity) : `@${item.profile.username}`}
+                        {item.lastActivity ? activityLine(item.lastActivity) : handleOf(item.profile.username)}
                       </TextV2>
                     </View>
                     <View

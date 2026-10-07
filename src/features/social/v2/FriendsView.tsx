@@ -22,6 +22,7 @@ import {
   isTodayActivity,
   mapSendRequestStatus,
 } from '@app/features/social/socialModel';
+import { handleOf } from '@app/features/social/socialMappers';
 import type {
   FindUserResult,
   FriendsOverview,
@@ -155,12 +156,25 @@ export function FriendsView({
       fail();
     }
   };
+  // The result row switches to "Solicitado" at once; it goes back if the
+  // request is refused or fails.
+  const markLookup = (id: string, relationship: FindUserResult['relationship']) =>
+    setLookup(current =>
+      current?.result?.user_id === id
+        ? { ...current, result: { ...current.result, relationship } }
+        : current,
+    );
   const send = async (result: FindUserResult) => {
+    markLookup(result.user_id, 'request_sent');
     try {
       const sent = await service.sendFriendRequest(result.user_id);
       const outcome = mapSendRequestStatus(sent, firstName(result.name));
+      if (!outcome.ok) {
+        markLookup(result.user_id, result.relationship);
+      }
       show(outcome.message, outcome.ok ? undefined : 'error');
     } catch {
+      markLookup(result.user_id, result.relationship);
       fail();
     }
   };
@@ -219,7 +233,7 @@ export function FriendsView({
                     <PersonRow
                       key={item.request.id}
                       name={item.profile.name}
-                      subtitle={`@${item.profile.username}`}
+                      subtitle={handleOf(item.profile.username)}
                       avatar={{
                         avatarKey: item.profile.avatar_key,
                         profilePhotoUrl: item.profile.profile_photo_url,
@@ -243,7 +257,7 @@ export function FriendsView({
                       subtitle={
                         item.lastActivity
                           ? activityLine(item.lastActivity)
-                          : `@${item.profile.username}`
+                          : handleOf(item.profile.username)
                       }
                       today={
                         item.lastActivity
@@ -270,7 +284,7 @@ export function FriendsView({
                     <PersonRow
                       key={item.request.id}
                       name={item.profile.name}
-                      subtitle={`@${item.profile.username}`}
+                      subtitle={handleOf(item.profile.username)}
                       avatar={{
                         avatarKey: item.profile.avatar_key,
                         profilePhotoUrl: item.profile.profile_photo_url,
@@ -295,7 +309,7 @@ export function FriendsView({
           <GroupHeader title="Resultado" count={1} />
           <PersonRow
             name={lookupResult.name}
-            subtitle={`@${lookupResult.username}`}
+            subtitle={handleOf(lookupResult.username)}
             avatar={{
               avatarKey: lookupResult.avatar_key,
               relationship: lookupResult.relationship,

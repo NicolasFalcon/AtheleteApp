@@ -52,6 +52,7 @@ export function SocialInviteScreen({ navigation }: Props) {
   const settings = useSocialResource('getSettings', s => s.getSettings());
   const invites = useSocialResource('getInvites', s => s.getInvites());
   const [creating, setCreating] = useState(false);
+  const [revoking, setRevoking] = useState<string | null>(null);
 
   const list = invites.data ?? [];
   const active = list.filter(invite => isInviteActive(invite));
@@ -87,6 +88,21 @@ export function SocialInviteScreen({ navigation }: Props) {
       toast.show('No se pudo crear el enlace', { tone: 'error' });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const revoke = async (id: string) => {
+    if (revoking) {
+      return;
+    }
+    setRevoking(id);
+    try {
+      const revoked = await service.revokeInvite(id);
+      toast.show(revoked ? 'Enlace revocado' : 'Ese enlace ya se había usado');
+    } catch {
+      toast.show('No se pudo revocar el enlace', { tone: 'error' });
+    } finally {
+      setRevoking(null);
     }
   };
 
@@ -172,7 +188,15 @@ export function SocialInviteScreen({ navigation }: Props) {
                   }
                   title={`Enlace …${invite.token.slice(-4)}`}
                   subtitle={inviteExpiryLabel(invite.expires_at)}
-                  trailing="chevron"
+                  trailing={
+                    <Button
+                      label="Revocar"
+                      variant="secondary"
+                      size="sm"
+                      loading={revoking === invite.id}
+                      onPress={() => revoke(invite.id)}
+                    />
+                  }
                   accessibilityLabel={`Compartir de nuevo el enlace que termina en ${invite.token.slice(-4)}`}
                   onPress={() => share(inviteMessage(myName, inviteUrl(invite.token)))}
                 />

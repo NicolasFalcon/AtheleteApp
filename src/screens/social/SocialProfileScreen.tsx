@@ -103,6 +103,7 @@ export function SocialProfileScreen({ navigation, route }: Props) {
   const lookup = useSocialResource('getProfile', s => s.getProfile(userId), [userId]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(Boolean(devConfirmBlock));
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const data = lookup.data;
@@ -162,6 +163,16 @@ export function SocialProfileScreen({ navigation, route }: Props) {
       await service.blockUser(userId);
       setConfirmBlock(false);
       show(`Bloqueaste a ${firstName(name)}`);
+    });
+  const removeFriend = () =>
+    run(async () => {
+      const removed = await service.removeFriend(userId);
+      setConfirmRemove(false);
+      show(
+        removed
+          ? `${firstName(name)} ya no es tu amigo`
+          : `${firstName(name)} ya no estaba en tu lista`,
+      );
     });
   const unblock = () =>
     run(async () => {
@@ -374,6 +385,16 @@ export function SocialProfileScreen({ navigation, route }: Props) {
         title={name}
       >
         <View style={styles.menu}>
+          {actions.canRemove ? (
+            <Button
+              label={`Eliminar a ${firstName(name)} de tus amigos`}
+              variant="outline"
+              onPress={() => {
+                setMenuOpen(false);
+                setConfirmRemove(true);
+              }}
+            />
+          ) : null}
           {actions.canBlock ? (
             <Button
               label={`Bloquear a ${firstName(name)}`}
@@ -395,6 +416,25 @@ export function SocialProfileScreen({ navigation, route }: Props) {
             />
           ) : null}
         </View>
+      </Sheet>
+
+      <Sheet
+        open={confirmRemove}
+        onClose={() => setConfirmRemove(false)}
+        title={`¿Eliminar a ${firstName(name)} de tus amigos?`}
+        footer={
+          <Button
+            label="Eliminar"
+            loading={busy}
+            loadingLabel="Eliminando"
+            onPress={removeFriend}
+            style={styles.flex}
+          />
+        }
+      >
+        <TextV2 variant="body" tone="secondary">
+          {`Dejaréis de veros la actividad y los retos compartidos. No le avisamos y puedes volver a agregarle cuando quieras.`}
+        </TextV2>
       </Sheet>
 
       <Sheet

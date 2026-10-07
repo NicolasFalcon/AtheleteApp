@@ -108,6 +108,8 @@ export type RelationActions = {
   canChallenge: boolean;
   canBlock: boolean;
   canUnblock: boolean;
+  // Eliminar amigo (remove_friend), with confirmation.
+  canRemove: boolean;
   // "No acepta solicitudes" instead of "Agregar" (Q12).
   requestsClosed: boolean;
 };
@@ -126,6 +128,7 @@ export function relationActions(
     canChallenge: state === 'friends',
     canBlock: state !== 'self' && state !== 'blocked',
     canUnblock: state === 'blocked',
+    canRemove: state === 'friends',
     requestsClosed: state === 'none' && !acceptsRequests,
   };
 }

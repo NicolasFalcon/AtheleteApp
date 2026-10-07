@@ -15,6 +15,7 @@ import {
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { ROOT_ROUTES } from '@app/constants/routes';
+import { handleOf } from '@app/features/social/socialMappers';
 import { firstName } from '@app/features/social/socialModel';
 import {
   useSocialResource,
@@ -113,7 +114,9 @@ export function SocialBlockedScreen({ navigation }: Props) {
                     key={entry.block.blocked_id}
                     name={name}
                     subtitle={
-                      entry.profile ? `@${entry.profile.username}` : 'Perfil no disponible'
+                      entry.profile
+                        ? handleOf(entry.profile.username) || 'Perfil no disponible'
+                        : 'Perfil no disponible'
                     }
                     avatar={{
                       avatarKey: entry.profile?.avatar_key,

@@ -140,8 +140,15 @@ describe('relationship and allowed actions', () => {
       canChallenge: false,
       canBlock: false,
       canUnblock: true,
+      canRemove: false,
       requestsClosed: false,
     });
+  });
+
+  it('only a friend can be removed', () => {
+    expect(relationActions('friends').canRemove).toBe(true);
+    expect(relationActions('none').canRemove).toBe(false);
+    expect(relationActions('blocked').canRemove).toBe(false);
   });
 
   it('self: no social action at all', () => {
