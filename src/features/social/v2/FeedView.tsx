@@ -32,6 +32,7 @@ export function FeedView({
   nearEnd,
   onCompose,
   onOpenPost,
+  onOpenRoutine,
   onOpenProfile,
 }: {
   me: SocialProfileRow;
@@ -39,6 +40,7 @@ export function FeedView({
   nearEnd: boolean;
   onCompose: () => void;
   onOpenPost: (postId: string) => void;
+  onOpenRoutine: (postId: string) => void;
   onOpenProfile: (userId: string) => void;
 }) {
   const { colors } = useThemeV2();
@@ -164,6 +166,7 @@ export function FeedView({
                 post={entry.post}
                 withTabBar
                 onOpenPost={() => onOpenPost(entry.post.id)}
+                onOpenRoutine={() => onOpenRoutine(entry.post.id)}
                 onOpenAuthor={
                   entry.post.author
                     ? () => onOpenProfile(entry.post.author_id)

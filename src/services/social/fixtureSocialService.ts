@@ -11,6 +11,26 @@ import {
   normalizeUsername,
   validateUsername,
 } from '@app/features/social/socialModel';
+import { challengeTitle, challengeViewState, validateManualAmount } from '@app/features/social/challengeModel';
+import type {
+  BoardEntry,
+  ChallengeBoard,
+  ChallengeSummary,
+  CreateChallengeInput,
+  CreateChallengeResult,
+  ManualContributionResult,
+  MyChallenges,
+} from '@app/features/social/challengeTypes';
+import type { FixtureChallenge } from '@app/dev/socialChallengeFixtures';
+import type {
+  ModerationAction,
+  ModerationActionRow,
+  ModerationQueueRow,
+  ModerationTarget,
+  ModeratorRole,
+} from '@app/features/social/moderationModel';
+import { allowedActions } from '@app/features/social/moderationModel';
+import type { SocialNotification } from '@app/features/social/notificationModel';
 import { validatePost } from '@app/features/social/postModel';
 import type {
   ActivityItem,
@@ -51,6 +71,7 @@ import type {
 let state: FixtureState = buildFixtureState('default');
 let version = 0;
 let resetVersion = 0;
+let sequence = 0;
 const listeners = new Set<() => void>();
 
 function commit(next: FixtureState) {
@@ -80,8 +101,19 @@ export const socialFixtureStore = {
   },
   // "Reintentar" on an error state: the next load succeeds.
   clearFailure() {
-    if (state.failure) {
-      commit({ ...state, failure: null });
+    if (
+      state.failure ||
+      state.challengesFailure ||
+      state.notificationsFailure ||
+      state.moderationFailure
+    ) {
+      commit({
+        ...state,
+        failure: null,
+        challengesFailure: null,
+        notificationsFailure: null,
+        moderationFailure: null,
+      });
     }
   },
   getState: () => state,
@@ -110,6 +142,56 @@ async function feedReady(isMore: boolean): Promise<void> {
   ) {
     throw new Error('Sin conexión (datos de ejemplo)');
   }
+}
+
+// Sections with their own failure (the rest of the hub keeps working).
+async function sectionReady(
+  key: 'challengesFailure' | 'notificationsFailure' | 'moderationFailure',
+): Promise<void> {
+  await ready();
+  if (state[key] === 'loading') {
+    await new Promise<void>(() => {});
+  }
+  if (state[key] === 'error') {
+    throw new Error('Sin conexión (datos de ejemplo)');
+  }
+}
+
+function personProfile(who: string): SocialProfileRow | null {
+  return who === 'me' ? state.meProfile : state.people[who]?.profile ?? null;
+}
+
+function relationOfWho(who: string): RelationshipState {
+  if (who === 'me') {
+    return 'self';
+  }
+  return state.relations[state.people[who]?.profile.id ?? ''] ?? 'none';
+}
+
+function summaryOf(item: FixtureChallenge): ChallengeSummary {
+  const leader = [...item.participants]
+    .filter(entry => entry.who !== 'me')
+    .sort((a, b) => b.progress - a.progress)[0];
+  return {
+    challenge: item.head,
+    mine: item.mine,
+    people: item.participants.map(entry => ({
+      profile: personProfile(entry.who),
+      isMe: entry.who === 'me',
+    })),
+    inviter: item.inviter ? personProfile(item.inviter) : null,
+    participants_total: item.participantsTotal,
+    leader: leader
+      ? { profile: personProfile(leader.who), progress: leader.progress }
+      : null,
+  };
+}
+
+function patchChallenge(id: string, patch: (item: FixtureChallenge) => FixtureChallenge): FixtureState {
+  return {
+    ...state,
+    challenges: state.challenges.map(item => (item.head.id === id ? patch(item) : item)),
+  };
 }
 
 const PHOTO_ASSETS: Record<string, ImageSourcePropType> = {
@@ -634,6 +716,247 @@ export const fixtureSocialService: SocialService = {
 
   async getTermsAccepted() {
     return state.termsAccepted;
+  },
+
+  async getMyChallenges(): Promise<MyChallenges> {
+    await sectionReady('challengesFailure');
+    const now = new Date();
+    const result: MyChallenges = { active: [], invitations: [], recently_completed: [], official: null };
+    state.challenges.forEach(item => {
+      const summary = summaryOf(item);
+      if (item.head.kind === 'official') {
+        result.official = summary;
+        return;
+      }
+      const view = challengeViewState(item.head, item.mine, now);
+      if (view === 'invited') {
+        result.invitations.push(summary);
+      } else if (view === 'completed') {
+        result.recently_completed.push(summary);
+      } else if (view === 'active' || view === 'waiting' || view === 'expired') {
+        result.active.push(summary);
+      }
+    });
+    return result;
+  },
+
+  async getChallengeBoard(challengeId): Promise<ChallengeBoard | null> {
+    await sectionReady('challengesFailure');
+    const item = state.challenges.find(entry => entry.head.id === challengeId);
+    if (!item) {
+      return null;
+    }
+    const now = Date.now();
+    const board: BoardEntry[] = item.participants
+      .filter(entry => entry.who === 'me' || state.relations[state.people[entry.who]?.profile.id] === 'friends')
+      .map(entry => ({
+        user_id: personProfile(entry.who)?.id ?? entry.who,
+        profile: personProfile(entry.who),
+        progress: entry.progress,
+        status: entry.status,
+        completed_at: entry.completedAgo ? new Date(now - entry.completedAgo).toISOString() : null,
+        isMe: entry.who === 'me',
+        relationship: relationOfWho(entry.who),
+      }));
+    return {
+      challenge: item.head,
+      mine: summaryOf(item).mine,
+      participants_total: item.participantsTotal,
+      board,
+      week: item.week,
+      manualToday: item.manualToday,
+      activity: item.activity.map((entry, index) => ({
+        id: `${item.head.id}-act-${index}`,
+        profile: personProfile(entry.who),
+        isMe: entry.who === 'me',
+        text: entry.text,
+        created_at: new Date(now - entry.ago).toISOString(),
+      })),
+      inviter: item.inviter ? personProfile(item.inviter) : null,
+    };
+  },
+
+  async respondChallengeInvite(challengeId, accept) {
+    await sectionReady('challengesFailure');
+    const startsAt = new Date();
+    commit(
+      patchChallenge(challengeId, item => ({
+        ...item,
+        head: accept
+          ? {
+              ...item.head,
+              status: 'active',
+              starts_at: startsAt.toISOString(),
+              ends_at: new Date(startsAt.getTime() + item.head.duration_days * 86_400_000).toISOString(),
+            }
+          : item.head,
+        mine: item.mine ? { ...item.mine, status: accept ? 'active' : 'declined' } : item.mine,
+        participants: item.participants.map(entry =>
+          entry.who === 'me' ? { ...entry, status: accept ? 'active' : 'declined' } : entry,
+        ),
+      })),
+    );
+  },
+
+  async joinOfficialChallenge(challengeId) {
+    await sectionReady('challengesFailure');
+    commit(
+      patchChallenge(challengeId, item => ({
+        ...item,
+        mine: { status: 'active', progress: 0, invited_by: null, final_rank_among_friends: null, celebrated_at: null },
+        participants: item.participants.map(entry => (entry.who === 'me' ? { ...entry, progress: 0 } : entry)),
+      })),
+    );
+  },
+
+  async leaveChallenge(challengeId) {
+    await sectionReady('challengesFailure');
+    commit(
+      patchChallenge(challengeId, item => ({
+        ...item,
+        mine: item.mine ? { ...item.mine, status: 'left' } : item.mine,
+        participants: item.participants.filter(entry => entry.who !== 'me'),
+      })),
+    );
+  },
+
+  async cancelFriendChallenge(challengeId) {
+    await sectionReady('challengesFailure');
+    commit(patchChallenge(challengeId, item => ({ ...item, head: { ...item.head, status: 'cancelled' } })));
+  },
+
+  async addManualContribution(challengeId, amount): Promise<ManualContributionResult> {
+    await sectionReady('challengesFailure');
+    const item = state.challenges.find(entry => entry.head.id === challengeId);
+    if (!item || !item.mine || !item.head.allow_manual) {
+      return { ok: false, error: 'not_allowed' };
+    }
+    const check = validateManualAmount(amount, item.manualToday);
+    if (!check.ok) {
+      return check;
+    }
+    const progress = Math.min(item.head.goal, item.mine.progress + amount);
+    const done = progress >= item.head.goal;
+    commit(
+      patchChallenge(challengeId, current => ({
+        ...current,
+        manualToday: current.manualToday + amount,
+        mine: current.mine ? { ...current.mine, progress, status: done ? 'completed' : current.mine.status, final_rank_among_friends: done ? 1 : null } : current.mine,
+        week: current.week ? current.week.map((value, index) => (index === 4 ? (value ?? 0) + amount : value)) : current.week,
+        participants: current.participants.map(entry =>
+          entry.who === 'me' ? { ...entry, progress, status: done ? 'completed' : entry.status } : entry,
+        ),
+      })),
+    );
+    return { ok: true, progress };
+  },
+
+  async createFriendChallenge(input: CreateChallengeInput): Promise<CreateChallengeResult> {
+    await sectionReady('challengesFailure');
+    const friends = Object.entries(state.relations)
+      .filter(([, relation]) => relation === 'friends')
+      .map(([id]) => id);
+    if (input.inviteeIds.length === 0 || input.inviteeIds.some(id => !friends.includes(id))) {
+      return { ok: false, error: 'not_friends' };
+    }
+    sequence += 1;
+    const id = `fx-ch-new-${sequence}`;
+    const title = challengeTitle(input.metric, input.goal, input.durationDays);
+    const now = Date.now();
+    const created: FixtureChallenge = {
+      head: {
+        id, kind: 'friends', metric: input.metric, status: 'pending', title,
+        goal: input.goal, duration_days: input.durationDays, starts_at: null, ends_at: null,
+        invite_expires_at: new Date(now + 7 * 86_400_000).toISOString(),
+        points: 0, badge_id: null, allow_manual: false, creator_id: state.me.id,
+      },
+      mine: { status: 'active', progress: 0, invited_by: null, final_rank_among_friends: null, celebrated_at: null },
+      participants: [
+        { who: 'me', progress: 0, status: 'active' },
+        ...input.inviteeIds.flatMap(inviteeId => {
+          const key = Object.keys(state.people).find(person => state.people[person].profile.id === inviteeId);
+          return key ? [{ who: key, progress: 0, status: 'invited' as const }] : [];
+        }),
+      ],
+      activity: [],
+      inviter: null, manualToday: 0, week: null, participantsTotal: null,
+    };
+    commit({ ...state, challenges: [...state.challenges, created] });
+    return { ok: true, challengeId: id, title };
+  },
+
+  async markChallengeCelebrated(challengeId) {
+    await ready();
+    commit(
+      patchChallenge(challengeId, item => ({
+        ...item,
+        mine: item.mine ? { ...item.mine, celebrated_at: new Date().toISOString() } : item.mine,
+      })),
+    );
+  },
+
+  async getCoParticipants() {
+    await sectionReady('challengesFailure');
+    return state.coParticipants.filter(item => {
+      const relation = state.relations[item.profile.id] ?? 'none';
+      return relation === 'none';
+    });
+  },
+
+  async getNotifications(): Promise<SocialNotification[]> {
+    await sectionReady('notificationsFailure');
+    return [...state.notifications].sort((a, b) => b.created_at.localeCompare(a.created_at));
+  },
+
+  async markNotificationsRead(ids) {
+    await ready();
+    const when = new Date().toISOString();
+    commit({
+      ...state,
+      notifications: state.notifications.map(item =>
+        ids.includes(item.id) && item.read_at === null ? { ...item, read_at: when } : item,
+      ),
+    });
+  },
+
+  async getModeratorRole(): Promise<ModeratorRole | null> {
+    await ready();
+    return state.moderatorRole;
+  },
+
+  async getModerationQueue(): Promise<ModerationQueueRow[]> {
+    await sectionReady('moderationFailure');
+    // RLS: a non-moderator gets no rows.
+    return state.moderatorRole ? state.moderationQueue : [];
+  },
+
+  async getModerationHistory(): Promise<ModerationActionRow[]> {
+    await sectionReady('moderationFailure');
+    return state.moderatorRole ? state.moderationHistory : [];
+  },
+
+  async moderateContent(target: ModerationTarget, targetId: string, action: ModerationAction, note: string | null) {
+    await sectionReady('moderationFailure');
+    const item = state.moderationQueue.find(row => row.target_id === targetId);
+    // moderate_content checks is_moderator() and what the content allows.
+    if (!item || !allowedActions(item, state.moderatorRole).includes(action)) {
+      throw new Error('not_allowed');
+    }
+    const now = new Date().toISOString();
+    const entry: ModerationActionRow = {
+      id: `fx-h-${Date.now()}`,
+      moderator_id: 'fx-mod',
+      target_type: target,
+      target_id: targetId,
+      action,
+      note,
+      created_at: now,
+    };
+    commit({
+      ...state,
+      moderationQueue: state.moderationQueue.filter(row => row.target_id !== targetId),
+      moderationHistory: [entry, ...state.moderationHistory],
+    });
   },
 
   async acceptTerms() {

@@ -288,6 +288,20 @@ export type AppStackParamList = {
   SocialUsername: SocialUsernameRouteParams;
   SocialPost: SocialPostRouteParams;
   SocialCompose: SocialComposeRouteParams;
+  SocialChallenge: { challengeId: string; devSheet?: 'leave' | 'cancel' };
+  SocialCreateChallenge:
+    | {
+        // "Retar" from a friend's profile preselects them.
+        inviteeId?: string;
+        // Dev only: opens at a step with a draft.
+        devStep?: 0 | 1 | 2 | 3 | 4;
+      }
+    | undefined;
+  SocialChallengeDone: { challengeId: string };
+  SocialNotifications: undefined;
+  SocialModeration: { devTab?: 'queue' | 'history' } | undefined;
+  SocialModerationItem: { targetId: string };
+  SocialRoutine: { postId: string };
 };
 
 export type RootStackParamList = {

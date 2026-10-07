@@ -35,6 +35,13 @@ import { QuizChallengeScreen } from '@app/screens/quiz/QuizChallengeScreen';
 import { QuizQuestionScreen } from '@app/screens/quiz/QuizQuestionScreen';
 import { DevFixtureTabs } from '@app/dev/DevFixtureTabs';
 import { QuizResultScreen } from '@app/screens/quiz/QuizResultScreen';
+import { SocialChallengeDoneScreen } from '@app/screens/social/SocialChallengeDoneScreen';
+import { SocialChallengeScreen } from '@app/screens/social/SocialChallengeScreen';
+import { SocialCreateChallengeScreen } from '@app/screens/social/SocialCreateChallengeScreen';
+import { SocialModerationItemScreen } from '@app/screens/social/SocialModerationItemScreen';
+import { SocialModerationScreen } from '@app/screens/social/SocialModerationScreen';
+import { SocialNotificationsScreen } from '@app/screens/social/SocialNotificationsScreen';
+import { SocialRoutineScreen } from '@app/screens/social/SocialRoutineScreen';
 import { SocialComposeScreen } from '@app/screens/social/SocialComposeScreen';
 import { SocialPostScreen } from '@app/screens/social/SocialPostScreen';
 import { SocialBlockedScreen } from '@app/screens/social/SocialBlockedScreen';
@@ -141,6 +148,35 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.SocialBlocked}
             component={SocialBlockedScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialChallenge}
+            component={SocialChallengeScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialCreateChallenge}
+            component={SocialCreateChallengeScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialChallengeDone}
+            component={SocialChallengeDoneScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialNotifications}
+            component={SocialNotificationsScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialModeration}
+            component={SocialModerationScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialModerationItem}
+            component={SocialModerationItemScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialRoutine}
+            component={SocialRoutineScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.SocialPost}
@@ -296,6 +332,35 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.SocialBlocked}
             component={SocialBlockedScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialChallenge}
+            component={SocialChallengeScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialCreateChallenge}
+            component={SocialCreateChallengeScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialChallengeDone}
+            component={SocialChallengeDoneScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialNotifications}
+            component={SocialNotificationsScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialModeration}
+            component={SocialModerationScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialModerationItem}
+            component={SocialModerationItemScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialRoutine}
+            component={SocialRoutineScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.SocialPost}

@@ -11,6 +11,7 @@ import {
   Mail,
   KeyRound,
   Shield,
+  ShieldCheck,
   Sparkles,
   Sun,
   Target,
@@ -41,6 +42,8 @@ import { useAppTheme } from '@app/hooks/useAppTheme';
 import { useAuth } from '@app/hooks/useAuth';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useProfilePreferences } from '@app/hooks/useProfilePreferences';
+import { moderatorPermissions } from '@app/features/social/moderationModel';
+import { useSocialResource } from '@app/features/social/useSocial';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import {
   mapDeleteAccountResponse,
@@ -70,6 +73,10 @@ const NOTIFICATIONS = [
 // Apple Health opens its placeholder screen.
 export function SettingsScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
+  // The moderation row only exists for moderators (app_moderators); a normal
+  // user never sees it and the screen checks the role again.
+  const moderatorRole = useSocialResource(s => s.getModeratorRole());
+  const isModerator = moderatorPermissions(moderatorRole.data ?? null).canSeePanel;
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { preferredMode, setPreferredMode } = useAppTheme();
@@ -219,6 +226,15 @@ export function SettingsScreen({ navigation, route }: Props) {
               })
             }
           />
+          {isModerator ? (
+            <Row
+              leading={icon(ShieldCheck)}
+              title="Moderación"
+              value="Cola de reportes"
+              trailing="chevron"
+              onPress={() => navigation.navigate(APP_ROUTES.SocialModeration)}
+            />
+          ) : null}
           <Row
             leading={icon(Shield)}
             title="Privacidad social"

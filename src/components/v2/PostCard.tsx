@@ -47,6 +47,8 @@ export type PostCardProps = {
   onComment?: () => void;
   routineSaved?: boolean;
   onSaveRoutine?: () => void;
+  // "Ver rutina" opens SOCIAL_04.
+  onOpenRoutine?: () => void;
   // Tab bar visible under the toast (feed) or not (detail).
   withTabBar?: boolean;
 };
@@ -63,6 +65,7 @@ export function PostCard({
   onComment,
   routineSaved = false,
   onSaveRoutine,
+  onOpenRoutine,
   withTabBar = false,
 }: PostCardProps) {
   const { colors } = useThemeV2();
@@ -165,7 +168,7 @@ export function PostCard({
         <RoutineBody
           attachment={attachment as RoutineAttachment}
           saved={routineSaved}
-          onOpen={onOpenPost ?? (() => {})}
+          onOpen={onOpenRoutine ?? onOpenPost ?? (() => {})}
           onSave={onSaveRoutine ?? (() => {})}
         />
       ) : null}

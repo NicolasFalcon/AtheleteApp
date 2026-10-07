@@ -75,11 +75,16 @@ const BAD_PHOTO: PostPhotoDraft = {
   height: 1500,
 };
 
+const SHARE_TITLE: Record<AttachmentKind, string> = {
+  workout: 'Compartir entreno',
+  record: 'Compartir récord',
+  routine: 'Compartir rutina',
+  achievement: 'Compartir logro',
+  challenge: 'Compartir reto',
+};
+
 function titleFor(attach: AttachmentKind | undefined, shared: boolean): string {
-  if (!shared) {
-    return 'Nueva publicación';
-  }
-  return attach === 'record' ? 'Compartir récord' : 'Compartir entreno';
+  return shared && attach ? SHARE_TITLE[attach] : 'Nueva publicación';
 }
 
 // Crear publicación (SOCIAL_02) y Compartir entreno / récord (SOCIAL_13):

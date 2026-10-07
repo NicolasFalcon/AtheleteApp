@@ -153,6 +153,7 @@ export function SocialPostScreen({ navigation, route }: Props) {
                 mine: post.data!.relationship === 'self',
               })
             }
+            onOpenRoutine={() => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}
             routineSaved={saved}
             onSaveRoutine={async () => {
               try {

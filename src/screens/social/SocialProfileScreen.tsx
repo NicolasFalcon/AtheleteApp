@@ -18,7 +18,7 @@ import {
   useToast,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { ROOT_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import {
   canShowRealPhoto,
   firstName,
@@ -278,7 +278,9 @@ export function SocialProfileScreen({ navigation, route }: Props) {
                     <Button
                       label="Retar"
                       size="md"
-                      onPress={() => show('Los retos llegan pronto')}
+                      onPress={() =>
+                        navigation.navigate(APP_ROUTES.SocialCreateChallenge, { inviteeId: userId })
+                      }
                     />
                   ) : null}
                   {actions.canUnblock ? (

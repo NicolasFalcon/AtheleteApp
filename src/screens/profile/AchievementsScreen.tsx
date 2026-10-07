@@ -9,7 +9,7 @@ import {
   StatusBarV2,
   useThemeV2,
 } from '@app/components/v2';
-import { ROOT_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { buildShelves, type ShelfItem } from '@app/features/progress/badgesModel';
 import {
@@ -139,7 +139,15 @@ export function AchievementsScreen({ navigation, route }: Props) {
       >
         {content}
       </ScrollView>
-      <BadgeSheet item={selected} onClose={() => setSelected(null)} />
+      <BadgeSheet
+        item={selected}
+        onClose={() => setSelected(null)}
+        onShare={() => {
+          // TODO(social-wire): the composer receives the badge id (sourceId).
+          setSelected(null);
+          navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'achievement' });
+        }}
+      />
     </View>
   );
 }

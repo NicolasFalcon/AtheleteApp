@@ -8,6 +8,7 @@ import type {
   PostType,
   RecordAttachment,
   ReportReason,
+  RoutineAttachment,
   ToggleLikeResult,
   WorkoutAttachment,
 } from '@app/features/social/postTypes';
@@ -362,6 +363,12 @@ export function recordDeltaLine(attachment: RecordAttachment): string | null {
   return attachment.delta && attachment.delta > 0
     ? `+${attachment.delta} ${attachment.unit} sobre su mejor marca`
     : null;
+}
+
+export function isRoutineAttachment(
+  attachment: PostAttachment | null,
+): attachment is RoutineAttachment {
+  return Boolean(attachment && 'exercises' in attachment && 'difficulty' in attachment);
 }
 
 export function isWorkoutAttachment(

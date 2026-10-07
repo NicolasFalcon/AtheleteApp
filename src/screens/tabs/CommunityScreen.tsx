@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus, Shield } from 'lucide-react-native';
+import { Bell, Plus, Shield } from 'lucide-react-native';
 import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import {
   AvatarStack,
@@ -17,15 +17,14 @@ import {
   type SegmentedOption,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
+import { unreadCount } from '@app/features/social/notificationModel';
 import { hubSubtitle } from '@app/features/social/socialModel';
 import type { FriendsOverview } from '@app/features/social/socialTypes';
 import { useSocialResource } from '@app/features/social/useSocial';
+import { ChallengesView } from '@app/features/social/v2/ChallengesView';
 import { FeedView } from '@app/features/social/v2/FeedView';
 import { FriendsView } from '@app/features/social/v2/FriendsView';
-import {
-  NoFriendsState,
-  SegmentPlaceholder,
-} from '@app/features/social/v2/SocialParts';
+import { NoFriendsState } from '@app/features/social/v2/SocialParts';
 import { useAuth } from '@app/hooks/useAuth';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import type { CommunitySegment, TabScreenProps } from '@app/types/navigation';
@@ -50,6 +49,9 @@ export function CommunityScreen({
   const [nearEnd, setNearEnd] = useState(false);
   const settings = useSocialResource(service => service.getSettings());
   const overview = useSocialResource(service => service.getFriendsOverview());
+  const challenges = useSocialResource(service => service.getMyChallenges());
+  const notifications = useSocialResource(service => service.getNotifications());
+  const unread = unreadCount(notifications.data ?? []);
   const redirected = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const devEndUntil = useRef(0);
@@ -119,7 +121,7 @@ export function CommunityScreen({
     {
       key: 'retos',
       label: 'Retos',
-      badge: data?.pendingInvitations || undefined,
+      badge: challenges.data?.invitations.length || undefined,
     },
     { key: 'amigos', label: 'Amigos', badge: received || undefined },
   ];
@@ -151,6 +153,12 @@ export function CommunityScreen({
             />
           </Pressable>
           <View style={styles.actions}>
+            <IconButton
+              icon={Bell}
+              badge={unread > 0}
+              accessibilityLabel={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
+              onPress={() => navigation.navigate(APP_ROUTES.SocialNotifications)}
+            />
             <IconButton
               icon={Shield}
               accessibilityLabel="Privacidad social"
@@ -248,15 +256,18 @@ export function CommunityScreen({
               nearEnd={nearEnd}
               onCompose={() => navigation.navigate(APP_ROUTES.SocialCompose, {})}
               onOpenPost={postId => navigation.navigate(APP_ROUTES.SocialPost, { postId })}
+              onOpenRoutine={postId => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}
               onOpenProfile={openProfile}
             />
           )
         ) : null}
 
         {segment === 'retos' ? (
-          <SegmentPlaceholder
-            title="Los retos llegan pronto"
-            body="Retos oficiales y retos entre amigos, con un ranking solo entre vosotros."
+          <ChallengesView
+            onOpenChallenge={challengeId =>
+              navigation.navigate(APP_ROUTES.SocialChallenge, { challengeId })
+            }
+            onCreate={() => navigation.navigate(APP_ROUTES.SocialCreateChallenge, {})}
           />
         ) : null}
       </ScrollView>

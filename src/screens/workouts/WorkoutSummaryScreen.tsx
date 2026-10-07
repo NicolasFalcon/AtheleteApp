@@ -152,7 +152,7 @@ function prPrevious(record: DetectedPR): string | null {
 // figures (duration without pauses, volume from the server, sets), the badge
 // unlocked by workout_completed, ELLIE and "Registrar récord" when
 // detect_session_prs finds new marks. Without Apple Health (SESSION_08) and
-// without "Compartir" (Comunidad pending).
+// "Compartir" (opens the composer with the session; fixture until wired).
 export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -382,17 +382,28 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
         ]}
       >
         <Button label="Listo" onPress={done} />
-        {canRegister ? (
+        <View style={styles.secondaryRow}>
+          {/* TODO(social-wire): the composer receives this session as the attachment (sourceId). */}
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={`Registrar récord, ${records.length} detectado${records.length === 1 ? '' : 's'}`}
-            onPress={() => setPrSheetOpen(true)}
-            style={[styles.prButton, { boxShadow: `inset 0 0 0 1px ${colors.outline.strong}` }]}
+            accessibilityLabel="Compartir entreno"
+            onPress={() => navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'workout' })}
+            style={[styles.prButton, styles.secondaryHalf, { boxShadow: `inset 0 0 0 1px ${colors.outline.strong}` }]}
           >
-            <View style={[styles.emberDot, { backgroundColor: colors.ember.base }]} />
-            <TextV2 variant="bodyStrong">Registrar récord</TextV2>
+            <TextV2 variant="bodyStrong">Compartir</TextV2>
           </PressableScale>
-        ) : null}
+          {canRegister ? (
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={`Registrar récord, ${records.length} detectado${records.length === 1 ? '' : 's'}`}
+              onPress={() => setPrSheetOpen(true)}
+              style={[styles.prButton, styles.secondaryHalf, { boxShadow: `inset 0 0 0 1px ${colors.outline.strong}` }]}
+            >
+              <View style={[styles.emberDot, { backgroundColor: colors.ember.base }]} />
+              <TextV2 variant="bodyStrong">Registrar récord</TextV2>
+            </PressableScale>
+          ) : null}
+        </View>
       </GlassSurface>
 
       <Sheet
@@ -526,6 +537,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   emberDot: { width: 6, height: 6, borderRadius: 3 },
+  secondaryRow: { flexDirection: 'row', gap: 8 },
+  secondaryHalf: { flex: 1 },
   prList: { gap: 4, paddingBottom: 8 },
   prRow: {
     flexDirection: 'row',

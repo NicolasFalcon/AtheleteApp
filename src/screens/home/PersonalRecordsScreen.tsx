@@ -304,13 +304,25 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
             },
           ]}
         >
-          <Button
-            label="Registrar nuevo récord"
-            onPress={() => {
-              setSaveError(null);
-              setSheetOpen(true);
-            }}
-          />
+          <View style={styles.footerRow}>
+            {/* TODO(social-wire): the composer receives the record id (sourceId). */}
+            <Button
+              label="Compartir"
+              variant="secondary"
+              onPress={() =>
+                navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'record' })
+              }
+              style={styles.footerHalf}
+            />
+            <Button
+              label="Registrar récord"
+              onPress={() => {
+                setSaveError(null);
+                setSheetOpen(true);
+              }}
+              style={styles.footerHalf}
+            />
+          </View>
         </GlassSurface>
         {sheet}
         {celebrationView}
@@ -405,6 +417,8 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  footerRow: { flexDirection: 'row', gap: 8 },
+  footerHalf: { flex: 1 },
   body: { paddingTop: 16 },
   skeletonGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   skeletonCard: { width: '47%', flexGrow: 1 },

@@ -28,7 +28,7 @@ import type {
   SocialLoadState,
   SocialProfileRow,
 } from '@app/features/social/socialTypes';
-import { useSocialService } from '@app/features/social/useSocial';
+import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
 import { inviteMessageLine } from '@app/features/social/v2/inviteLine';
 import {
   GroupHeader,
@@ -69,6 +69,17 @@ export function FriendsView({
     result: FindUserResult | null;
   } | null>(null);
 
+  // "En tus retos": people from the user's own challenges who are not friends
+  // yet. Only what comes from those participations (Q13); no suggestions.
+  const coParticipants = useSocialResource(s => s.getCoParticipants());
+  const q = query.trim().toLowerCase().replace(/^@+/, '');
+  const inChallenges = (coParticipants.data ?? []).filter(
+    item =>
+      q.length === 0 ||
+      item.profile.name.toLowerCase().includes(q) ||
+      item.profile.username.toLowerCase().includes(q),
+  );
+
   const exact = exactLookupQuery(query);
 
   // Exact username lookup, debounced; the local lists filter as you type.
@@ -106,6 +117,7 @@ export function FriendsView({
   const hasPeople =
     overview !== null &&
     (overview.friends.length > 0 ||
+      (coParticipants.data ?? []).length > 0 ||
       overview.received.length > 0 ||
       overview.sent.length > 0);
   const searching = query.trim().length > 0;
@@ -289,6 +301,40 @@ export function FriendsView({
             </View>
           ))
         : null}
+
+      {status === 'ready' && inChallenges.length > 0 ? (
+        <View>
+          <GroupHeader title="En tus retos" count={inChallenges.length} />
+          {inChallenges.map(item => (
+            <PersonRow
+              key={item.profile.id}
+              name={item.profile.name}
+              subtitle={`Participa en ${item.challengeTitle}`}
+              avatar={{
+                avatarKey: item.profile.avatar_key,
+                profilePhotoUrl: item.profile.profile_photo_url,
+                relationship: 'none',
+              }}
+              onPress={() => onOpenProfile(item.profile.id)}
+              trailing={
+                <PersonStateButton
+                  state="add"
+                  onPress={() =>
+                    send({
+                      user_id: item.profile.id,
+                      username: item.profile.username,
+                      name: item.profile.name,
+                      avatar_key: item.profile.avatar_key,
+                      accepts_requests: true,
+                      relationship: 'none',
+                    })
+                  }
+                />
+              }
+            />
+          ))}
+        </View>
+      ) : null}
 
       {status === 'ready' && showLookup && lookupResult ? (
         <View>

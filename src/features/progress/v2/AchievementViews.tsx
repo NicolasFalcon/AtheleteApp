@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import {
+  Button,
   HexMedal,
   PressableScale,
   Sheet,
@@ -129,9 +130,12 @@ export function ShelfRow({
 export function BadgeSheet({
   item,
   onClose,
+  onShare,
 }: {
   item: ShelfItem | null;
   onClose: () => void;
+  // Earned badge: "Compartir logro" opens the composer with it attached.
+  onShare?: () => void;
 }) {
   const { colors } = useThemeV2();
 
@@ -141,6 +145,11 @@ export function BadgeSheet({
       onClose={onClose}
       eyebrow={item?.earned ? 'Logro desbloqueado' : 'Logro bloqueado'}
       title={item?.badge.title}
+      footer={
+        item?.earned && onShare ? (
+          <Button label="Compartir logro" variant="secondary" onPress={onShare} style={styles.shareButton} />
+        ) : undefined
+      }
     >
       {item ? (
         <View style={styles.sheetBody}>
@@ -176,6 +185,7 @@ export function BadgeSheet({
 }
 
 const styles = StyleSheet.create({
+  shareButton: { flex: 1 },
   header: { gap: 10, paddingTop: 8 },
   count: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   earned: { fontSize: 88 },

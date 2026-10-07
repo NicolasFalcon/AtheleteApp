@@ -1,5 +1,21 @@
 import type { ImageSourcePropType } from 'react-native';
 import type {
+  ChallengeBoard,
+  CoParticipant,
+  CreateChallengeInput,
+  CreateChallengeResult,
+  ManualContributionResult,
+  MyChallenges,
+} from '@app/features/social/challengeTypes';
+import type {
+  ModerationAction,
+  ModerationActionRow,
+  ModerationQueueRow,
+  ModerationTarget,
+  ModeratorRole,
+} from '@app/features/social/moderationModel';
+import type { SocialNotification } from '@app/features/social/notificationModel';
+import type {
   ActivityItem,
   AttachmentSource,
   CreatePostInput,
@@ -59,6 +75,22 @@ import type {
 //   getPostPhotoSource     → createSignedUrl on social-photos (cache like profile-photo.ts)
 //   reportContent          → insert content_reports (ON CONFLICT DO NOTHING)
 //   saveSharedRoutine      → save_shared_routine(_post_id)
+//   getMyChallenges        → get_my_challenges() → {active, invitations, recently_completed, official}
+//   getChallengeBoard      → get_challenge_board(_challenge_id) (+ own social_challenge_contributions for the week)
+//   respondChallengeInvite → respond_challenge_invite(_challenge_id, _accept)
+//   joinOfficialChallenge  → join_official_challenge(_challenge_id)
+//   leaveChallenge         → leave_challenge(_challenge_id)
+//   cancelFriendChallenge  → cancel_friend_challenge(_challenge_id)
+//   addManualContribution  → add_manual_contribution(_challenge_id, _amount)
+//   createFriendChallenge  → create_friend_challenge(_metric, _goal, _duration_days, _invitee_ids)
+//   markChallengeCelebrated→ mark_challenge_celebrated(_challenge_id)
+//   getCoParticipants      → BT-46: people of the user's challenges who are not friends (the board only exposes friends today)
+//   getNotifications       → select social_notifications (+ get_social_profiles for actors)
+//   markNotificationsRead  → update social_notifications set read_at
+//   getModeratorRole       → is_moderator() / select app_moderators (own row)
+//   getModerationQueue     → select moderation_queue (moderators only)
+//   getModerationHistory   → select moderation_actions (moderators only)
+//   moderateContent        → moderate_content(_target_type, _target_id, _action, _note)
 //   getTermsAccepted / acceptTerms → BT-43: server flag (profiles.terms_accepted_at) when it exists
 export type ProfileLookup = {
   // null when get_social_profiles returned no row for that id.
@@ -116,4 +148,32 @@ export interface SocialService {
   ): Promise<{ templateId: string; created: boolean }>;
   getTermsAccepted(): Promise<boolean>;
   acceptTerms(): Promise<void>;
+
+  // ── Retos, notificaciones y moderación (tanda C) ──
+  getMyChallenges(): Promise<MyChallenges>;
+  getChallengeBoard(challengeId: string): Promise<ChallengeBoard | null>;
+  respondChallengeInvite(challengeId: string, accept: boolean): Promise<void>;
+  joinOfficialChallenge(challengeId: string): Promise<void>;
+  leaveChallenge(challengeId: string): Promise<void>;
+  cancelFriendChallenge(challengeId: string): Promise<void>;
+  addManualContribution(
+    challengeId: string,
+    amount: number,
+  ): Promise<ManualContributionResult>;
+  createFriendChallenge(
+    input: CreateChallengeInput,
+  ): Promise<CreateChallengeResult>;
+  markChallengeCelebrated(challengeId: string): Promise<void>;
+  getCoParticipants(): Promise<CoParticipant[]>;
+  getNotifications(): Promise<SocialNotification[]>;
+  markNotificationsRead(ids: string[]): Promise<void>;
+  getModeratorRole(): Promise<ModeratorRole | null>;
+  getModerationQueue(): Promise<ModerationQueueRow[]>;
+  getModerationHistory(): Promise<ModerationActionRow[]>;
+  moderateContent(
+    target: ModerationTarget,
+    targetId: string,
+    action: ModerationAction,
+    note: string | null,
+  ): Promise<void>;
 }

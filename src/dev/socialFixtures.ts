@@ -1,4 +1,9 @@
+import {
+  buildChallengeFixtures,
+  type ChallengeFixtureSet,
+} from '@app/dev/socialChallengeFixtures';
 import { buildPostFixtures } from '@app/dev/socialPostFixtures';
+import type { ModeratorRole } from '@app/features/social/moderationModel';
 import type {
   ActivityItem,
   AttachmentSource,
@@ -37,7 +42,21 @@ export type SocialScenario =
   | 'feedError' // the feed fails until "Reintentar"
   | 'feedMoreError' // the first page loads, the next one fails
   | 'retired' // a removed and a hidden post at the top
-  | 'termsAccepted'; // the Terms were already accepted
+  | 'termsAccepted' // the Terms were already accepted
+  | 'noChallenges' // no friend challenges and no invitations
+  | 'officialNotJoined' // the official challenge not joined yet
+  | 'expiredChallenge' // a challenge nobody accepted in time
+  | 'waitingChallenge' // a challenge the user created, nobody accepted yet
+  | 'challengesLoading'
+  | 'challengesError'
+  | 'noNotifications'
+  | 'notificationsLoading'
+  | 'notificationsError'
+  | 'moderator' // the user is a moderator
+  | 'admin' // the user is an admin
+  | 'moderatorEmpty' // moderator, empty queue
+  | 'moderationLoading'
+  | 'moderationError';
 
 export const FIXTURE_ME = {
   id: 'fx-me',
@@ -169,6 +188,10 @@ export function buildPeople(now: Date): Record<string, FixturePerson> {
       { streak_days: 8, hidden_categories: HIDDEN },
       { acceptsRequests: false },
     ),
+    tomas: person('fx-tomas', 'Tomás Rey', 'tomas.rey', 'avatar_male_03', 'gain_muscle', {
+      streak_days: 4,
+      hidden_categories: HIDDEN,
+    }),
     // Public audience: sees more without being a friend.
     elena: person(
       'fx-elena',
@@ -212,6 +235,11 @@ export type FixtureState = {
   failure: 'loading' | 'error' | null;
   // Feed only (the rest of the hub keeps working).
   feedFailure: 'loading' | 'error' | 'moreError' | null;
+  // Same idea for the other sections of tanda C.
+  challengesFailure: 'loading' | 'error' | null;
+  notificationsFailure: 'loading' | 'error' | null;
+  moderationFailure: 'loading' | 'error' | null;
+  moderatorRole: ModeratorRole | null;
   meProfile: SocialProfileRow;
   posts: FeedPost[];
   comments: FeedComment[];
@@ -221,6 +249,11 @@ export type FixtureState = {
   reportedIds: string[];
   savedRoutines: string[];
   termsAccepted: boolean;
+  challenges: ChallengeFixtureSet['challenges'];
+  notifications: ChallengeFixtureSet['notifications'];
+  moderationQueue: ChallengeFixtureSet['queue'];
+  moderationHistory: ChallengeFixtureSet['history'];
+  coParticipants: ChallengeFixtureSet['coParticipants'];
   activeChallenges: number;
   pendingInvitations: number;
 };
@@ -302,6 +335,7 @@ export function buildFixtureState(
     [id('valeria')]: 'request_received',
     [id('pablo')]: 'request_sent',
     [id('irene')]: 'none',
+    [id('tomas')]: 'none',
     [id('hugo')]: 'none',
     [id('elena')]: 'none',
     [id('raul')]: 'blocked',
@@ -381,6 +415,23 @@ export function buildFixtureState(
     takenUsernames: ['carlos', 'carlos.ruiz', 'andrea.molina', 'nicolas'],
     failure: null,
     feedFailure: null,
+    challengesFailure: null,
+    notificationsFailure: null,
+    moderationFailure: null,
+    moderatorRole: scenario === 'moderator' || scenario === 'moderatorEmpty' || scenario === 'moderationLoading' || scenario === 'moderationError' ? 'moderator' : scenario === 'admin' ? 'admin' : null,
+    ...(({ challenges, notifications, queue, history, coParticipants }) => ({
+      challenges,
+      notifications,
+      moderationQueue: queue,
+      moderationHistory: history,
+      coParticipants,
+    }))(
+      buildChallengeFixtures(now, people, meProfile, {
+        expired: scenario === 'expiredChallenge',
+        waiting: scenario === 'waitingChallenge',
+        official: scenario === 'officialNotJoined' ? 'notJoined' : undefined,
+      }),
+    ),
     meProfile,
     ...(({ activity, ...rest }) => ({ ...rest, activityItems: activity }))(
       buildPostFixtures(now, people, meProfile, {
@@ -414,6 +465,9 @@ export function buildFixtureState(
       state.posts = [];
       state.comments = [];
       state.activityItems = [];
+      state.challenges = state.challenges.filter(item => item.head.kind === 'official');
+      state.notifications = [];
+      state.coParticipants = [];
       state.activeChallenges = 0;
       state.pendingInvitations = 0;
       break;
@@ -423,6 +477,34 @@ export function buildFixtureState(
       break;
     case 'feedEmpty':
       state.activityItems = [];
+      break;
+    case 'challengesLoading':
+      state.challengesFailure = 'loading';
+      break;
+    case 'challengesError':
+      state.challengesFailure = 'error';
+      break;
+    case 'notificationsLoading':
+      state.notificationsFailure = 'loading';
+      break;
+    case 'notificationsError':
+      state.notificationsFailure = 'error';
+      break;
+    case 'noNotifications':
+      state.notifications = [];
+      break;
+    case 'moderationLoading':
+      state.moderationFailure = 'loading';
+      break;
+    case 'moderationError':
+      state.moderationFailure = 'error';
+      break;
+    case 'moderatorEmpty':
+      state.moderationQueue = [];
+      break;
+    case 'noChallenges':
+      state.challenges = state.challenges.filter(item => item.head.kind === 'official');
+      state.coParticipants = [];
       break;
     case 'feedLoading':
       state.feedFailure = 'loading';

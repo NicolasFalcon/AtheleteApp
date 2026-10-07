@@ -76,4 +76,12 @@ export const APP_ROUTES = {
   // Comunidad · tanda UI-A (contenido).
   SocialPost: 'SocialPost',
   SocialCompose: 'SocialCompose',
+  // Comunidad · tanda UI-C (retos, notificaciones, moderación, rutina).
+  SocialChallenge: 'SocialChallenge',
+  SocialCreateChallenge: 'SocialCreateChallenge',
+  SocialChallengeDone: 'SocialChallengeDone',
+  SocialNotifications: 'SocialNotifications',
+  SocialModeration: 'SocialModeration',
+  SocialModerationItem: 'SocialModerationItem',
+  SocialRoutine: 'SocialRoutine',
 } as const;
