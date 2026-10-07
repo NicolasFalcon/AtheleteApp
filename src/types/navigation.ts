@@ -196,12 +196,52 @@ export type EllieChatRouteParams = {
     | 'historyError';
 };
 
+export type CommunitySegment = 'feed' | 'retos' | 'amigos';
+
+export type CommunityTabParams = {
+  segment?: CommunitySegment;
+  // Dev only: prefilled search of Amigos.
+  devQuery?: string;
+  // Dev only: scroll the hub to the bottom (end of the feed, load more).
+  devScroll?: 'end';
+  // Dev only: changes on every dev open, so the same params apply again.
+  devNonce?: number;
+};
+
+export type SocialProfileRouteParams = {
+  userId: string;
+  // Dev only: opens the block confirmation.
+  devConfirmBlock?: boolean;
+};
+
+export type SocialPostRouteParams = {
+  postId: string;
+  // Dev only: opens a content sheet (options, report, delete) or reports a comment.
+  devAction?: 'menu' | 'report' | 'delete' | 'reportComment';
+};
+
+export type SocialComposeRouteParams = {
+  // Preselects the attachment (Compartir entreno / récord).
+  attach?: 'workout' | 'routine' | 'record' | 'achievement' | 'challenge';
+  // Dev only: opens with the Terms sheet, an invalid photo, or an attached photo.
+  devState?: 'terms' | 'badPhoto' | 'photo';
+};
+
+export type SocialUsernameRouteParams = {
+  // 'create' is the required first step before using Comunidad; 'edit'
+  // comes from Privacidad social.
+  mode: 'create' | 'edit';
+  // Dev only: starts with this text and a server error.
+  devText?: string;
+  devError?: 'username_taken';
+};
+
 export type MainTabParamList = {
   Home: undefined;
   Workouts: WorkoutsTabParams | undefined;
   Ellie: EllieTabParams | undefined;
   Progress: ProgressTabParams | undefined;
-  Community: undefined;
+  Community: CommunityTabParams | undefined;
 };
 
 // Shared screens above the tabs (handoff §6: detail, flows and immersive
@@ -241,12 +281,20 @@ export type AppStackParamList = {
   NutritionPlan: NutritionPlanRouteParams | undefined;
   BodyScience: undefined;
   BodyScienceArticle: { articleId: string };
+  SocialProfile: SocialProfileRouteParams;
+  SocialPrivacy: undefined;
+  SocialInvite: { devState?: 'limit' } | undefined;
+  SocialBlocked: undefined;
+  SocialUsername: SocialUsernameRouteParams;
+  SocialPost: SocialPostRouteParams;
+  SocialCompose: SocialComposeRouteParams;
 };
 
 export type RootStackParamList = {
   AuthFlow: NavigatorScreenParams<AuthStackParamList>;
   OnboardingFlow: NavigatorScreenParams<OnboardingStackParamList>;
   MainTabs: NavigatorScreenParams<MainTabParamList>;
+  DevFixtureTabs: NavigatorScreenParams<MainTabParamList>;
 } & AppStackParamList;
 
 export type AppRouteName = keyof AppStackParamList;

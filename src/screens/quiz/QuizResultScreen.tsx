@@ -121,7 +121,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
       };
     }
     return { status: 'saving', previousBest: null, points: null, total: null, badges: [], rewardPending: false };
-  }, [dev, params.pointsEarned, submit.data, submit.isError]);
+  }, [dev, params.devPreviousBest, params.pointsEarned, submit.data, submit.isError]);
 
   const saved = view.status === 'saved';
   const totalPoints = view.total ?? (saved ? profileQuery.data?.points ?? null : null);

@@ -2,6 +2,8 @@ export const ROOT_ROUTES = {
   AuthFlow: 'AuthFlow',
   OnboardingFlow: 'OnboardingFlow',
   MainTabs: 'MainTabs',
+  // Development only: tabs without session for fixture-only screens.
+  DevFixtureTabs: 'DevFixtureTabs',
 } as const;
 
 export const AUTH_ROUTES = {
@@ -65,4 +67,13 @@ export const APP_ROUTES = {
   NutritionPlan: 'NutritionPlan',
   BodyScience: 'BodyScience',
   BodyScienceArticle: 'BodyScienceArticle',
+  // Comunidad · tanda B (personas).
+  SocialProfile: 'SocialProfile',
+  SocialPrivacy: 'SocialPrivacy',
+  SocialInvite: 'SocialInvite',
+  SocialBlocked: 'SocialBlocked',
+  SocialUsername: 'SocialUsername',
+  // Comunidad · tanda UI-A (contenido).
+  SocialPost: 'SocialPost',
+  SocialCompose: 'SocialCompose',
 } as const;

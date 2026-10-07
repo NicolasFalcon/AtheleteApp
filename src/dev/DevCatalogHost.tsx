@@ -34,6 +34,11 @@ import {
   openQuizDevScreen,
 } from '@app/dev/devQuizScreens';
 import {
+  isSocialDevScreen,
+  openNextSocialDevScreen,
+  openSocialDevScreen,
+} from '@app/dev/devSocialScreens';
+import {
   isNutritionDevScreen,
   openNextNutritionDevScreen,
   openNutritionDevScreen,
@@ -180,6 +185,18 @@ function openQuizFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/social?screen=<key>: navigates (no overlay).
+function openSocialFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/social')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'friends';
+  if (isSocialDevScreen(screen)) {
+    openSocialDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 function toolFromUrl(url: string | null): DevToolState | null {
   if (
     !url ||
@@ -190,7 +207,8 @@ function toolFromUrl(url: string | null): DevToolState | null {
     openProfileFromUrl(url) ||
     openNutritionFromUrl(url) ||
     openCore33FromUrl(url) ||
-    openQuizFromUrl(url)
+    openQuizFromUrl(url) ||
+    openSocialFromUrl(url)
   ) {
     return null;
   }
@@ -285,6 +303,17 @@ export function DevCatalogHost() {
         .then(label =>
           toastRef.current.show(
             label ? `Quiz · ${label}` : 'Inicia sesión para ver Quiz',
+          ),
+        )
+        .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));
+    });
+    DevSettings.addMenuItem('Ver pantallas de Comunidad', () => {
+      openNextSocialDevScreen()
+        .then(label =>
+          toastRef.current.show(
+            label
+              ? `Comunidad · ${label}`
+              : 'Inicia sesión para ver Comunidad',
           ),
         )
         .catch(() => toastRef.current.show('No se pudo abrir la pantalla'));

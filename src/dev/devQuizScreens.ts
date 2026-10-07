@@ -1,5 +1,6 @@
 import { StackActions } from '@react-navigation/native';
 import { waitForApp } from '@app/dev/devWorkoutsScreens';
+import { waitForFixtureApp } from '@app/dev/devFixtureNav';
 import { navigationRef } from '@app/navigation/navigationRef';
 import type { QuizResultRouteParams } from '@app/types/quiz';
 
@@ -72,11 +73,17 @@ export function isQuizDevScreen(value: string | null): value is QuizDevScreen {
 }
 
 export async function openQuizDevScreen(key: QuizDevScreen): Promise<boolean> {
-  if (!__DEV__ || !(await waitForApp())) {
-    return false;
-  }
   const target = SCREENS.find(screen => screen.key === key);
   if (!target) {
+    return false;
+  }
+  // States with a `devState` use sample data only and open without a session;
+  // the real-data portada ("home") still waits for the signed-in app.
+  const fixtureOnly = Boolean(
+    (target.params as { devState?: string } | undefined)?.devState,
+  );
+  const ready = fixtureOnly ? await waitForFixtureApp() : await waitForApp();
+  if (!__DEV__ || !ready) {
     return false;
   }
   // Pushed so each state opens fresh.

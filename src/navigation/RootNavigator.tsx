@@ -33,7 +33,15 @@ import { BodyScienceArticleDetailScreen } from '@app/screens/progress/BodyScienc
 import { BodyScienceScreen } from '@app/screens/progress/BodyScienceScreen';
 import { QuizChallengeScreen } from '@app/screens/quiz/QuizChallengeScreen';
 import { QuizQuestionScreen } from '@app/screens/quiz/QuizQuestionScreen';
+import { DevFixtureTabs } from '@app/dev/DevFixtureTabs';
 import { QuizResultScreen } from '@app/screens/quiz/QuizResultScreen';
+import { SocialComposeScreen } from '@app/screens/social/SocialComposeScreen';
+import { SocialPostScreen } from '@app/screens/social/SocialPostScreen';
+import { SocialBlockedScreen } from '@app/screens/social/SocialBlockedScreen';
+import { SocialInviteScreen } from '@app/screens/social/SocialInviteScreen';
+import { SocialPrivacyScreen } from '@app/screens/social/SocialPrivacyScreen';
+import { SocialProfileScreen } from '@app/screens/social/SocialProfileScreen';
+import { SocialUsernameScreen } from '@app/screens/social/SocialUsernameScreen';
 import { ProfileScreen } from '@app/screens/tabs/ProfileScreen';
 import { AddExerciseToRoutineScreen } from '@app/screens/workouts/AddExerciseToRoutineScreen';
 import { CreateRoutineScreen } from '@app/screens/workouts/CreateRoutineScreen';
@@ -109,6 +117,64 @@ export function RootNavigator() {
           name={ROOT_ROUTES.AuthFlow}
           component={AuthStackNavigator}
         />
+      ) : null}
+      {/* Development only: screens that use sample data open without a
+          session (athelete://dev/social, athelete://dev/quiz). */}
+      {__DEV__ && flow === 'auth' ? (
+        <Stack.Group>
+          <Stack.Screen
+            name={ROOT_ROUTES.DevFixtureTabs}
+            component={DevFixtureTabs}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialProfile}
+            component={SocialProfileScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialPrivacy}
+            component={SocialPrivacyScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialInvite}
+            component={SocialInviteScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialBlocked}
+            component={SocialBlockedScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialPost}
+            component={SocialPostScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialCompose}
+            component={SocialComposeScreen}
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialUsername}
+            component={SocialUsernameScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.QuizLanding}
+            component={QuizLandingScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.QuizChallenge}
+            component={QuizChallengeScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.QuizQuestion}
+            component={QuizQuestionScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.QuizResult}
+            component={QuizResultScreen}
+            options={{ gestureEnabled: false }}
+          />
+        </Stack.Group>
       ) : null}
       {flow === 'onboarding' ? (
         <Stack.Screen
@@ -213,6 +279,36 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.QuizResult}
             component={QuizResultScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialProfile}
+            component={SocialProfileScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialPrivacy}
+            component={SocialPrivacyScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialInvite}
+            component={SocialInviteScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialBlocked}
+            component={SocialBlockedScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialPost}
+            component={SocialPostScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialCompose}
+            component={SocialComposeScreen}
+            options={{ presentation: 'modal' }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialUsername}
+            component={SocialUsernameScreen}
             options={{ gestureEnabled: false }}
           />
           <Stack.Screen

@@ -360,7 +360,11 @@ export async function submitQuizAttempt(params: {
       unlockedBadges.push('first_quiz');
     }
 
-    if (score === 100) {
+    if (attemptAward.badgesUnlocked.includes('quiz_master')) {
+      // The server already granted it with quiz_completed (BT-39): do not
+      // send quiz_master_unlocked on top of it.
+      unlockedBadges.push('quiz_master');
+    } else if (score === 100) {
       const unlockedQuizMaster = await maybeUnlockQuizMaster(
         params.userId,
         params.categoryId,

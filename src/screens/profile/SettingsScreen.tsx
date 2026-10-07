@@ -66,7 +66,7 @@ const NOTIFICATIONS = [
 ] as const;
 
 // Ajustes (PROFILE_03): flat rows by section. Community and Apple Health
-// depend on future modules: Comunidad rows are disabled ("Próximamente") and
+// depend on future modules: Comunidad rows open Amigos and Privacidad social and
 // Apple Health opens its placeholder screen.
 export function SettingsScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
@@ -208,8 +208,23 @@ export function SettingsScreen({ navigation, route }: Props) {
         </SettingsSection>
 
         <SettingsSection title="Comunidad">
-          <Row leading={icon(Users)} title="Amigos y retos" value="Próximamente" disabled />
-          <Row leading={icon(Shield)} title="Privacidad social" value="Próximamente" disabled />
+          <Row
+            leading={icon(Users)}
+            title="Amigos y retos"
+            trailing="chevron"
+            onPress={() =>
+              navigation.navigate(ROOT_ROUTES.MainTabs, {
+                screen: TAB_ROUTES.Community,
+                params: { segment: 'amigos' },
+              })
+            }
+          />
+          <Row
+            leading={icon(Shield)}
+            title="Privacidad social"
+            trailing="chevron"
+            onPress={() => navigation.navigate(APP_ROUTES.SocialPrivacy)}
+          />
         </SettingsSection>
 
         <SettingsSection title="Integraciones">
