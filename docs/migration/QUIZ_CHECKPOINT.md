@@ -61,6 +61,6 @@ Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5)
 - Tests: `__tests__/quizModel.test.ts` (31 casos de lógica pura: racha, puntuación, resumen, mejor intento, récord, Quiz Master, selección y barajado, semana, desafío del día, historial). jest en verde (31 suites, 235 tests).
 - Bloque E: conexiones verificadas (Inicio, Notificaciones, Logros con `get_badge_progress`); estados vacío / cargando / error; dev kit.
 - Bloque F: `MIGRATION_PROGRESS.md` §28 (DA-111…118, D-74…77), `QA_CHECKLIST.md` Bloque 9b, `BACKEND_TODO.md` BT-38…40. tsc limpio; jest 31 suites / 235 tests; eslint: 0 errores nuevos (queda 1 error previo en `__tests__/recordsBadges.test.ts`, import sin usar, no tocado).
-- **Capturas: no hechas.** El binario del simulador es anterior a Reanimated nativo y el dev kit requiere sesión iniciada. Pendiente tras recompilar.
+- **Capturas (2026-10-07): hechas.** 23 de los 24 estados dev × Light y Dark = 46 PNG en `~/athelete-captures/quiz/` (los estados con `devState` abren ahora sin sesión; la portada con datos reales `home` necesita sesión y no se capturó). Comparadas con QUIZ_01 a QUIZ_09: composición, anillos, racha ×2/×3, panel de respuesta, "Repasemos esto" y resultados coinciden. Diferencias ya registradas: foto por palabra clave del slug (placeholder), etiqueta "NIVEL N" sustituida por el estado real, desafío del día derivado, "Aún sin récord" cuando no hay intentos. Método: `-themeMode light|dark` + `xcrun simctl openurl booted 'athelete://dev/quiz?screen=<key>'`.
 
 ## COMPLETADO

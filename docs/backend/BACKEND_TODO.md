@@ -17,6 +17,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-04 | Gamificación | Activar el modo `strict` | Media | No |
 | BT-05 | Gamificación | Cerrar `UPDATE` de `profiles.points` e `INSERT` en `user_badges` | Media | No (depende de la web) |
 | BT-06 | ELLIE / Nutrición | Confirmar si `ellie-chat` usa el género para calorías | Baja | No |
+| BT-43 | Comunidad | Términos de uso (URL) y correo de soporte para contenido de usuarios | Alta | **Sí, antes de TestFlight** |
 | BT-41 | Perfil | ~~`profiles_gender_check` debe aceptar `other`~~ | — | **Resuelto** (2026-10-06) |
 | BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
 | BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
@@ -37,6 +38,8 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-22 | Core 33 | ~~`profiles.core33_invite_dismiss_count` para recuperar el tope de 2 descartes de la tarjeta de Inicio~~ | — | **Resuelto** (2026-10-04) |
 | BT-23 | Progreso | ~~Agregados de entrenos en el servidor (minutos activos por día, volumen medio por sesión y mes)~~ | — | **Resuelto** (2026-10-04) |
 | BT-24 | Logros | ~~Progreso de logros y racha de hidratación completa desde el servidor~~ | — | **Resuelto** (2026-10-04) |
+| BT-38 | Quiz | El servidor debe calcular los puntos del quiz, no aceptar el número de la app | **Alta** | No (vía abierta para dar puntos) |
+| BT-39 | Quiz | Que el servidor otorgue `quiz_master` por sí solo (la app deja de enviar `quiz_master_unlocked` en cuanto `quiz_completed` lo devuelva) | Media | No |
 
 ---
 
@@ -131,6 +134,12 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
   - el contacto de soporte publicado en la ficha de la App Store.
 - **Por qué:** guía 1.2 de la App Store (contenido de usuarios).
 - **Prioridad:** Alta **antes de publicar Comunidad**.
+
+### BT-43 · Términos de uso y soporte para contenido de usuarios
+- **Qué falta:** la URL pública de los Términos de uso y el correo de soporte. App Store 1.2 los exige junto con reportar y bloquear, y la ficha debe publicar el contacto (ver BT-08).
+- **En la app (tanda UI-B):** `src/constants/legal.ts` con `TERMS_URL` y `SUPPORT_EMAIL` **placeholder** (`TODO(testflight)`, `LEGAL_IS_PLACEHOLDER = true`). Se usan en "Elige tu nombre de usuario" (enlace a Términos) y en Privacidad social ("Términos de uso", "Contactar con soporte"). Mientras sean placeholder muestran un aviso en vez de abrir un enlace.
+- **Cierre:** **BT-43 se cierra antes de TestFlight**: poner los valores reales y `LEGAL_IS_PLACEHOLDER = false`.
+- **Prioridad:** Alta. **Bloquea** TestFlight, no el desarrollo.
 
 ## Storage
 
@@ -333,7 +342,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 
 ### BT-39 · Que el servidor otorgue `quiz_master` por sí solo
 - **Verificado (2026-10-04, `BACKEND_SUMMARY` §6):** el servidor **no** lo otorga solo. Solo los logros de hidratación figuran en "Badges del servidor" y se evalúan en cada llamada. `quiz_master` aparece únicamente como badge permitido de `quiz_master_unlocked` (sin referencia, una vez por usuario), un evento que manda la app. `get_badge_progress` sí mide su avance, pero eso es lectura.
-- **Qué hace la app:** como el servidor no lo decide, la app comprueba la regla (todas las categorías activas con un intento al 100 %) y, solo entonces, envía `quiz_master_unlocked` después de `quiz_completed`. En modo `log` el servidor acepta ese evento sin comprobar la regla.
+- **Qué hace la app:** como el servidor no lo decide, la app comprueba la regla (todas las categorías activas con un intento al 100 %) y, solo entonces, envía `quiz_master_unlocked` después de `quiz_completed`. En modo `log` el servidor acepta ese evento sin comprobar la regla. **Aplicado (2026-10-06):** si `new_badges` de `quiz_completed` ya trae `quiz_master`, la app lo da por otorgado y **no** envía `quiz_master_unlocked`.
 - **Propuesta:** añadir `quiz_master` a "Badges del servidor" de `quiz_completed` con la regla que usa `get_badge_progress`, de modo que `new_badges` de `quiz_completed` lo traiga. Con eso la app deja de enviar `quiz_master_unlocked` y de decidirlo (la celebración ya sale de `new_badges`).
 - **Prioridad:** Media. **No bloquea.**
 
@@ -384,4 +393,5 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-04: BT-37 resuelto.
 - 2026-10-04: BT-38 a BT-40 (módulo Quiz).
 - 2026-10-04: BT-38 sube a prioridad alta (puntos del quiz calculados por el servidor); BT-39 verificado: el servidor no otorga `quiz_master` solo.
+- 2026-10-06: BT-43 (Términos y soporte de Comunidad, antes de TestFlight).
 - 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.

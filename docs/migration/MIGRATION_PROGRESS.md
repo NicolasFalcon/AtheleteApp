@@ -1929,3 +1929,75 @@ Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5)
 **Checklist de QA real (falcon1989)**: `QA_CHECKLIST.md` · Bloque 9b (13 pasos: portada, ronda, segundo plano, guardado y reintento, récord, niveles, repetir, Primer Quiz, Quiz Master, Logros, error sin red y puntos con racha).
 
 **Componentes v1 sin uso (no borrados)**: `features/quiz/components/QuizAnswerOption`, `QuizCategoryCard`, `QuizProgressHeader`, `QuizScoreSummaryCard`; `features/home/components/QuizPromoCard`.
+
+## Comunidad · tanda UI-B (personas) · 2026-10-06
+
+Solo interfaz con datos de ejemplo (`dev/socialFixtures.ts`, 8 escenarios); **sin lecturas ni escrituras al backend**. Plan: `SOCIAL_PLAN.md`. Checkpoint: `SOCIAL_B_CHECKPOINT.md`. Pantallas: hub (Feed · Retos · Amigos), Amigos, nombre de usuario, perfil de otro usuario, Privacidad social, Invitar amigos, Bloquear y Usuarios bloqueados. Feed (tanda A) y Retos (tanda C) son placeholders.
+
+**Decisiones de alcance (DA)**
+- **DA-119** · **Foto real solo para uno mismo y amigos.** A quien no es amigo (incluidos los comentaristas de un post de un amigo) se le muestran iniciales, nunca la foto, aunque la política del bucket (`can_view_profile_photo`) lo permita. Regla pura `canShowRealPhoto` y primitivo `PersonAvatar`.
+- **DA-120** · **Búsqueda solo por nombre de usuario exacto** (Q3, confirmado). Escribir filtra tu lista; una consulta con formato de usuario válido llama a `find_user_by_username` (350 ms). Sin "buscar por nombre" ni sección "En tus retos" (Q13; solo vendrá de las participaciones del usuario, tanda C).
+- **DA-121** · **Nombre de usuario obligatorio antes de usar Comunidad.** El hub redirige a la pantalla si no hay fila en `social_settings`; atrás lleva a Inicio. Sin disponibilidad en vivo (no hay RPC): `username_taken` solo al guardar. Los nombres reservados son cortesía de la app.
+- **DA-122** · **BT-43:** `constants/legal.ts` con `TERMS_URL` y `SUPPORT_EMAIL` placeholder (`TODO(testflight)`). "Continuar" en el nombre de usuario implica aceptar los Términos (texto con enlace); Privacidad social lleva Términos y Soporte. Se cierra antes de TestFlight.
+- **DA-123** · **`blocked` es un estado de quien bloquea** (`user_blocks`); bloquear quita la amistad y las solicitudes; desbloquear vuelve a "ninguna".
+- **DA-124** · **El perfil muestra una sección solo si el servidor devuelve su campo**; a un no amigo nunca se le enseña "amigos desde" ni retos en común aunque lleguen. Fila ausente de `get_social_profiles` → "Este perfil no está disponible".
+- **DA-125** · Toda acción pasa por `SocialService` (`services/social/socialService.ts`); hoy la implementa `fixtureSocialService` en memoria.
+
+**Desviaciones del diseño (D)**
+- **D-79** · Elegir / editar nombre de usuario (sin pantalla en el handoff): sigue el paso "nombre" del onboarding (pregunta a 32 pt, campo con línea, footer fijo).
+- **D-80** · Perfil sin foto: el hero es la placa oscura con las iniciales a gran tamaño (sin foto de archivo); la foto firmada solo se pide a amigos.
+- **D-81** · Invitar amigos (sin pantalla en el handoff): enlace de un uso y 7 días (máx. 5 activos), compartir usuario, lista de enlaces activos.
+- **D-82** · Cuenta social bajo Privacidad social: nombre de usuario, usuarios bloqueados, Términos y soporte.
+- **D-83** · Usuarios bloqueados (sin pantalla): Friend Row + "Desbloquear".
+- **D-84** · Confirmar bloqueo = hoja (patrón de Ajustes); acceso por "⋯" del perfil y por el botón "Amigos".
+- **D-85** · Búsqueda: "Buscar por nombre de usuario" (el diseño dice "nombre o usuario"); estado "sin resultados" y "sin amigos" en Amigos reutilizan la composición de STATE_04.
+- **D-86** · Privacidad: el control de audiencia no lleva iconos (el `Segmented` v2 no los admite).
+- **D-87** · Perfil: récords sin el "+" de los lastrados (el servidor devuelve un número); "Retar" y las tarjetas de actividad avisan con un toast hasta que existan Retos (C) y el feed (A); la insignia de Retos usa `pendingInvitations`.
+
+**Primitivos nuevos (`components/v2`):** `PersonAvatar`, `AvatarStack`, `PersonRow` (+ `PersonStateButton`, `PersonRequestActions`).
+
+**TODO(social-wire)** (conectar = cambiar la fuente de datos)
+- `services/social/socialService.ts`: una línea por método con su RPC o tabla (`getSettings`, `setUsername`, `updateSettings`, `getFriendsOverview`, `findByUsername`, `getProfile`, `sendFriendRequest`, `respondFriendRequest`, `cancelFriendRequest`, `blockUser`, `unblockUser`, `getBlocked`, `createInvite`, `getInvites`).
+- `services/social/fixtureSocialService.ts`: borrar al conectar; `getSocialService()` debe devolver el servicio de Supabase.
+- `features/social/useSocial.ts`: sustituir la suscripción al store por React Query (`useQuery` + invalidación tras cada mutación) y quitar `clearFailure()` de `reload`.
+- `types/socialTypes`: verificar con backend `hidden_categories` (BT-46), `records[]` y `recent_posts[]` de `get_social_profile`.
+- `SocialInviteScreen`: el nombre para el texto compartido sale de `useAuth().profile`.
+- Deep link `athelete://amigo/{token}` → `redeem_friend_invite` (no hay manejador todavía; Universal Link, BT-48).
+- Quitar los toasts "llega con el feed" / "llegan pronto" al construir las tandas A y C.
+
+**Herramientas dev:** menú "Ver pantallas de Comunidad" y `athelete://dev/social?screen=<key>` (36 estados, ver `dev/devSocialScreens.ts`).
+- **Enlaces dev sin sesión (2026-10-07):** los enlaces de pantallas que solo usan datos de ejemplo (`athelete://dev/social` y los estados con `devState` de `athelete://dev/quiz`) abren aunque no haya sesión. Solo en `__DEV__`: `RootNavigator` registra esas pantallas en el flujo de auth y `DevFixtureTabs` (tab bar real, solo Comunidad con contenido); los abridores comprueban `__DEV__` y `waitForFixtureApp` (`dev/devFixtureNav.ts`). Las pantallas que leen la base (resto de módulos y la portada real de Quiz) siguen esperando a la sesión.
+
+## Comunidad · tanda UI-A (contenido) · 2026-10-07
+
+Solo interfaz con datos de ejemplo (`dev/socialFixtures.ts` + `dev/socialPostFixtures.ts`); **sin lecturas ni escrituras al backend**. Checkpoint: `SOCIAL_A_CHECKPOINT.md`. Pantallas: Feed (sustituye el placeholder del hub), Publicación y comentarios, Crear publicación y Compartir entreno / récord, Reportar y Eliminar (publicación y comentario) y "contenido retirado". "Rutina compartida" (SOCIAL_04) y el botón "Compartir" del Resumen de sesión **no** entran en esta tanda.
+
+**Decisiones de alcance (DA)**
+- **DA-126** · **Feed paginado por cursor:** páginas de 10, cursor = `created_at` del último post (`get_feed(_limit, _before)`), sin duplicados (gana la copia más reciente), la siguiente página se pide al acercarse al final del scroll y la lista termina cuando una página llega corta ("Estás al día"). Al volver al feed se refresca sin vaciarlo.
+- **DA-127** · **El adjunto de entreno muestra el volumen** como el diseño; si el snapshot no lo trae, "—" (BT-44 se resuelve al conectar).
+- **DA-128** · **Contenido retirado:** `deleted_at` no deja rastro; `removed_at` muestra "Contenido retirado" y `hidden_at` "Contenido en revisión", sin texto ni foto originales; lo que reportas desaparece al instante para ti. El servidor no devuelve el contenido retirado a otras personas, así que el estado se ve en listas ya cargadas, en comentarios y al abrir una publicación que ya no existe ("Contenido no disponible").
+- **DA-129** · **Términos antes de la primera publicación** (hoja con enlace a `TERMS_URL`, placeholder BT-43). La aceptación es una marca local de la fixture; al conectar pasa al servidor (BT-43).
+- **DA-130** · **Todo texto de usuario es texto plano:** sin enlaces, sin Markdown, sin selección.
+- **DA-131** · **Foto:** solo en entrenos o sola (DA-S4), JPG / PNG / WebP y ≤ 5 MB, validado en el modelo (`validatePhoto`); el selector es un placeholder que rota fotos de la app.
+- **DA-132** · **Nunca solo texto** (Q4): una publicación lleva un adjunto de Athelete o una foto; el texto es opcional (≤ 280). Un comentario va de 1 a 500 caracteres.
+
+**Desviaciones del diseño (D)**
+- **D-88** · **Reportar** (sin pantalla en el handoff): una sola hoja con los seis motivos de `content_reports`, nota opcional (≤ 500) y la frase de qué pasa después; se abre desde "⋯" de la publicación o del comentario.
+- **D-89** · **Eliminar** tu publicación o comentario: la misma hoja pide confirmación.
+- **D-90** · Estados del feed sin diseño propio: vacío con amigos, cargando más, error al cargar más y fin de la lista; el error y el esqueleto siguen STATE_07 y STATE_01.
+- **D-91** · El chip de audiencia del composer es informativo y lleva a Privacidad social (el prototipo lo alterna): `create_post` copia la audiencia de `social_settings`.
+- **D-92** · Cuerpo de rutina: las miniaturas son iconos (la anatomía por `exercise_id` llega al conectar); "Guardar" usa `save_shared_routine` y "Ver rutina" abre la publicación hasta que exista SOCIAL_04.
+- **D-93** · Cuerpo de reto (sin composición en el diseño): tarjeta clara con la cifra final y la posición entre amigos.
+- **D-94** · La imagen del bloque de récord es decorativa (foto de la app), no una foto de usuario; el récord no admite foto (DA-S4).
+
+**Primitivos nuevos (`components/v2`):** `ReactionBar`, `ActivityLine`, `CommentRow`, `CommentComposer`, `RetiredContent`, `PostCard`, `PostBodies` (workout con foto, workout claro, récord, rutina, logro, reto, foto) y `AttachmentPreview`.
+
+**TODO(social-wire) nuevos**
+- `SocialService`: `getFeed`, `getFriendActivity`, `getPost`, `toggleLike`, `getComments`, `addComment`, `deleteComment`, `deletePost`, `getAttachmentSources`, `createPost`, `getPostPhotoSource`, `reportContent`, `saveSharedRoutine`, `getTermsAccepted`, `acceptTerms` (RPC / tabla de cada uno en `socialService.ts`).
+- `useFeed`: pasar a `useInfiniteQuery`; quitar el reinicio por escenario y `clearFeedFailure`.
+- Fotos: URL firmadas de `social-photos` con caché (`usePostPhotoSource`); selector real (`launchImageLibrary`), redimensionar ≤ 1600 px, quitar EXIF/GPS, JPEG 0,8, HEIC → JPEG; subir a `{uid}/{post_id}/…` y borrar la subida si `create_post` falla (BT-52).
+- Rutinas: miniaturas de anatomía por `exercise_id`; pantalla SOCIAL_04 y el botón "Compartir" del Resumen de sesión, de Récords y de Logros (entradas del plan).
+- Términos: marca en el servidor (BT-43).
+- Comentarios y publicaciones: el nombre del autor propio sale de `useAuth().profile` (hoy fixture en dev sin sesión).
+
+**Herramientas dev:** los 27 estados nuevos están en el menú "Ver pantallas de Comunidad" y en `athelete://dev/social?screen=<key>` (feed, feedNoPosts, feedLoading, feedError, feedMore, feedMoreError, feedEnd, feedRetired, post*, commentReport, postReport, postDelete, compose*).
