@@ -41,10 +41,11 @@ import type {
 } from '@app/features/social/socialTypes';
 
 // Data layer of Comunidad. The screens only talk to this interface.
-// The real app uses `supabaseSocialService` (W1 connected: settings, username,
-// friends overview, find, profile, blocked list); in `__DEV__` the dev screens
+// The real app uses `supabaseSocialService` (W1 + W2 connected: settings,
+// username, friends overview, find, profile, blocked list, friend requests,
+// remove friend, block and invites); in `__DEV__` the dev screens
 // use `fixtureSocialService` (see `socialSource.ts`). What is left to connect,
-// one method per RPC / table (the W1 ones are marked ✔):
+// one method per RPC / table (the W1 and W2 ones are marked ✔):
 //
 // TODO(social-wire): implement with Supabase (getSupabaseClient):
 // ✔ getSettings            → select social_settings (own row; null = no row)
@@ -56,13 +57,15 @@ import type {
 // ✔ findByUsername         → find_user_by_username(_username)
 // ✔ getProfile             → get_social_profile(_user_id) + get_social_profiles([id])
 //                            (the profile row may be absent: tolerate it)
-//   sendFriendRequest      → send_friend_request(_target)
-//   respondFriendRequest   → respond_friend_request(_request_id, _accept)
-//   cancelFriendRequest    → cancel_friend_request(_request_id)
-//   blockUser / unblockUser→ block_user(_target) / delete from user_blocks
+// ✔ sendFriendRequest      → send_friend_request(_target)
+// ✔ respondFriendRequest   → respond_friend_request(_request_id, _accept)
+// ✔ cancelFriendRequest    → cancel_friend_request(_request_id)
+// ✔ removeFriend           → remove_friend(_friend)
+// ✔ revokeInvite           → update friend_invites set revoked_at (only if unused)
+// ✔ blockUser / unblockUser→ block_user(_target) / delete from user_blocks
 // ✔ getBlocked             → select user_blocks + get_social_profiles
-//   createInvite           → create_friend_invite() (max 5 active)
-//   getInvites             → select friend_invites (own)
+// ✔ createInvite           → create_friend_invite() (max 5 active)
+// ✔ getInvites             → select friend_invites (own)
 //   getFeed                → get_feed(_limit, _before) (+ get_social_profiles for authors)
 //   getFriendActivity      → get_friend_activity(_limit)
 //   getPost                → get_feed / select social_posts via can_view_post; null if unavailable
@@ -119,11 +122,16 @@ export interface SocialService {
     accept: boolean,
   ): Promise<'accepted' | 'declined' | 'not_found'>;
   cancelFriendRequest(requestId: string): Promise<void>;
+  // remove_friend: false when there was no friendship to remove.
+  removeFriend(friendId: string): Promise<boolean>;
   blockUser(target: string): Promise<void>;
   unblockUser(target: string): Promise<void>;
   getBlocked(): Promise<BlockedEntry[]>;
   createInvite(): Promise<CreateInviteResult>;
   getInvites(): Promise<FriendInviteRow[]>;
+  // Sets revoked_at on a link that was not used yet; false if it was already
+  // used or revoked.
+  revokeInvite(inviteId: string): Promise<boolean>;
 
   // ── Contenido (tanda A) ──
   getFeed(cursor: string | null, limit: number): Promise<FeedPage>;

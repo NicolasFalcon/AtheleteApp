@@ -4,39 +4,51 @@ import type {
   SocialService,
 } from '@app/services/social/socialService';
 import {
+  acceptsRequestsFrom,
   buildBlocked,
   buildFriendsOverview,
+  inviteRowFrom,
   interpretUsernameRpc,
+  isOkResponse,
   overviewPersonIds,
   parseChallengeCounts,
   parseFindUser,
   parseFriendActivity,
+  parseInviteCreation,
   parseProfileDetail,
+  parseRespondStatus,
+  parseSendStatus,
+  profileFromProfileRpc,
   profileMap,
   toSetUsernameResult,
   usernameErrorFromPostgres,
+  withPhotoPolicy,
 } from '@app/features/social/socialMappers';
 import {
+  inviteUrl,
   normalizeUsername,
   validateUsername,
 } from '@app/features/social/socialModel';
 import type {
   BlockedEntry,
   FindUserResult,
+  FriendInviteRow,
   FriendsOverview,
+  SendFriendRequestStatus,
   SetUsernameResult,
   SocialProfileRow,
   SocialSettingsPatch,
   SocialSettingsRow,
 } from '@app/features/social/socialTypes';
 import { getSupabaseClient } from '@app/services/supabase/client';
+import { prefetchProfilePhotoUris } from '@app/services/supabase/profile-photo';
 
 // Supabase implementation of `SocialService` · W1 (personas: lectura, nombre de
-// usuario y privacidad). Only the W1 methods talk to the backend; everything
-// else is not connected yet (W2 to W6) and answers with an empty value (reads)
+// usuario y privacidad) and W2 (escrituras de personas). Only these methods
+// talk to the backend; everything else is not connected yet (W3 to W7) and answers with an empty value (reads)
 // or rejects (writes), so the real app never mixes in sample data.
-// TODO(social-wire): W2 writes of friends/blocks/invites, W3 feed and posts,
-// W4 compose, W5 challenges, W6 notifications, W7 moderation.
+// TODO(social-wire): W3 feed and posts, W4 compose, W5 challenges,
+// W6 notifications, W7 moderation.
 
 export class SocialNotWiredError extends Error {
   constructor(method: string) {
@@ -202,7 +214,7 @@ export const supabaseSocialService: SocialService = {
         ),
     ]);
 
-    return buildFriendsOverview({
+    const overview = buildFriendsOverview({
       me,
       friendships: friendships.data,
       requests: requests.data,
@@ -210,6 +222,12 @@ export const supabaseSocialService: SocialService = {
       activity: parseFriendActivity(activity),
       counts: parseChallengeCounts(challenges),
     });
+    // Photos are storage paths: sign the friends' ones in one request (DA-119:
+    // only friends get a real photo). The avatars then find them in the cache.
+    await prefetchProfilePhotoUris(
+      overview.friends.map(friend => friend.profile.profile_photo_url),
+    ).catch(() => undefined);
+    return overview;
   },
 
   async findByUsername(username): Promise<FindUserResult | null> {
@@ -237,29 +255,33 @@ export const supabaseSocialService: SocialService = {
         )
         .limit(1),
     ]);
-    // An unreadable profile is "no disponible", not a failure: an error with a
-    // database code (the RPC refused the profile) maps to null; only a failure
-    // without one (network, session) is an error with retry.
+    // null from the RPC (block, no such user, no config and not friends) or an
+    // error with a database code is "no disponible"; only a failure without a
+    // code (network, session) is an error with retry.
     if (detailResult.error && !detailResult.error.code) {
       throw detailResult.error;
     }
-    const detail = detailResult.error ? null : parseProfileDetail(detailResult.data);
     if (block.error) {
       throw block.error;
     }
-    const profile = profiles.get(userId) ?? null;
-
-    // accepts_requests is only exposed by the exact search.
-    let acceptsRequests = true;
-    if (profile?.username && detail?.relationship === 'none') {
-      const found = await findUser(profile.username).catch(() => null);
-      acceptsRequests = found?.accepts_requests ?? true;
+    const detail = detailResult.error ? null : parseProfileDetail(detailResult.data);
+    // get_social_profile carries the identity too; get_social_profiles covers
+    // the case where only the batch RPC returns the row.
+    const identity =
+      (detailResult.error ? null : profileFromProfileRpc(detailResult.data)) ??
+      profiles.get(userId) ??
+      null;
+    const profile = identity
+      ? withPhotoPolicy(identity, detail?.relationship ?? 'none')
+      : null;
+    if (profile && (detail?.relationship === 'friends' || detail?.relationship === 'self')) {
+      await prefetchProfilePhotoUris([profile.profile_photo_url]).catch(() => undefined);
     }
 
     return {
       profile,
       detail,
-      acceptsRequests,
+      acceptsRequests: detailResult.error ? true : acceptsRequestsFrom(detailResult.data),
       blocked: block.data !== null,
       requestId: requests.error ? null : (requests.data?.[0]?.id ?? null),
     };
@@ -279,15 +301,124 @@ export const supabaseSocialService: SocialService = {
     return buildBlocked(data, profiles);
   },
 
-  // ── W2 · escrituras de amistad (todavía no conectadas) ──────────────────
-  sendFriendRequest: unwired('sendFriendRequest'),
-  respondFriendRequest: unwired('respondFriendRequest'),
-  cancelFriendRequest: unwired('cancelFriendRequest'),
-  blockUser: unwired('blockUser'),
-  unblockUser: unwired('unblockUser'),
-  createInvite: unwired('createInvite') as () => Promise<CreateInviteResult>,
-  async getInvites() {
-    return [];
+  // ── W2 · escrituras de personas ─────────────────────────────────────────
+  async sendFriendRequest(target): Promise<SendFriendRequestStatus> {
+    const { data, error } = await client().rpc('send_friend_request', {
+      _target: target,
+    });
+    if (error) {
+      throw error;
+    }
+    return parseSendStatus(data);
+  },
+
+  async respondFriendRequest(requestId, accept) {
+    const { data, error } = await client().rpc('respond_friend_request', {
+      _request_id: requestId,
+      _accept: accept,
+    });
+    if (error) {
+      throw error;
+    }
+    return parseRespondStatus(data, accept);
+  },
+
+  async cancelFriendRequest(requestId) {
+    const { error } = await client().rpc('cancel_friend_request', {
+      _request_id: requestId,
+    });
+    if (error) {
+      throw error;
+    }
+  },
+
+  async removeFriend(friendId): Promise<boolean> {
+    const { data, error } = await client().rpc('remove_friend', {
+      _friend: friendId,
+    });
+    if (error) {
+      throw error;
+    }
+    if (!isOkResponse(data)) {
+      throw new Error('remove_friend no respondió ok');
+    }
+    return (data as { removed?: unknown }).removed !== false;
+  },
+
+  async blockUser(target) {
+    const { data, error } = await client().rpc('block_user', { _target: target });
+    if (error) {
+      throw error;
+    }
+    if (!isOkResponse(data)) {
+      throw new Error('block_user no respondió ok');
+    }
+  },
+
+  async unblockUser(target) {
+    const me = await currentUserId();
+    const { error } = await client()
+      .from('user_blocks')
+      .delete()
+      .eq('blocker_id', me)
+      .eq('blocked_id', target);
+    if (error) {
+      throw error;
+    }
+  },
+
+  async createInvite(): Promise<CreateInviteResult> {
+    const me = await currentUserId();
+    const { data, error } = await client().rpc('create_friend_invite');
+    if (error) {
+      throw error;
+    }
+    const created = parseInviteCreation(data);
+    if (!created.ok) {
+      if (created.error === 'limit') {
+        return { ok: false, error: 'limit' };
+      }
+      throw new Error('Respuesta inesperada de create_friend_invite');
+    }
+    // The stored row (the list shows the real dates); the response is enough
+    // when it cannot be read back.
+    const stored = await client()
+      .from('friend_invites')
+      .select('*')
+      .eq('id', created.id)
+      .maybeSingle();
+    const invite: FriendInviteRow = stored.data ?? inviteRowFrom(created, me);
+    return { ok: true, link: { invite, url: inviteUrl(invite.token) } };
+  },
+
+  async getInvites(): Promise<FriendInviteRow[]> {
+    const me = await currentUserId();
+    const { data, error } = await client()
+      .from('friend_invites')
+      .select('*')
+      .eq('inviter_id', me)
+      .order('created_at', { ascending: false });
+    if (error) {
+      throw error;
+    }
+    return data;
+  },
+
+  async revokeInvite(inviteId): Promise<boolean> {
+    const me = await currentUserId();
+    // Only a link that is neither used nor revoked can be revoked.
+    const { data, error } = await client()
+      .from('friend_invites')
+      .update({ revoked_at: new Date().toISOString() })
+      .eq('id', inviteId)
+      .eq('inviter_id', me)
+      .is('used_at', null)
+      .is('revoked_at', null)
+      .select('id');
+    if (error) {
+      throw error;
+    }
+    return data.length > 0;
   },
 
   // ── Contenido (W3, W4) ──────────────────────────────────────────────────

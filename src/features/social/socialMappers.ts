@@ -2,12 +2,14 @@ import type { Tables } from '@app/types/supabase';
 import type {
   BlockedEntry,
   FindUserResult,
+  FriendInviteRow,
   FriendActivity,
   FriendEntry,
   FriendRequestRow,
   FriendsOverview,
   HiddenCategory,
   Relationship,
+  SendFriendRequestStatus,
   SetUsernameResult,
   SocialProfileDetail,
   SocialProfileRow,
@@ -174,7 +176,16 @@ const POST_TYPES: readonly SocialRecentPost['type'][] = [
   'photo',
 ];
 
-function parseRecords(value: unknown): SocialRecord[] | undefined {
+const NEW_RECORD_DAYS = 7;
+
+// get_social_profile.records[]: {exercise_name, pr_type, value_weight,
+// value_reps, unit, recorded_at}. A weight record keeps its reps; a record
+// without weight is a repetitions record ("12 reps"). The server has no
+// "is new" flag: a record of the last week is "nuevo".
+function parseRecords(
+  value: unknown,
+  now: Date = new Date(),
+): SocialRecord[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
   }
@@ -183,21 +194,49 @@ function parseRecords(value: unknown): SocialRecord[] | undefined {
     const row = asRecord(item);
     const name =
       asString(row?.exercise_name) ?? asString(row?.exercise) ?? asString(row?.name);
-    const amount = asNumber(row?.value) ?? asNumber(row?.value_weight);
-    if (!row || !name || amount === undefined) {
+    if (!row || !name) {
       return;
     }
+    const weight = asNumber(row.value_weight) ?? asNumber(row.value);
+    const reps = asNumber(row.value_reps) ?? asNumber(row.reps);
+    const amount = weight ?? reps;
+    if (amount === undefined) {
+      return;
+    }
+    const recordedAt = asString(row.recorded_at);
+    const age = recordedAt ? now.getTime() - new Date(recordedAt).getTime() : NaN;
     records.push({
       exercise_name: name,
       value: amount,
-      unit: asString(row.unit) ?? 'kg',
-      reps: asNumber(row.reps) ?? asNumber(row.value_reps) ?? null,
-      is_new: row.is_new === true,
+      unit: weight !== undefined ? (asString(row.unit) ?? 'kg') : 'reps',
+      reps: weight !== undefined ? (reps ?? null) : null,
+      is_new:
+        row.is_new === true ||
+        (Number.isFinite(age) && age >= 0 && age <= NEW_RECORD_DAYS * 86_400_000),
     });
   });
   return records;
 }
 
+// Title of a post in the feed format: the attachment says what it is.
+function postTitle(row: Json): string {
+  const attachment = asRecord(row.attachment);
+  const summary = asRecord(row.summary);
+  const exercise = asString(attachment?.exercise_name);
+  const figure = asNumber(attachment?.value);
+  return (
+    asString(row.title) ??
+    asString(summary?.title) ??
+    asString(attachment?.title) ??
+    (exercise
+      ? `${exercise}${figure !== undefined ? ` · ${figure} ${asString(attachment?.unit) ?? ''}`.trimEnd() : ''}`
+      : undefined) ??
+    asString(row.body) ??
+    ''
+  );
+}
+
+// get_social_profile.recent_posts[]: up to 2 posts in the feed format.
 function parseRecentPosts(value: unknown): SocialRecentPost[] | undefined {
   if (!Array.isArray(value)) {
     return undefined;
@@ -210,12 +249,7 @@ function parseRecentPosts(value: unknown): SocialRecentPost[] | undefined {
     if (!row || !id || !type || !POST_TYPES.includes(type)) {
       return;
     }
-    const summary = asRecord(row.summary);
-    posts.push({
-      id,
-      type,
-      title: asString(row.title) ?? asString(summary?.title) ?? '',
-    });
+    posts.push({ id, type, title: postTitle(row) });
   });
   return posts;
 }
@@ -391,7 +425,7 @@ export function buildFriendsOverview(input: OverviewInput): FriendsOverview {
   const friends: FriendEntry[] = friendships.map(row => {
     const id = friendIdOf(row, me);
     return {
-      profile: profileOrPlaceholder(profiles, id),
+      profile: withPhotoPolicy(profileOrPlaceholder(profiles, id), 'friends'),
       friendsSince: row.created_at,
       lastActivity: activity.get(id) ?? null,
     };
@@ -407,13 +441,13 @@ export function buildFriendsOverview(input: OverviewInput): FriendsOverview {
     .filter(row => row.receiver_id === me)
     .map(request => ({
       request,
-      profile: profileOrPlaceholder(profiles, request.sender_id),
+      profile: withPhotoPolicy(profileOrPlaceholder(profiles, request.sender_id), 'none'),
     }));
   const sent = pending
     .filter(row => row.sender_id === me)
     .map(request => ({
       request,
-      profile: profileOrPlaceholder(profiles, request.receiver_id),
+      profile: withPhotoPolicy(profileOrPlaceholder(profiles, request.receiver_id), 'none'),
     }));
 
   return {
@@ -432,6 +466,127 @@ export function buildBlocked(
 ): BlockedEntry[] {
   return blocks.map(block => ({
     block,
-    profile: profiles.get(block.blocked_id) ?? null,
+    profile: profiles.has(block.blocked_id)
+      ? withPhotoPolicy(profiles.get(block.blocked_id) as SocialProfileRow, 'blocked')
+      : null,
   }));
+}
+
+// ── get_social_profile also carries the identity of the person ───────────
+// (user_id, username, name, avatar_key, profile_photo_url, goal, weight), so
+// the profile screen does not need a second call. profile_photo_url is a
+// storage path (null when the identity is not visible).
+export function profileFromProfileRpc(data: unknown): SocialProfileRow | null {
+  const body = asRecord(data);
+  const id = asString(body?.user_id);
+  if (!body || !id || asString(body.error)) {
+    return null;
+  }
+  return {
+    id,
+    username: asString(body.username) ?? '',
+    name: asString(body.name) ?? 'Usuario',
+    avatar_key: asString(body.avatar_key) ?? '',
+    profile_photo_url: asString(body.profile_photo_url) ?? '',
+    goal: asString(body.goal) ?? '',
+    weight: asNumber(body.weight) ?? 0,
+  };
+}
+
+// Sending is allowed unless the profile says the person closed requests.
+export function acceptsRequestsFrom(data: unknown): boolean {
+  return asRecord(data)?.accepts_requests !== false;
+}
+
+// DA-119: the real photo is only for the viewer and their friends. Anyone
+// else keeps no photo path at all, so it is never requested or shown.
+export function withPhotoPolicy(
+  profile: SocialProfileRow,
+  relationship: Relationship | 'blocked',
+): SocialProfileRow {
+  return relationship === 'self' || relationship === 'friends'
+    ? profile
+    : { ...profile, profile_photo_url: '' };
+}
+
+// "@usuario", or nothing when the person has no username to show.
+export function handleOf(username: string | null | undefined): string {
+  return username ? `@${username}` : '';
+}
+
+// ── Friend request RPCs ──────────────────────────────────────────────────
+const SEND_STATUSES: readonly SendFriendRequestStatus[] = [
+  'sent',
+  'pending',
+  'accepted',
+  'already_friends',
+  'not_accepting',
+  'unavailable',
+  'invalid',
+];
+
+// send_friend_request → {status}. An unknown status is "invalid".
+export function parseSendStatus(data: unknown): SendFriendRequestStatus {
+  const status = asString(asRecord(data)?.status);
+  return SEND_STATUSES.includes(status as SendFriendRequestStatus)
+    ? (status as SendFriendRequestStatus)
+    : 'invalid';
+}
+
+// respond_friend_request → {status: accepted | declined | not_found}.
+export function parseRespondStatus(
+  data: unknown,
+  accept: boolean,
+): 'accepted' | 'declined' | 'not_found' {
+  const status = asString(asRecord(data)?.status);
+  if (status === 'accepted' || status === 'declined' || status === 'not_found') {
+    return status;
+  }
+  return accept ? 'accepted' : 'declined';
+}
+
+// remove_friend → {ok, removed}; block_user → {ok}. Not ok is a failure.
+export function isOkResponse(data: unknown): boolean {
+  return asRecord(data)?.ok === true;
+}
+
+// create_friend_invite → {ok, invite_id, token, expires_at}, or an error when
+// there are already 5 active links.
+export type InviteCreation =
+  | { ok: true; id: string; token: string; expiresAt: string }
+  | { ok: false; error: 'limit' | 'unknown' };
+
+export function parseInviteCreation(data: unknown): InviteCreation {
+  const body = asRecord(data);
+  const token = asString(body?.token);
+  const id = asString(body?.invite_id) ?? asString(body?.id);
+  if (body?.ok === true && token && id) {
+    return {
+      ok: true,
+      id,
+      token,
+      expiresAt:
+        asString(body.expires_at) ?? new Date(Date.now() + 7 * 86_400_000).toISOString(),
+    };
+  }
+  const error = asString(body?.error) ?? '';
+  return { ok: false, error: /limit|max|too_many|active/i.test(error) ? 'limit' : 'unknown' };
+}
+
+// The row of the link just created, for the list while it reloads.
+export function inviteRowFrom(
+  created: Extract<InviteCreation, { ok: true }>,
+  inviterId: string,
+  now: Date = new Date(),
+): FriendInviteRow {
+  return {
+    id: created.id,
+    inviter_id: inviterId,
+    token: created.token,
+    created_at: now.toISOString(),
+    expires_at: created.expiresAt,
+    used_at: null,
+    used_by: null,
+    revoked_at: null,
+  };
 }

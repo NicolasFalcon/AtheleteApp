@@ -172,6 +172,54 @@ export async function resolveProfilePhotoUri(
   }
 }
 
+// Signs several photos with one request (createSignedUrls) and fills the same
+// cache `resolveProfilePhotoUri` reads, so a list of people (Amigos) does not
+// sign one photo per row. Best effort: a photo that fails to sign is signed
+// later by its avatar, as before.
+export async function prefetchProfilePhotoUris(
+  references: ReadonlyArray<string | null | undefined>,
+): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return;
+  }
+
+  const paths = Array.from(
+    new Set(
+      references
+        .map(reference => getProfilePhotoStoragePath(reference))
+        .filter((path): path is string => {
+          if (!path) {
+            return false;
+          }
+          const cached = signedUrlCache.get(path);
+          return !(
+            cached && cached.expiresAt - SIGNED_URL_REFRESH_BUFFER_MS > Date.now()
+          );
+        }),
+    ),
+  );
+  if (paths.length === 0) {
+    return;
+  }
+
+  const { data, error } = await client.storage
+    .from(PROFILE_PHOTOS_BUCKET)
+    .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
+  if (error || !data) {
+    return;
+  }
+
+  data.forEach(item => {
+    if (item.path && item.signedUrl) {
+      signedUrlCache.set(item.path, {
+        expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1000,
+        url: item.signedUrl,
+      });
+    }
+  });
+}
+
 export async function uploadProfilePhoto(
   userId: string,
   photo: ProfilePhotoUpload,

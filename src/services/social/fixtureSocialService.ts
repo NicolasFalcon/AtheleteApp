@@ -489,6 +489,17 @@ export const fixtureSocialService: SocialService = {
     });
   },
 
+  async removeFriend(friendId) {
+    await ready();
+    if (relationOf(friendId) !== 'friends') {
+      return false;
+    }
+    const friendsSince = { ...state.friendsSince };
+    delete friendsSince[friendId];
+    commit({ ...setRelation(friendId, 'none'), friendsSince });
+    return true;
+  },
+
   async blockUser(target) {
     await ready();
     const friendsSince = { ...state.friendsSince };
@@ -550,6 +561,23 @@ export const fixtureSocialService: SocialService = {
   async getInvites() {
     await ready();
     return state.invites;
+  },
+
+  async revokeInvite(inviteId) {
+    await ready();
+    const invite = state.invites.find(item => item.id === inviteId);
+    if (!invite || invite.used_at !== null || invite.revoked_at !== null) {
+      return false;
+    }
+    commit({
+      ...state,
+      invites: state.invites.map(item =>
+        item.id === inviteId
+          ? { ...item, revoked_at: new Date().toISOString() }
+          : item,
+      ),
+    });
+    return true;
   },
 
   async getFeed(cursor, limit): Promise<FeedPage> {
@@ -977,7 +1005,17 @@ function fixtureAttachment(source: {
         exercises_done: num(source.stats[1].value.split(' ')[0]),
         exercises_total: num(source.stats[1].value.split(' ').pop() ?? ''),
         volume_kg: num(source.stats[2].value) || null,
-        record: source.record ?? null,
+        prs_count: source.record ? 1 : 0,
+        top_pr: source.record
+          ? {
+              exercise: source.record.exercise,
+              exercise_id: 'fx',
+              pr_type: 'weight',
+              value_weight: source.record.value,
+              value_reps: null,
+              unit: source.record.unit,
+            }
+          : null,
       };
     case 'record':
       return {
