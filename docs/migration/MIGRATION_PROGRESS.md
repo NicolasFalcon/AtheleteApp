@@ -1974,7 +1974,7 @@ Solo interfaz con datos de ejemplo (`dev/socialFixtures.ts` + `dev/socialPostFix
 
 **Decisiones de alcance (DA)**
 - **DA-126** · **Feed paginado por cursor:** páginas de 10, cursor = `created_at` del último post (`get_feed(_limit, _before)`), sin duplicados (gana la copia más reciente), la siguiente página se pide al acercarse al final del scroll y la lista termina cuando una página llega corta ("Estás al día"). Al volver al feed se refresca sin vaciarlo.
-- **DA-127** · **El adjunto de entreno muestra el volumen** como el diseño; si el snapshot no lo trae, "—" (BT-44 se resuelve al conectar).
+- **DA-127** · **El adjunto de entreno muestra el volumen** como el diseño; si el snapshot no lo trae, "—" (BT-44 resuelto el 7-oct-2026: `volume_kg`, `prs_count` y `top_pr`, opcionales en posts viejos).
 - **DA-128** · **Contenido retirado:** `deleted_at` no deja rastro; `removed_at` muestra "Contenido retirado" y `hidden_at` "Contenido en revisión", sin texto ni foto originales; lo que reportas desaparece al instante para ti. El servidor no devuelve el contenido retirado a otras personas, así que el estado se ve en listas ya cargadas, en comentarios y al abrir una publicación que ya no existe ("Contenido no disponible").
 - **DA-129** · **Términos antes de la primera publicación** (hoja con enlace a `TERMS_URL`, placeholder BT-43). La aceptación es una marca local de la fixture; al conectar pasa al servidor (BT-43).
 - **DA-130** · **Todo texto de usuario es texto plano:** sin enlaces, sin Markdown, sin selección.
@@ -2044,11 +2044,11 @@ Todas las pantallas hablan con `SocialService` (`services/social/socialService.t
 | `send_friend_request` · `respond_friend_request` · `cancel_friend_request` | `sendFriendRequest`, `respondFriendRequest`, `cancelFriendRequest` | Amigos, Perfil | Estados de `send_friend_request` ya mapeados |
 | `block_user` · `user_blocks` | `blockUser`, `unblockUser`, `getBlocked` | Perfil, Bloqueados | Invalidar feed, amigos, retos y notificaciones al bloquear |
 | `friend_invites` · `create_friend_invite` · `redeem_friend_invite` | `createInvite`, `getInvites` | Invitar | Enlace `athelete://amigo/{token}` sin manejador todavía (BT-48) |
-| `get_feed` | `getFeed` | Feed | `useFeed` → `useInfiniteQuery`; cursor `_before`; BT-44 (volumen) |
+| `get_feed` | `getFeed` | Feed | `useFeed` → `useInfiniteQuery`; cursor `_before`; BT-44 resuelto (volumen y `top_pr` opcionales) |
 | `social_posts` (vía `can_view_post`) | `getPost` | Detalle, Rutina | `null` = contenido no disponible |
 | `social_post_likes` | `toggleLike` | Feed, Detalle | `INSERT … ON CONFLICT DO NOTHING` / `DELETE`; el cliente ya hace el me gusta optimista |
 | `social_post_comments` · `delete_comment` | `getComments`, `addComment`, `deleteComment` | Detalle | Autores con `get_social_profiles` |
-| `create_post` + Storage `social-photos` | `createPost`, `getPostPhotoSource` | Crear / Compartir | Selector real, ≤ 1600 px, sin EXIF, URL firmada con caché; borrar la subida si falla (BT-52); `sourceId` real del Resumen, Récords y Logros |
+| `create_post` + Storage `social-photos` | `createPost`, `getPostPhotoSource` | Crear / Compartir | Selector real, ≤ 1600 px, sin EXIF, URL firmada con caché; borrar la subida si falla (BT-52 ya resuelto en servidor para las huérfanas de más de 24 h; la app sigue borrando la suya); `sourceId` real del Resumen, Récords y Logros |
 | `content_reports` | `reportContent` | Reportar | `INSERT … ON CONFLICT DO NOTHING`; lo reportado desaparece para quien reporta |
 | `save_shared_routine` | `saveSharedRoutine` | Feed, Detalle, Rutina | "Empezar": abrir la sesión de la copia (`template_id`) |
 | `profiles.terms_accepted_at` (BT-43) | `getTermsAccepted`, `acceptTerms` | Crear, Usuario, Privacidad | `TERMS_URL` y `SUPPORT_EMAIL` reales antes de TestFlight |
@@ -2096,7 +2096,7 @@ Nueva implementación `services/social/supabaseSocialService.ts` (mapeos puros e
 | `getProfile` | `get_social_profile` + `get_social_profiles` + `user_blocks` + `friend_requests` (+ `find_user_by_username` para `accepts_requests`) | Una RPC que rechaza el perfil (error con código) o una fila ausente = "no disponible"; solo un fallo sin código (red, sesión) es error con reintento |
 | `getBlocked` | `user_blocks` propios + `get_social_profiles` | Entrada con `profile: null` si no se puede leer |
 
-Todo lo demás (W2 a W7) en la app real **no usa fixtures**: las lecturas devuelven vacío (feed, actividad, retos, notificaciones, moderación, enlaces) y las escrituras fallan con `SocialNotWiredError` ("todavía no está conectado").
+Todo lo demás (W3 a W7; W2 está más abajo) en la app real **no usa fixtures**: las lecturas devuelven vacío (feed, actividad, retos, notificaciones, moderación, enlaces) y las escrituras fallan con `SocialNotWiredError` ("todavía no está conectado").
 
 - **DA-146** · **Fuente de datos por contexto:** `getSocialService()` vive en `socialSource.ts`; `fixtureSocialService` queda solo para desarrollo (`socialFixtureStore.isActive()` lo activa el primer `reset`, que llaman las pantallas dev).
 - **DA-147** · **Caché con React Query:** `useSocialResource(nombre, carga, claves)` (el `nombre` es la clave; la caché es por usuario). Recarga al volver el foco a la pantalla y al pasar la app a primer plano (`focusManager` + `AppState`), con `staleTime` de 30 s. `useSocialService()` envuelve el servicio: tras cada escritura (cualquier método que no empiece por `get`) invalida toda la caché `social`, también si la escritura falla. Estado de error con "Reintentar" en todas las lecturas.
@@ -2106,7 +2106,8 @@ Todo lo demás (W2 a W7) en la app real **no usa fixtures**: las lecturas devuel
 - **DA-151** · **Se quita "Retos en común" del perfil de otra persona:** el servidor no devuelve `common_challenges`; se eliminan el campo, la sección y su fixture. Las rutinas de otra persona solo se ven si las publicó (aparecen como publicaciones en "Actividad reciente", no hay lista de rutinas).
 
 ### Ajustes confirmados con backend que se aplican en otras oleadas (anotados ya)
-- **W2 · Eliminar amigo:** con la RPC `remove_friend` (backend la está aplicando); acción secundaria en SOCIAL_06.
+- **W2 · Eliminar amigo:** con la RPC `remove_friend(_friend uuid)` → `{ok, removed}` (aplicada; tipo ya en `supabase.ts`), no con `DELETE` directo; acción secundaria en SOCIAL_06.
+- **BT-44 resuelto (7-oct-2026):** el adjunto de entreno de `create_post` trae `volume_kg` (`null` sin series), `prs_count` y `top_pr`; los posts viejos no tienen las claves, así que son opcionales en `WorkoutAttachment` (`topPrLine` para la línea de récord; fixtures y tests actualizados). Publicar la misma sesión otra vez devuelve el mismo `post_id`. **BT-52 resuelto:** la limpieza diaria borra las huérfanas de `social-photos` de más de 24 h; la app no hace nada nuevo.
 - **W5 · Detalle de reto:** ocultar la actividad por reto y dejar solo el ranking.
 - **W6 · Contador de no leídas:** `count` sobre `social_notifications` con `read_at is null`.
 - **Documentación:** `BACKEND_SUMMARY` corregido (no hay posts automáticos; solo `create_post` publica) y con lo que generan `social_activity` y `social_challenge_contributions`; `SOCIAL_PLAN §8.1` #6, #7 y #8 resueltos.
@@ -2117,7 +2118,7 @@ Todo lo demás (W2 a W7) en la app real **no usa fixtures**: las lecturas devuel
 - `PersonalRecordsScreen`, `WorkoutSummaryScreen`, `AchievementsScreen` (`sourceId` del composer), `SocialComposeScreen` (selector real), `SocialRoutineScreen` y `PostBodies` (miniaturas de anatomía por `exercise_id`, "Empezar" tras `save_shared_routine`), `OfficialChallengeHero` (`cover_path`).
 - `fixtureSocialService.ts`: borrar al terminar W7.
 - **Por verificar con datos reales (BT-46):** forma exacta de `records[]` y `recent_posts[]` de `get_social_profile`, y de las filas de `get_friend_activity`; los mapeos son tolerantes y descartan lo que no reconocen. `ensure_social_settings` cuando la fila ya existe (se reintenta con `set_username`).
-- Sin cobertura en esta oleada: fila de `get_social_profiles` ausente muestra "Usuario" con `@` vacío en el subtítulo de Amigos.
+- ~~Fila de `get_social_profiles` ausente muestra "Usuario" con `@` vacío~~ (corregido en W2, DA-159).
 
 ### Checklist de QA con dos cuentas (A y B; la base no se toca desde aquí)
 Preparación: dos cuentas con perfil; en la base, B sin fila en `social_settings`. Amistades y solicitudes se crean desde la web o el panel hasta que llegue W2 (la app no escribe todavía).
@@ -2132,3 +2133,86 @@ Preparación: dos cuentas con perfil; en la base, B sin fila en `social_settings
 9. **Cambio de cuenta:** cerrar sesión en A, entrar con B: no se ve nada de A (caché por usuario).
 10. **Comprobar que no se mezcla con ejemplos:** el Feed, Retos y Notificaciones salen vacíos (no hay publicaciones ni retos de ejemplo) y "Compartir" / acciones de escritura de W2 en adelante fallan con aviso, sin romper la pantalla.
 11. **Dev:** "Ver pantallas de Comunidad" sigue abriendo todos los estados con datos de ejemplo (y, tras usarlo, recargar la app para volver a datos reales).
+
+## Comunidad · conexión W2 (personas: escrituras) · 2026-10-07
+
+Sin migraciones, sin `npx supabase`, sin escrituras de prueba y sin commits. Las formas reales de las RPC salen de `docs/backend/SOCIAL_RPC_SHAPES.md`.
+
+### Antes de empezar (comprobado)
+- Tipos de `remove_friend(_friend)` en `types/supabase.ts` y el adjunto de entreno nuevo (`volume_kg`, `prs_count`, `top_pr`, opcionales para posts viejos) en `WorkoutAttachment`, con fixtures y test: hechos.
+- BT-44 y BT-52 marcados como resueltos en `BACKEND_TODO`, y `remove_friend` anotada en `BACKEND_SUMMARY`: hecho.
+
+### Mapeos de W1 revisados contra `SOCIAL_RPC_SHAPES.md` (DA-152)
+- `records[]` trae `{exercise_name, pr_type, value_weight, value_reps, unit, recorded_at}`: un récord de peso conserva sus repeticiones; uno sin peso es de repeticiones ("12 reps"; antes se descartaba). El servidor no manda "nuevo": un récord de la última semana lleva la etiqueta NUEVO.
+- `recent_posts[]` viene en el formato del feed: el título sale del `attachment` (título de la sesión o rutina, "ejercicio · valor" de un récord) o del texto.
+- `get_social_profile` ya incluye la identidad (`username`, `name`, `avatar_key`, `profile_photo_url`, `goal`, `accepts_requests`): `getProfile` la usa en lugar de pedir `find_user_by_username` y `get_social_profiles` solo cubre el caso de que no venga.
+- `get_friend_activity` no trae foto: sale de `get_social_profiles` (ya era así).
+- `ensure_social_settings` con fila existente ignora el nombre y ni lo valida: el servicio usa siempre `set_username` cuando hay fila, y, si la fila aparece entre medias (`created:false`), reintenta con `set_username`. Errores `invalid_username` y `username_taken` mapeados.
+- `get_social_profile` = `null` (bloqueo, no existe, sin configuración y no amigos) o error con código → "Este perfil no está disponible". Perfil limitado (solo hasta `hidden_categories`): las claves opcionales son ausentes, nunca 0. `relationship` (5 valores) a los estados de la UI.
+
+### Lo conectado
+| Acción | Llamada | Respuesta |
+|---|---|---|
+| Enviar solicitud | `send_friend_request(_target)` | `status` (`sent`, `pending`, `accepted`, `already_friends`, `not_accepting`, `unavailable`, `invalid`); uno desconocido es `invalid` |
+| Aceptar / rechazar | `respond_friend_request(_request_id, _accept)` | `accepted`, `declined`, `not_found` |
+| Cancelar una enviada | `cancel_friend_request(_request_id)` | |
+| Eliminar amigo | `remove_friend(_friend)` | `{ok, removed}`; `ok` distinto de true es un error |
+| Bloquear | `block_user(_target)` | `{ok}` |
+| Desbloquear | `delete` en `user_blocks` (propio) | |
+| Crear invitación | `create_friend_invite()` | `{ok, invite_id, token, expires_at}`; con 5 activos, "límite"; se lee la fila guardada |
+| Lista de invitaciones | `select friend_invites` (propias) | |
+| Revocar | `update friend_invites set revoked_at` solo si `used_at` y `revoked_at` son nulos | `false` si ya se usó o ya estaba revocado |
+
+- **DA-153** · **Fotos:** `profile_photo_url` es una ruta de storage. Las de los amigos se firman en lote con `createSignedUrls` (`prefetchProfilePhotoUris`), que llena la misma caché que usan los avatares. DA-119: la ruta de una foto solo se conserva para uno mismo y los amigos; solicitudes, bloqueados y no amigos reciben `''` (nunca se pide) y se ve el avatar con iniciales.
+- **DA-154** · **Solicitudes** (enviar, aceptar, rechazar, cancelar) con toast en cada acción; la fila del resultado de búsqueda pasa a "Solicitado" al instante y vuelve si se rechaza o falla.
+- **DA-155** · **Eliminar amigo:** en el menú del perfil de un amigo, "Eliminar a … de tus amigos", con hoja de confirmación (no avisa; se puede volver a agregar). Nuevo método `removeFriend` en `SocialService` (y en los fixtures).
+- **DA-156** · **Bloquear / desbloquear:** con confirmación al bloquear (ya existía la hoja). Al bloquear, la persona sale al instante de Amigos (amigos, recibidas, enviadas), el perfil pasa a "bloqueado" y sus publicaciones salen del feed de la sesión; si falla, todo vuelve.
+- **DA-157** · **Invitaciones:** crear y compartir el enlace (`athelete://amigo/{token}`) como antes, y "Revocar" en cada enlace activo (nuevo `revokeInvite`; toast "Enlace revocado" o "Ese enlace ya se había usado").
+- **DA-158** · **Interfaz optimista con vuelta atrás:** `useSocialService` aplica el cambio a la caché antes de la petición (`relationMachine.ts`: `optimisticRelation`, `settleRelation`, `applyAction`, `runOptimistic`), lo mantiene si el servidor acepta, lo deshace si falla o si rechaza (`not_accepting`, `unavailable`, `invalid`, `remove` sin amistad) y, termine como termine, invalida la caché social.
+- **DA-159** · **Cosmético:** sin nombre de usuario no se muestra "@" vacío (`handleOf`) en Amigos, Bloqueados y Crear reto.
+
+Tests: `relationMachine.test.ts` (estado de la relación tras cada acción, los errores y la vuelta atrás, y el efecto en la caché de Amigos, perfil, bloqueados e invitaciones).
+
+### `TODO(social-wire)` que quedan tras W2
+W3 feed, publicaciones, comentarios, likes y reportes (`useFeed` sigue siendo un cargador local) · W4 composer y fotos · W5 retos · W6 notificaciones · W7 moderación y términos (BT-43) · `usePostPhotoSource` sin caché de URL firmadas · `sourceId` del composer en Récords, Resumen y Logros · miniaturas de anatomía por `exercise_id` · `OfficialChallengeHero` (`cover_path`) · borrar `fixtureSocialService.ts` al terminar W7. **Por verificar con datos reales:** `get_friend_activity` (campos de `summary` por `kind`), el error exacto de `create_friend_invite` con 5 activos (hoy cualquier error con "limit", "max", "too_many" o "active" cuenta como límite) y si `block_user` borra ya amistad y solicitudes en el servidor (la app lo refleja en cliente).
+
+### Checklist de QA con dos cuentas (W1 + W2)
+**A** = falcon1989 (ya tiene perfil), **B** = la cuenta nueva (sin fila en `social_settings`). Dos dispositivos o dos sesiones; nunca la misma cuenta en ambas.
+
+*Nombre de usuario (B)*
+1. B abre Comunidad → "Nombre de usuario". Atrás no entra al hub.
+2. `Mi Nombre!` → formato no válido; el nombre de A → "ya está en uso"; un nombre de 2 letras → no válido; `Bruno_01` → entra y se guarda en minúsculas.
+3. Ajustes → editar: cambiar a otro válido funciona; volver a poner el mismo no da "en uso".
+
+*Buscar y solicitar*
+4. A busca a B por su usuario exacto (también con `@` y mayúsculas): aparece con "Agregar". Un usuario inexistente → sin resultados.
+5. A pulsa Agregar: pasa a "Solicitado" al instante. Con avión, o si B tiene "Permitir solicitudes" apagado, vuelve a "Agregar" / "No acepta solicitudes" y sale el aviso.
+6. B ve la solicitud en Amigos → Recibidas (con iniciales, sin foto: aún no son amigos).
+7. A cancela su solicitud: desaparece de Enviadas en ambas cuentas. Repetir el envío.
+8. B ignora la solicitud: A ya no la ve como enviada. Repetir y B la acepta.
+9. Ambos se ven en Amigos; el toast dice "… ya es tu amigo". Si A envía a B mientras B ya le había enviado una, queda como amigos directos ("accepted").
+
+*Perfil y privacidad*
+10. A abre el perfil de B (amigos): racha, sesiones, logros, récords y "Amigos desde"; las fotos de amigos se ven (y las de quien no es amigo, nunca).
+11. B apaga "Récords" y "Logros" en Privacidad; A recarga el perfil (volver a la pantalla o a la app): desaparecen. B pone audiencia Pública.
+12. Con una tercera cuenta no amiga (o sin sesión social), el perfil público muestra solo lo permitido y no "Amigos desde". Un perfil limitado (audiencia solo amigos) muestra solo racha y el botón.
+13. Un perfil inexistente o bloqueado por el otro lado → "Este perfil no está disponible".
+
+*Eliminar amigo*
+14. A: perfil de B → ··· → "Eliminar a B de tus amigos" → confirmar. Pasa a "Agregar" y desaparece de Amigos; B también deja de verle. Cancelar la hoja no hace nada.
+15. Con avión durante el paso 14: vuelve a "Amigos" y sale el error.
+
+*Bloquear y desbloquear*
+16. Volver a ser amigos. A bloquea a B (confirmación): B sale de Amigos de A al instante, el perfil dice "Bloqueaste a B" y B no aparece en la búsqueda de A ni A en la de B.
+17. B busca a A o abre su perfil → "no disponible". Las solicitudes entre ambos se cancelan.
+18. A: Ajustes → Privacidad → Bloqueados muestra a B (si el perfil no se puede leer, "Usuario" sin "@"). "Desbloquear" lo quita de la lista y A puede volver a buscarle.
+19. Bloquear con avión: la persona vuelve a su lista y sale el error.
+
+*Invitar y revocar*
+20. A: Invitar → "Compartir enlace": se abre el menú de compartir con `athelete://amigo/…`; el enlace aparece en "Enlaces activos · 1 de 5" con su caducidad.
+21. "Revocar" → el enlace desaparece de activos y el contador baja. Crear 5 y comprobar que el sexto dice "Ya tienes 5 enlaces activos" y el botón queda desactivado.
+22. Un enlace ya usado: "Revocar" avisa "Ese enlace ya se había usado" (el canje se prueba con B cuando exista el manejador del enlace, BT-48).
+
+*Transversal*
+23. Cambiar de cuenta (cerrar sesión de A, entrar con B): no queda nada de A en pantalla (caché por usuario).
+24. Cada acción pone un toast y deja la caché al día sin recargar a mano; el feed, retos y notificaciones siguen vacíos (W3 en adelante).
