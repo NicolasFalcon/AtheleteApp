@@ -2001,3 +2001,68 @@ Solo interfaz con datos de ejemplo (`dev/socialFixtures.ts` + `dev/socialPostFix
 - Comentarios y publicaciones: el nombre del autor propio sale de `useAuth().profile` (hoy fixture en dev sin sesión).
 
 **Herramientas dev:** los 27 estados nuevos están en el menú "Ver pantallas de Comunidad" y en `athelete://dev/social?screen=<key>` (feed, feedNoPosts, feedLoading, feedError, feedMore, feedMoreError, feedEnd, feedRetired, post*, commentReport, postReport, postDelete, compose*).
+
+## Comunidad · tanda UI-C (retos, notificaciones y moderación) · 2026-10-07
+
+Solo interfaz con datos de ejemplo (`dev/socialFixtures.ts`, `socialPostFixtures.ts` y `socialChallengeFixtures.ts`); **sin lecturas ni escrituras al backend**. Checkpoint: `SOCIAL_C_CHECKPOINT.md`. Pantallas: Retos (sustituye el placeholder del hub), Detalle del reto (oficial y entre amigos), Crear reto (5 pasos), Reto completado, Notificaciones sociales, Moderación (cola, reporte, historial), Rutina compartida (SOCIAL_04, pendiente de A) y los botones "Compartir" del Resumen de sesión, Récords y Logros.
+
+**Registro retroactivo**
+- **D-95** · **Mosaico muscular** (commit `04ac554`): `MuscleHotspot` sustituye el punto fijo de Pecho del prototipo por un punto Ember sobre el músculo de cada zona, con el núcleo que respira y dos anillos de radar (estático con Reducir movimiento); las posiciones salen de `MUSCLE_HOTSPOTS` (`workoutAssets.ts`) y cada tarjeta empieza con un retardo de 250 ms para que no pulsen a la vez.
+
+**Decisiones de alcance (DA)**
+- **DA-133** · **Entre amigos no hay retos de repeticiones** (BT-45 queda como decisión de producto): Crear reto ofrece 5 de los 6 tipos; solo el reto oficial cuenta repeticiones.
+- **DA-134** · **"En tus retos" solo sale de las participaciones del usuario:** un grupo de Amigos con las personas de tus retos que aún no son amigas. Hoy la API solo expone amigos en el ranking (Q13, BT-46), así que en producción puede salir vacío.
+- **DA-135** · **Puntos e insignia solo en el reto oficial** (Q1); entre amigos 0 puntos. El registro manual solo existe en el oficial: 1–100 por registro y 300 al día (DA-S7).
+- **DA-136** · **Estado del reto derivado** (`challengeViewState`): no unido, invitado, esperando, activo, completado, expirado, cancelado, rechazado o salido. Un reto completado no expira después; uno expirado o cancelado ofrece "Crear otro reto".
+- **DA-137** · **Ranking con empates:** quien tiene el mismo progreso comparte posición (1, 1, 3); dentro del empate va primero quien terminó antes y luego el usuario. La frase de distancia da el dato sin presión.
+- **DA-138** · **Notificaciones sociales:** los me gusta de una publicación forman una línea; el contador son las notificaciones sin leer (9+); se marcan al abrir una línea o con "Marcar todo". **La campana de Inicio no se conecta**: el diseño (HOME_08) no trae avisos sociales; el acceso es la campana de la cabecera del hub.
+- **DA-139** · **Moderación solo para moderadores:** la UI pregunta `is_moderator()`; sin rol los permisos son todos falsos, no se piden ni la cola ni el historial y se ve "No tienes acceso"; la fila de Ajustes solo existe para moderadores y no hay enlace profundo fuera de `__DEV__`. El servidor lo impone con RLS.
+- **DA-140** · **Acciones por `moderate_content`:** restaurar (solo lo oculto), retirar (publicaciones y comentarios, nunca un usuario) y descartar los reportes; nota interna ≤ 500; cada acción pasa al historial.
+- **DA-141** · **"Compartir" abre el composer con su adjunto** desde el Resumen de sesión, Récords y Logros, y desde un reto completado (fixture hasta conectar).
+
+**Desviaciones del diseño (D)**
+- **D-96** · Notificaciones sociales (sin diseño): pantalla propia con filas planas como HOME_08, agrupadas en Nuevas y Anteriores, con la campana en la cabecera del hub (no mezcladas en Inicio).
+- **D-97** · Moderación (sin diseño): cola con `Segmented` Cola · Historial, reporte con el contenido en texto plano, motivos y nota, y las acciones permitidas.
+- **D-98** · Detalle del reto: la etiqueta de la cabecera es corta ("INVITACIÓN", "EXPIRADO") por ancho; el "⋯" ofrece Salir o Cancelar (creador sin aceptaciones); estados expirado, cancelado y no disponible sin diseño.
+- **D-99** · Crear reto: la confirmación es el toast "Reto creado. Empieza cuando acepte alguien." y el detalle en estado "esperando"; la duración dice "Empieza cuando acepte alguien" en vez de una fecha de fin, porque las fechas nacen al aceptar el primero; el título se genera (`challengeTitle`).
+- **D-100** · Reto completado: la medalla Ember se dibuja con SVG (el `HexMedal` es oscuro); la pastilla de puntos solo aparece si el reto los da.
+- **D-101** · La cabecera del hub tiene campana, escudo y "+".
+- **D-102** · Portada del reto oficial: foto de la app (decorativa); `cover_path` al conectar.
+- **D-103** · Rutina compartida: miniaturas con icono; "Empezar" guarda la copia y arrancará la sesión al conectar con Entrenos.
+
+**Primitivos nuevos (`components/v2`):** `ChallengeRow`, `OfficialChallengeHero` (+ `OfficialBadge`) y `RankBars`.
+
+### Guía de la fase de conexión · `TODO(social-wire)` de las tres tandas (A, B y C), por RPC o tabla
+Todas las pantallas hablan con `SocialService` (`services/social/socialService.ts`); conectar es implementar esa interfaz con Supabase, borrar `fixtureSocialService.ts` y devolver el servicio real en `getSocialService()`. El resto de `TODO(social-wire)` del código son los de la última columna.
+
+| RPC / tabla | Método de `SocialService` | Pantallas | Notas |
+|---|---|---|---|
+| `social_settings` · `ensure_social_settings` · `set_username` | `getSettings`, `setUsername`, `updateSettings` | Hub (puerta), Usuario, Privacidad | Sin fila = no hay Comunidad; el reservado de nombres es de la app |
+| `friendships` · `friend_requests` · `get_social_profiles` · `get_friend_activity` | `getFriendsOverview` | Amigos, hub | BT-47 (una RPC); tolerar filas ausentes |
+| `find_user_by_username` | `findByUsername` | Amigos | Búsqueda exacta |
+| `get_social_profile` + `get_social_profiles` | `getProfile` | Perfil | Verificar `hidden_categories`, `records[]`, `recent_posts[]` y `common_challenges` (BT-46) |
+| `send_friend_request` · `respond_friend_request` · `cancel_friend_request` | `sendFriendRequest`, `respondFriendRequest`, `cancelFriendRequest` | Amigos, Perfil | Estados de `send_friend_request` ya mapeados |
+| `block_user` · `user_blocks` | `blockUser`, `unblockUser`, `getBlocked` | Perfil, Bloqueados | Invalidar feed, amigos, retos y notificaciones al bloquear |
+| `friend_invites` · `create_friend_invite` · `redeem_friend_invite` | `createInvite`, `getInvites` | Invitar | Enlace `athelete://amigo/{token}` sin manejador todavía (BT-48) |
+| `get_feed` | `getFeed` | Feed | `useFeed` → `useInfiniteQuery`; cursor `_before`; BT-44 (volumen) |
+| `social_posts` (vía `can_view_post`) | `getPost` | Detalle, Rutina | `null` = contenido no disponible |
+| `social_post_likes` | `toggleLike` | Feed, Detalle | `INSERT … ON CONFLICT DO NOTHING` / `DELETE`; el cliente ya hace el me gusta optimista |
+| `social_post_comments` · `delete_comment` | `getComments`, `addComment`, `deleteComment` | Detalle | Autores con `get_social_profiles` |
+| `create_post` + Storage `social-photos` | `createPost`, `getPostPhotoSource` | Crear / Compartir | Selector real, ≤ 1600 px, sin EXIF, URL firmada con caché; borrar la subida si falla (BT-52); `sourceId` real del Resumen, Récords y Logros |
+| `content_reports` | `reportContent` | Reportar | `INSERT … ON CONFLICT DO NOTHING`; lo reportado desaparece para quien reporta |
+| `save_shared_routine` | `saveSharedRoutine` | Feed, Detalle, Rutina | "Empezar": abrir la sesión de la copia (`template_id`) |
+| `profiles.terms_accepted_at` (BT-43) | `getTermsAccepted`, `acceptTerms` | Crear, Usuario, Privacidad | `TERMS_URL` y `SUPPORT_EMAIL` reales antes de TestFlight |
+| `get_my_challenges` | `getMyChallenges` | Retos, hub (insignia) | `mine = null` en el oficial sin unir |
+| `get_challenge_board` + `social_challenge_contributions` (propias) | `getChallengeBoard` | Detalle, Reto completado | Actividad por reto no declarada (BT-46 c); la semana sale de las aportaciones |
+| `respond_challenge_invite` · `join_official_challenge` · `leave_challenge` · `cancel_friend_challenge` | `respondChallengeInvite`, `joinOfficialChallenge`, `leaveChallenge`, `cancelFriendChallenge` | Retos, Detalle | |
+| `add_manual_contribution` | `addManualContribution` | Reto oficial | Errores `amount_out_of_range`, `daily_limit`, `not_allowed` |
+| `create_friend_challenge` | `createFriendChallenge` | Crear reto | Rechaza extraños y `exercise_reps`; el título lo genera el servidor |
+| `mark_challenge_celebrated` | `markChallengeCelebrated` | Reto completado | |
+| (BT-46) personas de tus retos | `getCoParticipants` | Amigos | Hoy el ranking solo expone amigos |
+| `social_notifications` | `getNotifications`, `markNotificationsRead` | Notificaciones | BT-50 (contador y "marcar todo"); integrar en HOME_08 como grupo "Comunidad" y conectar la campana de Inicio si producto lo decide |
+| `app_moderators` · `is_moderator()` | `getModeratorRole` | Ajustes, Moderación | La UI y la RLS validan el rol |
+| `moderation_queue` · `moderation_actions` · `moderate_content` | `getModerationQueue`, `getModerationHistory`, `moderateContent` | Moderación | Solo moderadores; foto reportada con URL firmada de moderador |
+
+**Resto de `TODO(social-wire)` (no son RPC):** `useSocial.ts` → React Query en lugar de la suscripción al store y quitar `clearFailure` / `clearFeedFailure` / el reinicio por escenario; `usePostPhotoSource` → caché de URL firmadas; `OfficialChallengeHero` → `cover_path`; miniaturas de anatomía por `exercise_id` (`PostBodies`, `SocialRoutineScreen`); el nombre propio en el composer, en Invitar y en comentarios sale de `useAuth().profile`; quitar los toasts "llegan con…" que queden; `getSocialService()`.
+
+**Herramientas dev:** los estados nuevos (Retos, Detalle, Crear reto, Reto completado, Notificaciones, Moderación con y sin acceso, Rutina) están en el menú "Ver pantallas de Comunidad" y en `athelete://dev/social?screen=<key>`.
