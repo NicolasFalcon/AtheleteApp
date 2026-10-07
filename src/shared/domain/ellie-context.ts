@@ -499,6 +499,8 @@ export function serializeEllieContext(ctx: EllieFullContext): string {
       ? 'Masculino'
       : profile.gender === 'female'
       ? 'Femenino'
+      : profile.gender === 'other'
+      ? 'Otro (usa estimaciones neutras)'
       : 'No indicado'
   }
 — Objetivo: ${goalMap[profile.goal] || profile.goal}

@@ -25,7 +25,7 @@ export type AuthStackParamList = {
 };
 
 export type OnboardingStackParamList = {
-  // v2: 8 questions + ELLIE welcome in one screen. The routes below belong
+  // v2: 9 questions + ELLIE welcome in one screen. The routes below belong
   // to the v1 onboarding, no longer registered (pending cleanup).
   Flow: undefined;
   Welcome: undefined;

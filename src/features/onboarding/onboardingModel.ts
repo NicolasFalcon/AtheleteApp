@@ -1,20 +1,23 @@
 import type {
   OnboardingData,
   OnboardingGoal,
+  ProfileGender,
   TrainingLevel,
 } from '@app/types/auth';
 
-// Onboarding v2 (Auth.dc.html · STEPS): 8 questions in 3 blocks.
-// Saved to `profiles`: name, birth_date, weight, height, goal,
+// Onboarding v2 (Auth.dc.html · STEPS): 8 questions + "sexo" (D-78, not in
+// the handoff) = 9 questions in 3 blocks.
+// Saved to `profiles`: name, birth_date, gender, weight, height, goal,
 // training_level, training_days_per_week, available_equipment and
 // preferred_session_minutes.
-// Not asked any more (user decision 2026-09-30): gender and avatar.
+// Avatar is not asked (user decision 2026-09-30); gender is asked again.
 
 export const BLOCKS = ['Tú', 'Tu objetivo', 'Tu semana'] as const;
 
 export type StepKind =
   | 'name'
   | 'birthDate'
+  | 'gender'
   | 'body'
   | 'goal'
   | 'level'
@@ -31,6 +34,7 @@ export type StepDefinition = {
 export const STEPS: StepDefinition[] = [
   { kind: 'name', block: 0, question: '¿Cómo te llamas?' },
   { kind: 'birthDate', block: 0, question: '¿Cuándo naciste?' },
+  { kind: 'gender', block: 0, question: '¿Cuál es tu sexo?' },
   { kind: 'body', block: 0, question: 'Tu peso y altura' },
   { kind: 'goal', block: 1, question: '¿Qué quieres conseguir?' },
   { kind: 'level', block: 1, question: '¿Cuál es tu nivel?' },
@@ -140,6 +144,7 @@ export const DAYS_RANGE = { min: 1, max: 7 } as const;
 export type OnboardingAnswers = {
   name: string;
   birthDate: string | null; // YYYY-MM-DD
+  gender: ProfileGender | null;
   weight: number;
   height: number;
   goal: number | null;
@@ -153,6 +158,7 @@ export function initialAnswers(name = ''): OnboardingAnswers {
   return {
     name,
     birthDate: null,
+    gender: null,
     weight: 70,
     height: 170,
     goal: null,
@@ -172,6 +178,8 @@ export function canContinue(
       return answers.name.trim().length > 0;
     case 'birthDate':
       return Boolean(answers.birthDate);
+    case 'gender':
+      return answers.gender !== null;
     case 'body':
       return answers.weight > 0 && answers.height > 0;
     case 'goal':
@@ -225,7 +233,7 @@ export type OnboardingPayload = {
   data: OnboardingData;
 };
 
-// Gender and avatar are no longer asked (null).
+// Avatar is not asked (null). Gender goes through genderToDb at the write.
 export function toOnboardingPayload(
   answers: OnboardingAnswers,
 ): OnboardingPayload {
@@ -240,7 +248,7 @@ export function toOnboardingPayload(
       profilePhotoUrl: null,
       goal: GOALS[answers.goal].value,
       birthDate: answers.birthDate,
-      gender: null,
+      gender: answers.gender,
       weight: answers.weight,
       height: answers.height,
       trainingDaysPerWeek: answers.days,

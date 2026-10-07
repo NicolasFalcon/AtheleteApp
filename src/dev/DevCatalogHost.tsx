@@ -78,7 +78,7 @@ function queryParam(url: string, key: string): string | null {
 }
 
 // athelete://dev/catalog
-// athelete://dev/onboarding[?step=0…7]
+// athelete://dev/onboarding[?step=0…8]
 // athelete://dev/welcome[?status=error]
 // athelete://dev/workouts?screen=<key>[&zone=<key>]: navigates (no overlay).
 function openWorkoutsFromUrl(url: string | null): boolean {

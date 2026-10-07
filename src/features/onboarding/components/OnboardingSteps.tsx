@@ -6,6 +6,9 @@ import {
   Cable,
   Check,
   Dumbbell,
+  Mars,
+  Venus,
+  CircleDashed,
   Layers,
   Minus,
   PersonStanding,
@@ -41,6 +44,7 @@ import {
   weekPattern,
   type OnboardingAnswers,
 } from '@app/features/onboarding/onboardingModel';
+import { GENDER_OPTIONS } from '@app/features/profile/genderModel';
 import { tightLine } from '@app/theme/v2';
 
 type StepProps = {
@@ -211,7 +215,41 @@ export function BirthDateStep({ answers, update }: StepProps) {
   );
 }
 
-// ── 3 · Peso y altura ──────────────────────────────────────────────────────
+// ── 3 · Sexo (D-78) ────────────────────────────────────────────────────────
+const GENDER_ICONS: LucideIcon[] = [Venus, Mars, CircleDashed];
+
+export function GenderStep({ answers, update }: StepProps) {
+  return (
+    <View style={styles.gap18}>
+      <View accessibilityRole="radiogroup" style={styles.capsules}>
+        {GENDER_OPTIONS.map((option, index) => (
+          <ChoiceTile
+            key={option.value}
+            selected={answers.gender === option.value}
+            height={132}
+            accessibilityLabel={option.label}
+            onPress={() => update({ gender: option.value })}
+            style={styles.capsule}
+          >
+            {color => (
+              <IconChoiceContent
+                icon={GENDER_ICONS[index]}
+                label={option.label}
+                color={color}
+              />
+            )}
+          </ChoiceTile>
+        ))}
+      </View>
+      <TextV2 variant="meta" tone="secondary">
+        Lo usamos para afinar tus estimaciones. Con "Otro" usamos una
+        estimación neutra. Puedes cambiarlo en Editar perfil.
+      </TextV2>
+    </View>
+  );
+}
+
+// ── 4 · Peso y altura ──────────────────────────────────────────────────────
 export function BodyStep({ answers, update }: StepProps) {
   return (
     <View style={styles.gap30}>
@@ -235,7 +273,7 @@ export function BodyStep({ answers, update }: StepProps) {
   );
 }
 
-// ── 4 · Objetivo ───────────────────────────────────────────────────────────
+// ── 5 · Objetivo ───────────────────────────────────────────────────────────
 // Package photos with the prototype treatment baked in (PLACEHOLDER).
 const GOAL_PHOTOS = [
   require('@app/assets/v2/photos/hero-entreno.jpg'),
@@ -262,7 +300,7 @@ export function GoalStep({ answers, update }: StepProps) {
   );
 }
 
-// ── 5 · Nivel ──────────────────────────────────────────────────────────────
+// ── 6 · Nivel ──────────────────────────────────────────────────────────────
 export function LevelStep({ answers, update }: StepProps) {
   const { colors } = useThemeV2();
 
@@ -327,7 +365,7 @@ export function LevelStep({ answers, update }: StepProps) {
   );
 }
 
-// ── 6 · Días por semana ────────────────────────────────────────────────────
+// ── 7 · Días por semana ────────────────────────────────────────────────────
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 
 export function DaysStep({ answers, update }: StepProps) {
@@ -401,7 +439,7 @@ export function DaysStep({ answers, update }: StepProps) {
   );
 }
 
-// ── 7 · Equipamiento ───────────────────────────────────────────────────────
+// ── 8 · Equipamiento ───────────────────────────────────────────────────────
 const EQUIPMENT_ICONS: Record<(typeof EQUIPMENT)[number], LucideIcon> = {
   'Peso corporal': PersonStanding,
   Mancuernas: Dumbbell,
@@ -449,7 +487,7 @@ export function EquipmentStep({ answers, update }: StepProps) {
   );
 }
 
-// ── 8 · Duración ───────────────────────────────────────────────────────────
+// ── 9 · Duración ───────────────────────────────────────────────────────────
 export function DurationStep({ answers, update }: StepProps) {
   const { colors } = useThemeV2();
   const current =

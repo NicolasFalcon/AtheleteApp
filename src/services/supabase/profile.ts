@@ -1,6 +1,7 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
 import { normalizeAvatarKey } from '@app/assets/avatars';
 import { normalizeProfilePhotoReference } from '@app/services/supabase/profile-photo';
+import { genderFromDb, genderToDb } from '@app/features/profile/genderModel';
 import type {
   OnboardingData,
   NotificationPrefs,
@@ -38,9 +39,6 @@ function mapTrainingLevel(value: string | null): TrainingLevel | null {
     : null;
 }
 
-function mapGender(value: string | null): ProfileGender | null {
-  return value === 'male' || value === 'female' ? value : null;
-}
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
   workouts: true,
@@ -76,7 +74,7 @@ function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
     profilePhotoUrl: normalizeProfilePhotoReference(row.profile_photo_url),
     goal: mapGoal(row.goal),
     birthDate: row.birth_date,
-    gender: mapGender(row.gender),
+    gender: genderFromDb(row.gender),
     weight: row.weight,
     height: row.height,
     trainingDaysPerWeek: row.training_days_per_week,
@@ -165,7 +163,7 @@ export async function updateOnboardingProfile(
       ),
       goal: onboarding.goal,
       birth_date: onboarding.birthDate,
-      gender: onboarding.gender,
+      gender: genderToDb(onboarding.gender),
       weight: onboarding.weight,
       height: onboarding.height,
       training_days_per_week: onboarding.trainingDaysPerWeek,
@@ -243,7 +241,7 @@ export async function updateProfileDetails(
     payload.birth_date = patch.birthDate;
   }
   if (typeof patch.gender !== 'undefined') {
-    payload.gender = patch.gender;
+    payload.gender = genderToDb(patch.gender);
   }
   if (typeof patch.weight !== 'undefined') {
     payload.weight = patch.weight;

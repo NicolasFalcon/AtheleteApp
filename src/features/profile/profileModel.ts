@@ -6,8 +6,10 @@ import {
   LEVELS,
   WEIGHT_RANGE,
 } from '@app/features/onboarding/onboardingModel';
+import { genderToDb } from '@app/features/profile/genderModel';
 import type {
   OnboardingGoal,
+  ProfileGender,
   ProfileRecord,
   TrainingLevel,
 } from '@app/types/auth';
@@ -110,6 +112,7 @@ export function memberSince(iso: string | null | undefined): string | null {
 export type EditDraft = {
   name: string;
   birthDate: string | null;
+  gender: ProfileGender | null;
   weight: number;
   height: number;
   goal: OnboardingGoal | null;
@@ -125,6 +128,7 @@ export function draftFromProfile(profile: ProfileRecord): EditDraft {
   return {
     name: profile.name ?? '',
     birthDate: profile.birthDate,
+    gender: profile.gender,
     weight: profile.weight ?? 70,
     height: profile.height ?? 170,
     goal: profile.goal,
@@ -186,7 +190,11 @@ export const isValid = (errors: DraftErrors) => Object.keys(errors).length === 0
 
 export function isDirty(draft: EditDraft, saved: EditDraft): boolean {
   return (Object.keys(draft) as (keyof EditDraft)[]).some(key =>
-    key === 'name' ? draft.name.trim() !== saved.name.trim() : draft[key] !== saved[key],
+    key === 'name'
+      ? draft.name.trim() !== saved.name.trim()
+      : key === 'gender'
+      ? genderToDb(draft.gender) !== genderToDb(saved.gender)
+      : draft[key] !== saved[key],
   );
 }
 
@@ -202,6 +210,7 @@ export const stepMinutes = (minutes: number, direction: 1 | -1) =>
 export type ProfilePatch = {
   name?: string;
   birthDate?: string | null;
+  gender?: ProfileGender | null;
   weight?: number;
   height?: number;
   goal?: OnboardingGoal | null;
@@ -218,6 +227,10 @@ export function toPatch(draft: EditDraft, saved: EditDraft): ProfilePatch {
   }
   if (draft.birthDate !== saved.birthDate) {
     patch.birthDate = draft.birthDate;
+  }
+  // "Otro" is written as NULL until BT-41, so compare what reaches the DB.
+  if (genderToDb(draft.gender) !== genderToDb(saved.gender)) {
+    patch.gender = draft.gender;
   }
   if (draft.weight !== saved.weight) {
     patch.weight = draft.weight;

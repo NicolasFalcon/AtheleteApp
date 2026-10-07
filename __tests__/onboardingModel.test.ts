@@ -10,9 +10,9 @@ import {
 } from '../src/features/onboarding/onboardingModel';
 
 describe('onboarding v2 model', () => {
-  it('has the 8 steps of the prototype in 3 blocks', () => {
-    expect(STEPS).toHaveLength(8);
-    expect(STEPS.map(step => step.block)).toEqual([0, 0, 0, 1, 1, 2, 2, 2]);
+  it('has the 8 steps of the prototype plus sexo (D-78) in 3 blocks', () => {
+    expect(STEPS).toHaveLength(9);
+    expect(STEPS.map(step => step.block)).toEqual([0, 0, 0, 0, 1, 1, 2, 2, 2]);
   });
 
   it('only continues when the current step is answered', () => {
@@ -21,6 +21,8 @@ describe('onboarding v2 model', () => {
     expect(canContinue('name', answers)).toBe(false);
     expect(canContinue('name', { ...answers, name: ' Ana ' })).toBe(true);
     expect(canContinue('birthDate', answers)).toBe(false);
+    expect(canContinue('gender', answers)).toBe(false);
+    expect(canContinue('gender', { ...answers, gender: 'other' })).toBe(true);
     expect(canContinue('body', answers)).toBe(true);
     expect(canContinue('goal', answers)).toBe(false);
     expect(canContinue('equipment', answers)).toBe(false);

@@ -31,6 +31,7 @@ import {
   DaysStep,
   DurationStep,
   EquipmentStep,
+  GenderStep,
   GoalStep,
   LevelStep,
   NameStep,
@@ -49,7 +50,7 @@ export type OnboardingWizardProps = {
 
 const BLOCK_OF_STEP = STEPS.map(step => step.block);
 
-// ONB_02 · Onboarding (8 steps): one question per screen at 32 pt, grouped in
+// ONB_02 · Onboarding (9 steps): one question per screen at 32 pt, grouped in
 // Tú · Tu objetivo · Tu semana, segmented progress and a fixed "Siguiente".
 export function OnboardingWizard({
   step,
@@ -91,6 +92,7 @@ export function OnboardingWizard({
       />
     ),
     birthDate: <BirthDateStep answers={answers} update={update} />,
+    gender: <GenderStep answers={answers} update={update} />,
     body: <BodyStep answers={answers} update={update} />,
     goal: <GoalStep answers={answers} update={update} />,
     level: <LevelStep answers={answers} update={update} />,

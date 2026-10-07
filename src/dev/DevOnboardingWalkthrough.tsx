@@ -11,6 +11,7 @@ import { VisualOnboardingScreen } from '@app/screens/onboarding/VisualOnboarding
 const SAMPLE: Partial<OnboardingAnswers> = {
   name: 'Nicolas',
   birthDate: '1989-08-30',
+  gender: 'male',
   weight: 76,
   height: 170,
   goal: 0,
@@ -20,11 +21,11 @@ const SAMPLE: Partial<OnboardingAnswers> = {
   duration: 2,
 };
 
-// Development-only walkthrough: Intro → 8 questions → ELLIE welcome, with
+// Development-only walkthrough: Intro → 9 questions → ELLIE welcome, with
 // sample data. It never calls Supabase, never creates users and never saves
 // the profile ("Ir a Inicio" / "Hablar con ELLIE" just close it).
 export type WalkthroughStart = {
-  // Question index (0–7) to open directly, skipping the intro.
+  // Question index (0–8) to open directly, skipping the intro.
   step?: number;
   // Open the ELLIE welcome directly; `failSave` simulates a save error.
   welcome?: boolean;

@@ -9,7 +9,7 @@ export type StepProgressProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-// Segmented bar of a guided flow (onboarding · 8 steps in 3 blocks): one
+// Segmented bar of a guided flow (onboarding · 9 steps in 3 blocks): one
 // 4 pt segment per step, an extra 8 pt gap between blocks, filled up to the
 // current step.
 export function StepProgress({ blocks, current, style }: StepProgressProps) {

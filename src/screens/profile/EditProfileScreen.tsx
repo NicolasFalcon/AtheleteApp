@@ -17,6 +17,7 @@ import {
 } from '@app/components/v2';
 import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import { LEVELS } from '@app/features/onboarding/onboardingModel';
+import { GENDER_OPTIONS } from '@app/features/profile/genderModel';
 import { BirthDateSheet } from '@app/features/profile/v2/BirthDateSheet';
 import {
   draftFromProfile,
@@ -237,6 +238,19 @@ export function EditProfileScreen({ navigation, route }: Props) {
               <TextV2 variant="bodyL" style={styles.value}>
                 {formatBirthDate(draft.birthDate)}
               </TextV2>
+            </FormRow>
+            <FormRow label="Sexo">
+              <View style={styles.chips}>
+                {GENDER_OPTIONS.map(option => (
+                  <FilterChip
+                    key={option.value}
+                    size={40}
+                    label={option.label}
+                    selected={draft.gender === option.value}
+                    onPress={() => set({ gender: option.value })}
+                  />
+                ))}
+              </View>
             </FormRow>
             <FormRow
               label="Peso"

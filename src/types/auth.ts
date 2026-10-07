@@ -13,14 +13,15 @@ export type OnboardingGoal =
 // against Supabase 2026-10-02; BACKEND_SUMMARY lists the English values).
 export type TrainingLevel = 'principiante' | 'intermedio' | 'avanzado';
 
-export type ProfileGender = 'male' | 'female';
+// DB accepts 'male' | 'female' today; 'other' needs BT-41 (see genderModel).
+export type ProfileGender = 'male' | 'female' | 'other';
 
 export type OnboardingData = {
   avatarKey: AvatarKey | null;
   profilePhotoUrl: string | null;
   goal: OnboardingGoal;
   birthDate: string;
-  // Not asked by the v2 onboarding (user decision 2026-09-30): null.
+  // v2 onboarding step "sexo" (D-78); null when skipped or not stored.
   gender: ProfileGender | null;
   weight: number;
   height: number;

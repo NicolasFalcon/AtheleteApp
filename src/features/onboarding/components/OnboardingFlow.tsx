@@ -33,7 +33,7 @@ const SAVE_ERROR =
   'No pudimos guardar tu perfil. Revisa tu conexión y reintenta.';
 const CONTINUE_ERROR = 'No pudimos abrir tu inicio. Inténtalo de nuevo.';
 
-// 8 questions → ELLIE welcome. Answers stay local until the welcome; the
+// 9 questions → ELLIE welcome. Answers stay local until the welcome; the
 // welcome saves them while it is shown (with retry) and its buttons only
 // navigate once the save has succeeded.
 export function OnboardingFlow({
