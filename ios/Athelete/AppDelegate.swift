@@ -75,11 +75,48 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
       launchOptions[.url] = url
     }
 
+    // Same colour as LaunchScreen.storyboard, so no white frame shows while
+    // the JS bundle loads.
+    let background = UIColor(named: "LaunchBackground")
+    window.backgroundColor = background
+
     factory.startReactNative(
       withModuleName: "Athelete",
       in: window,
       launchOptions: launchOptions
     )
+
+    // Until React paints its first frame (the LaunchOverlay), repeat the
+    // launch screen: same background and isologo in the same place.
+    if let rootView = window.rootViewController?.view
+      as? RCTSurfaceHostingProxyRootView
+    {
+      let loading = UIView()
+      loading.backgroundColor = background
+      let logo = UIImageView(image: UIImage(named: "LaunchLogo"))
+      let wordmark = UIImageView(image: UIImage(named: "LaunchWordmark"))
+      for view in [logo, wordmark] {
+        view.contentMode = .scaleAspectFit
+        view.translatesAutoresizingMaskIntoConstraints = false
+        loading.addSubview(view)
+      }
+      // Measures of LaunchScreen.storyboard (design/launch-screen/INTEGRACION.md).
+      NSLayoutConstraint.activate([
+        logo.centerXAnchor.constraint(equalTo: loading.centerXAnchor),
+        logo.centerYAnchor.constraint(equalTo: loading.centerYAnchor),
+        logo.widthAnchor.constraint(equalToConstant: 96),
+        logo.heightAnchor.constraint(equalToConstant: 96),
+        wordmark.centerXAnchor.constraint(equalTo: loading.centerXAnchor),
+        wordmark.bottomAnchor.constraint(
+          equalTo: loading.safeAreaLayoutGuide.bottomAnchor, constant: -44),
+        wordmark.widthAnchor.constraint(equalToConstant: 112),
+        wordmark.heightAnchor.constraint(equalToConstant: 9.15),
+      ])
+      rootView.backgroundColor = background
+      rootView.loadingView = loading
+      rootView.loadingViewFadeDelay = 0.15
+      rootView.loadingViewFadeDuration = 0.1
+    }
   }
 
   // Forwards custom-scheme URLs (athelete://…) to React Native's Linking

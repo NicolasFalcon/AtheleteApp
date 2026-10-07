@@ -21,6 +21,8 @@ type ThemeContextValue = {
   mode: ThemeMode;
   preferredMode: ThemePreference;
   isDark: boolean;
+  // False until the stored preference has been read (launch overlay).
+  isReady: boolean;
   setMode: (mode: ThemeMode | null) => void;
   setPreferredMode: (mode: ThemePreference) => void;
 };
@@ -47,6 +49,7 @@ export function ThemeProvider({children}: PropsWithChildren) {
   const systemMode = useColorScheme() === 'dark' ? 'dark' : 'light';
   const [preferredMode, setPreferredModeState] =
     useState<ThemePreference>('system');
+  const [isReady, setIsReady] = useState(false);
   const [devOverride] = useState(devThemeOverride);
   const mode =
     devOverride ?? (preferredMode === 'system' ? systemMode : preferredMode);
@@ -58,7 +61,8 @@ export function ThemeProvider({children}: PropsWithChildren) {
           setPreferredModeState(value);
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setIsReady(true));
   }, []);
 
   const setPreferredMode = (nextMode: ThemePreference) => {
@@ -72,11 +76,12 @@ export function ThemeProvider({children}: PropsWithChildren) {
       mode,
       preferredMode,
       isDark: mode === 'dark',
+      isReady,
       setMode: (nextMode: ThemeMode | null) =>
         setPreferredMode(nextMode ?? 'system'),
       setPreferredMode,
     }),
-    [mode, preferredMode],
+    [mode, preferredMode, isReady],
   );
 
   return (

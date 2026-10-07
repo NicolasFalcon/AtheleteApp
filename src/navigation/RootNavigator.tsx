@@ -13,6 +13,7 @@ import { enableScreens } from 'react-native-screens';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { ScreenContainer } from '@app/components';
 import { Loader } from '@app/components/ui';
+import { markFirstScreenReady } from '@app/app/launchGate';
 import { useAuth } from '@app/hooks/useAuth';
 import {
   hasSeenVisualOnboarding,
@@ -105,7 +106,15 @@ export function RootNavigator() {
     }
   }, []);
 
-  if (isHydrating || visualOnboardingState === 'loading') {
+  const isRestoring = isHydrating || visualOnboardingState === 'loading';
+
+  useEffect(() => {
+    if (!isRestoring) {
+      markFirstScreenReady();
+    }
+  }, [isRestoring]);
+
+  if (isRestoring) {
     return <RootLoadingScreen />;
   }
 
