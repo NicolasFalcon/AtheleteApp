@@ -6,7 +6,7 @@ Alcance: `docs/migration/SOCIAL_PLAN.md` (tanda A + reportar, movido desde C) y 
 
 ## Reglas de esta tanda
 - Las de la tanda B: fuente visual única, `theme.v2`, `components/v2`, fixtures en `dev/socialFixtures.ts` con tipos de `supabase.ts`, acciones tras `SocialService` con `TODO(social-wire)`.
-- El adjunto de entreno muestra volumen como el diseño; sin volumen en la fixture, "—" (BT-44 se resuelve al conectar).
+- El adjunto de entreno muestra volumen como el diseño; sin volumen en la fixture, "—" (BT-44 resuelto el 7-oct-2026).
 - Foto real solo entre amigos (DA-119). Texto de usuario siempre como texto plano.
 - `hidden_at`, `removed_at` y `deleted_at` se respetan: estado "contenido retirado".
 - Foto: selector placeholder (`TODO(social-wire)`); tipo (JPG/PNG/WebP) y tamaño (5 MB) se validan en el modelo.

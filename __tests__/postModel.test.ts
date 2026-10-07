@@ -21,6 +21,7 @@ import {
   validatePhoto,
   validatePost,
   validateReport,
+  topPrLine,
   workoutStats,
 } from '../src/features/social/postModel';
 import type {
@@ -260,6 +261,29 @@ describe('text of the cards', () => {
     expect(workoutStats(base)[2].value).toBe('—');
     expect(workoutStats({ ...base, volume_kg: null })[2].value).toBe('—');
     expect(formatKg(0)).toBe('—');
+  });
+
+  it('reads the BT-44 keys of the workout attachment as optional', () => {
+    const base = { title: 'Pierna', duration_min: 58, exercises_done: 7, exercises_total: 7 };
+    // Post published before BT-44: no volume, no prs_count, no top_pr.
+    expect(topPrLine(base)).toBeNull();
+    // Session without records.
+    expect(topPrLine({ ...base, volume_kg: 9120, prs_count: 0, top_pr: null })).toBeNull();
+    const pr = {
+      exercise: 'Sentadilla',
+      exercise_id: 'e1',
+      pr_type: 'weight',
+      value_weight: 165,
+      value_reps: 3,
+      unit: 'kg',
+    };
+    expect(topPrLine({ ...base, prs_count: 2, top_pr: pr })).toBe('Sentadilla · 165 kg');
+    expect(
+      topPrLine({ ...base, top_pr: { ...pr, value_weight: null, value_reps: 12 } }),
+    ).toBe('Sentadilla · 12 reps');
+    expect(
+      topPrLine({ ...base, top_pr: { ...pr, value_weight: null, value_reps: null } }),
+    ).toBe('Sentadilla');
   });
 
   it('writes the record delta only when it improved', () => {

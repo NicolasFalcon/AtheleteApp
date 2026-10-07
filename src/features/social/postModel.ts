@@ -343,7 +343,7 @@ export function formatKg(value: number | null | undefined): string {
 }
 
 // Duración · ejercicios · volumen (as the design). Without a volume in the
-// snapshot (BT-44) the third figure is "—".
+// snapshot (null without sets, absent in old posts) the third figure is "—".
 export function workoutStats(
   attachment: WorkoutAttachment,
 ): { value: string; label: string }[] {
@@ -357,6 +357,22 @@ export function workoutStats(
     },
     { value: formatKg(attachment.volume_kg), label: 'volumen' },
   ];
+}
+
+// "Press banca · 140 kg" of the best record of a workout (BT-44); null when
+// the session had none or the post predates the field.
+export function topPrLine(attachment: WorkoutAttachment): string | null {
+  const pr = attachment.top_pr;
+  if (!pr) {
+    return null;
+  }
+  const figure =
+    pr.value_weight !== null && pr.value_weight !== undefined
+      ? `${pr.value_weight} ${pr.unit}`
+      : pr.value_reps !== null && pr.value_reps !== undefined
+        ? `${pr.value_reps} reps`
+        : null;
+  return figure ? `${pr.exercise} · ${figure}` : pr.exercise;
 }
 
 export function recordDeltaLine(attachment: RecordAttachment): string | null {

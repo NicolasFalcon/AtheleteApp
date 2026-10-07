@@ -51,7 +51,7 @@
 
 ### Almacenamiento
 - `profile-photos` (privado). Ruta `{userId}/avatar`. Mostrar con URL firmada.
-- `social-photos` (privado, 5 MB). Ruta `{autor}/{post_id}/archivo`. Mostrar con URL firmada.
+- `social-photos` (privado, 5 MB). Ruta `{autor}/{post_id}/archivo`. Mostrar con URL firmada. La limpieza diaria borra también las fotos huérfanas (sin post) de más de 24 h.
 
 ### Tareas programadas
 - `social-maintenance-hourly` (minuto 7 de cada hora): cierra y caduca retos, limpia actividad antigua.
@@ -79,10 +79,12 @@
 - `cancel_friend_request(_request_id)` → `{status}`.
 - `create_friend_invite()` → `{ok, invite_id, token, expires_at}` (máximo 5 activos).
 - `redeem_friend_invite(_token)` → `{status: friends | already_friends | invalid_or_used, friend_id}`.
+- `remove_friend(_friend uuid)` → `{ok, removed}`. Elimina la amistad (la app la usa en lugar de un `DELETE` directo en `friendships`).
 - `block_user(_target)` → `{ok}`. Desbloquear: `DELETE` en `user_blocks`.
 
 ### Publicaciones
 - `create_post(_type, _source_id, _body, _photo_path, _photo_width, _photo_height)` → `{ok, created, post_id}` o `{error}`.
+  - Tipo `workout`: el `attachment` trae `volume_kg` (`null` sin series), `prs_count` y `top_pr` `{exercise, exercise_id, pr_type, value_weight, value_reps, unit}` (`null` sin récords). Los posts anteriores no tienen estas claves. Publicar de nuevo la misma sesión devuelve el mismo `post_id`.
   - `_source_id`: id de sesión, récord o rutina; `badge_id`; `core33:<participation_id>`; o id de reto.
 - `get_feed(_limit, _before)` → posts con datos del autor y `liked_by_me`.
 - `get_friend_activity(_limit)` → actividad de amigos.

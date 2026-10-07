@@ -11,7 +11,7 @@ import { HexMedal } from '@app/components/v2/HexMedal';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
-import { recordDeltaLine, workoutStats } from '@app/features/social/postModel';
+import { recordDeltaLine, topPrLine, workoutStats } from '@app/features/social/postModel';
 import type {
   AchievementAttachment,
   ChallengeAttachment,
@@ -166,11 +166,11 @@ export function WorkoutLightBody({
         </TextV2>
       </View>
       <StatsGrid stats={workoutStats(attachment)} />
-      {attachment.record ? (
+      {topPrLine(attachment) ? (
         <View style={[styles.recordLine, { borderTopColor: colors.divider }]}>
           <NewRecordTag />
           <TextV2 variant="meta" style={styles.flex}>
-            {`${attachment.record.exercise} · ${attachment.record.value} ${attachment.record.unit}`}
+            {topPrLine(attachment)}
           </TextV2>
         </View>
       ) : null}

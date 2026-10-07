@@ -29,9 +29,22 @@ export type WorkoutAttachment = {
   exercises_total: number;
   workout_type?: string;
   calories?: number | null;
-  // BT-44: not written by the server yet; shown as "—" when absent.
+  // BT-44: create_post writes these for new posts; posts published before
+  // that have none of the three keys, so they are all optional.
+  // `volume_kg`: null when the session has no sets (shown as "—").
   volume_kg?: number | null;
-  record?: { exercise: string; value: number; unit: string } | null;
+  prs_count?: number;
+  // Best record of the session; null when there was none.
+  top_pr?: WorkoutTopPr | null;
+};
+
+export type WorkoutTopPr = {
+  exercise: string;
+  exercise_id: string;
+  pr_type: string;
+  value_weight: number | null;
+  value_reps: number | null;
+  unit: string;
 };
 
 export type RecordAttachment = {

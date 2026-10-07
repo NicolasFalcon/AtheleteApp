@@ -1939,6 +1939,7 @@ export type Database = {
         Returns: Json
       }
       redeem_friend_invite: { Args: { _token: string }; Returns: Json }
+      remove_friend: { Args: { _friend: string }; Returns: Json }
       respond_challenge_invite: {
         Args: { _accept: boolean; _challenge_id: string }
         Returns: Json

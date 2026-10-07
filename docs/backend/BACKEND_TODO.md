@@ -3,7 +3,7 @@
 **Para:** backend (Lovable / Supabase) y Nicolás.
 **Mantenido por:** el equipo de la app móvil. Cada vez que la app necesite algo del backend que aún no existe, se añade aquí en lugar de improvisarlo en la app.
 **Fuente de lo que ya existe:** [`BACKEND_SUMMARY.md`](BACKEND_SUMMARY.md).
-**Última actualización:** 2026-10-06 (BT-41 y BT-42).
+**Última actualización:** 2026-10-07 (BT-44 y BT-52 resueltos).
 
 Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** (la app funciona con un sustituto local o aproximado) · **Baja** (mejora u operación).
 
@@ -18,6 +18,8 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-05 | Gamificación | Cerrar `UPDATE` de `profiles.points` e `INSERT` en `user_badges` | Media | No (depende de la web) |
 | BT-06 | ELLIE / Nutrición | Confirmar si `ellie-chat` usa el género para calorías | Baja | No |
 | BT-43 | Comunidad | Términos de uso (URL) y correo de soporte para contenido de usuarios | Alta | **Sí, antes de TestFlight** |
+| BT-44 | Comunidad | ~~Volumen y récord en el adjunto de entreno (`create_post`)~~ | — | **Resuelto** (2026-10-07) |
+| BT-52 | Comunidad | ~~Subidas huérfanas de `social-photos`~~ | — | **Resuelto** (2026-10-07) |
 | BT-41 | Perfil | ~~`profiles_gender_check` debe aceptar `other`~~ | — | **Resuelto** (2026-10-06) |
 | BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
 | BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
@@ -40,6 +42,17 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-24 | Logros | ~~Progreso de logros y racha de hidratación completa desde el servidor~~ | — | **Resuelto** (2026-10-04) |
 | BT-38 | Quiz | El servidor debe calcular los puntos del quiz, no aceptar el número de la app | **Alta** | No (vía abierta para dar puntos) |
 | BT-39 | Quiz | Que el servidor otorgue `quiz_master` por sí solo (la app deja de enviar `quiz_master_unlocked` en cuanto `quiz_completed` lo devuelva) | Media | No |
+
+---
+
+## Comunidad
+
+### BT-44 · Volumen y récord en el adjunto de entreno · ✅ resuelto (2026-10-07)
+- **Aplicado por backend:** en `create_post` de tipo `workout`, el `attachment` trae `volume_kg` (`null` si la sesión no tiene series), `prs_count` y `top_pr` `{exercise, exercise_id, pr_type, value_weight, value_reps, unit}` (`null` si no hay récords). Los posts publicados antes no tienen estas claves, así que la app las trata como opcionales. Volver a publicar la misma sesión devuelve el mismo `post_id`.
+- **En la app:** `WorkoutAttachment` (`volume_kg?`, `prs_count?`, `top_pr?`), `topPrLine` y los fixtures; el volumen sin dato sigue siendo "—".
+
+### BT-52 · Subidas huérfanas de `social-photos` · ✅ resuelto (2026-10-07)
+- **Aplicado por backend:** la limpieza diaria borra las fotos huérfanas de `social-photos` de más de 24 h. La app no tiene que hacer nada más que seguir borrando su subida si `create_post` falla (BT-52 original, ya solo cortesía).
 
 ---
 
@@ -394,4 +407,5 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-04: BT-38 a BT-40 (módulo Quiz).
 - 2026-10-04: BT-38 sube a prioridad alta (puntos del quiz calculados por el servidor); BT-39 verificado: el servidor no otorga `quiz_master` solo.
 - 2026-10-06: BT-43 (Términos y soporte de Comunidad, antes de TestFlight).
+- 2026-10-07: BT-44 y BT-52 (Comunidad) resueltos; `remove_friend` aplicada (ver `BACKEND_SUMMARY`).
 - 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.

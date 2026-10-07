@@ -79,6 +79,11 @@ export function buildPostFixtures(
       attachment: {
         title: 'Pierna completa', duration_min: 58, exercises_done: 7,
         exercises_total: 7, workout_type: 'strength', calories: 480, volume_kg: 9120,
+        prs_count: 1,
+        top_pr: {
+          exercise: 'Sentadilla', exercise_id: 'fx-ex-squat', pr_type: 'weight',
+          value_weight: 165, value_reps: 3, unit: 'kg',
+        },
       },
       likes: 18, comments: 4, likedByMe: true,
     },
@@ -106,10 +111,11 @@ export function buildPostFixtures(
     {
       id: 'fx-p5', who: 'sofia', type: 'workout', ago: 28 * HOUR,
       body: 'Corto pero intenso.',
-      // No volume in the snapshot yet (BT-44): the card shows "—".
+      // A session without sets: volume_kg is null (the card shows "—") and no record (BT-44).
       attachment: {
         title: 'HIIT de 20', duration_min: 22, exercises_done: 5,
         exercises_total: 5, workout_type: 'hiit', calories: 210, volume_kg: null,
+        prs_count: 0, top_pr: null,
       },
       likes: 12, comments: 2,
     },
@@ -128,6 +134,7 @@ export function buildPostFixtures(
       attachment: {
         title: 'Total Body Dumbbell', duration_min: 42, exercises_done: 6,
         exercises_total: 6, workout_type: 'strength', calories: 330, volume_kg: 6480,
+        // Published before BT-44: no prs_count / top_pr keys.
       },
       likes: 9, comments: 2,
     },
