@@ -1936,11 +1936,11 @@ Solo interfaz con datos de ejemplo (`dev/socialFixtures.ts`, 8 escenarios); **si
 
 **Decisiones de alcance (DA)**
 - **DA-119** · **Foto real solo para uno mismo y amigos.** A quien no es amigo (incluidos los comentaristas de un post de un amigo) se le muestran iniciales, nunca la foto, aunque la política del bucket (`can_view_profile_photo`) lo permita. Regla pura `canShowRealPhoto` y primitivo `PersonAvatar`.
-- **DA-120** · **Búsqueda solo por nombre de usuario exacto** (Q3, confirmado). Escribir filtra tu lista; una consulta con formato de usuario válido llama a `find_user_by_username` (350 ms). Sin "buscar por nombre" ni sección "En tus retos" (Q13; solo vendrá de las participaciones del usuario, tanda C).
+- **DA-120** · **Búsqueda solo por nombre de usuario exacto** (Q3, confirmado). Escribir filtra tu lista; una consulta con formato de usuario válido llama a `find_user_by_username` (350 ms). Sin "buscar por nombre" ni sección "En tus retos" (Q13). *(W1: la sección "En tus retos" se retiró del todo, DA-150.)*
 - **DA-121** · **Nombre de usuario obligatorio antes de usar Comunidad.** El hub redirige a la pantalla si no hay fila en `social_settings`; atrás lleva a Inicio. Sin disponibilidad en vivo (no hay RPC): `username_taken` solo al guardar. Los nombres reservados son cortesía de la app.
 - **DA-122** · **BT-43:** `constants/legal.ts` con `TERMS_URL` y `SUPPORT_EMAIL` placeholder (`TODO(testflight)`). "Continuar" en el nombre de usuario implica aceptar los Términos (texto con enlace); Privacidad social lleva Términos y Soporte. Se cierra antes de TestFlight.
 - **DA-123** · **`blocked` es un estado de quien bloquea** (`user_blocks`); bloquear quita la amistad y las solicitudes; desbloquear vuelve a "ninguna".
-- **DA-124** · **El perfil muestra una sección solo si el servidor devuelve su campo**; a un no amigo nunca se le enseña "amigos desde" ni retos en común aunque lleguen. Fila ausente de `get_social_profiles` → "Este perfil no está disponible".
+- **DA-124** · **El perfil muestra una sección solo si el servidor devuelve su campo**; a un no amigo nunca se le enseña "amigos desde" aunque llegue. *(W1: "retos en común" se retiró, DA-151.)* Fila ausente de `get_social_profiles` → "Este perfil no está disponible".
 - **DA-125** · Toda acción pasa por `SocialService` (`services/social/socialService.ts`); hoy la implementa `fixtureSocialService` en memoria.
 
 **Desviaciones del diseño (D)**
@@ -2011,7 +2011,7 @@ Solo interfaz con datos de ejemplo (`dev/socialFixtures.ts`, `socialPostFixtures
 
 **Decisiones de alcance (DA)**
 - **DA-133** · **Entre amigos no hay retos de repeticiones** (BT-45 queda como decisión de producto): Crear reto ofrece 5 de los 6 tipos; solo el reto oficial cuenta repeticiones.
-- **DA-134** · **"En tus retos" solo sale de las participaciones del usuario:** un grupo de Amigos con las personas de tus retos que aún no son amigas. Hoy la API solo expone amigos en el ranking (Q13, BT-46), así que en producción puede salir vacío.
+- **DA-134** · ~~"En tus retos"~~ **retirado en W1 (DA-150):** el ranking solo muestra amigos por privacidad.
 - **DA-135** · **Puntos e insignia solo en el reto oficial** (Q1); entre amigos 0 puntos. El registro manual solo existe en el oficial: 1–100 por registro y 300 al día (DA-S7).
 - **DA-136** · **Estado del reto derivado** (`challengeViewState`): no unido, invitado, esperando, activo, completado, expirado, cancelado, rechazado o salido. Un reto completado no expira después; uno expirado o cancelado ofrece "Crear otro reto".
 - **DA-137** · **Ranking con empates:** quien tiene el mismo progreso comparte posición (1, 1, 3); dentro del empate va primero quien terminó antes y luego el usuario. La frase de distancia da el dato sin presión.
@@ -2040,7 +2040,7 @@ Todas las pantallas hablan con `SocialService` (`services/social/socialService.t
 | `social_settings` · `ensure_social_settings` · `set_username` | `getSettings`, `setUsername`, `updateSettings` | Hub (puerta), Usuario, Privacidad | Sin fila = no hay Comunidad; el reservado de nombres es de la app |
 | `friendships` · `friend_requests` · `get_social_profiles` · `get_friend_activity` | `getFriendsOverview` | Amigos, hub | BT-47 (una RPC); tolerar filas ausentes |
 | `find_user_by_username` | `findByUsername` | Amigos | Búsqueda exacta |
-| `get_social_profile` + `get_social_profiles` | `getProfile` | Perfil | Verificar `hidden_categories`, `records[]`, `recent_posts[]` y `common_challenges` (BT-46) |
+| `get_social_profile` + `get_social_profiles` | `getProfile` | Perfil | ✔ W1. Verificar `hidden_categories`, `records[]` y `recent_posts[]` (BT-46); `common_challenges` no existe (DA-151) |
 | `send_friend_request` · `respond_friend_request` · `cancel_friend_request` | `sendFriendRequest`, `respondFriendRequest`, `cancelFriendRequest` | Amigos, Perfil | Estados de `send_friend_request` ya mapeados |
 | `block_user` · `user_blocks` | `blockUser`, `unblockUser`, `getBlocked` | Perfil, Bloqueados | Invalidar feed, amigos, retos y notificaciones al bloquear |
 | `friend_invites` · `create_friend_invite` · `redeem_friend_invite` | `createInvite`, `getInvites` | Invitar | Enlace `athelete://amigo/{token}` sin manejador todavía (BT-48) |
@@ -2058,7 +2058,7 @@ Todas las pantallas hablan con `SocialService` (`services/social/socialService.t
 | `add_manual_contribution` | `addManualContribution` | Reto oficial | Errores `amount_out_of_range`, `daily_limit`, `not_allowed` |
 | `create_friend_challenge` | `createFriendChallenge` | Crear reto | Rechaza extraños y `exercise_reps`; el título lo genera el servidor |
 | `mark_challenge_celebrated` | `markChallengeCelebrated` | Reto completado | |
-| (BT-46) personas de tus retos | `getCoParticipants` | Amigos | Hoy el ranking solo expone amigos |
+| ~~personas de tus retos~~ | ~~`getCoParticipants`~~ | — | Eliminado en W1 (DA-150) |
 | `social_notifications` | `getNotifications`, `markNotificationsRead` | Notificaciones | BT-50 (contador y "marcar todo"); integrar en HOME_08 como grupo "Comunidad" y conectar la campana de Inicio si producto lo decide |
 | `app_moderators` · `is_moderator()` | `getModeratorRole` | Ajustes, Moderación | La UI y la RLS validan el rol |
 | `moderation_queue` · `moderation_actions` · `moderate_content` | `getModerationQueue`, `getModerationHistory`, `moderateContent` | Moderación | Solo moderadores; foto reportada con URL firmada de moderador |
@@ -2078,3 +2078,57 @@ Sin dependencias nuevas: isologo y wordmark se dibujan con `react-native-svg` (y
 - **BT-iOS-icon** · Verificado en simulador (Release, iPhone 17 Pro, app desinstalada antes): `transition-frames-*.png`, `launch-*.png`. **Observación abierta (BT-iOS-launch):** en los ~0,3 s del zoom inicial, la imagen que pinta el sistema muestra el isologo pero no el wordmark; este aparece cuando entra el storyboard vivo y la vista de carga, y luego el overlay. Con el sistema en claro el arranque es tan rápido que el wordmark casi no llega a verse antes del fundido. Probado: recortes, altura exacta y restricción al borde inferior; no cambia, así que parece cosa de cómo el sistema pre-renderiza la imagen. Hay que confirmarlo en un iPhone real y en Release. Los iconos oscuro y tintado en Inicio siguen sin verse en el simulador (mantiene el estilo "Claro"; cambiarlo a mano en Inicio ▸ Personalizar).
 
 **Fase Android (sin integrar):** los assets ya están en `design/launch-screen/athelete-launch-screen/android/res/` (`splash_icon`, `splash_branding`, `splash_colors.xml` con `#F7F6F3` y `#121110`). Se integran en la fase Android: copiarlos a `android/app/src/main/res/`, tema `Theme.App.Starting` con `core-splashscreen`, `installSplashScreen()` en `MainActivity` y `windowSplashScreenBrandingImage` (solo Android 12+). Icono adaptativo: foreground = isologo del diseño en la zona segura de 66 dp, `background` `#F7F6F3`, `monochrome` del mismo SVG. `LaunchOverlay` se mantiene en Android.
+
+## Comunidad · conexión W1 (personas: lectura, nombre de usuario y privacidad) · 2026-10-07
+
+Sin migraciones ni `npx supabase`, y sin escrituras de prueba en la base: el QA real se hace con dos cuentas (lista abajo).
+
+### Lo conectado
+Nueva implementación `services/social/supabaseSocialService.ts` (mapeos puros en `features/social/socialMappers.ts`, con tests). La app real usa Supabase; en `__DEV__` las pantallas dev y los deep links (`athelete://dev/social`, "Ver pantallas de Comunidad") cargan un escenario y pasan a los fixtures hasta recargar la app (`services/social/socialSource.ts`); una build de release nunca usa fixtures.
+
+| Método | Origen | Notas |
+|---|---|---|
+| `getSettings` | `social_settings` (fila propia, `maybeSingle`) | Sin fila = `null` → la puerta del hub lleva a "Nombre de usuario" |
+| `setUsername` | `ensure_social_settings` la primera vez; `set_username` después | Errores `invalid_username` y `username_taken` por la respuesta de la RPC o por el código de Postgres (23514 / 23505); una respuesta rara es un error con reintento, no un resultado inventado |
+| `updateSettings` | `update social_settings` (audiencia, 6 categorías, `allow_friend_requests`) | Devuelve la fila actualizada |
+| `getFriendsOverview` | `friendships` + `friend_requests` pendientes + `get_social_profiles` + `get_friend_activity` + `get_my_challenges` (solo recuento) | Actividad y recuentos solo decoran: si fallan salen las personas igual. Fila ausente de `get_social_profiles` → "Usuario" |
+| `findByUsername` | `find_user_by_username` | Solo formato válido y exacto; `null` si no existe o hay bloqueo |
+| `getProfile` | `get_social_profile` + `get_social_profiles` + `user_blocks` + `friend_requests` (+ `find_user_by_username` para `accepts_requests`) | Una RPC que rechaza el perfil (error con código) o una fila ausente = "no disponible"; solo un fallo sin código (red, sesión) es error con reintento |
+| `getBlocked` | `user_blocks` propios + `get_social_profiles` | Entrada con `profile: null` si no se puede leer |
+
+Todo lo demás (W2 a W7) en la app real **no usa fixtures**: las lecturas devuelven vacío (feed, actividad, retos, notificaciones, moderación, enlaces) y las escrituras fallan con `SocialNotWiredError` ("todavía no está conectado").
+
+- **DA-146** · **Fuente de datos por contexto:** `getSocialService()` vive en `socialSource.ts`; `fixtureSocialService` queda solo para desarrollo (`socialFixtureStore.isActive()` lo activa el primer `reset`, que llaman las pantallas dev).
+- **DA-147** · **Caché con React Query:** `useSocialResource(nombre, carga, claves)` (el `nombre` es la clave; la caché es por usuario). Recarga al volver el foco a la pantalla y al pasar la app a primer plano (`focusManager` + `AppState`), con `staleTime` de 30 s. `useSocialService()` envuelve el servicio: tras cada escritura (cualquier método que no empiece por `get`) invalida toda la caché `social`, también si la escritura falla. Estado de error con "Reintentar" en todas las lecturas.
+- **DA-148** · **Perfil que no se puede ver = "no disponible":** `parseProfileDetail` devuelve `null` ante `{error}`, `null` o una forma que no es un perfil. `hidden_categories` siempre incluye `nutrition` (Q14) aunque el servidor no lo diga; `records[]` y `recent_posts[]` descartan las entradas inválidas.
+- **DA-149** · **Nombre de usuario:** se normaliza (`@`, mayúsculas, espacios) antes de enviarlo; los errores de duplicado y de formato salen del servidor, no de la app.
+- **DA-150** · **Se quita "En tus retos":** el ranking solo muestra amigos por privacidad, así que se eliminan la sección de Amigos, `getCoParticipants` y su tipo y fixtures (BT-46 cerrado).
+- **DA-151** · **Se quita "Retos en común" del perfil de otra persona:** el servidor no devuelve `common_challenges`; se eliminan el campo, la sección y su fixture. Las rutinas de otra persona solo se ven si las publicó (aparecen como publicaciones en "Actividad reciente", no hay lista de rutinas).
+
+### Ajustes confirmados con backend que se aplican en otras oleadas (anotados ya)
+- **W2 · Eliminar amigo:** con la RPC `remove_friend` (backend la está aplicando); acción secundaria en SOCIAL_06.
+- **W5 · Detalle de reto:** ocultar la actividad por reto y dejar solo el ranking.
+- **W6 · Contador de no leídas:** `count` sobre `social_notifications` con `read_at is null`.
+- **Documentación:** `BACKEND_SUMMARY` corregido (no hay posts automáticos; solo `create_post` publica) y con lo que generan `social_activity` y `social_challenge_contributions`; `SOCIAL_PLAN §8.1` #6, #7 y #8 resueltos.
+
+### `TODO(social-wire)` que quedan
+- `socialService.ts` (lista de métodos sin ✔): W2 escrituras de amistad, bloqueo e invitaciones; W3 feed, publicaciones, comentarios, likes y reportes; W4 composer y fotos; W5 retos; W6 notificaciones; W7 moderación y términos (BT-43).
+- `useSocial.ts`: `useFeed` sigue siendo un cargador local (W3: `useInfiniteQuery` sobre `get_feed`); `usePostPhotoSource` sin caché de URL firmadas; restos fixture-only (`clearFailure`, `clearFeedFailure`, reinicio por escenario).
+- `PersonalRecordsScreen`, `WorkoutSummaryScreen`, `AchievementsScreen` (`sourceId` del composer), `SocialComposeScreen` (selector real), `SocialRoutineScreen` y `PostBodies` (miniaturas de anatomía por `exercise_id`, "Empezar" tras `save_shared_routine`), `OfficialChallengeHero` (`cover_path`).
+- `fixtureSocialService.ts`: borrar al terminar W7.
+- **Por verificar con datos reales (BT-46):** forma exacta de `records[]` y `recent_posts[]` de `get_social_profile`, y de las filas de `get_friend_activity`; los mapeos son tolerantes y descartan lo que no reconocen. `ensure_social_settings` cuando la fila ya existe (se reintenta con `set_username`).
+- Sin cobertura en esta oleada: fila de `get_social_profiles` ausente muestra "Usuario" con `@` vacío en el subtítulo de Amigos.
+
+### Checklist de QA con dos cuentas (A y B; la base no se toca desde aquí)
+Preparación: dos cuentas con perfil; en la base, B sin fila en `social_settings`. Amistades y solicitudes se crean desde la web o el panel hasta que llegue W2 (la app no escribe todavía).
+1. **Puerta:** B abre Comunidad → lleva a "Nombre de usuario" (crear). Atrás no deja entrar al hub.
+2. **Nombre de usuario (B):** `Mi Nombre!` → formato no válido; el de A → "ya está en uso"; uno válido → entra a Comunidad. Cambiarlo desde Ajustes → editar; volver a poner el mismo no da error de duplicado.
+3. **Privacidad (A):** cambiar audiencia a Público y apagar/encender categorías y "Permitir solicitudes"; salir y volver (y matar la app): se conserva. Sin conexión → error con "Reintentar" (no valores por defecto).
+4. **Amigos (A):** con una amistad y una solicitud recibida y otra enviada creadas a mano: aparecen en su grupo con nombre y foto o avatar; sin conexión → error con reintento; volver a la pestaña desde otra pantalla o desde segundo plano recarga la lista.
+5. **Búsqueda:** el usuario exacto de B (con `@` y mayúsculas) lo encuentra con su estado (Agregar / Solicitado / Amigos); uno inexistente → "sin resultados"; un bloqueado (en ambos sentidos) no aparece.
+6. **Perfil de B visto por A:** amigo (Amigos desde, sesiones, logros, récords si comparte); no amigo con perfil de solo amigos (solo racha y botón; sin "retos en común"); no amigo con perfil público; apagar "Récords" en B y recargar en A → desaparecen. Nutrición nunca.
+7. **Perfil no disponible:** abrir un `userId` inexistente o bloqueado por el otro lado → "Este perfil no está disponible", sin error ni reintento.
+8. **Bloqueados (A):** con un bloqueo creado a mano, aparece en la lista de Bloqueados (desde Privacidad) con su nombre; uno cuyo perfil no se puede leer sale como "Usuario".
+9. **Cambio de cuenta:** cerrar sesión en A, entrar con B: no se ve nada de A (caché por usuario).
+10. **Comprobar que no se mezcla con ejemplos:** el Feed, Retos y Notificaciones salen vacíos (no hay publicaciones ni retos de ejemplo) y "Compartir" / acciones de escritura de W2 en adelante fallan con aviso, sin romper la pantalla.
+11. **Dev:** "Ver pantallas de Comunidad" sigue abriendo todos los estados con datos de ejemplo (y, tras usarlo, recargar la app para volver a datos reales).

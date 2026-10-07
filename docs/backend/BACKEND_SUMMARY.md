@@ -36,6 +36,19 @@
 - **Notificaciones y moderación:** `social_notifications`, `content_reports`, `app_moderators`, `moderation_actions`, vista `moderation_queue` (solo devuelve filas a moderadores).
 - `workout_templates`: `copied_from_post_id`, `copied_from_user_id`. (`created_by`, `copied_from_post_id`) no se repite.
 
+**Qué se genera solo (sin RPC de la app)** — confirmado con backend el 7 de octubre de 2026:
+- **No hay posts automáticos.** La única forma de publicar es `create_post`, que llama el usuario; el `INSERT` directo en `social_posts` está bloqueado y ningún trigger crea publicaciones.
+- **`social_activity`** (líneas breves de actividad, se borran a los 30 días; alimentan `get_friend_activity`) se escribe sola cuando el usuario:
+  - completa una sesión de entrenamiento,
+  - registra un récord,
+  - consigue un logro,
+  - completa Core 33.
+- **`social_challenge_contributions`** (aportes a retos) se escribe sola cuando:
+  - se completa una sesión, según la métrica del reto (sesiones, minutos, volumen…),
+  - se completa un día de Core 33 con sus 3 hábitos,
+  - el usuario llama a `add_manual_contribution` (solo retos oficiales).
+- Revertir una sesión completada no deshace los aportes de un reto ya completado (ver §8.3).
+
 ### Almacenamiento
 - `profile-photos` (privado). Ruta `{userId}/avatar`. Mostrar con URL firmada.
 - `social-photos` (privado, 5 MB). Ruta `{autor}/{post_id}/archivo`. Mostrar con URL firmada.
@@ -118,7 +131,7 @@
 6. **Comunidad:**
    - Todo lo sensible por las RPC de la sección 2.
    - Fotos: quitar EXIF, aceptar solo JPG/PNG/WebP en la app, subir a `{uid}/{post_id}/…` con un `post_id` generado en la app y pasarlo al publicar. Mostrar con URL firmada.
-   - Posts automáticos, actividad y aportes a retos se generan solos al completar sesiones, récords, logros y Core 33.
+   - La actividad (`social_activity`) y los aportes a retos se generan solos al completar sesiones, récords, logros y Core 33. **No hay posts automáticos**: solo `create_post` publica.
 7. **Fotos de perfil:** si la URL firmada falla (por ejemplo, bloqueo), mostrar `avatar_key` o el avatar por defecto.
 
 ---
