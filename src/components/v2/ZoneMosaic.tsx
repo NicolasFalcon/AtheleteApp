@@ -13,6 +13,7 @@ import Svg, {
   Rect,
   Stop,
 } from 'react-native-svg';
+import { MuscleHotspot } from '@app/components/v2/MuscleHotspot';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 
@@ -22,7 +23,9 @@ export type ZoneTileItem = {
   count: number;
   column: 1 | 2;
   span: 1 | 2;
-  dot?: boolean; // Ember point (Pecho, the protagonist)
+  // Ember hotspot over the muscle (percent of the tile) and its start delay.
+  hotspot: { top: number; left: number };
+  hotspotDelay?: number;
   // Full-bleed anatomical image without text or borders; the dark
   // bottom-left fade is drawn by the tile.
   image: ImageSourcePropType;
@@ -118,12 +121,11 @@ function ZoneTile({ item }: { item: ZoneTileItem }) {
           fill={`url(#fade-${item.key})`}
         />
       </Svg>
-      {item.dot ? (
-        <View style={styles.dot}>
-          <View style={styles.dotHalo} />
-          <View style={styles.dotCore} />
-        </View>
-      ) : null}
+      <MuscleHotspot
+        top={item.hotspot.top}
+        left={item.hotspot.left}
+        delay={item.hotspotDelay}
+      />
       <View style={styles.labels}>
         <TextV2
           variant="bodyStrong"
@@ -159,32 +161,6 @@ const styles = StyleSheet.create({
     left: 0,
     width: '100%',
     height: '100%',
-  },
-  // left 104 / top 118 in the prototype (10 pt dot + 6 pt halo)
-  dot: {
-    position: 'absolute',
-    left: 104,
-    top: 118,
-    width: 10,
-    height: 10,
-  },
-  dotHalo: {
-    position: 'absolute',
-    top: -6,
-    left: -6,
-    right: -6,
-    bottom: -6,
-    borderRadius: 11,
-    backgroundColor: 'rgba(255,91,31,.3)',
-  },
-  dotCore: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: 5,
-    backgroundColor: '#FF5B1F',
   },
   labels: {
     position: 'absolute',

@@ -56,4 +56,5 @@ export * from '@app/components/v2/Wordmark';
 export * from '@app/components/v2/WaterTank';
 export * from '@app/components/v2/WeeklyCapsules';
 export * from '@app/components/v2/WorkoutHero';
+export * from '@app/components/v2/MuscleHotspot';
 export * from '@app/components/v2/ZoneMosaic';

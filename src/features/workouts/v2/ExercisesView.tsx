@@ -16,6 +16,7 @@ import { BlockError } from '@app/features/home/v2/BlockError';
 import {
   EQUIPMENT_IMAGES,
   SCAN_IMAGE,
+  MUSCLE_HOTSPOTS,
   MUSCLE_IMAGES,
 } from '@app/features/workouts/workoutAssets';
 import {
@@ -119,10 +120,12 @@ export function ExercisesView({
               </SkeletonGroup>
             ) : (
               <ZoneMosaic
-                items={ZONES.map(zone => ({
+                items={ZONES.map((zone, index) => ({
                   ...zone,
                   count: zoneCounts[zone.key],
                   image: MUSCLE_IMAGES[zone.key],
+                  hotspot: MUSCLE_HOTSPOTS[zone.key],
+                  hotspotDelay: index * 250,
                   onPress: () => onOpenZone(zone.key),
                 }))}
               />

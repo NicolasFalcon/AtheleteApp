@@ -35,6 +35,19 @@ export const MUSCLE_IMAGES: Record<ZoneKey, ImageSourcePropType> = {
   glutes: require('@app/assets/images/musculos_atheleteapp/musculo_gluteos.png'),
 };
 
+// Ember hotspot center per zone, in percent of the tile (top / left). Tweak
+// here if a crop with resizeMode "cover" moves the point off the muscle; keep
+// it clear of the label (bottom-left) in the tile.
+export const MUSCLE_HOTSPOTS: Record<ZoneKey, { top: number; left: number }> = {
+  chest: { top: 50, left: 62 },
+  back: { top: 45, left: 76 },
+  shoulders: { top: 33, left: 54 },
+  arms: { top: 40, left: 78 },
+  core: { top: 34, left: 68 },
+  legs: { top: 32, left: 66 },
+  glutes: { top: 26, left: 62 },
+};
+
 const THUMBS: Record<ZoneKey | 'default', ImageSourcePropType> = {
   chest: require('@app/assets/v2/workouts/thumb-chest.jpg'),
   back: require('@app/assets/v2/workouts/thumb-back.jpg'),
