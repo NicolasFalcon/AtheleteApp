@@ -6,7 +6,8 @@ import { PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
 import { SceneScope } from '@app/providers/ThemeProvider';
 
-// ATHELETE Wear banner (Home.dc.html). The photo fades to the plate with a
+// ATHELETE Wear banner (Home.dc.html). Wear is ATHELETE's upcoming clothing
+// line (an announcement, not a device or a connection). The photo fades to the plate with a
 // gradient instead of the prototype's mask-image.
 export function WearBannerV2({ onPress }: { onPress: () => void }) {
   return (
@@ -22,7 +23,7 @@ function WearContent({ onPress }: { onPress: () => void }) {
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel="ATHELETE Wear, ver colección"
+      accessibilityLabel="ATHELETE Wear, la próxima línea de ropa. Próximamente."
       onPress={onPress}
       style={[
         styles.card,
@@ -80,7 +81,7 @@ function WearContent({ onPress }: { onPress: () => void }) {
               { borderBottomColor: scene.glass.onPhotoStrong },
             ]}
           >
-            <TextV2 variant="metaStrong">Ver colección</TextV2>
+            <TextV2 variant="metaStrong">Próximamente</TextV2>
             <ArrowRight
               size={13}
               color={scene.onDark.primary}
