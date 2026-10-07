@@ -16,6 +16,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import { useAuth } from '@app/hooks/useAuth';
+import { actionFor, runOptimistic } from '@app/features/social/relationMachine';
 import {
   FEED_PAGE_SIZE,
   groupActivity,
@@ -61,7 +62,40 @@ function isWrite(name: string): boolean {
   return !name.startsWith('get');
 }
 
-// Wraps the service so each write refreshes what the screens show.
+// People blocked in this session: their posts leave the feed at once, before
+// the server filters them out of the next load (and come back if it fails).
+const hiddenAuthors = new Set<string>();
+let hiddenVersion = 0;
+const hiddenListeners = new Set<() => void>();
+function setAuthorHidden(id: string, hidden: boolean) {
+  if (hidden === hiddenAuthors.has(id)) {
+    return;
+  }
+  if (hidden) {
+    hiddenAuthors.add(id);
+  } else {
+    hiddenAuthors.delete(id);
+  }
+  hiddenVersion += 1;
+  hiddenListeners.forEach(listener => listener());
+}
+function useHiddenAuthors(): ReadonlySet<string> {
+  useSyncExternalStore(
+    listener => {
+      hiddenListeners.add(listener);
+      return () => {
+        hiddenListeners.delete(listener);
+      };
+    },
+    () => hiddenVersion,
+  );
+  return hiddenAuthors;
+}
+
+// Wraps the service so each write refreshes what the screens show: friend
+// requests, removing a friend, blocking and revoking a link update the cache
+// at once (and go back if the request fails), and every write invalidates the
+// social cache when it ends.
 function withInvalidation(
   service: SocialService,
   client: QueryClient,
@@ -71,8 +105,29 @@ function withInvalidation(
     const method = service[name] as (...args: unknown[]) => Promise<unknown>;
     wrapped[name] = isWrite(name)
       ? async (...args: unknown[]) => {
+          const action = actionFor(name, args);
+          const execute = () => method.apply(service, args);
           try {
-            return await method.apply(service, args);
+            if (!action) {
+              return await execute();
+            }
+            // A refetch in flight would overwrite the optimistic data.
+            await client.cancelQueries({ queryKey: [SOCIAL_KEY] });
+            if (action.type === 'block') {
+              setAuthorHidden(action.target, true);
+            }
+            try {
+              const result = await runOptimistic(client, action, execute);
+              if (action.type === 'unblock') {
+                setAuthorHidden(action.target, false);
+              }
+              return result;
+            } catch (error) {
+              if (action.type === 'block') {
+                setAuthorHidden(action.target, false);
+              }
+              throw error;
+            }
           } finally {
             client.invalidateQueries({ queryKey: [SOCIAL_KEY] });
           }
@@ -300,5 +355,8 @@ export function useFeed() {
     }));
   }, []);
 
-  return { ...state, refresh, loadMore, retry, retryMore, removePost };
+  const hidden = useHiddenAuthors();
+  const posts = state.posts.filter(post => !hidden.has(post.author_id));
+
+  return { ...state, posts, refresh, loadMore, retry, retryMore, removePost };
 }
