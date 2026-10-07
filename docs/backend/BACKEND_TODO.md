@@ -3,7 +3,7 @@
 **Para:** backend (Lovable / Supabase) y Nicolás.
 **Mantenido por:** el equipo de la app móvil. Cada vez que la app necesite algo del backend que aún no existe, se añade aquí en lugar de improvisarlo en la app.
 **Fuente de lo que ya existe:** [`BACKEND_SUMMARY.md`](BACKEND_SUMMARY.md).
-**Última actualización:** 2026-10-04 (lote de backend integrado).
+**Última actualización:** 2026-10-06 (BT-41 y BT-42).
 
 Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** (la app funciona con un sustituto local o aproximado) · **Baja** (mejora u operación).
 
@@ -17,6 +17,8 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-04 | Gamificación | Activar el modo `strict` | Media | No |
 | BT-05 | Gamificación | Cerrar `UPDATE` de `profiles.points` e `INSERT` en `user_badges` | Media | No (depende de la web) |
 | BT-06 | ELLIE / Nutrición | Confirmar si `ellie-chat` usa el género para calorías | Baja | No |
+| BT-41 | Perfil | `profiles_gender_check` debe aceptar `other` (opción "Otro" del onboarding) | Media | No (se guarda NULL) |
+| BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
 | BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
 | BT-08 | Social | Proceso de moderación (revisión de reportes en 24 h, contacto de soporte) | Alta antes de lanzar Comunidad | Sí, para publicar Comunidad |
 | BT-09 | Storage | Tipos de archivo en `social-photos` y `profile-photos`, 5 MB en `profile-photos` | Media | No (la app valida) |
@@ -113,7 +115,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 
 ### BT-06 · Género en `ellie-chat`
 - **Qué falta:** confirmar si la edge function `ellie-chat` (planes nutricionales) usa el género para estimar calorías. Su código no está en el repo de la app.
-- **Por qué:** el onboarding v2 ya no pide el género (`gender` puede ser `null`, BK-06).
+- **Por qué:** el onboarding vuelve a pedir el sexo (D-78); los usuarios antiguos lo tienen `null`.
 - **Propuesta:** si lo usa, la app lo pediría al activar un plan cuando falte, sin añadirlo al onboarding.
 - **Prioridad:** Baja.
 
@@ -339,6 +341,28 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Qué falta:** (a) un **tema** por pregunta (`quiz_questions.topic`) para "Repasemos esto" (hoy la app muestra el texto de las preguntas falladas); (b) **nivel** y **foto** por categoría (`quiz_categories.level`, `image_url`) para "NIVEL 3" y la portada (hoy: etiqueta con el estado real y fotos de ejemplo por palabra clave del slug); (c) un **desafío del día** elegido por el servidor (hoy la app rota entre las categorías no completadas).
 - **Prioridad:** Baja. **No bloquea.**
 
+### BT-41 · "Otro" en `profiles.gender`
+- **Qué falta:** `profiles_gender_check` (migración web `20260611090000`) solo admite `NULL`, `'male'` y `'female'`. El onboarding y Editar perfil ofrecen Mujer / Hombre / Otro.
+- **Mientras tanto:** la app guarda "Otro" como `NULL` (`GENDER_OTHER_STORED = false` en `genderModel.ts`); para la estimación de kcal y para ELLIE equivale a vacío.
+- **Propuesta:** cambiar el CHECK a `gender IS NULL OR gender IN ('male','female','other')`, sin tocar RLS. Cuando esté aplicado, poner `GENDER_OTHER_STORED = true`.
+- **Prioridad:** Media. **No bloquea.**
+
+## Scan
+
+### BT-42 · Scan comida + Scan máquina (pendiente de TestFlight)
+- **Estado:** no se implementa hasta tener un build en TestFlight: necesita cámara y un iPhone real.
+- **Entradas que ya existen en la UI (hoy sin acción real):**
+  - ELLIE → tarjeta "¿No sabes cómo usar una máquina? Escanéala con ELLIE" (`EllieHome.ScanCard`, `EllieScreen`): muestra el aviso "Pronto podrás escanear máquinas".
+  - Entrenos → Ejercicios → tarjeta "Escanear máquina · Con ELLIE" (`ExercisesView.ScanCard`): solo texto, "Próximamente".
+  - Nutrición e Inicio: no tienen entrada de Scan de comida hoy; se añadirá con el diseño SCAN_03/04/05.
+- **Dependencias:**
+  - librería de cámara compatible con React Native 0.85 y la New Architecture (por elegir y probar en iPhone);
+  - permiso de cámara en `Info.plist` (`NSCameraUsageDescription`, y fototeca si se permite elegir foto);
+  - Edge Function `scan-food` (BT-33) y la equivalente para máquinas (imagen → máquina identificada + ejercicios, p. ej. `scan-machine`);
+  - BT-32 (registro de comidas por alimento) si el resultado de comida debe guardarse con `source = 'scan'`; BT-26 para los límites de uso.
+- **Cuándo:** cuando haya build en TestFlight.
+- **Prioridad:** Media. **No bloquea.**
+
 ## Historial
 - 2026-10-02: documento creado con BT-01 a BT-11.
 - 2026-10-03: BT-12 a BT-16 (módulo Entrenos).
@@ -357,3 +381,4 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-04: BT-37 resuelto.
 - 2026-10-04: BT-38 a BT-40 (módulo Quiz).
 - 2026-10-04: BT-38 sube a prioridad alta (puntos del quiz calculados por el servidor); BT-39 verificado: el servidor no otorga `quiz_master` solo.
+- 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.

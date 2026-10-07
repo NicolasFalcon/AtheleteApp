@@ -25,7 +25,7 @@ Rama: `feature-migration` · Fuente única: `migration-source/ATHELETE Alive Min
 | 4 · Navegación final (ver §13) | 🟡 Implementada sin validación visual (sin Xcode); `tsc` + lint + jest en verde | — |
 | 5 · Restyling por módulo | ⏳ | — |
 | 6 · Estados del sistema | ⏳ | — |
-| 7 · Funcionalidad nueva (Pausa/Descanso → Core 33 → MoveKit → Comunidad → Scan → Apple Health → Wear) | ⏳ | — |
+| 7 · Funcionalidad nueva (Pausa/Descanso → Core 33 → MoveKit → Comunidad → Scan → Apple Health → Wear [línea de ropa, anuncio]) | ⏳ | — |
 | 8 · QA visual final | ⏳ | — |
 
 ---
@@ -118,7 +118,7 @@ Clave: **R** = se reestiliza · **P** = existe parcialmente · **N** = no existe
 | Apple Health | — | N | Solo iOS. |
 | Scan | — | N | |
 | Comunidad (14 pantallas) | — | N | |
-| Wear | `WearBanner` + `WearPreviewModal` | P | Faltan colección y producto. |
+| Wear (próxima línea de ropa de ATHELETE; **no** es un dispositivo ni una conexión) | `WearBanner` + `WearPreviewModal` | P | Banner de anuncio "Próximamente"; faltan colección y producto. |
 | Estados del sistema | `Loader`, `EmptyState` | P | Sin skeletons con forma real. |
 | Celebración y toast | — | N | |
 
@@ -146,7 +146,7 @@ Clave: **R** = se reestiliza · **P** = existe parcialmente · **N** = no existe
 
 ### 3.4 Funcionalidad nueva
 
-Social (esquema a aprobar), Scan (cámara + IA, UI con mock primero), Apple Health (solo iOS), Core 33 nuevo (catálogo, estados, Intro vista), Pausa y Descanso (series por ejercicio), MoveKit (video), Wear, Quiz v3, Reto de la semana (depende de social), Récord condicional.
+Social (esquema a aprobar), Scan (cámara + IA, UI con mock primero), Apple Health (solo iOS), Core 33 nuevo (catálogo, estados, Intro vista), Pausa y Descanso (series por ejercicio), MoveKit (video), Wear (anuncio de la línea de ropa; no es un dispositivo), Quiz v3, Reto de la semana (depende de social), Récord condicional.
 
 ### 3.5 Riesgos existentes
 
@@ -1920,6 +1920,9 @@ Cuenta de prueba: falcon1989@gmail.com (id 7d143a1f-bf73-4481-b8d2-03f0b2e73ec5)
 - **D-75** · **Últimas rondas** con datos reales (el prototipo trae dos de ejemplo); sin rondas, la sección no aparece.
 - **D-76** · El halo de la ronda y del resultado es un degradado lineal vertical (el prototipo usa radial); las ondas del resultado son anillos animados.
 - **D-77** · Ronda y resultado son escena en Light y Dark (valores de Light, como D-04, D-05, D-06, D-18, D-19, D-20).
+
+- **D-78** · **Sexo en el onboarding (Mujer / Hombre / Otro)**: el handoff no trae la pantalla; se añade como paso 4 de 9 (bloque "Tú", antes de peso y altura) con el patrón de elección de Equipamiento/Duración (`ChoiceTile` + icono, tres columnas) y `StepProgress` de 9 segmentos. Es obligatorio dentro del flujo (hay que elegir una opción). Los usuarios actuales lo tienen vacío y no se les pide: lo ven en Editar perfil (fila "Sexo", tres chips, sin validación). Columna `profiles.gender`, valores `male` / `female`; "Otro" necesita `other` en el CHECK (BT-41), así que mientras `GENDER_OTHER_STORED = false` (`features/profile/genderModel.ts`) se guarda como `NULL` y no rompe el guardado. Con "Otro" o vacío la estimación usa la constante neutra (Mifflin–St Jeor: +5 hombre, −161 mujer, −78 neutra). Hoy ningún cálculo de la app estima kcal (el plan lo genera `ellie-chat`, BT-06), así que `estimateBmr` queda disponible y probado, sin conectar. El contexto de ELLIE ya enviaba el género: ahora distingue "Otro". BK-06 queda sustituido por este punto.
+- **Wear** (2026-10-06): es la próxima línea de ropa de ATHELETE, no un reloj. El banner de Inicio queda como anuncio: "Próximamente" (antes "Ver colección"). No hay filas de Ajustes ni textos de conexión o sincronización de Wear en la app.
 
 **Bloqueos y pendientes**: BT-38 (**alta**: el servidor debe calcular los puntos del quiz), BT-39 (verificado: el servidor **no** otorga `quiz_master` solo; la app sigue enviando `quiz_master_unlocked` tras comprobar la regla), BT-40 (tema, nivel, foto y desafío del día).
 
