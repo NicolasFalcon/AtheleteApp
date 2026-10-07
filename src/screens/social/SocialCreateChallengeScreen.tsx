@@ -85,7 +85,7 @@ export function SocialCreateChallengeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
-  const overview = useSocialResource(s => s.getFriendsOverview());
+  const overview = useSocialResource('getFriendsOverview', s => s.getFriendsOverview());
   const inviteeId = route.params?.inviteeId;
   const devStep = __DEV__ ? route.params?.devStep : undefined;
   const [step, setStep] = useState<number>(devStep ?? 0);

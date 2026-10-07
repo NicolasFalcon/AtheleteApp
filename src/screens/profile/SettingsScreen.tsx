@@ -75,7 +75,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   // The moderation row only exists for moderators (app_moderators); a normal
   // user never sees it and the screen checks the role again.
-  const moderatorRole = useSocialResource(s => s.getModeratorRole());
+  const moderatorRole = useSocialResource('getModeratorRole', s => s.getModeratorRole());
   const isModerator = moderatorPermissions(moderatorRole.data ?? null).canSeePanel;
   const insets = useSafeAreaInsets();
   const toast = useToast();

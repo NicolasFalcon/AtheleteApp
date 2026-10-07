@@ -7,7 +7,6 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import type {
-  SocialProfileDetail,
   SocialRecord,
   SocialRecentPost,
 } from '@app/features/social/socialTypes';
@@ -50,44 +49,6 @@ export function RecordsList({ records }: { records: SocialRecord[] }) {
   );
 }
 
-// "RETOS EN COMÚN": title + progress and a 5 pt bar (SOCIAL_06).
-export function CommonChallenges({
-  items,
-}: {
-  items: NonNullable<SocialProfileDetail['common_challenges']>;
-}) {
-  const { colors } = useThemeV2();
-
-  return (
-    <View style={styles.challenges}>
-      <Eyebrow>Retos en común</Eyebrow>
-      {items.map(item => (
-        <View key={item.id} style={styles.challenge}>
-          <View style={styles.challengeHead}>
-            <TextV2 variant="cta" style={styles.challengeTitle}>
-              {item.title}
-            </TextV2>
-            <TextV2 variant="meta" tone="secondary">
-              {`${item.progress} / ${item.goal}`}
-            </TextV2>
-          </View>
-          <View style={[styles.track, { backgroundColor: colors.surface.muted }]}>
-            <View
-              style={[
-                styles.fill,
-                {
-                  backgroundColor: colors.cta.primary,
-                  width: `${Math.min(100, (item.progress / item.goal) * 100)}%`,
-                },
-              ]}
-            />
-          </View>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 const OVER: Record<SocialRecentPost['type'], string> = {
   workout: 'ENTRENAMIENTO',
   record: 'NUEVO RÉCORD',
@@ -108,7 +69,7 @@ export function RecentActivity({
   const { scene, colors, mode } = useThemeV2();
 
   return (
-    <View style={styles.challenges}>
+    <View style={styles.activity}>
       <Eyebrow>Actividad reciente</Eyebrow>
       <View style={styles.tiles}>
         {posts.slice(0, 2).map(post => (
@@ -160,6 +121,7 @@ export function PrivacyLine({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
+  activity: { gap: 12 },
   block: { gap: 0 },
   eyebrow: { paddingBottom: 4 },
   recordRow: {
@@ -177,12 +139,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     justifyContent: 'center',
   },
-  challenges: { gap: 12 },
-  challenge: { gap: 8 },
-  challengeHead: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
-  challengeTitle: { flexShrink: 1 },
-  track: { height: 5, borderRadius: 3, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 3 },
   tiles: { flexDirection: 'row', gap: 10 },
   tile: {
     flex: 1,

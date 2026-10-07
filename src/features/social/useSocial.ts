@@ -1,11 +1,21 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
-import type { ImageSourcePropType } from 'react-native';
+import { AppState, type ImageSourcePropType } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import {
+  focusManager,
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
+import { useAuth } from '@app/hooks/useAuth';
 import {
   FEED_PAGE_SIZE,
   groupActivity,
@@ -15,19 +25,71 @@ import {
 } from '@app/features/social/postModel';
 import type { FeedPost } from '@app/features/social/postTypes';
 import type { SocialLoadState } from '@app/features/social/socialTypes';
+import { socialFixtureStore } from '@app/services/social/fixtureSocialService';
+import type { SocialService } from '@app/services/social/socialService';
 import {
   getSocialService,
-  socialFixtureStore,
-} from '@app/services/social/fixtureSocialService';
-import type { SocialService } from '@app/services/social/socialService';
+  usesFixtures,
+} from '@app/services/social/socialSource';
 
-// Hooks of Comunidad · tanda B.
-// TODO(social-wire): replace the fixture store subscription with React Query
-// (`useQuery` + invalidation after each mutation). The screens only use the
-// shape returned here.
+// Hooks of Comunidad. Reads go through React Query (`useSocialResource`);
+// every write made through `useSocialService()` invalidates the social cache,
+// and a screen reloads when it regains focus or the app returns to the
+// foreground. In `__DEV__` the fixture scenarios keep their own store (the
+// version of the store is part of the query key).
+// TODO(social-wire): `useFeed` is still a local loader (W3: `useInfiniteQuery`
+// over get_feed, cursor = `_before`).
+
+const SOCIAL_KEY = 'social';
+
+// React Query refetches on "focus": tie it to the app returning to foreground.
+let focusManagerReady = false;
+function ensureFocusManager() {
+  if (focusManagerReady) {
+    return;
+  }
+  focusManagerReady = true;
+  focusManager.setEventListener(handleFocus => {
+    const subscription = AppState.addEventListener('change', state => {
+      handleFocus(state === 'active');
+    });
+    return () => subscription.remove();
+  });
+}
+
+function isWrite(name: string): boolean {
+  return !name.startsWith('get');
+}
+
+// Wraps the service so each write refreshes what the screens show.
+function withInvalidation(
+  service: SocialService,
+  client: QueryClient,
+): SocialService {
+  const wrapped: Record<string, unknown> = {};
+  (Object.keys(service) as (keyof SocialService)[]).forEach(name => {
+    const method = service[name] as (...args: unknown[]) => Promise<unknown>;
+    wrapped[name] = isWrite(name)
+      ? async (...args: unknown[]) => {
+          try {
+            return await method.apply(service, args);
+          } finally {
+            client.invalidateQueries({ queryKey: [SOCIAL_KEY] });
+          }
+        }
+      : method.bind(service);
+  });
+  return wrapped as unknown as SocialService;
+}
 
 export function useSocialService(): SocialService {
-  return getSocialService();
+  const client = useQueryClient();
+  const fixtures = usesFixtures();
+  return useMemo(
+    () => withInvalidation(getSocialService(), client),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [client, fixtures],
+  );
 }
 
 export type SocialResource<T> = {
@@ -36,53 +98,67 @@ export type SocialResource<T> = {
   reload: () => void;
 };
 
+// `name` identifies the read (it is the cache key together with `keys`); the
+// cache is per user, so signing out and in with another account never shows
+// the previous one's data.
 export function useSocialResource<T>(
+  name: string,
   load: (service: SocialService) => Promise<T>,
   keys: ReadonlyArray<unknown> = [],
 ): SocialResource<T> {
-  // Reloads whenever a fixture action changes the state.
+  ensureFocusManager();
+  const { session } = useAuth();
+  const userId = session?.user.id ?? 'dev';
+  // Fixture scenarios reload whenever a fixture action changes the state.
   const version = useSyncExternalStore(
     socialFixtureStore.subscribe,
     socialFixtureStore.getVersion,
   );
-  const [nonce, setNonce] = useState(0);
-  const [result, setResult] = useState<{
-    status: SocialLoadState;
-    data: T | null;
-  }>({ status: 'loading', data: null });
+  const fixtures = usesFixtures();
   const loadRef = useRef(load);
   loadRef.current = load;
 
-  useEffect(() => {
-    let active = true;
-    setResult(current =>
-      current.data ? current : { status: 'loading', data: null },
-    );
-    loadRef
-      .current(getSocialService())
-      .then(data => {
-        if (active) {
-          setResult({ status: 'ready', data });
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setResult({ status: 'error', data: null });
-        }
-      });
-    return () => {
-      active = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, nonce, ...keys]);
+  const query = useQuery({
+    queryKey: [
+      SOCIAL_KEY,
+      fixtures ? `fixtures-${version}` : userId,
+      name,
+      ...keys,
+    ],
+    queryFn: () => loadRef.current(getSocialService()),
+    // Refresh in the background when the screen is seen again.
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    retry: fixtures ? false : 1,
+    // Fixture actions change the key: keep what is on screen meanwhile.
+    placeholderData: fixtures ? keepPreviousData : undefined,
+  });
+  const { refetch, data } = query;
+
+  // Screens of the stack: reload when coming back to them.
+  const first = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (first.current) {
+        first.current = false;
+        return;
+      }
+      refetch();
+    }, [refetch]),
+  );
+
+  const status: SocialLoadState =
+    data !== undefined ? 'ready' : query.isError ? 'error' : 'loading';
 
   const reload = useCallback(() => {
-    // TODO(social-wire): only refetch; clearing the failure is fixture-only.
-    socialFixtureStore.clearFailure();
-    setNonce(value => value + 1);
-  }, []);
+    if (usesFixtures()) {
+      // Fixture scenarios: the next load succeeds.
+      socialFixtureStore.clearFailure();
+    }
+    refetch();
+  }, [refetch]);
 
-  return { ...result, reload };
+  return { status, data: data ?? null, reload };
 }
 
 // Source of a post photo. The real one is a signed URL of `social-photos`;

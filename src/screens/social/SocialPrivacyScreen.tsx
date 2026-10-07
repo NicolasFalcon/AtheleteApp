@@ -74,8 +74,8 @@ export function SocialPrivacyScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
-  const settings = useSocialResource(s => s.getSettings());
-  const blocked = useSocialResource(s => s.getBlocked());
+  const settings = useSocialResource('getSettings', s => s.getSettings());
+  const blocked = useSocialResource('getBlocked', s => s.getBlocked());
   const data = settings.data;
 
   const update = async (

@@ -35,7 +35,7 @@ export function SocialBlockedScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
-  const blocked = useSocialResource(s => s.getBlocked());
+  const blocked = useSocialResource('getBlocked', s => s.getBlocked());
   const entries = blocked.data ?? [];
 
   const unblock = async (id: string, name: string) => {

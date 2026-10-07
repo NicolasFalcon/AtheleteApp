@@ -36,7 +36,6 @@ import {
   useSocialService,
 } from '@app/features/social/useSocial';
 import {
-  CommonChallenges,
   PrivacyLine,
   RecentActivity,
   RecordsList,
@@ -101,7 +100,7 @@ export function SocialProfileScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { userId, devConfirmBlock } = route.params;
-  const lookup = useSocialResource(s => s.getProfile(userId), [userId]);
+  const lookup = useSocialResource('getProfile', s => s.getProfile(userId), [userId]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(Boolean(devConfirmBlock));
   const [busy, setBusy] = useState(false);
@@ -347,9 +346,6 @@ export function SocialProfileScreen({ navigation, route }: Props) {
               />
               {sections.records && detail.records ? (
                 <RecordsList records={detail.records} />
-              ) : null}
-              {sections.commonChallenges && detail.common_challenges ? (
-                <CommonChallenges items={detail.common_challenges} />
               ) : null}
               {sections.recentPosts && detail.recent_posts ? (
                 <RecentActivity

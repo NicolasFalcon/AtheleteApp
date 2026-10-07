@@ -49,7 +49,7 @@ export function SocialUsernameScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
-  const settings = useSocialResource(s => s.getSettings());
+  const settings = useSocialResource('getSettings', s => s.getSettings());
   const { mode, devText, devError } = route.params;
   const creating = mode === 'create';
   const [text, setText] = useState(devText ?? '');

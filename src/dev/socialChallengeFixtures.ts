@@ -2,7 +2,6 @@ import type { FixturePerson } from '@app/dev/socialFixtures';
 import type {
   ChallengeHead,
   ChallengeMine,
-  CoParticipant,
 } from '@app/features/social/challengeTypes';
 import type { ModerationActionRow, ModerationQueueRow } from '@app/features/social/moderationModel';
 import type { SocialNotification } from '@app/features/social/notificationModel';
@@ -38,7 +37,6 @@ export type ChallengeFixtureSet = {
   notifications: SocialNotification[];
   queue: ModerationQueueRow[];
   history: ModerationActionRow[];
-  coParticipants: CoParticipant[];
 };
 
 export function buildChallengeFixtures(
@@ -220,12 +218,5 @@ export function buildChallengeFixtures(
     { id: 'fx-h3', moderator_id: 'fx-mod', target_type: 'user', target_id: 'fx-old-c', action: 'dismiss', note: null, created_at: iso(4 * DAY) },
   ];
 
-  // People from the user's own challenges who are not friends yet (Q13: only
-  // the user's participations; today the API only exposes friends, BT-46).
-  const coParticipants: CoParticipant[] = [
-    { profile: profile('irene'), challengeTitle: '100 dominadas' },
-    { profile: profile('tomas'), challengeTitle: '100 dominadas' },
-  ];
-
-  return { challenges, notifications, queue, history, coParticipants };
+  return { challenges, notifications, queue, history };
 }

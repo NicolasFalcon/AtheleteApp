@@ -66,9 +66,12 @@ import type {
 
 // In-memory implementation of `SocialService` over the fixtures. Actions
 // change the local state and notify the screens; nothing leaves the device.
-// TODO(social-wire): delete this file when the Supabase service exists.
+// Dev only: the real app uses `supabaseSocialService` (see `socialSource.ts`).
+// TODO(social-wire): delete this file once every wave (W2 to W7) is connected.
 
 let state: FixtureState = buildFixtureState('default');
+// Set by the dev screens (reset); the real app never reads fixtures.
+let active = false;
 let version = 0;
 let resetVersion = 0;
 let sequence = 0;
@@ -90,7 +93,9 @@ export const socialFixtureStore = {
   },
   // Dev only: bumps when a scenario is loaded, so mounted lists reload.
   getResetVersion: () => resetVersion,
+  isActive: () => active,
   reset(scenario: SocialScenario = 'default') {
+    active = true;
     resetVersion += 1;
     commit(buildFixtureState(scenario));
   },
@@ -895,14 +900,6 @@ export const fixtureSocialService: SocialService = {
     );
   },
 
-  async getCoParticipants() {
-    await sectionReady('challengesFailure');
-    return state.coParticipants.filter(item => {
-      const relation = state.relations[item.profile.id] ?? 'none';
-      return relation === 'none';
-    });
-  },
-
   async getNotifications(): Promise<SocialNotification[]> {
     await sectionReady('notificationsFailure');
     return [...state.notifications].sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -1014,7 +1011,3 @@ function fixtureAttachment(source: {
   }
 }
 
-// TODO(social-wire): return the Supabase service here.
-export function getSocialService(): SocialService {
-  return fixtureSocialService;
-}

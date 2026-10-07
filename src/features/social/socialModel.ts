@@ -272,14 +272,13 @@ export type ProfileSections = {
   sessions: boolean;
   badges: boolean;
   records: boolean;
-  commonChallenges: boolean;
   recentPosts: boolean;
   friendsSince: boolean;
 };
 
 // The server only returns what the viewer may see, so a section shows when
 // its field is present. On top of that, a non-friend never gets "amigos desde"
-// or retos en común (SOCIAL_SCHEMA §5.2), even if the field came back.
+// (SOCIAL_SCHEMA §5.2), even if the field came back. There is no "retos en común": the server does not return them.
 export function profileSections(
   state: RelationshipState,
   detail: SocialProfileDetail | null,
@@ -291,9 +290,6 @@ export function profileSections(
     sessions: detail?.sessions_total !== undefined,
     badges: detail?.badges_total !== undefined,
     records: Boolean(detail?.records && detail.records.length > 0),
-    commonChallenges: Boolean(
-      friend && detail?.common_challenges && detail.common_challenges.length > 0,
-    ),
     recentPosts: Boolean(detail?.recent_posts && detail.recent_posts.length > 0),
     friendsSince: Boolean(friend && detail?.friends_since),
   };

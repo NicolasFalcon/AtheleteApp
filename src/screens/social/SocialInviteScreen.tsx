@@ -49,8 +49,8 @@ export function SocialInviteScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
-  const settings = useSocialResource(s => s.getSettings());
-  const invites = useSocialResource(s => s.getInvites());
+  const settings = useSocialResource('getSettings', s => s.getSettings());
+  const invites = useSocialResource('getInvites', s => s.getInvites());
   const [creating, setCreating] = useState(false);
 
   const list = invites.data ?? [];

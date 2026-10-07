@@ -39,14 +39,16 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 export function SocialModerationScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const role = useSocialResource(s => s.getModeratorRole());
+  const role = useSocialResource('getModeratorRole', s => s.getModeratorRole());
   const permissions = moderatorPermissions(role.data ?? null);
   const [tab, setTab] = useState<'queue' | 'history'>(route.params?.devTab ?? 'queue');
   const queue = useSocialResource(
+    'getModerationQueue',
     s => (permissions.canSeePanel ? s.getModerationQueue() : Promise.resolve([])),
     [permissions.canSeePanel],
   );
   const history = useSocialResource(
+    'getModerationHistory',
     s => (permissions.canSeePanel ? s.getModerationHistory() : Promise.resolve([])),
     [permissions.canSeePanel],
   );

@@ -133,9 +133,3 @@ export type CreateChallengeResult =
 export type ManualContributionResult =
   | { ok: true; progress: number }
   | { ok: false; error: 'amount_out_of_range' | 'daily_limit' | 'not_allowed' };
-
-export type CoParticipant = {
-  profile: SocialProfileRow;
-  // The challenge they share with the user.
-  challengeTitle: string;
-};

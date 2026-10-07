@@ -97,8 +97,8 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { profile } = useAuth();
-  const sources = useSocialResource(s => s.getAttachmentSources());
-  const settings = useSocialResource(s => s.getSettings());
+  const sources = useSocialResource('getAttachmentSources', s => s.getAttachmentSources());
+  const settings = useSocialResource('getSettings', s => s.getSettings());
   const { attach, devState } = route.params ?? {};
   const shared = Boolean(attach);
 

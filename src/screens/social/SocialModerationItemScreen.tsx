@@ -46,8 +46,9 @@ export function SocialModerationItemScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { targetId } = route.params;
-  const role = useSocialResource(s => s.getModeratorRole());
+  const role = useSocialResource('getModeratorRole', s => s.getModeratorRole());
   const queue = useSocialResource(
+    'getModerationQueue',
     s => (role.data ? s.getModerationQueue() : Promise.resolve([])),
     [role.data],
   );

@@ -39,7 +39,7 @@ export function SocialRoutineScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { postId } = route.params;
-  const post = useSocialResource(s => s.getPost(postId), [postId]);
+  const post = useSocialResource('getPost', s => s.getPost(postId), [postId]);
   const [saved, setSaved] = useState(false);
   const [busy, setBusy] = useState(false);
   const data = post.data;

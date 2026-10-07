@@ -228,15 +228,13 @@ describe('real photo only for friends (DA-119)', () => {
 describe('profile of another user', () => {
   const people = buildPeople(NOW);
 
-  it('does not show "amigos desde" or retos en común to non-friends', () => {
+  it('does not show "amigos desde" to non-friends', () => {
     const detail = { ...people.carlos.detail, relationship: 'none' as const };
     const sections = profileSections('none', detail);
     expect(sections.friendsSince).toBe(false);
-    expect(sections.commonChallenges).toBe(false);
     expect(sections.records).toBe(true);
     expect(profileSections('friends', people.carlos.detail)).toMatchObject({
       friendsSince: true,
-      commonChallenges: true,
       sessions: true,
       badges: true,
       records: true,
@@ -255,7 +253,6 @@ describe('profile of another user', () => {
       sessions: false,
       badges: false,
       records: false,
-      commonChallenges: false,
       recentPosts: false,
       friendsSince: false,
     });

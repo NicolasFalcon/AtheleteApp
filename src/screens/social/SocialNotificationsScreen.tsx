@@ -38,7 +38,7 @@ export function SocialNotificationsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const service = useSocialService();
-  const list = useSocialResource(s => s.getNotifications());
+  const list = useSocialResource('getNotifications', s => s.getNotifications());
   const items = list.data ?? [];
   const groups = groupNotifications(items);
   const fresh = groups.filter(group => group.unread);

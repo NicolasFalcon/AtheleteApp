@@ -58,7 +58,7 @@ export function ChallengesView({
   const { colors } = useThemeV2();
   const toast = useToast();
   const service = useSocialService();
-  const challenges = useSocialResource(s => s.getMyChallenges());
+  const challenges = useSocialResource('getMyChallenges', s => s.getMyChallenges());
   const data = challenges.data;
 
   const respond = async (summary: ChallengeSummary, accept: boolean) => {

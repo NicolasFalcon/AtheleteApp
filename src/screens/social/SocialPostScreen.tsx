@@ -59,8 +59,8 @@ export function SocialPostScreen({ navigation, route }: Props) {
   const service = useSocialService();
   const { profile } = useAuth();
   const { postId } = route.params;
-  const post = useSocialResource(s => s.getPost(postId), [postId]);
-  const comments = useSocialResource(s => s.getComments(postId), [postId]);
+  const post = useSocialResource('getPost', s => s.getPost(postId), [postId]);
+  const comments = useSocialResource('getComments', s => s.getComments(postId), [postId]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const { devAction } = route.params;

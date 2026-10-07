@@ -87,8 +87,6 @@ export type SocialProfileDetail = {
   records?: SocialRecord[];
   weight?: number;
   recent_posts?: SocialRecentPost[];
-  // Verify (BT-46): in the schema but not in BACKEND_SUMMARY.
-  common_challenges?: { id: string; title: string; progress: number; goal: number }[];
 };
 
 // get_friend_activity row (last activity line of a friend).

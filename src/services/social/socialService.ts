@@ -1,7 +1,6 @@
 import type { ImageSourcePropType } from 'react-native';
 import type {
   ChallengeBoard,
-  CoParticipant,
   CreateChallengeInput,
   CreateChallengeResult,
   ManualContributionResult,
@@ -41,25 +40,27 @@ import type {
   SocialSettingsRow,
 } from '@app/features/social/socialTypes';
 
-// Data layer of Comunidad · tanda B. The screens only talk to this interface.
-// Today it is backed by in-memory fixtures (`services/social/fixtureSocialService`);
-// the wiring phase swaps it for Supabase calls, one method per RPC / table:
+// Data layer of Comunidad. The screens only talk to this interface.
+// The real app uses `supabaseSocialService` (W1 connected: settings, username,
+// friends overview, find, profile, blocked list); in `__DEV__` the dev screens
+// use `fixtureSocialService` (see `socialSource.ts`). What is left to connect,
+// one method per RPC / table (the W1 ones are marked ✔):
 //
 // TODO(social-wire): implement with Supabase (getSupabaseClient):
-//   getSettings            → select social_settings (own row; null = no row)
-//   setUsername            → ensure_social_settings(_username) the first time,
+// ✔ getSettings            → select social_settings (own row; null = no row)
+// ✔ setUsername            → ensure_social_settings(_username) the first time,
 //                            set_username(_username) afterwards
-//   updateSettings         → update social_settings (audience, share_*, allow_friend_requests)
-//   getFriendsOverview     → friendships + friend_requests (+ get_social_profiles,
+// ✔ updateSettings         → update social_settings (audience, share_*, allow_friend_requests)
+// ✔ getFriendsOverview     → friendships + friend_requests (+ get_social_profiles,
 //                            get_friend_activity, get_my_challenges for the counts)
-//   findByUsername         → find_user_by_username(_username)
-//   getProfile             → get_social_profile(_user_id) + get_social_profiles([id])
+// ✔ findByUsername         → find_user_by_username(_username)
+// ✔ getProfile             → get_social_profile(_user_id) + get_social_profiles([id])
 //                            (the profile row may be absent: tolerate it)
 //   sendFriendRequest      → send_friend_request(_target)
 //   respondFriendRequest   → respond_friend_request(_request_id, _accept)
 //   cancelFriendRequest    → cancel_friend_request(_request_id)
 //   blockUser / unblockUser→ block_user(_target) / delete from user_blocks
-//   getBlocked             → select user_blocks + get_social_profiles
+// ✔ getBlocked             → select user_blocks + get_social_profiles
 //   createInvite           → create_friend_invite() (max 5 active)
 //   getInvites             → select friend_invites (own)
 //   getFeed                → get_feed(_limit, _before) (+ get_social_profiles for authors)
@@ -84,7 +85,6 @@ import type {
 //   addManualContribution  → add_manual_contribution(_challenge_id, _amount)
 //   createFriendChallenge  → create_friend_challenge(_metric, _goal, _duration_days, _invitee_ids)
 //   markChallengeCelebrated→ mark_challenge_celebrated(_challenge_id)
-//   getCoParticipants      → BT-46: people of the user's challenges who are not friends (the board only exposes friends today)
 //   getNotifications       → select social_notifications (+ get_social_profiles for actors)
 //   markNotificationsRead  → update social_notifications set read_at
 //   getModeratorRole       → is_moderator() / select app_moderators (own row)
@@ -164,7 +164,6 @@ export interface SocialService {
     input: CreateChallengeInput,
   ): Promise<CreateChallengeResult>;
   markChallengeCelebrated(challengeId: string): Promise<void>;
-  getCoParticipants(): Promise<CoParticipant[]>;
   getNotifications(): Promise<SocialNotification[]>;
   markNotificationsRead(ids: string[]): Promise<void>;
   getModeratorRole(): Promise<ModeratorRole | null>;

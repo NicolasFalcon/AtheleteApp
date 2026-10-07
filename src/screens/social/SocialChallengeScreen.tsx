@@ -58,7 +58,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { challengeId, devSheet } = route.params;
-  const board = useSocialResource(s => s.getChallengeBoard(challengeId), [challengeId]);
+  const board = useSocialResource('getChallengeBoard', s => s.getChallengeBoard(challengeId), [challengeId]);
   const [sheet, setSheet] = useState<'leave' | 'cancel' | null>(devSheet ?? null);
   const [busy, setBusy] = useState(false);
   const data = board.data;

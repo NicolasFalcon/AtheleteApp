@@ -47,10 +47,10 @@ export function CommunityScreen({
   );
   const [query, setQuery] = useState(route.params?.devQuery ?? '');
   const [nearEnd, setNearEnd] = useState(false);
-  const settings = useSocialResource(service => service.getSettings());
-  const overview = useSocialResource(service => service.getFriendsOverview());
-  const challenges = useSocialResource(service => service.getMyChallenges());
-  const notifications = useSocialResource(service => service.getNotifications());
+  const settings = useSocialResource('getSettings', service => service.getSettings());
+  const overview = useSocialResource('getFriendsOverview', service => service.getFriendsOverview());
+  const challenges = useSocialResource('getMyChallenges', service => service.getMyChallenges());
+  const notifications = useSocialResource('getNotifications', service => service.getNotifications());
   const unread = unreadCount(notifications.data ?? []);
   const redirected = useRef(false);
   const scrollRef = useRef<ScrollView>(null);

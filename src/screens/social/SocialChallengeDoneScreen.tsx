@@ -61,7 +61,7 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const service = useSocialService();
   const { challengeId } = route.params;
-  const board = useSocialResource(s => s.getChallengeBoard(challengeId), [challengeId]);
+  const board = useSocialResource('getChallengeBoard', s => s.getChallengeBoard(challengeId), [challengeId]);
   const data = board.data;
 
   useEffect(() => {

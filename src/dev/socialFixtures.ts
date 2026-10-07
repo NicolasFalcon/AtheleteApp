@@ -117,10 +117,6 @@ export function buildPeople(now: Date): Record<string, FixturePerson> {
         { exercise_name: 'Sentadilla', value: 165, unit: 'kg', reps: 3, is_new: false },
         { exercise_name: 'Dominadas lastradas', value: 20, unit: 'kg', reps: 5, is_new: false },
       ],
-      common_challenges: [
-        { id: 'fx-ch-1', title: '100 dominadas', progress: 81, goal: 100 },
-        { id: 'fx-ch-2', title: '4 entrenamientos esta semana', progress: 4, goal: 4 },
-      ],
       recent_posts: [
         { id: 'fx-post-1', type: 'record', title: '140 kg · Press banca' },
         { id: 'fx-post-2', type: 'achievement', title: 'Racha de 14 días' },
@@ -253,7 +249,6 @@ export type FixtureState = {
   notifications: ChallengeFixtureSet['notifications'];
   moderationQueue: ChallengeFixtureSet['queue'];
   moderationHistory: ChallengeFixtureSet['history'];
-  coParticipants: ChallengeFixtureSet['coParticipants'];
   activeChallenges: number;
   pendingInvitations: number;
 };
@@ -419,12 +414,11 @@ export function buildFixtureState(
     notificationsFailure: null,
     moderationFailure: null,
     moderatorRole: scenario === 'moderator' || scenario === 'moderatorEmpty' || scenario === 'moderationLoading' || scenario === 'moderationError' ? 'moderator' : scenario === 'admin' ? 'admin' : null,
-    ...(({ challenges, notifications, queue, history, coParticipants }) => ({
+    ...(({ challenges, notifications, queue, history }) => ({
       challenges,
       notifications,
       moderationQueue: queue,
       moderationHistory: history,
-      coParticipants,
     }))(
       buildChallengeFixtures(now, people, meProfile, {
         expired: scenario === 'expiredChallenge',
@@ -467,7 +461,6 @@ export function buildFixtureState(
       state.activityItems = [];
       state.challenges = state.challenges.filter(item => item.head.kind === 'official');
       state.notifications = [];
-      state.coParticipants = [];
       state.activeChallenges = 0;
       state.pendingInvitations = 0;
       break;
@@ -504,7 +497,6 @@ export function buildFixtureState(
       break;
     case 'noChallenges':
       state.challenges = state.challenges.filter(item => item.head.kind === 'official');
-      state.coParticipants = [];
       break;
     case 'feedLoading':
       state.feedFailure = 'loading';
