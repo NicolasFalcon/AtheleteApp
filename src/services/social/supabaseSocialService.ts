@@ -46,6 +46,7 @@ import {
   isUnavailable,
   isValidationError,
   parseActivityItems,
+  parseCreatePost,
   parseFeedPage,
   parseFeedPost,
   toFeedComments,
@@ -53,11 +54,16 @@ import {
   type PostgrestLike,
 } from '@app/features/social/feedMappers';
 import {
+  normalizePhotoMime,
+  PHOTO_MAX_BYTES,
+  POST_BODY_MAX,
   validateComment,
+  validatePhoto,
   validateReport,
 } from '@app/features/social/postModel';
 import type {
   ActivityItem,
+  CreatePostResult,
   FeedComment,
   FeedPage,
   FeedPost,
@@ -66,6 +72,9 @@ import type {
   SocialCommentRow,
   ToggleLikeResult,
 } from '@app/features/social/postTypes';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createUuid } from '@app/lib/uuid';
+import { loadAttachmentSources } from '@app/services/social/attachmentSources';
 import { getSupabaseClient } from '@app/services/supabase/client';
 import {
   prefetchSocialPhotoUrls,
@@ -79,6 +88,9 @@ import { prefetchProfilePhotoUris } from '@app/services/supabase/profile-photo';
 // or rejects (writes), so the real app never mixes in sample data.
 // TODO(social-wire): W3 feed and posts, W4 compose, W5 challenges,
 // W6 notifications, W7 moderation.
+
+// BT-43 (placeholder): local acceptance of the Terms before the first post.
+const TERMS_KEY = '@athelete/social-terms-accepted';
 
 export class SocialNotWiredError extends Error {
   constructor(method: string) {
@@ -652,10 +664,99 @@ export const supabaseSocialService: SocialService = {
     }
   },
 
-  async getAttachmentSources() {
-    return [];
+  // ── Publicar (W4) ───────────────────────────────────────────────────────
+  async editPost(postId, body) {
+    const me = await currentUserId();
+    const text = body.trim();
+    if (text.length > POST_BODY_MAX) {
+      throw new SocialValidationError('comment');
+    }
+    const { data, error } = await client()
+      .from('social_posts')
+      .update({ body: text.length > 0 ? text : null })
+      .eq('id', postId)
+      .eq('author_id', me)
+      .select('id');
+    if (error) {
+      return failed(error);
+    }
+    // 0 rows updated: nothing changed (not yours, deleted or removed).
+    if (data.length === 0) {
+      throw new Error('No se pudo editar la publicación');
+    }
   },
-  createPost: unwired('createPost'),
+
+  async getAttachmentSources(focus) {
+    const me = await currentUserId();
+    const settings = await supabaseSocialService.getSettings();
+    return loadAttachmentSources(me, settings, focus);
+  },
+
+  // The photo goes up first ({uid}/{uuid}/photo.jpg in social-photos), then
+  // create_post. If create_post fails the upload is not retried: orphan photos
+  // are deleted by the server after 24 h.
+  async createPost(input): Promise<CreatePostResult> {
+    const me = await currentUserId();
+    const supabase = client();
+    let photoPath: string | undefined;
+    let size: { width: number; height: number } | null = null;
+
+    if (input.photo) {
+      const photo = input.photo;
+      const issue = validatePhoto(photo);
+      if (issue) {
+        return { ok: false, error: issue };
+      }
+      if (!photo.uri) {
+        return { ok: false, error: 'validation' };
+      }
+      input.onStep?.('uploading');
+      let bytes: ArrayBuffer;
+      try {
+        bytes = await (await fetch(photo.uri)).arrayBuffer();
+      } catch {
+        return { ok: false, error: 'upload_failed' };
+      }
+      // The real size of the file: what the picker reported can be off.
+      if (bytes.byteLength > PHOTO_MAX_BYTES) {
+        return { ok: false, error: 'photo_size' };
+      }
+      const path = `${me}/${createUuid()}/photo.jpg`;
+      const upload = await supabase.storage.from('social-photos').upload(path, bytes, {
+        contentType: normalizePhotoMime(photo.mime),
+        upsert: false,
+      });
+      if (upload.error) {
+        const status = String(
+          (upload.error as { statusCode?: string | number }).statusCode ?? '',
+        );
+        return {
+          ok: false,
+          error:
+            status === '413' || /too large|payload/i.test(upload.error.message)
+              ? 'photo_size'
+              : 'upload_failed',
+        };
+      }
+      photoPath = path;
+      size = { width: Math.round(photo.width), height: Math.round(photo.height) };
+    }
+
+    input.onStep?.('publishing');
+    const { data, error } = await supabase.rpc('create_post', {
+      _type: input.type,
+      ...(input.sourceId ? { _source_id: input.sourceId } : {}),
+      ...(input.body ? { _body: input.body } : {}),
+      ...(photoPath && size
+        ? { _photo_path: photoPath, _photo_width: size.width, _photo_height: size.height }
+        : {}),
+    });
+    if (error) {
+      return failed(error);
+    }
+    return parseCreatePost(data);
+  },
+
   async getPostPhotoSource(path) {
     const uri = await resolveSocialPhotoUrl(path);
     return uri ? { uri } : null;
@@ -686,11 +787,34 @@ export const supabaseSocialService: SocialService = {
       return failed(error, 'report');
     }
   },
-  saveSharedRoutine: unwired('saveSharedRoutine'),
-  async getTermsAccepted() {
-    return false;
+  // Saves the copy of a shared routine in my Entrenos (save_shared_routine).
+  async saveSharedRoutine(postId) {
+    const { data, error } = await client().rpc('save_shared_routine', {
+      _post_id: postId,
+    });
+    if (error) {
+      return failed(error);
+    }
+    const body = data as { ok?: unknown; created?: unknown; template_id?: unknown } | null;
+    if (body?.ok !== true || typeof body.template_id !== 'string') {
+      throw new Error('save_shared_routine no respondió ok');
+    }
+    return { templateId: body.template_id, created: body.created !== false };
   },
-  acceptTerms: unwired('acceptTerms'),
+  // BT-43: the acceptance lives on the device until the server flag exists.
+  // TODO(testflight): pass the acceptance to the server (profiles.terms_accepted_at).
+  async getTermsAccepted() {
+    const me = await currentUserId();
+    try {
+      return (await AsyncStorage.getItem(`${TERMS_KEY}:${me}`)) === 'true';
+    } catch {
+      return false;
+    }
+  },
+  async acceptTerms() {
+    const me = await currentUserId();
+    await AsyncStorage.setItem(`${TERMS_KEY}:${me}`, 'true');
+  },
 
   // ── Retos, notificaciones y moderación (W5 a W7) ────────────────────────
   async getMyChallenges() {

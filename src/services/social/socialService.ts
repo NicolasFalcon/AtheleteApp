@@ -14,6 +14,7 @@ import type {
   ModeratorRole,
 } from '@app/features/social/moderationModel';
 import type { SocialNotification } from '@app/features/social/notificationModel';
+import type { AttachmentFocus } from '@app/services/social/attachmentSources';
 import type {
   ActivityItem,
   AttachmentSource,
@@ -142,7 +143,10 @@ export interface SocialService {
   addComment(postId: string, body: string): Promise<FeedComment>;
   deleteComment(commentId: string): Promise<void>;
   deletePost(postId: string): Promise<void>;
-  getAttachmentSources(): Promise<AttachmentSource[]>;
+  // Edits the text of my post (update body); 0 rows updated is a failure.
+  editPost(postId: string, body: string): Promise<void>;
+  // `focus`: the exact item a "Compartir" button points to (else the latest of each kind).
+  getAttachmentSources(focus?: AttachmentFocus): Promise<AttachmentSource[]>;
   createPost(input: CreatePostInput): Promise<CreatePostResult>;
   getPostPhotoSource(path: string): Promise<ImageSourcePropType | null>;
   reportContent(

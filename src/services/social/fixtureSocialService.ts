@@ -30,6 +30,7 @@ import type {
   ModeratorRole,
 } from '@app/features/social/moderationModel';
 import { allowedActions } from '@app/features/social/moderationModel';
+import type { AttachmentFocus } from '@app/services/social/attachmentSources';
 import type { SocialNotification } from '@app/features/social/notificationModel';
 import { validatePost } from '@app/features/social/postModel';
 import type {
@@ -668,12 +669,21 @@ export const fixtureSocialService: SocialService = {
     });
   },
 
+  async editPost(postId, body) {
+    await ready();
+    const post = state.posts.find(item => item.id === postId && item.author_id === state.me.id);
+    if (!post) {
+      throw new Error('post');
+    }
+    commit(replacePost(postId, { body: body.trim() || null, edited_at: new Date().toISOString() }));
+  },
+
   async deletePost(postId) {
     await ready();
     commit(replacePost(postId, { deleted_at: new Date().toISOString() }));
   },
 
-  async getAttachmentSources() {
+  async getAttachmentSources(_focus?: AttachmentFocus) {
     await ready();
     const settings = state.settings;
     return state.sources.map(source => ({
@@ -699,7 +709,7 @@ export const fixtureSocialService: SocialService = {
       return { ok: false, error: 'validation' };
     }
     if (source?.blockedByPrivacy) {
-      return { ok: false, error: 'privacy' };
+      return { ok: false, error: 'category_not_shared' };
     }
     const id = `fx-new-${Date.now()}`;
     const post: FeedPost = {
@@ -724,7 +734,7 @@ export const fixtureSocialService: SocialService = {
       relationship: 'self',
     };
     commit({ ...state, posts: [post, ...state.posts] });
-    return { ok: true, postId: id };
+    return { ok: true, postId: id, created: true };
   },
 
   async getPostPhotoSource(path) {
