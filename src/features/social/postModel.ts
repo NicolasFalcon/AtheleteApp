@@ -1,6 +1,7 @@
 import type {
   ActivityItem,
   AttachmentKind,
+  CreatePostError,
   FeedComment,
   FeedPost,
   PostAttachment,
@@ -26,6 +27,10 @@ export const PHOTO_MIME_TYPES: readonly string[] = [
   'image/png',
   'image/webp',
 ];
+// A photo is resized to 1440 px on its longer side and re-encoded as JPEG 0.8
+// (that also drops its EXIF, location included) before it is uploaded.
+export const PHOTO_MAX_SIDE = 1440;
+export const PHOTO_QUALITY = 0.8;
 export const FEED_PAGE_SIZE = 10;
 
 // ── Which body a post gets ─────────────────────────────────────────────────
@@ -76,6 +81,51 @@ export function postKindLabel(type: PostType): string {
   }
 }
 
+// ── create_post errors, each with a clear message ──────────────────────────
+export type CreatePostErrorCopy = {
+  message: string;
+  // "Ir a Privacidad social" for what the user switched off.
+  goToPrivacy: boolean;
+};
+
+export function createPostErrorCopy(error: CreatePostError): CreatePostErrorCopy {
+  const plain = (message: string): CreatePostErrorCopy => ({ message, goToPrivacy: false });
+  switch (error) {
+    case 'category_not_shared':
+      return {
+        message: 'Tienes desactivado compartir esto en Privacidad social.',
+        goToPrivacy: true,
+      };
+    case 'photos_not_shared':
+      return {
+        message: 'Tienes desactivado compartir fotos en Privacidad social.',
+        goToPrivacy: true,
+      };
+    case 'photo_not_allowed':
+      return plain('La foto solo se puede añadir a un entrenamiento o publicarla sola.');
+    case 'photo_required':
+      return plain('Una publicación de foto necesita una foto.');
+    case 'photo_not_owned':
+      return plain('No pudimos usar esa foto. Elígela otra vez.');
+    case 'photo_type':
+      return plain('Usa una foto JPG, PNG o WebP.');
+    case 'photo_size':
+      return plain('La foto pesa más de 5 MB.');
+    case 'upload_failed':
+      return plain('No se pudo subir la foto. Revisa tu conexión e inténtalo de nuevo.');
+    case 'invalid_source':
+    case 'source_not_found':
+      return plain('Ya no encontramos lo que querías compartir. Elige otro adjunto.');
+    case 'routine_not_shareable':
+      return plain('Solo puedes compartir rutinas que hayas creado tú, no copias ni las de ELLIE.');
+    case 'invalid_type':
+    case 'validation':
+      return plain('Revisa la publicación: falta algo o no es válido.');
+    default:
+      return plain('No se pudo publicar. Inténtalo de nuevo.');
+  }
+}
+
 // ── Likes (optimistic) ─────────────────────────────────────────────────────
 export type LikeState = { liked: boolean; count: number };
 
@@ -106,12 +156,39 @@ export function settleLike(
 }
 
 // ── Photo, post and comment validation ─────────────────────────────────────
+// The picker names a JPEG "image/jpg" and may send a capital letter.
+export function normalizePhotoMime(mime: string | null | undefined): string {
+  const value = (mime ?? '').trim().toLowerCase();
+  return value === 'image/jpg' || value === 'image/pjpeg' ? 'image/jpeg' : value;
+}
+
+// Size after fitting the photo in a MAX × MAX box without enlarging it and
+// keeping its proportions (what the picker does with maxWidth / maxHeight).
+export function resizedSize(
+  width: number,
+  height: number,
+  maxSide: number = PHOTO_MAX_SIDE,
+): { width: number; height: number } {
+  if (!(width > 0) || !(height > 0)) {
+    return { width: 0, height: 0 };
+  }
+  const longer = Math.max(width, height);
+  if (longer <= maxSide) {
+    return { width: Math.round(width), height: Math.round(height) };
+  }
+  const scale = maxSide / longer;
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
 export type PhotoIssue = 'photo_type' | 'photo_size';
 
 export function validatePhoto(
   photo: Pick<PostPhotoDraft, 'mime' | 'sizeBytes'>,
 ): PhotoIssue | null {
-  if (!PHOTO_MIME_TYPES.includes(photo.mime.toLowerCase())) {
+  if (!PHOTO_MIME_TYPES.includes(normalizePhotoMime(photo.mime))) {
     return 'photo_type';
   }
   if (photo.sizeBytes <= 0 || photo.sizeBytes > PHOTO_MAX_BYTES) {

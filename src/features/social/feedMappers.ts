@@ -1,6 +1,8 @@
 import { mergeFeedPages, nextFeedCursor } from '@app/features/social/postModel';
 import type {
   AchievementAttachment,
+  CreatePostError,
+  CreatePostResult,
   ActivityItem,
   ChallengeAttachment,
   FeedComment,
@@ -398,4 +400,35 @@ export function isNotAuthenticated(error: PostgrestLike): boolean {
 // A duplicate report or like is not an error (ON CONFLICT DO NOTHING).
 export function isDuplicate(error: PostgrestLike): boolean {
   return error?.code === '23505';
+}
+
+// ── create_post ───────────────────────────────────────────────────────────
+// {ok: true, created, post_id} or {ok: false, error}. Repeating the same
+// source answers `created: false` with the same post_id: it is a success
+// ("ya lo compartiste").
+const SERVER_ERRORS: readonly CreatePostError[] = [
+  'invalid_type',
+  'category_not_shared',
+  'photo_not_allowed',
+  'photos_not_shared',
+  'photo_not_owned',
+  'invalid_source',
+  'source_not_found',
+  'routine_not_shareable',
+  'photo_required',
+];
+
+export function parseCreatePost(data: unknown): CreatePostResult {
+  const body = asRecord(data);
+  const postId = asString(body?.post_id);
+  if (body?.ok === true && postId) {
+    return { ok: true, postId, created: body.created !== false };
+  }
+  const error = asString(body?.error);
+  return {
+    ok: false,
+    error: SERVER_ERRORS.includes(error as CreatePostError)
+      ? (error as CreatePostError)
+      : 'unknown',
+  };
 }

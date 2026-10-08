@@ -168,8 +168,11 @@ export type ReportReason =
 export type ReportTarget = 'post' | 'comment' | 'user';
 
 export type PostPhotoDraft = {
-  // Fixture key of the picked photo (the real picker returns a local file).
+  // Fixture key of the picked photo (dev screens only).
   key: string;
+  // Local file the picker returned (already resized and re-encoded without
+  // EXIF); absent for fixtures.
+  uri?: string;
   mime: string;
   sizeBytes: number;
   width: number;
@@ -202,11 +205,34 @@ export type CreatePostInput = {
   sourceId?: string;
   body: string;
   photo?: PostPhotoDraft | null;
+  // Where a publication with a photo is (the upload comes first).
+  onStep?: (step: 'uploading' | 'publishing') => void;
 };
 
+// Errors of create_post ({ok: false, error}) plus the ones the app finds
+// before or while uploading the photo.
+export type CreatePostError =
+  | 'invalid_type'
+  | 'category_not_shared'
+  | 'photo_not_allowed'
+  | 'photos_not_shared'
+  | 'photo_not_owned'
+  | 'invalid_source'
+  | 'source_not_found'
+  | 'routine_not_shareable'
+  | 'photo_required'
+  // The app, before sending: type, size or an invalid post.
+  | 'photo_type'
+  | 'photo_size'
+  | 'validation'
+  // The upload failed (413 = too large) or the answer was not understood.
+  | 'upload_failed'
+  | 'unknown';
+
+// `created: false` = the same source was already shared: the post is the same.
 export type CreatePostResult =
-  | { ok: true; postId: string }
-  | { ok: false; error: 'validation' | 'privacy' | 'duplicate' };
+  | { ok: true; postId: string; created: boolean }
+  | { ok: false; error: CreatePostError };
 
 // `count` is null when the server count could not be read back: the screen
 // then keeps its own optimistic figure.
