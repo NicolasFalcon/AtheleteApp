@@ -40,7 +40,37 @@ import type {
   SocialSettingsPatch,
   SocialSettingsRow,
 } from '@app/features/social/socialTypes';
+import {
+  isDuplicate,
+  isNotAuthenticated,
+  isUnavailable,
+  isValidationError,
+  parseActivityItems,
+  parseFeedPage,
+  parseFeedPost,
+  toFeedComments,
+  withActivityAuthors,
+  type PostgrestLike,
+} from '@app/features/social/feedMappers';
+import {
+  validateComment,
+  validateReport,
+} from '@app/features/social/postModel';
+import type {
+  ActivityItem,
+  FeedComment,
+  FeedPage,
+  FeedPost,
+  ReportReason,
+  ReportTarget,
+  SocialCommentRow,
+  ToggleLikeResult,
+} from '@app/features/social/postTypes';
 import { getSupabaseClient } from '@app/services/supabase/client';
+import {
+  prefetchSocialPhotoUrls,
+  resolveSocialPhotoUrl,
+} from '@app/services/supabase/social-photos';
 import { prefetchProfilePhotoUris } from '@app/services/supabase/profile-photo';
 
 // Supabase implementation of `SocialService` · W1 (personas: lectura, nombre de
@@ -54,6 +84,23 @@ export class SocialNotWiredError extends Error {
   constructor(method: string) {
     super(`Comunidad: ${method} todavía no está conectado`);
     this.name = 'SocialNotWiredError';
+  }
+}
+
+// 42501 = "no disponible" (no permission): the screens show the content as
+// unavailable, not as a failure with retry.
+export class SocialUnavailableError extends Error {
+  constructor() {
+    super('Contenido no disponible');
+    this.name = 'SocialUnavailableError';
+  }
+}
+
+// 23514 on a comment: the body is not 1 to 500 characters.
+export class SocialValidationError extends Error {
+  constructor(public field: 'comment' | 'report') {
+    super(`Valor no válido: ${field}`);
+    this.name = 'SocialValidationError';
   }
 }
 
@@ -99,6 +146,40 @@ async function findUser(username: string): Promise<FindUserResult | null> {
     throw error;
   }
   return parseFindUser(data);
+}
+
+// Maps the errors of a W3 call: a gone session signs out (not_authenticated),
+// no permission is "no disponible", a check violation is a validation error.
+async function failed(error: PostgrestLike & object, field?: 'comment' | 'report'): Promise<never> {
+  if (isNotAuthenticated(error)) {
+    await client().auth.signOut().catch(() => undefined);
+  }
+  if (isUnavailable(error)) {
+    throw new SocialUnavailableError();
+  }
+  if (field && isValidationError(error)) {
+    throw new SocialValidationError(field);
+  }
+  throw error;
+}
+
+// People the viewer is friends with (to decide whose comment photo is shown).
+async function friendIdSet(me: string): Promise<Set<string>> {
+  const { data } = await client()
+    .from('friendships')
+    .select('user_low,user_high')
+    .or(`user_low.eq.${me},user_high.eq.${me}`);
+  return new Set(
+    (data ?? []).map(row => (row.user_low === me ? row.user_high : row.user_low)),
+  );
+}
+
+// Signs, in one request each, the friend avatars and the photos of a page.
+async function prefetchPostPhotos(posts: FeedPost[]): Promise<void> {
+  await Promise.all([
+    prefetchSocialPhotoUrls(posts.map(post => post.photo_path)),
+    prefetchProfilePhotoUris(posts.map(post => post.author?.profile_photo_url)),
+  ]).catch(() => undefined);
 }
 
 const unwired = (method: string) => (): Promise<never> =>
@@ -421,31 +502,190 @@ export const supabaseSocialService: SocialService = {
     return data.length > 0;
   },
 
-  // ── Contenido (W3, W4) ──────────────────────────────────────────────────
-  async getFeed() {
-    return { posts: [], nextCursor: null };
+  // ── Contenido (W3) ──────────────────────────────────────────────────────
+  async getFeed(cursor, limit): Promise<FeedPage> {
+    const me = await currentUserId();
+    const { data, error } = await client().rpc('get_feed', {
+      _limit: limit,
+      ...(cursor ? { _before: cursor } : {}),
+    });
+    if (error) {
+      return failed(error);
+    }
+    const page = parseFeedPage(data, me, limit);
+    await prefetchPostPhotos(page.posts);
+    return page;
   },
-  async getFriendActivity() {
-    return [];
+
+  async getFriendActivity(limit): Promise<ActivityItem[]> {
+    const supabase = client();
+    const { data, error } = await supabase.rpc('get_friend_activity', {
+      _limit: Math.min(100, Math.max(1, limit)),
+    });
+    if (error) {
+      return failed(error);
+    }
+    const items = parseActivityItems(data);
+    // The activity has no photo: complete the authors with get_social_profiles.
+    const profiles = await fetchProfiles(Array.from(new Set(items.map(item => item.user_id))));
+    const withAuthors = withActivityAuthors(items, profiles, data);
+    await prefetchProfilePhotoUris(
+      withAuthors.map(item => item.author?.profile_photo_url),
+    ).catch(() => undefined);
+    return withAuthors;
   },
-  async getPost() {
-    return null;
+
+  // get_post: same format as a row of get_feed, or null when it cannot be seen
+  // (no permission error): the screen shows "no disponible".
+  async getPost(postId): Promise<FeedPost | null> {
+    const me = await currentUserId();
+    const { data, error } = await client().rpc('get_post', { _id: postId });
+    if (error) {
+      if (isUnavailable(error)) {
+        return null;
+      }
+      return failed(error);
+    }
+    const post = parseFeedPost(data, me);
+    if (post) {
+      await prefetchPostPhotos([post]);
+    }
+    return post;
   },
-  toggleLike: unwired('toggleLike'),
-  async getComments() {
-    return [];
+
+  async toggleLike(postId, like): Promise<ToggleLikeResult> {
+    const me = await currentUserId();
+    const supabase = client();
+    // Like: INSERT … ON CONFLICT DO NOTHING (a second tap is not an error).
+    // Unlike: DELETE (nothing to delete is not an error either).
+    const write = like
+      ? await supabase
+          .from('social_post_likes')
+          .upsert(
+            { post_id: postId, user_id: me },
+            { onConflict: 'post_id,user_id', ignoreDuplicates: true },
+          )
+      : await supabase
+          .from('social_post_likes')
+          .delete()
+          .eq('post_id', postId)
+          .eq('user_id', me);
+    if (write.error && !isDuplicate(write.error)) {
+      return failed(write.error);
+    }
+    // The server keeps the counter: read it back; without it the screen keeps
+    // its own figure.
+    const counted = await supabase
+      .from('social_posts')
+      .select('like_count')
+      .eq('id', postId)
+      .maybeSingle();
+    return { liked: like, count: counted.error ? null : (counted.data?.like_count ?? null) };
   },
-  addComment: unwired('addComment'),
-  deleteComment: unwired('deleteComment'),
-  deletePost: unwired('deletePost'),
+
+  async getComments(postId): Promise<FeedComment[]> {
+    const me = await currentUserId();
+    const { data, error } = await client()
+      .from('social_post_comments')
+      .select('*')
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true });
+    if (error) {
+      return failed(error);
+    }
+    const rows: SocialCommentRow[] = data ?? [];
+    const authors = Array.from(new Set(rows.map(row => row.author_id)));
+    const [profiles, friends] = await Promise.all([fetchProfiles(authors), friendIdSet(me)]);
+    const comments = toFeedComments(rows, profiles, me, friends);
+    await prefetchProfilePhotoUris(
+      comments.map(comment => comment.author?.profile_photo_url),
+    ).catch(() => undefined);
+    return comments;
+  },
+
+  async addComment(postId, body): Promise<FeedComment> {
+    // 1 to 500 characters, checked before sending (23514 maps to the same).
+    const check = validateComment(body);
+    if (!check.ok) {
+      throw new SocialValidationError('comment');
+    }
+    const me = await currentUserId();
+    const { data, error } = await client()
+      .from('social_post_comments')
+      .insert({ post_id: postId, author_id: me, body: check.body })
+      .select('*')
+      .single();
+    if (error) {
+      return failed(error, 'comment');
+    }
+    const profiles = await fetchProfiles([me]);
+    return toFeedComments([data], profiles, me, new Set())[0];
+  },
+
+  async deleteComment(commentId) {
+    // The author of the comment or the author of the post can delete it.
+    const { data, error } = await client().rpc('delete_comment', {
+      _comment_id: commentId,
+    });
+    if (error) {
+      return failed(error);
+    }
+    if (!isOkResponse(data)) {
+      throw new Error('delete_comment no respondió ok');
+    }
+  },
+
+  async deletePost(postId) {
+    const me = await currentUserId();
+    const { data, error } = await client()
+      .from('social_posts')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', postId)
+      .eq('author_id', me)
+      .select('id');
+    if (error) {
+      return failed(error);
+    }
+    // 0 rows updated: nothing was deleted (not yours, or already gone).
+    if (data.length === 0) {
+      throw new Error('No se pudo borrar la publicación');
+    }
+  },
+
   async getAttachmentSources() {
     return [];
   },
   createPost: unwired('createPost'),
-  async getPostPhotoSource() {
-    return null;
+  async getPostPhotoSource(path) {
+    const uri = await resolveSocialPhotoUrl(path);
+    return uri ? { uri } : null;
   },
-  reportContent: unwired('reportContent'),
+  async reportContent(
+    target: ReportTarget,
+    targetId: string,
+    reason: ReportReason,
+    details: string | null,
+  ) {
+    const check = validateReport({ reason, details: details ?? '' });
+    if (!check.ok) {
+      throw new SocialValidationError('report');
+    }
+    const me = await currentUserId();
+    const { error } = await client()
+      .from('content_reports')
+      .insert({
+        reporter_id: me,
+        target_type: target,
+        target_id: targetId,
+        reason: check.reason,
+        details: check.details,
+      });
+    // Reporting the same thing twice is not an error (ON CONFLICT DO NOTHING);
+    // the server already hides it from the reporter.
+    if (error && !isDuplicate(error)) {
+      return failed(error, 'report');
+    }
+  },
   saveSharedRoutine: unwired('saveSharedRoutine'),
   async getTermsAccepted() {
     return false;

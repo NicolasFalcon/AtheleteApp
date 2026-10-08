@@ -30,6 +30,8 @@ import type { SocialProfileRow } from '@app/features/social/socialTypes';
 export function FeedView({
   me,
   nearEnd,
+  refreshSignal,
+  onRefreshed,
   onCompose,
   onOpenPost,
   onOpenRoutine,
@@ -38,6 +40,9 @@ export function FeedView({
   me: SocialProfileRow;
   // The hub scroll is near the bottom: ask for the next page.
   nearEnd: boolean;
+  // Pull to refresh: a new value reloads the feed; `onRefreshed` says when it ended.
+  refreshSignal: number;
+  onRefreshed: () => void;
   onCompose: () => void;
   onOpenPost: (postId: string) => void;
   onOpenRoutine: (postId: string) => void;
@@ -56,6 +61,13 @@ export function FeedView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [feed.refresh]);
   useFocusEffect(first);
+
+  useEffect(() => {
+    if (refreshSignal > 0) {
+      feed.refresh(true).finally(onRefreshed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshSignal]);
 
   useEffect(() => {
     if (nearEnd) {

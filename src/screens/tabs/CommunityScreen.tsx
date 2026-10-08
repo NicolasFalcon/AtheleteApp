@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Plus, Shield } from 'lucide-react-native';
@@ -47,6 +47,10 @@ export function CommunityScreen({
   );
   const [query, setQuery] = useState(route.params?.devQuery ?? '');
   const [nearEnd, setNearEnd] = useState(false);
+  // Pull to refresh: the feed reloads itself (`refreshSignal`) and tells when
+  // it is done; the rest of the hub reloads from here.
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshSignal, setRefreshSignal] = useState(0);
   const settings = useSocialResource('getSettings', service => service.getSettings());
   const overview = useSocialResource('getFriendsOverview', service => service.getFriendsOverview());
   const challenges = useSocialResource('getMyChallenges', service => service.getMyChallenges());
@@ -200,6 +204,24 @@ export function CommunityScreen({
 
       <ScrollView
         ref={scrollRef}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={colors.text.secondary}
+            onRefresh={() => {
+              setRefreshing(true);
+              settings.reload();
+              overview.reload();
+              challenges.reload();
+              notifications.reload();
+              if (segment === 'feed') {
+                setRefreshSignal(value => value + 1);
+              } else {
+                setTimeout(() => setRefreshing(false), 600);
+              }
+            }}
+          />
+        }
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={64}
@@ -254,6 +276,8 @@ export function CommunityScreen({
             <FeedView
               me={meProfile}
               nearEnd={nearEnd}
+              refreshSignal={refreshSignal}
+              onRefreshed={() => setRefreshing(false)}
               onCompose={() => navigation.navigate(APP_ROUTES.SocialCompose, {})}
               onOpenPost={postId => navigation.navigate(APP_ROUTES.SocialPost, { postId })}
               onOpenRoutine={postId => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}
