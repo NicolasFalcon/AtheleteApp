@@ -305,7 +305,7 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
           ]}
         >
           <View style={styles.footerRow}>
-            {/* TODO(social-wire): the composer receives the record id (sourceId). */}
+            {/* No single record is selected here: the composer offers the latest one. */}
             <Button
               label="Compartir"
               variant="secondary"

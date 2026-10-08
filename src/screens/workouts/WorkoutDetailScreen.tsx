@@ -209,6 +209,22 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
     }
   };
 
+  // A routine of mine can go to Comunidad (create_post type routine; the server
+  // refuses copies and routines made by ELLIE); anything else is shared as text.
+  const shareMenu = () =>
+    Alert.alert(workout.title, undefined, [
+      {
+        text: 'Compartir en Comunidad',
+        onPress: () =>
+          navigation.navigate(APP_ROUTES.SocialCompose, {
+            attach: 'routine',
+            sourceId: workout.id,
+          }),
+      },
+      { text: 'Compartir fuera de la app', onPress: share },
+      { text: 'Cancelar', style: 'cancel' as const },
+    ]);
+
   const share = async () => {
     try {
       await Share.share({
@@ -319,7 +335,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
                   icon={Share2}
                   variant="glass"
                   accessibilityLabel="Compartir"
-                  onPress={share}
+                  onPress={access.canEdit ? shareMenu : share}
                 />
               </View>
             </>

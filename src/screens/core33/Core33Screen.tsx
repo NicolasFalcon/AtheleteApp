@@ -217,6 +217,20 @@ export function Core33Screen({ navigation, route }: Props) {
               <TextV2 variant="bodyL">
                 Terminaste este compromiso. Puedes descansar unos días o elegir el siguiente cuando quieras.
               </TextV2>
+              {/* achievement with the participation as source: `core33:<id>` (create_post). */}
+              {challenge && 'id' in challenge && typeof challenge.id === 'string' && !sample ? (
+                <Button
+                  label="Compartir logro"
+                  variant="secondary"
+                  onPress={() =>
+                    navigation.navigate(APP_ROUTES.SocialCompose, {
+                      attach: 'achievement',
+                      sourceId: `core33:${challenge.id}`,
+                    })
+                  }
+                  fullWidth
+                />
+              ) : null}
               <Button label="Explorar otro Core 33" onPress={() => navigation.navigate(APP_ROUTES.Core33Explore)} fullWidth />
               <PressableScale accessibilityRole="button" onPress={() => safeGoBack(navigation, BACK_FALLBACKS)} style={styles.home}>
                 <TextV2 variant="bodyStrong">Volver a Inicio</TextV2>

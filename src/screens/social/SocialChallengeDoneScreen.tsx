@@ -128,7 +128,7 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
         >
           <Button
             label="Compartir"
-            onPress={() => navigation.replace(APP_ROUTES.SocialCompose, { attach: 'challenge' })}
+            onPress={() => navigation.replace(APP_ROUTES.SocialCompose, { attach: 'challenge', sourceId: challengeId })}
           />
           <Button
             label="Volver a Comunidad"

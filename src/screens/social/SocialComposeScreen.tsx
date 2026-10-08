@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -28,16 +29,21 @@ import {
 import { LEGAL_IS_PLACEHOLDER, TERMS_URL } from '@app/constants/legal';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import {
+  createPostErrorCopy,
   POST_BODY_MAX,
   POST_ISSUES,
+  validatePhoto,
   validatePost,
+  type CreatePostErrorCopy,
   type PostIssue,
 } from '@app/features/social/postModel';
+import { pickPostPhoto } from '@app/features/social/postPhotoPicker';
 import type {
   AttachmentKind,
   AttachmentSource,
   PostPhotoDraft,
 } from '@app/features/social/postTypes';
+import { usesFixtures } from '@app/services/social/socialSource';
 import {
   usePostPhotoSource,
   useSocialResource,
@@ -59,9 +65,8 @@ const CHIP_LABEL: Record<AttachmentKind, string> = {
   challenge: 'Reto',
 };
 
-// Photos the placeholder picker cycles through (the real picker returns a
-// local file). TODO(social-wire): `launchImageLibrary`, resize to ≤ 1600 px,
-// strip EXIF/GPS (the server does not), JPEG 0.8; HEIC → JPEG.
+// Photos the dev screens cycle through (sample data only). The real app uses
+// the image picker: resized to 1440 px, JPEG 0.8, without EXIF (pickPostPhoto).
 const FIXTURE_PHOTOS: PostPhotoDraft[] = [
   { key: 'barra-mujer', mime: 'image/jpeg', sizeBytes: 640_000, width: 1200, height: 1500 },
   { key: 'hero-entreno', mime: 'image/jpeg', sizeBytes: 720_000, width: 1200, height: 1500 },
@@ -97,9 +102,13 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { profile } = useAuth();
-  const sources = useSocialResource('getAttachmentSources', s => s.getAttachmentSources());
+  const { attach, sourceId, devState } = route.params ?? {};
+  const sources = useSocialResource(
+    'getAttachmentSources',
+    s => s.getAttachmentSources(attach && sourceId ? { kind: attach, sourceId } : undefined),
+    [attach ?? null, sourceId ?? null],
+  );
   const settings = useSocialResource('getSettings', s => s.getSettings());
-  const { attach, devState } = route.params ?? {};
   const shared = Boolean(attach);
 
   const [text, setText] = useState('');
@@ -112,8 +121,13 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   );
   const [termsOpen, setTermsOpen] = useState(devState === 'terms');
   const [publishing, setPublishing] = useState(false);
+  // Where a publication with a photo is: the upload comes first.
+  const [step, setStep] = useState<'uploading' | 'publishing'>('publishing');
+  // What create_post refused, with its message (and a way to Privacidad social).
+  const [failure, setFailure] = useState<CreatePostErrorCopy | null>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
-  const photoSource = usePostPhotoSource(photo ? `fx://${photo.key}` : null);
+  const fixturePhoto = usePostPhotoSource(photo && !photo.uri ? `fx://${photo.key}` : null);
+  const photoSource = photo?.uri ? { uri: photo.uri } : fixturePhoto;
 
   // Opens with the first available attachment when none came preselected.
   useEffect(() => {
@@ -133,12 +147,28 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   const AudienceIcon = audience === 'Público' ? Globe : Users;
   const remaining = POST_BODY_MAX - text.length;
 
-  const pickPhoto = () => {
-    // TODO(social-wire): real image picker (see FIXTURE_PHOTOS).
+  const pickPhoto = async () => {
     haptics.selection();
-    setPhoto(FIXTURE_PHOTOS[photoIndex % FIXTURE_PHOTOS.length]);
-    setPhotoIndex(value => value + 1);
-    setIssues(current => current.filter(item => !item.startsWith('photo')));
+    setFailure(null);
+    if (usesFixtures()) {
+      // Dev screens: sample photos, nothing is read from the library.
+      setPhoto(FIXTURE_PHOTOS[photoIndex % FIXTURE_PHOTOS.length]);
+      setPhotoIndex(value => value + 1);
+      setIssues(current => current.filter(item => !item.startsWith('photo')));
+      return;
+    }
+    const picked = await pickPostPhoto();
+    if (picked.status === 'cancelled') {
+      return;
+    }
+    if (picked.status === 'error') {
+      toast.show(picked.message, { tone: 'error' });
+      return;
+    }
+    // Type and size are checked before anything is uploaded.
+    const issue = validatePhoto(picked.photo);
+    setPhoto(picked.photo);
+    setIssues(issue ? [issue] : []);
   };
 
   const publish = async (termsAccepted: boolean) => {
@@ -160,6 +190,8 @@ export function SocialComposeScreen({ navigation, route }: Props) {
       return;
     }
     setIssues([]);
+    setFailure(null);
+    setStep(photo ? 'uploading' : 'publishing');
     setPublishing(true);
     try {
       const outcome = await service.createPost({
@@ -167,23 +199,21 @@ export function SocialComposeScreen({ navigation, route }: Props) {
         sourceId: selected?.sourceId,
         body: result.body,
         photo,
+        onStep: setStep,
       });
       if (outcome.ok) {
-        toast.show('Publicado para tus amigos');
-        safeGoBack(navigation, BACK_FALLBACKS);
-      } else if (outcome.error === 'privacy') {
-        setIssues([]);
-        toast.show('Tienes desactivado compartir esto en Privacidad social', {
-          tone: 'error',
-        });
-      } else {
-        toast.show('No se pudo publicar. Inténtalo de nuevo.', { tone: 'error' });
+        // Repeating the same source gives the same post: "ya lo compartiste".
+        toast.show(outcome.created ? 'Publicado para tus amigos' : 'Ya lo habías compartido');
+        navigation.replace(APP_ROUTES.SocialPost, { postId: outcome.postId });
+        return;
       }
+      haptics.error();
+      setFailure(createPostErrorCopy(outcome.error));
     } catch {
-      toast.show('No se pudo publicar. Inténtalo de nuevo.', { tone: 'error' });
-    } finally {
-      setPublishing(false);
+      haptics.error();
+      setFailure(createPostErrorCopy('unknown'));
     }
+    setPublishing(false);
   };
 
   const onPublish = async () => {
@@ -232,7 +262,8 @@ export function SocialComposeScreen({ navigation, route }: Props) {
             label="Publicar"
             size="sm"
             loading={publishing}
-            loadingLabel="Publicando"
+            disabled={publishing}
+            loadingLabel={step === 'uploading' ? 'Subiendo foto' : 'Publicando'}
             onPress={onPublish}
           />
         </View>
@@ -305,6 +336,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
               accessibilityLabel="Quitar foto"
               onPress={() => {
                 setPhoto(null);
+                setFailure(null);
                 setIssues(current => current.filter(item => !item.startsWith('photo')));
               }}
               style={styles.removePhoto}
@@ -388,6 +420,31 @@ export function SocialComposeScreen({ navigation, route }: Props) {
           ) : null}
         </View>
 
+        {publishing ? (
+          <View accessibilityLiveRegion="polite" style={styles.progress}>
+            <ActivityIndicator color={colors.text.secondary} />
+            <TextV2 variant="meta" tone="secondary">
+              {step === 'uploading' ? 'Subiendo la foto…' : 'Publicando…'}
+            </TextV2>
+          </View>
+        ) : null}
+
+        {failure ? (
+          <View accessibilityLiveRegion="polite" style={styles.issues}>
+            <TextV2 variant="meta" color={colors.ember.deep}>
+              {failure.message}
+            </TextV2>
+            {failure.goToPrivacy ? (
+              <Button
+                label="Ir a Privacidad social"
+                variant="secondary"
+                size="md"
+                onPress={() => navigation.navigate(APP_ROUTES.SocialPrivacy)}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
         {issues.length > 0 ? (
           <View accessibilityLiveRegion="polite" style={styles.issues}>
             {issues.map(issue => (
@@ -428,6 +485,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  progress: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   flex: { flex: 1 },
   bar: {
     flexDirection: 'row',

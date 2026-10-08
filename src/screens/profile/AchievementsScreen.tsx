@@ -143,9 +143,12 @@ export function AchievementsScreen({ navigation, route }: Props) {
         item={selected}
         onClose={() => setSelected(null)}
         onShare={() => {
-          // TODO(social-wire): the composer receives the badge id (sourceId).
+          const badgeId = selected?.badge.id;
           setSelected(null);
-          navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'achievement' });
+          navigation.navigate(APP_ROUTES.SocialCompose, {
+            attach: 'achievement',
+            sourceId: badgeId,
+          });
         }}
       />
     </View>

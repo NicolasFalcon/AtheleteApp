@@ -134,7 +134,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
         navigation.replace(APP_ROUTES.SocialChallengeDone, { challengeId });
       }
     });
-  const share = () => navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'challenge' });
+  const share = () => navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'challenge', sourceId: challengeId });
   const startWorkout = () =>
     navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Workouts });
 

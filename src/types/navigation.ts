@@ -223,6 +223,9 @@ export type SocialPostRouteParams = {
 export type SocialComposeRouteParams = {
   // Preselects the attachment (Compartir entreno / récord).
   attach?: 'workout' | 'routine' | 'record' | 'achievement' | 'challenge';
+  // The exact item to share (session, record, badge or `core33:<id>`,
+  // routine, challenge); without it the latest of that kind is offered.
+  sourceId?: string;
   // Dev only: opens with the Terms sheet, an invalid photo, or an attached photo.
   devState?: 'terms' | 'badPhoto' | 'photo';
 };

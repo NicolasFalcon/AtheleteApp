@@ -383,11 +383,10 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
       >
         <Button label="Listo" onPress={done} />
         <View style={styles.secondaryRow}>
-          {/* TODO(social-wire): the composer receives this session as the attachment (sourceId). */}
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Compartir entreno"
-            onPress={() => navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'workout' })}
+            onPress={() => navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'workout', sourceId: sessionId })}
             style={[styles.prButton, styles.secondaryHalf, { boxShadow: `inset 0 0 0 1px ${colors.outline.strong}` }]}
           >
             <TextV2 variant="bodyStrong">Compartir</TextV2>
