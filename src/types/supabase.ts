@@ -1901,6 +1901,7 @@ export type Database = {
       get_feed: { Args: { _before?: string; _limit?: number }; Returns: Json }
       get_friend_activity: { Args: { _limit?: number }; Returns: Json }
       get_my_challenges: { Args: never; Returns: Json }
+      get_post: { Args: { _id: string }; Returns: Json }
       get_social_profile: { Args: { _user_id: string }; Returns: Json }
       get_social_profiles: {
         Args: { _user_ids: string[] }

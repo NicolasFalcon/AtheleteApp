@@ -556,7 +556,11 @@ export function activityWhen(iso: string, now: Date = new Date()): string {
 // kinds of social_activity: workout_completed, record, badge,
 // core33_completed, challenge_completed, streak.
 export function activityLine(
-  activity: { kind: string; summary: { title: string }; created_at: string },
+  activity: {
+    kind: string;
+    summary: { title: string; duration_min?: number };
+    created_at: string;
+  },
   now: Date = new Date(),
 ): string {
   const when = activityWhen(activity.created_at, now);
@@ -564,7 +568,9 @@ export function activityLine(
 
   switch (activity.kind) {
     case 'workout_completed':
-      return `Entrenó ${when} · ${title}`;
+      return activity.summary.duration_min
+        ? `Entrenó ${when} · ${title} · ${activity.summary.duration_min} min`
+        : `Entrenó ${when} · ${title}`;
     case 'record':
       return `Nuevo récord · ${title}`;
     case 'badge':

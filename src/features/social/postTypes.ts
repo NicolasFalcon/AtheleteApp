@@ -55,6 +55,8 @@ export type RecordAttachment = {
   unit: string;
   delta: number | null;
   previous_best: number | null;
+  // Reps of a weight record (create_post writes `reps`).
+  reps?: number | null;
 };
 
 export type RoutineAttachment = {
@@ -86,6 +88,7 @@ export type ChallengeAttachment = {
   final_value: number;
   rank_among_friends: number | null;
   points: number;
+  badge_id?: string | null;
 };
 
 export type PostAttachment =
@@ -148,7 +151,8 @@ export type ActivityItem = {
   id: string;
   user_id: string;
   kind: string;
-  summary: { title: string };
+  // `title` always; `duration_min` for workout_completed (SOCIAL_RPC_SHAPES).
+  summary: { title: string; duration_min?: number };
   created_at: string;
   author: SocialProfileRow | null;
 };
@@ -204,4 +208,6 @@ export type CreatePostResult =
   | { ok: true; postId: string }
   | { ok: false; error: 'validation' | 'privacy' | 'duplicate' };
 
-export type ToggleLikeResult = { liked: boolean; count: number };
+// `count` is null when the server count could not be read back: the screen
+// then keeps its own optimistic figure.
+export type ToggleLikeResult = { liked: boolean; count: number | null };

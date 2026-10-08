@@ -93,7 +93,8 @@ export type SocialProfileDetail = {
 export type FriendActivity = {
   user_id: string;
   kind: string;
-  summary: { title: string };
+  // `title` always; `duration_min` for workout_completed.
+  summary: { title: string; duration_min?: number };
   created_at: string;
 };
 

@@ -93,9 +93,16 @@ export function settleLike(
   previous: LikeState,
   server: ToggleLikeResult | null,
 ): LikeState {
-  return server
-    ? { liked: server.liked, count: Math.max(0, server.count) }
-    : previous;
+  if (!server) {
+    return previous;
+  }
+  return {
+    liked: server.liked,
+    count:
+      server.count === null
+        ? toggleLikeState(previous).count
+        : Math.max(0, server.count),
+  };
 }
 
 // ── Photo, post and comment validation ─────────────────────────────────────
