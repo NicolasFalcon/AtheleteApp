@@ -129,3 +129,13 @@ Devuelve {"created":false,"username":"<el actual>"}.
   - Creada: {"created":true,"username":"…"}. El nombre se guarda en minúsculas y sin espacios alrededor.
   - Nombre no válido: {"created":false,"error":"invalid_username"}. Se aceptan de 3 a 24 caracteres entre a-z, 0-9, _ y ..
   - Nombre ocupado: {"created":false,"error":"username_taken"}.
+
+Aplicado y probado. La prueba llegó al final (ROLLBACK_OK) con todas las comprobaciones pasadas y sin dejar nada guardado.
+
+Resumen para la app — get_post(_id uuid)
+- Devuelve una fila con el mismo formato que get_feed: campos del post, author, attachment, contadores y liked_by_me.
+- Visibilidad idéntica al feed: autor o amigo, sin bloqueo, y post no borrado/oculto/retirado. En cualquier otro caso devuelve null (no hay error de permiso).
+- Sin sesión: excepción not_authenticated (P0001 / HTTP 400).
+- Solo ejecutable por usuarios con sesión (revocado para anónimos).
+
+Pruebas: el autor vio su post con liked_by_me: false ✓; un usuario sin amistad recibió null ✓; tras marcar el post como borrado, el autor también recibió null ✓. No pude probar el caso "amigo lo ve" porque no hay amistades en la base de datos, pero usa exactamente la misma condición are_friends que get_feed, ya probada antes.

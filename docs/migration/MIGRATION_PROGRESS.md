@@ -2166,15 +2166,15 @@ Sin migraciones, sin `npx supabase`, sin escrituras de prueba y sin commits. Las
 - **DA-153** · **Fotos:** `profile_photo_url` es una ruta de storage. Las de los amigos se firman en lote con `createSignedUrls` (`prefetchProfilePhotoUris`), que llena la misma caché que usan los avatares. DA-119: la ruta de una foto solo se conserva para uno mismo y los amigos; solicitudes, bloqueados y no amigos reciben `''` (nunca se pide) y se ve el avatar con iniciales.
 - **DA-154** · **Solicitudes** (enviar, aceptar, rechazar, cancelar) con toast en cada acción; la fila del resultado de búsqueda pasa a "Solicitado" al instante y vuelve si se rechaza o falla.
 - **DA-155** · **Eliminar amigo:** en el menú del perfil de un amigo, "Eliminar a … de tus amigos", con hoja de confirmación (no avisa; se puede volver a agregar). Nuevo método `removeFriend` en `SocialService` (y en los fixtures).
-- **DA-156** · **Bloquear / desbloquear:** con confirmación al bloquear (ya existía la hoja). Al bloquear, la persona sale al instante de Amigos (amigos, recibidas, enviadas), el perfil pasa a "bloqueado" y sus publicaciones salen del feed de la sesión; si falla, todo vuelve.
+- **DA-156** · **Bloquear / desbloquear:** con confirmación al bloquear (ya existía la hoja). *Corregido en W3 con lo confirmado por backend:* `block_user` ya borra la amistad y cancela las solicitudes en ambos sentidos (no toca los retos compartidos), así que la app **no lo simula**: solo invalida la caché social y Amigos, el perfil y el feed se recargan con lo que dice el servidor. Desbloquear sí es optimista (quita la entrada de Bloqueados y limpia la marca del perfil; vuelve si falla).
 - **DA-157** · **Invitaciones:** crear y compartir el enlace (`athelete://amigo/{token}`) como antes, y "Revocar" en cada enlace activo (nuevo `revokeInvite`; toast "Enlace revocado" o "Ese enlace ya se había usado").
-- **DA-158** · **Interfaz optimista con vuelta atrás:** `useSocialService` aplica el cambio a la caché antes de la petición (`relationMachine.ts`: `optimisticRelation`, `settleRelation`, `applyAction`, `runOptimistic`), lo mantiene si el servidor acepta, lo deshace si falla o si rechaza (`not_accepting`, `unavailable`, `invalid`, `remove` sin amistad) y, termine como termine, invalida la caché social.
+- **DA-158** · **Interfaz optimista con vuelta atrás:** `useSocialService` aplica el cambio a la caché antes de la petición (`relationMachine.ts`: `optimisticRelation`, `settleRelation`, `applyAction`, `runOptimistic`), lo mantiene si el servidor acepta, lo deshace si falla o si rechaza (`not_accepting`, `unavailable`, `invalid`, `remove` o `revokeInvite` sin efecto) y, termine como termine, invalida la caché social.
 - **DA-159** · **Cosmético:** sin nombre de usuario no se muestra "@" vacío (`handleOf`) en Amigos, Bloqueados y Crear reto.
 
 Tests: `relationMachine.test.ts` (estado de la relación tras cada acción, los errores y la vuelta atrás, y el efecto en la caché de Amigos, perfil, bloqueados e invitaciones).
 
 ### `TODO(social-wire)` que quedan tras W2
-W3 feed, publicaciones, comentarios, likes y reportes (`useFeed` sigue siendo un cargador local) · W4 composer y fotos · W5 retos · W6 notificaciones · W7 moderación y términos (BT-43) · `usePostPhotoSource` sin caché de URL firmadas · `sourceId` del composer en Récords, Resumen y Logros · miniaturas de anatomía por `exercise_id` · `OfficialChallengeHero` (`cover_path`) · borrar `fixtureSocialService.ts` al terminar W7. **Por verificar con datos reales:** `get_friend_activity` (campos de `summary` por `kind`), el error exacto de `create_friend_invite` con 5 activos (hoy cualquier error con "limit", "max", "too_many" o "active" cuenta como límite) y si `block_user` borra ya amistad y solicitudes en el servidor (la app lo refleja en cliente).
+W3 feed, publicaciones, comentarios, likes y reportes (`useFeed` sigue siendo un cargador local) · W4 composer y fotos · W5 retos · W6 notificaciones · W7 moderación y términos (BT-43) · `usePostPhotoSource` sin caché de URL firmadas · `sourceId` del composer en Récords, Resumen y Logros · miniaturas de anatomía por `exercise_id` · `OfficialChallengeHero` (`cover_path`) · borrar `fixtureSocialService.ts` al terminar W7. *(Resuelto en W3: el límite de invitaciones es `{ok:false, error:"too_many_active_invites"}`, `block_user` limpia en el servidor y `summary` de `get_friend_activity` está documentado.)*
 
 ### Checklist de QA con dos cuentas (W1 + W2)
 **A** = falcon1989 (ya tiene perfil), **B** = la cuenta nueva (sin fila en `social_settings`). Dos dispositivos o dos sesiones; nunca la misma cuenta en ambas.
@@ -2203,10 +2203,10 @@ W3 feed, publicaciones, comentarios, likes y reportes (`useFeed` sigue siendo un
 15. Con avión durante el paso 14: vuelve a "Amigos" y sale el error.
 
 *Bloquear y desbloquear*
-16. Volver a ser amigos. A bloquea a B (confirmación): B sale de Amigos de A al instante, el perfil dice "Bloqueaste a B" y B no aparece en la búsqueda de A ni A en la de B.
+16. Volver a ser amigos. A bloquea a B (confirmación): tras la respuesta del servidor B sale de Amigos de A, el perfil dice "Bloqueaste a B" y B no aparece en la búsqueda de A ni A en la de B.
 17. B busca a A o abre su perfil → "no disponible". Las solicitudes entre ambos se cancelan.
 18. A: Ajustes → Privacidad → Bloqueados muestra a B (si el perfil no se puede leer, "Usuario" sin "@"). "Desbloquear" lo quita de la lista y A puede volver a buscarle.
-19. Bloquear con avión: la persona vuelve a su lista y sale el error.
+19. Bloquear con avión: sale el error y B sigue en la lista de amigos (no hay simulación que deshacer).
 
 *Invitar y revocar*
 20. A: Invitar → "Compartir enlace": se abre el menú de compartir con `athelete://amigo/…`; el enlace aparece en "Enlaces activos · 1 de 5" con su caducidad.
@@ -2216,3 +2216,58 @@ W3 feed, publicaciones, comentarios, likes y reportes (`useFeed` sigue siendo un
 *Transversal*
 23. Cambiar de cuenta (cerrar sesión de A, entrar con B): no queda nada de A en pantalla (caché por usuario).
 24. Cada acción pone un toast y deja la caché al día sin recargar a mano; el feed, retos y notificaciones siguen vacíos (W3 en adelante).
+
+## Comunidad · conexión W3 (feed, publicar, me gusta, comentarios y reportar) · 2026-10-07
+
+Sin migraciones, sin `npx supabase`, sin escrituras de prueba y sin commits. Formas de las respuestas: `docs/backend/SOCIAL_RPC_SHAPES.md` (con `get_post`).
+
+### Correcciones de W2 con lo confirmado por backend (DA-160)
+- `create_friend_invite` con el límite responde HTTP 200 con `{ok:false, error:"too_many_active_invites"}`: se detecta ese código exacto (antes, palabras clave); cualquier otro error es un fallo.
+- `block_user` borra la amistad y cancela las solicitudes en ambos sentidos y no toca los retos compartidos: la app ya no lo simula (se retiran la acción `block` de la máquina de estados, la limpieza de Amigos/perfil y el ocultado de autores del feed); solo invalida la caché.
+- `get_friend_activity`: `summary.title` siempre y `summary.duration_min` en `workout_completed` (tipos `ActivityItem` y `FriendActivity`); la línea del feed añade " · 45 min" cuando llega.
+
+### Lo conectado
+| Método | Origen | Notas |
+|---|---|---|
+| `getFeed(cursor, limit)` | `get_feed(_limit, _before)` | `_before` = `created_at` del último post recibido; la página se deduplica por `id` (gana la copia más reciente) y el cursor sale de lo que mandó el servidor, aunque la última fila no se pueda leer; página corta = fin |
+| `getFriendActivity(limit)` | `get_friend_activity(_limit)` (1 a 100) | Autores con `get_social_profiles` (foto), o con el bloque `user` de la fila si falta |
+| `getPost(id)` | `get_post(_id)` | `null` (o 42501) = "Contenido no disponible"; `not_authenticated` cierra sesión (`auth.signOut`) |
+| `toggleLike(id, like)` | `upsert` en `social_post_likes` (`onConflict: post_id,user_id`, `ignoreDuplicates`) / `delete` | El contador sale de `social_posts.like_count`; si no se puede leer, la pantalla conserva su cifra optimista |
+| `getComments(id)` | `select` de `social_post_comments` | Autores con `get_social_profiles`; foto solo de amigos (DA-119) |
+| `addComment(id, body)` | `insert` en `social_post_comments` | 1 a 500 caracteres comprobados antes de enviar; 23514 = error de validación |
+| `deleteComment(id)` | RPC `delete_comment` → `{ok}` | La borra su autor o el autor del post |
+| `deletePost(id)` | `update deleted_at` (solo el autor) | 0 filas actualizadas = fallo y vuelta atrás |
+| `reportContent(...)` | `insert` en `content_reports` | Motivos `spam, harassment, nudity, violence, self_harm, other`; detalle opcional ≤ 500; un duplicado (23505) cuenta como hecho |
+| `getPostPhotoSource(path)` | URL firmada de `social-photos` | Caché de 1 h (`services/supabase/social-photos.ts`) |
+
+Errores: 42501 → `SocialUnavailableError` ("no disponible"), 23514 → `SocialValidationError`; el resto, error con reintento.
+
+- **DA-161** · **Feed paginado y deduplicado:** `useFeed` carga con `_before` y mezcla páginas sin repetir ids; recarga al volver el foco a la pantalla y **al tirar para refrescar** (nuevo `RefreshControl` en el hub, que también recarga ajustes, amigos, retos y notificaciones). Sin conexión: error con "Reintentar".
+- **DA-162** · **Fotos firmadas en lote:** por página se firman en una sola petición (`createSignedUrls`) las fotos de los posts (`social-photos`) y las fotos de perfil de los autores (`profile-photos`, que llena la caché de los avatares). La foto de un post reserva su alto con `photo_width`/`photo_height` (relación de aspecto) y la de entreno mantiene su cuadrado: nada salta al cargar.
+- **DA-163** · **Mezcla con la actividad de amigos** como en el diseño (líneas agrupadas entre los posts, sin likes ni comentarios).
+- **DA-164** · **Detalle:** `get_post` + comentarios (tabla); contenido que no se puede ver = "Contenido no disponible". Los posts publicados antes de BT-44 se pintan sin las claves nuevas (volumen "—", sin línea de récord).
+- **DA-165** · **Me gusta optimista con vuelta atrás** (ya estaba en la tarjeta): ahora con el contador real del servidor, y si no se puede leer se queda con la cifra optimista.
+- **DA-166** · **Comentar, borrar mi comentario y borrar mi post con confirmación;** reportar post o comentario: tras reportar, el contenido desaparece para mí (el servidor ya lo oculta y la caché se invalida).
+- **DA-167** · **Adjuntos por tipo** según `SOCIAL_RPC_SHAPES.md`: entreno (con `volume_kg`, `prs_count` y `top_pr` opcionales), récord (`reps`, `previous_best`, `delta`), rutina, logro (insignia o Core 33 `{kind:"core33", days_completed}`), reto (`rank_among_friends`, `points`, `badge_id`) y foto (sin adjunto). Un adjunto ilegible es `null` y la tarjeta enseña solo texto y foto. **Texto de usuario siempre como texto plano.**
+
+Tests: `feedMappers.test.ts` (paginación y deduplicado, me gusta optimista y los mapeos por tipo de adjunto, actividad y comentarios).
+
+### `TODO(social-wire)` que quedan tras W3
+W4 composer y fotos (`createPost`, `getAttachmentSources`, selector real y `sourceId` en Récords, Resumen y Logros, términos BT-43) · W5 retos (en el detalle solo ranking, sin actividad por reto) · W6 notificaciones (contador de no leídas con `count` sobre `read_at is null`) · W7 moderación · `saveSharedRoutine` y "Empezar" de una rutina compartida · miniaturas de anatomía por `exercise_id` · `OfficialChallengeHero` (`cover_path`) · borrar `fixtureSocialService.ts` al terminar. **Por verificar con datos reales:** la restricción única de `content_reports` (hoy un duplicado se reconoce por el código 23505 en lugar de `ON CONFLICT`, porque la app no conoce las columnas del índice) y que el conteo `like_count` se lee con el permiso del propio usuario.
+
+### Checklist de QA con dos cuentas (W3)
+**A** = falcon1989, **B** = la cuenta nueva. A y B ya son amigos (W2). A necesita un entreno completado y un récord para publicar (la publicación llega en W4: hasta entonces A publica desde la web o una función del panel; la app no escribe posts todavía).
+1. **Feed vacío:** B abre Comunidad → Feed sin publicaciones; sin errores. Tirar hacia abajo recarga y quita el indicador.
+2. **Feed con posts (B):** A publica un entreno con foto, un récord, una rutina, un logro y un post de foto. B los ve ordenados por fecha, con nombre y avatar o foto de A (son amigos), y las fotos reservan su alto antes de cargar (nada salta).
+3. **Adjuntos:** entreno (duración, ejercicios, volumen "—" si no hay series, línea de récord si `top_pr`), récord (+delta sobre su mejor marca), rutina (lista), logro (y Core 33 completado "33 días"), reto (puesto y puntos). Un post anterior a BT-44 no muestra volumen ni récord.
+4. **Paginación:** con más de 10 posts, al bajar se cargan más sin repetir ninguno; al final no hay más cargas. Con avión al pedir más → "error al cargar más" con reintento.
+5. **Actividad:** una sesión completada de A aparece como línea "A entrenó · …" (con minutos) entre los posts; sin likes ni comentarios.
+6. **Foco:** B entra al detalle, vuelve: el feed se actualiza (contadores). Poner la app en segundo plano y volver recarga.
+7. **Detalle:** B abre el post de A: autor, adjunto, contadores y comentarios. Con un id inexistente o de alguien sin amistad → "Contenido no disponible".
+8. **Me gusta:** B pulsa el corazón: se enciende y suma 1 al instante; pulsar de nuevo lo quita. Con avión → vuelve atrás con aviso. Doble toque rápido no duplica.
+9. **Comentar:** B escribe y envía: aparece y el contador del post sube. Un comentario vacío no se envía; uno de más de 500 caracteres muestra el contador en rojo y no se envía.
+10. **Borrar comentario:** B borra el suyo; A (autor del post) borra el de B. Un tercero no puede.
+11. **Reportar:** B reporta un post de A (motivo + detalle ≤ 500): toast de confirmación y el post desaparece para B (A lo sigue viendo). Reportarlo otra vez no da error. B reporta un comentario: desaparece para B.
+12. **Borrar mi post:** A abre las opciones de su post → Eliminar → confirmar: desaparece del feed de A y de B. Cancelar no hace nada. Con avión → el post sigue donde estaba y sale el aviso de error.
+13. **Privacidad:** A apaga "Fotos" en Privacidad: B deja de ver la foto de sus posts (el post sigue). A bloquea a B: los posts de A desaparecen del feed de B tras recargar y B no puede abrir el detalle ("no disponible").
+14. **Sesión:** si la sesión caduca mientras se abre un detalle, la app cierra sesión en vez de quedarse con un error.
