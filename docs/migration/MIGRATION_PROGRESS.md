@@ -2271,3 +2271,93 @@ W4 composer y fotos (`createPost`, `getAttachmentSources`, selector real y `sour
 12. **Borrar mi post:** A abre las opciones de su post → Eliminar → confirmar: desaparece del feed de A y de B. Cancelar no hace nada. Con avión → el post sigue donde estaba y sale el aviso de error.
 13. **Privacidad:** A apaga "Fotos" en Privacidad: B deja de ver la foto de sus posts (el post sigue). A bloquea a B: los posts de A desaparecen del feed de B tras recargar y B no puede abrir el detalle ("no disponible").
 14. **Sesión:** si la sesión caduca mientras se abre un detalle, la app cierra sesión en vez de quedarse con un error.
+
+## Comunidad · conexión W4 (publicar: foto, compartir y editar) · 2026-10-07
+
+Sin migraciones, sin `npx supabase`, sin escrituras de prueba y sin commits. **Sin dependencias nuevas.**
+
+### Foto: qué se hace y por qué no hace falta otra librería
+- **Selector:** el mismo de la foto de perfil (`openProfilePhotoLibrary` → `react-native-image-picker`), con `maxWidth`/`maxHeight` 1440 y `quality` 0,8 (`pickPostPhoto`).
+- **Redimensionar y quitar EXIF:** lo hace el propio selector. Comprobado en su código (`ImagePickerManager.mm`): con `quality < 1` o con un redimensionado vuelve a codificar la imagen (`UIImageJPEGRepresentation`), así que **no conserva EXIF, ubicación incluida**. Una foto HEIC o WebP sale como JPEG; un PNG sigue siendo PNG (también re-codificado y sin EXIF). Devuelve `width` y `height` reales de lo que se sube; si faltaran, se calculan con `resizedSize` (lado mayor 1440, sin ampliar, mismas proporciones).
+- **Si se quiere convertir también los PNG a JPEG** (o garantizar lo mismo en Android) haría falta una librería de redimensionado (por ejemplo `@bam.tech/react-native-image-resizer`). **No se instala sin tu visto bueno.** En Android hay que comprobar el comportamiento del selector en su fase.
+- **Validación antes de subir:** tipo JPG/PNG/WebP (el selector llama "image/jpg" a un JPEG: se normaliza) y 5 MB; el servicio vuelve a comprobar el tamaño real del archivo.
+- **Orden:** subir `social-photos/{uid}/{uuid generado en la app}/photo.jpg` → `create_post` con `_photo_path`, `_photo_width` y `_photo_height`. Si `create_post` falla **no se reintenta la subida**: la foto huérfana se borra sola a las 24 h (BT-52). 413 al subir = "pesa más de 5 MB".
+
+### Lo conectado
+| Pieza | Cómo |
+|---|---|
+| Composer y "Compartir" | `create_post(_type, _source_id, _body, _photo_*)`; texto ≤ 280 y nunca solo texto (adjunto o foto), solo `workout` y `photo` admiten foto y `photo` la exige |
+| Repetir la misma fuente | `{ok:true, created:false, post_id}` = éxito: "Ya lo habías compartido" y se abre ese post |
+| Errores `{ok:false, error}` | `invalid_type`, `category_not_shared`, `photo_not_allowed`, `photos_not_shared`, `photo_not_owned`, `invalid_source`, `source_not_found`, `routine_not_shareable`, `photo_required`: cada uno con su mensaje; `category_not_shared` y `photos_not_shared` ofrecen "Ir a Privacidad social" |
+| Adjuntos a compartir | `getAttachmentSources(focus?)`: último entreno completado (con su mejor récord), rutina propia (no copia ni de ELLIE), récord, logro y reto completado, o el elemento exacto que señala el botón |
+| Botones "Compartir" | Resumen de sesión (la sesión), Logros (la insignia), Reto y Reto completado (el reto), Récords (el último récord: la pantalla no elige uno), **Core 33 completado** (botón nuevo en el final del reto: logro con fuente `core33:<participation_id>`, que `BACKEND_SUMMARY` admite) |
+| Compartir rutina | Desde el detalle de una rutina **propia**: el icono de compartir ofrece "Compartir en Comunidad" (`create_post` tipo `routine`) o fuera de la app. El servidor rechaza copias y rutinas de ELLIE (`routine_not_shareable`) |
+| Guardar rutina de otra persona | `save_shared_routine(_post_id)` → `{ok, created, template_id}`; invalida la biblioteca de Entrenos y "Empezar" abre el detalle de la copia |
+| Editar mi post | "Editar el texto" en las opciones de mi publicación: `update social_posts set body` (solo el autor); 0 filas = fallo con aviso |
+| Borrar comentarios | El autor del post también puede borrar los de otros (`delete_comment`) |
+| Términos (BT-43) | La hoja de aceptación antes de la primera publicación sigue con `TERMS_URL` de ejemplo; la aceptación se guarda **en local** por usuario. `TODO(testflight)`: pasarla al servidor (`profiles.terms_accepted_at`) |
+| Tras publicar | La caché social se invalida (perfil incluido), el feed se recarga al volver al hub y se abre el post (`navigation.replace`) |
+
+- **DA-168** · **Publicar con foto y progreso visible:** "Subiendo foto…" y "Publicando…" con el botón Publicar deshabilitado mientras tanto (sin dobles envíos).
+- **DA-169** · **Errores de `create_post` con mensaje claro** (`createPostErrorCopy`), con la acción de ir a Privacidad social cuando es una categoría o las fotos que el usuario apagó.
+- **DA-170** · **Compartir con la fuente exacta** (`sourceId`) desde cada pantalla y rutina propia; Core 33 completado como logro `core33:<id>` (botón nuevo).
+- **DA-171** · **Editar el texto de mi publicación** y borrar comentarios de mi publicación.
+- **DA-172** · **Guardar y empezar una rutina compartida** con `save_shared_routine`.
+
+Tests: `publishPost.test.ts` (mapeo de errores de `create_post`, validación de la foto y cálculo del tamaño al redimensionar).
+
+### `TODO(social-wire)` que quedan tras W4
+W5 retos (el detalle solo con ranking, sin actividad por reto) · W6 notificaciones (contador de no leídas con `count` sobre `read_at is null`) · W7 moderación · miniaturas de anatomía por `exercise_id` (`PostBodies`, `SocialRoutineScreen`) · `OfficialChallengeHero` (`cover_path`) · pasar la aceptación de los Términos al servidor (`TODO(testflight)`, BT-43) · borrar `fixtureSocialService.ts` al terminar. **Por verificar con datos reales:** que la política de `social-photos` admite `{uid}/{uuid}/photo.jpg` con `contentType` PNG o WebP bajo ese nombre; que el servidor acepta `core33:<participation_id>` como fuente de un logro (`BACKEND_SUMMARY`); y el comportamiento de la foto en Android.
+
+### Checklist de QA unificado W1 a W4 (dos cuentas)
+**A** = falcon1989, **B** = la cuenta nueva (sin fila en `social_settings`). Reemplaza a los listados de W1, W2 y W3. Nunca la misma cuenta en las dos sesiones. Para tener qué compartir, A necesita un entreno completado con series (volumen) y un récord de esa sesión, una rutina propia, un logro y, si se puede, un reto completado.
+
+*Nombre de usuario*
+1. B abre Comunidad → "Nombre de usuario"; atrás no entra al hub. `Mi Nombre!` → formato no válido; el de A → "ya está en uso"; `Bruno_01` → entra (se guarda en minúsculas).
+2. Ajustes → editar: otro nombre válido funciona; volver a poner el mismo no da "en uso".
+
+*Amistad*
+3. A busca a B por su usuario exacto (con `@` y mayúsculas): "Agregar" → pasa a "Solicitado" al instante. Un usuario inexistente → sin resultados.
+4. B ve la solicitud en Recibidas (con iniciales). A la cancela y la vuelve a enviar; B la ignora; A la envía otra vez y B la acepta. Ambos se ven en Amigos.
+5. Con avión al enviar o aceptar: vuelve atrás con aviso.
+
+*Privacidad*
+6. B abre Privacidad social: cambia audiencia a Público y vuelve a "Solo amigos"; apaga "Récords" y vuelve a encenderlo. Se conserva al salir y al matar la app. A recarga el perfil de B y los cambios se reflejan (sin "Amigos desde" para quien no es amigo, nunca nutrición).
+7. Perfil inexistente o de alguien que te bloqueó → "Este perfil no está disponible".
+
+*Publicar texto (con adjunto)*
+8. A: Comunidad → "Comparte tu último entreno": hoja de Términos la primera vez (el enlace avisa de que son de ejemplo); "Acepto y publico" publica. Cerrar y volver a publicar no la vuelve a pedir.
+9. Escribir un texto de más de 280 caracteres → contador en rojo y no se envía; sin adjunto ni foto → "no se publica solo texto".
+10. Tras publicar: toast "Publicado para tus amigos" y se abre el post de A. B lo ve en su feed (tirar para refrescar).
+
+*Publicar con foto*
+11. A elige "Añadir foto" (galería): se ve la vista previa; Publicar muestra "Subiendo foto…" y luego "Publicando…" con el botón deshabilitado; el post aparece con la foto sin saltos de altura. Una foto de la galería con ubicación: tras subirla, la imagen descargada **no** lleva EXIF (comprobar con una herramienta de metadatos).
+12. Foto muy grande (> 1440 px): se sube redimensionada. Una foto HEIC se publica como JPEG. Una imagen de más de 5 MB (p. ej. un PNG grande): "La foto pesa más de 5 MB" sin llegar a subirla.
+13. Foto sola (tipo foto, sin adjunto): se publica. Foto con rutina o récord → "La foto solo se puede añadir a un entrenamiento o sola".
+14. A apaga "Fotos" en Privacidad y publica con foto → mensaje claro y botón "Ir a Privacidad social". Con avión durante la subida: "No se pudo subir la foto…" y nada publicado.
+
+*Compartir un entreno con volumen y récord*
+15. A completa un entreno con series y un récord; en el Resumen pulsa "Compartir": el adjunto es **esa** sesión (duración, ejercicios, volumen) con su línea de récord. Publica: B ve en la tarjeta volumen "x kg" y "Nuevo récord · ejercicio · valor" (`top_pr`). Un entreno sin series muestra volumen "—" y sin récord.
+16. A vuelve a compartir la misma sesión: "Ya lo habías compartido" y abre el mismo post (no se duplica).
+17. A apaga "Entrenamientos" en Privacidad y comparte un entreno → mensaje con "Ir a Privacidad social".
+
+*Otros adjuntos*
+18. Récords → Compartir (último récord), Logros → una insignia → Compartir, un reto completado → Compartir, Core 33 completado → "Compartir logro" ("Core 33 completado", 33 días). Si alguno falla con `source_not_found`, anotar cuál.
+19. Rutina propia → icono de compartir → "Compartir en Comunidad": B ve la rutina en el feed y la abre. Una rutina de la biblioteca, una copia o una de ELLIE → "Solo puedes compartir rutinas que hayas creado tú".
+20. B pulsa "Guardar rutina" (o "Empezar"): aparece una copia "Tuya" en sus Entrenos y "Empezar" abre su detalle; guardarla otra vez dice "Ya la tenías guardada".
+
+*Me gusta, comentar y reportar*
+21. B da me gusta a un post de A: se enciende y suma 1 al instante; otra vez lo quita. Con avión: vuelve atrás con aviso. A ve el contador actualizado.
+22. B comenta (vacío no se envía; más de 500 caracteres, contador en rojo). El contador del post sube. B borra su comentario; A (autor del post) borra uno de B.
+23. A edita el texto de su post ("Editar el texto" → Guardar): se actualiza en el feed y en el detalle. Con avión: aviso de error y el texto no cambia.
+24. B reporta un post de A (motivo + detalle ≤ 500): toast y el post desaparece para B (A lo sigue viendo). Reportar otra vez no da error. B reporta un comentario: desaparece para B.
+25. A borra su post (confirmación): desaparece del feed de A y de B; con avión sale el aviso y el post sigue.
+
+*Bloquear y eliminar amigo*
+26. A elimina a B de sus amigos (perfil → ··· → confirmar): pasa a "Agregar" y B deja de verle y de ver sus posts. Volver a ser amigos.
+27. A bloquea a B (confirmación): tras la respuesta del servidor B sale de Amigos, A no aparece en la búsqueda de B y los posts de A desaparecen del feed de B al recargar. Bloqueados muestra a B; "Desbloquear" lo quita.
+
+*Invitaciones y transversal*
+28. A: Invitar → compartir el enlace (`athelete://amigo/…`) → aparece en "Enlaces activos"; "Revocar" lo quita y el contador baja. Con 5 activos el sexto dice "Ya tienes 5 enlaces activos".
+29. Cambiar de cuenta (cerrar sesión de A, entrar con B): no queda nada de A en pantalla.
+30. Con sesión caducada al abrir un post: la app cierra sesión.
