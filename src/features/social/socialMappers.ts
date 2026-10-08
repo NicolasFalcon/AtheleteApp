@@ -364,10 +364,11 @@ export function parseFriendActivity(data: unknown): Map<string, FriendActivity> 
       asString(asRecord(summary)?.title) ??
       (typeof summary === 'string' ? summary : undefined) ??
       '';
+    const duration = asNumber(asRecord(summary)?.duration_min);
     const activity: FriendActivity = {
       user_id: userId,
       kind: asString(row.kind) ?? asString(row.type) ?? '',
-      summary: { title },
+      summary: duration !== undefined ? { title, duration_min: duration } : { title },
       created_at: createdAt,
     };
     const current = latest.get(userId);
@@ -569,8 +570,11 @@ export function parseInviteCreation(data: unknown): InviteCreation {
         asString(body.expires_at) ?? new Date(Date.now() + 7 * 86_400_000).toISOString(),
     };
   }
-  const error = asString(body?.error) ?? '';
-  return { ok: false, error: /limit|max|too_many|active/i.test(error) ? 'limit' : 'unknown' };
+  // The limit answers HTTP 200 with {ok: false, error: 'too_many_active_invites'}.
+  return {
+    ok: false,
+    error: asString(body?.error) === 'too_many_active_invites' ? 'limit' : 'unknown',
+  };
 }
 
 // The row of the link just created, for the list while it reloads.

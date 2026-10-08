@@ -77,9 +77,6 @@ describe('relationship after each action (optimistic)', () => {
     ['request_received', 'decline', 'none'],
     ['request_sent', 'cancel', 'none'],
     ['friends', 'remove', 'none'],
-    ['friends', 'block', 'blocked'],
-    ['none', 'block', 'blocked'],
-    ['request_sent', 'block', 'blocked'],
     ['blocked', 'unblock', 'none'],
   ];
   it.each(cases)('%s + %s → %s', (from, action, to) => {
@@ -91,7 +88,7 @@ describe('relationship after each action (optimistic)', () => {
     expect(optimisticRelation('none', 'accept')).toBe('none');
     expect(optimisticRelation('none', 'remove')).toBe('none');
     expect(optimisticRelation('friends', 'unblock')).toBe('friends');
-    expect(optimisticRelation('self', 'block')).toBe('self');
+    expect(optimisticRelation('self', 'unblock')).toBe('self');
   });
 });
 
@@ -116,7 +113,7 @@ describe('relationship once the server answered', () => {
   });
 
   it('goes back to the previous state when the request fails', () => {
-    const actions: PersonAction[] = ['send', 'accept', 'decline', 'cancel', 'remove', 'block', 'unblock'];
+    const actions: PersonAction[] = ['send', 'accept', 'decline', 'cancel', 'remove', 'unblock'];
     actions.forEach(action => {
       expect(settleRelation('friends', action, { kind: 'error' })).toBe('friends');
       expect(settleRelation('request_received', action, { kind: 'error' })).toBe('request_received');
@@ -132,7 +129,6 @@ describe('relationship once the server answered', () => {
   it('settles the rest of the writes on their target', () => {
     expect(settleRelation('request_sent', 'cancel', { kind: 'ok' })).toBe('none');
     expect(settleRelation('friends', 'remove', { kind: 'ok' })).toBe('none');
-    expect(settleRelation('friends', 'block', { kind: 'ok' })).toBe('blocked');
     expect(settleRelation('blocked', 'unblock', { kind: 'ok' })).toBe('none');
   });
 });
@@ -144,7 +140,8 @@ describe('service calls as actions', () => {
     expect(actionFor('respondFriendRequest', ['r1', false])).toEqual({ type: 'decline', requestId: 'r1' });
     expect(actionFor('cancelFriendRequest', ['r1'])).toEqual({ type: 'cancel', requestId: 'r1' });
     expect(actionFor('removeFriend', ['u1'])).toEqual({ type: 'remove', friendId: 'u1' });
-    expect(actionFor('blockUser', ['u1'])).toEqual({ type: 'block', target: 'u1' });
+    // Blocking is done by the server (friendship and requests); the app only invalidates.
+    expect(actionFor('blockUser', ['u1'])).toBeNull();
     expect(actionFor('unblockUser', ['u1'])).toEqual({ type: 'unblock', target: 'u1' });
     expect(actionFor('revokeInvite', ['i1'])).toEqual({ type: 'revokeInvite', inviteId: 'i1' });
     expect(actionFor('createInvite', [])).toBeNull();
@@ -159,7 +156,7 @@ describe('service calls as actions', () => {
     expect(shouldRollback(send, 'unavailable')).toBe(true);
     expect(shouldRollback({ type: 'remove', friendId: 'u' }, false)).toBe(true);
     expect(shouldRollback({ type: 'remove', friendId: 'u' }, true)).toBe(false);
-    expect(shouldRollback({ type: 'block', target: 'u' }, undefined)).toBe(false);
+    expect(shouldRollback({ type: 'unblock', target: 'u' }, undefined)).toBe(false);
   });
 });
 
@@ -181,19 +178,6 @@ describe('what each action does to the cache', () => {
     expect(remove.friends).toHaveLength(0);
   });
 
-  it('blocking removes the person from friends, received and sent', () => {
-    ['ana', 'bruno', 'carla'].forEach(id => {
-      const next = applyAction('getFriendsOverview', [], overview(), { type: 'block', target: id }) as FriendsOverview;
-      const ids = [
-        ...next.friends.map(item => item.profile.id),
-        ...next.received.map(item => item.profile.id),
-        ...next.sent.map(item => item.profile.id),
-      ];
-      expect(ids).not.toContain(id);
-      expect(ids).toHaveLength(2);
-    });
-  });
-
   it('updates the profile of that person only', () => {
     const none = lookup('none');
     const sent = applyAction('getProfile', ['x'], none, { type: 'send', target: 'x' }) as ProfileLookup;
@@ -212,10 +196,8 @@ describe('what each action does to the cache', () => {
     expect(removed.detail?.relationship).toBe('none');
   });
 
-  it('blocks and unblocks on the profile through the blocked flag', () => {
-    const blocked = applyAction('getProfile', ['x'], lookup('friends'), { type: 'block', target: 'x' }) as ProfileLookup;
-    expect(blocked.blocked).toBe(true);
-    expect(blocked.requestId).toBeNull();
+  it('unblocking clears the blocked flag on the profile', () => {
+    const blocked = lookup('blocked');
     const unblocked = applyAction('getProfile', ['x'], blocked, { type: 'unblock', target: 'x' }) as ProfileLookup;
     expect(unblocked.blocked).toBe(false);
     expect(unblocked.detail?.relationship).toBe('none');
@@ -244,8 +226,8 @@ describe('what each action does to the cache', () => {
 
   it('does not touch other queries', () => {
     const data = { anything: 1 };
-    expect(applyAction('getSettings', [], data, { type: 'block', target: 'x' })).toBe(data);
-    expect(applyAction('getFriendsOverview', [], undefined, { type: 'block', target: 'x' })).toBeUndefined();
+    expect(applyAction('getSettings', [], data, { type: 'unblock', target: 'x' })).toBe(data);
+    expect(applyAction('getFriendsOverview', [], undefined, { type: 'unblock', target: 'x' })).toBeUndefined();
   });
 });
 
@@ -313,10 +295,10 @@ describe('optimistic run with rollback', () => {
     expect(cache.read(key)).toBe(none);
   });
 
-  it('blocking goes back too when it fails', async () => {
+  it('declining goes back too when it fails', async () => {
     const { before, profile, cache } = setup();
     await expect(
-      runOptimistic(cache, { type: 'block', target: 'bruno' }, async () => {
+      runOptimistic(cache, { type: 'decline', requestId: 'r-in' }, async () => {
         throw new Error('boom');
       }),
     ).rejects.toThrow('boom');
@@ -328,7 +310,7 @@ describe('optimistic run with rollback', () => {
     const cache = fakeCache([[['social', 'me', 'getSettings'], { a: 1 }]]);
     const settings = cache.read(['social', 'me', 'getSettings']);
     await expect(
-      runOptimistic(cache, { type: 'block', target: 'u' }, async () => {
+      runOptimistic(cache, { type: 'decline', requestId: 'zz' }, async () => {
         throw new Error('x');
       }),
     ).rejects.toThrow();

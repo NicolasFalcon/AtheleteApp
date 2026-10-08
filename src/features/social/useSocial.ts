@@ -62,38 +62,8 @@ function isWrite(name: string): boolean {
   return !name.startsWith('get');
 }
 
-// People blocked in this session: their posts leave the feed at once, before
-// the server filters them out of the next load (and come back if it fails).
-const hiddenAuthors = new Set<string>();
-let hiddenVersion = 0;
-const hiddenListeners = new Set<() => void>();
-function setAuthorHidden(id: string, hidden: boolean) {
-  if (hidden === hiddenAuthors.has(id)) {
-    return;
-  }
-  if (hidden) {
-    hiddenAuthors.add(id);
-  } else {
-    hiddenAuthors.delete(id);
-  }
-  hiddenVersion += 1;
-  hiddenListeners.forEach(listener => listener());
-}
-function useHiddenAuthors(): ReadonlySet<string> {
-  useSyncExternalStore(
-    listener => {
-      hiddenListeners.add(listener);
-      return () => {
-        hiddenListeners.delete(listener);
-      };
-    },
-    () => hiddenVersion,
-  );
-  return hiddenAuthors;
-}
-
 // Wraps the service so each write refreshes what the screens show: friend
-// requests, removing a friend, blocking and revoking a link update the cache
+// requests, removing a friend, unblocking and revoking a link update the cache
 // at once (and go back if the request fails), and every write invalidates the
 // social cache when it ends.
 function withInvalidation(
@@ -113,21 +83,7 @@ function withInvalidation(
             }
             // A refetch in flight would overwrite the optimistic data.
             await client.cancelQueries({ queryKey: [SOCIAL_KEY] });
-            if (action.type === 'block') {
-              setAuthorHidden(action.target, true);
-            }
-            try {
-              const result = await runOptimistic(client, action, execute);
-              if (action.type === 'unblock') {
-                setAuthorHidden(action.target, false);
-              }
-              return result;
-            } catch (error) {
-              if (action.type === 'block') {
-                setAuthorHidden(action.target, false);
-              }
-              throw error;
-            }
+            return await runOptimistic(client, action, execute);
           } finally {
             client.invalidateQueries({ queryKey: [SOCIAL_KEY] });
           }
@@ -355,8 +311,5 @@ export function useFeed() {
     }));
   }, []);
 
-  const hidden = useHiddenAuthors();
-  const posts = state.posts.filter(post => !hidden.has(post.author_id));
-
-  return { ...state, posts, refresh, loadMore, retry, retryMore, removePost };
+  return { ...state, refresh, loadMore, retry, retryMore, removePost };
 }

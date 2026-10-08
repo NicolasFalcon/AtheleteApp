@@ -8,7 +8,9 @@ import type {
 import type { ProfileLookup } from '@app/services/social/socialService';
 
 // State machine of the relationship with another person and the optimistic
-// cache updates that follow each action (W2). Pure: `useSocialService` applies
+// cache updates that follow each action (W2). Blocking is not simulated: the
+// server removes the friendship and cancels the requests in both directions
+// (shared challenges are untouched), so the app only invalidates the cache. Pure: `useSocialService` applies
 // these to the React Query cache before the request, keeps them if it
 // succeeds, and puts the previous data back if it fails.
 
@@ -18,7 +20,6 @@ export type PersonAction =
   | 'decline'
   | 'cancel'
   | 'remove'
-  | 'block'
   | 'unblock';
 
 // What the screen shows right after the tap, before the server answers.
@@ -41,8 +42,6 @@ export function optimisticRelation(
       return current === 'request_sent' ? 'none' : current;
     case 'remove':
       return current === 'friends' ? 'none' : current;
-    case 'block':
-      return current === 'self' ? current : 'blocked';
     case 'unblock':
       return current === 'blocked' ? 'none' : current;
     default:
@@ -89,8 +88,6 @@ export function settleRelation(
     case 'remove':
     case 'unblock':
       return 'none';
-    case 'block':
-      return 'blocked';
     default:
       return before;
   }
@@ -103,7 +100,6 @@ export type SocialAction =
   | { type: 'decline'; requestId: string }
   | { type: 'cancel'; requestId: string }
   | { type: 'remove'; friendId: string }
-  | { type: 'block'; target: string }
   | { type: 'unblock'; target: string }
   | { type: 'revokeInvite'; inviteId: string };
 
@@ -123,8 +119,6 @@ export function actionFor(method: string, args: unknown[]): SocialAction | null 
       return { type: 'cancel', requestId: first };
     case 'removeFriend':
       return { type: 'remove', friendId: first };
-    case 'blockUser':
-      return { type: 'block', target: first };
     case 'unblockUser':
       return { type: 'unblock', target: first };
     case 'revokeInvite':
@@ -180,13 +174,6 @@ function overviewWith(
         ...overview,
         friends: overview.friends.filter(item => item.profile.id !== action.friendId),
       };
-    case 'block':
-      return {
-        ...overview,
-        friends: overview.friends.filter(item => item.profile.id !== action.target),
-        received: overview.received.filter(item => item.profile.id !== action.target),
-        sent: overview.sent.filter(item => item.profile.id !== action.target),
-      };
     default:
       return overview;
   }
@@ -206,7 +193,6 @@ function lookupWith(
   let relation: PersonAction | null = null;
   switch (action.type) {
     case 'send':
-    case 'block':
     case 'unblock':
       relation = own(action.target) ? action.type : null;
       break;
@@ -229,16 +215,15 @@ function lookupWith(
   if (next === current) {
     return lookup;
   }
-  const blocked = next === 'blocked';
   return {
     ...lookup,
-    blocked,
+    blocked: next === 'blocked',
     // `blocked` is not a server relationship: the detail keeps the last real one.
     detail:
       lookup.detail && next !== 'blocked'
         ? { ...lookup.detail, relationship: next }
         : lookup.detail,
-    requestId: next === 'friends' || next === 'none' || blocked ? null : lookup.requestId,
+    requestId: next === 'friends' || next === 'none' ? null : lookup.requestId,
   };
 }
 
