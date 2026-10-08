@@ -16,6 +16,9 @@ import {
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { buildFeedEntries, listedContent } from '@app/features/social/postModel';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@app/hooks/useAuth';
+import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
 import { useFeed, useSocialService } from '@app/features/social/useSocial';
 import {
   ContentActions,
@@ -51,6 +54,8 @@ export function FeedView({
   const { colors } = useThemeV2();
   const toast = useToast();
   const service = useSocialService();
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const feed = useFeed();
   const [target, setTarget] = useState<ContentTarget | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
@@ -85,6 +90,9 @@ export function FeedView({
   const saveRoutine = async (postId: string) => {
     try {
       await service.saveSharedRoutine(postId);
+      if (profile?.id) {
+        invalidateWorkoutQueries(queryClient, profile.id).catch(() => undefined);
+      }
       setSaved(current => [...current, postId]);
       toast.show('Rutina guardada en tus Entrenos', { withTabBar: true });
     } catch {
@@ -189,6 +197,7 @@ export function FeedView({
                     kind: 'post',
                     id: entry.post.id,
                     mine: entry.post.relationship === 'self',
+                    body: entry.post.body,
                   })
                 }
                 routineSaved={saved.includes(entry.post.id)}
@@ -229,7 +238,9 @@ export function FeedView({
         target={target}
         withTabBar
         onClose={() => setTarget(null)}
-        onDone={done => feed.removePost(done.id)}
+        onDone={(done, action) =>
+          action === 'edited' ? feed.refresh(true) : feed.removePost(done.id)
+        }
       />
     </View>
   );

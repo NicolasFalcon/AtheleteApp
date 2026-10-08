@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,7 +18,9 @@ import {
   useToast,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import { useAuth } from '@app/hooks/useAuth';
+import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
 import { isRoutineAttachment } from '@app/features/social/postModel';
 import { firstName } from '@app/features/social/socialModel';
 import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
@@ -38,6 +41,8 @@ export function SocialRoutineScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const { postId } = route.params;
   const post = useSocialResource('getPost', s => s.getPost(postId), [postId]);
   const [saved, setSaved] = useState(false);
@@ -47,17 +52,24 @@ export function SocialRoutineScreen({ navigation, route }: Props) {
   const author = data?.author;
 
   const back = () => safeGoBack(navigation, BACK_FALLBACKS);
-  const save = async () => {
+  // save_shared_routine: a copy of the routine in my Entrenos; returns its id.
+  const save = async (): Promise<string | null> => {
     if (busy) {
-      return;
+      return null;
     }
     setBusy(true);
     try {
-      await service.saveSharedRoutine(postId);
+      const copy = await service.saveSharedRoutine(postId);
       setSaved(true);
-      toast.show('Rutina guardada en tus Entrenos');
+      if (profile?.id) {
+        // The library shows the new copy.
+        await invalidateWorkoutQueries(queryClient, profile.id);
+      }
+      toast.show(copy.created ? 'Rutina guardada en tus Entrenos' : 'Ya la tenías guardada');
+      return copy.templateId;
     } catch {
       toast.show('No se pudo guardar la rutina', { tone: 'error' });
+      return null;
     } finally {
       setBusy(false);
     }
@@ -70,11 +82,12 @@ export function SocialRoutineScreen({ navigation, route }: Props) {
       toast.show('Disponible al conectar con Entrenos');
     }
   };
+  // "Empezar": saves the copy and opens it, ready to start from its detail.
   const start = async () => {
-    // TODO(social-wire): save the copy (save_shared_routine) and open its
-    // session with the returned `template_id`.
-    await save();
-    toast.show('La sesión empieza al conectar con Entrenos');
+    const templateId = await save();
+    if (templateId) {
+      navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: templateId });
+    }
   };
 
   return (

@@ -41,7 +41,9 @@ import {
   ContentActions,
   type ContentTarget,
 } from '@app/features/social/v2/ContentActions';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@app/hooks/useAuth';
+import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -57,6 +59,7 @@ export function SocialPostScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
   const { postId } = route.params;
   const post = useSocialResource('getPost', s => s.getPost(postId), [postId]);
@@ -151,6 +154,7 @@ export function SocialPostScreen({ navigation, route }: Props) {
                 kind: 'post',
                 id: post.data!.id,
                 mine: post.data!.relationship === 'self',
+                body: post.data!.body,
               })
             }
             onOpenRoutine={() => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}
@@ -158,6 +162,9 @@ export function SocialPostScreen({ navigation, route }: Props) {
             onSaveRoutine={async () => {
               try {
                 await service.saveSharedRoutine(postId);
+                if (profile?.id) {
+                  invalidateWorkoutQueries(queryClient, profile.id).catch(() => undefined);
+                }
                 setSaved(true);
                 toast.show('Rutina guardada en tus Entrenos');
               } catch {
@@ -218,7 +225,10 @@ export function SocialPostScreen({ navigation, route }: Props) {
                     setTarget({
                       kind: 'comment',
                       id: comment.id,
-                      mine: comment.relationship === 'self',
+                      // The author of the comment or of the post can delete it.
+                      mine:
+                        comment.relationship === 'self' ||
+                        post.data?.relationship === 'self',
                     })
                   }
                 />
@@ -268,7 +278,7 @@ export function SocialPostScreen({ navigation, route }: Props) {
         }
         onClose={() => setTarget(null)}
         onDone={(done, action) => {
-          if (done.kind === 'post') {
+          if (done.kind === 'post' && action !== 'edited') {
             safeGoBack(navigation, BACK_FALLBACKS);
           } else if (action === 'reported') {
             comments.reload();

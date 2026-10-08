@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { Check, Flag, Trash2 } from 'lucide-react-native';
+import { Check, Flag, Pencil, Trash2 } from 'lucide-react-native';
 import {
   Button,
   PressableScale,
@@ -12,6 +12,7 @@ import {
   useToast,
 } from '@app/components/v2';
 import {
+  POST_BODY_MAX,
   REPORT_DETAILS_MAX,
   REPORT_REASONS,
   validateReport,
@@ -23,9 +24,11 @@ export type ContentTarget = {
   kind: 'post' | 'comment';
   id: string;
   mine: boolean;
+  // Current text of my post (to edit it).
+  body?: string | null;
 };
 
-type Step = 'menu' | 'report' | 'delete';
+type Step = 'menu' | 'report' | 'delete' | 'edit';
 
 const COPY = {
   post: { noun: 'publicación', article: 'esta' },
@@ -48,7 +51,7 @@ export function ContentActions({
   initialStep?: Step;
   onClose: () => void;
   // The content left the list: because the user reported or deleted it.
-  onDone: (target: ContentTarget, action: 'reported' | 'deleted') => void;
+  onDone: (target: ContentTarget, action: 'reported' | 'deleted' | 'edited') => void;
   withTabBar?: boolean;
 }) {
   const { colors } = useThemeV2();
@@ -64,6 +67,7 @@ export function ContentActions({
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
   const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState('');
 
   // Every time it opens it starts from the menu with an empty report.
   useEffect(() => {
@@ -71,6 +75,7 @@ export function ContentActions({
       setStep(initialStep);
       setReason(null);
       setDetails('');
+      setDraft(liveTarget.body ?? '');
       setBusy(false);
     }
   }, [liveTarget, initialStep]);
@@ -95,6 +100,26 @@ export function ContentActions({
       show('Gracias por avisar. Ya no verás este contenido.');
     } catch {
       show('No se pudo enviar el reporte. Inténtalo de nuevo.', 'error');
+      setBusy(false);
+    }
+  };
+
+  // Edit the text of my post (update body); 0 rows updated is a failure.
+  const trimmed = draft.trim();
+  const canSave =
+    trimmed.length <= POST_BODY_MAX && trimmed !== (target.body ?? '').trim();
+  const saveEdit = async () => {
+    if (!canSave || busy) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await service.editPost(target.id, trimmed);
+      onClose();
+      onDone(target, 'edited');
+      show('Publicación actualizada');
+    } catch {
+      show('No se pudo guardar el cambio. Inténtalo de nuevo.', 'error');
       setBusy(false);
     }
   };
@@ -126,6 +151,8 @@ export function ContentActions({
       ? `Opciones de la ${copy.noun}`
       : step === 'report'
       ? `Reportar ${copy.noun}`
+      : step === 'edit'
+      ? 'Editar el texto'
       : `¿Eliminar ${copy.article} ${copy.noun}?`;
 
   return (
@@ -144,6 +171,15 @@ export function ContentActions({
             onPress={submitReport}
             style={styles.flex}
           />
+        ) : step === 'edit' ? (
+          <Button
+            label="Guardar"
+            loading={busy}
+            loadingLabel="Guardando"
+            disabled={!canSave}
+            onPress={saveEdit}
+            style={styles.flex}
+          />
         ) : step === 'delete' ? (
           <Button
             label="Eliminar"
@@ -157,6 +193,13 @@ export function ContentActions({
     >
       {step === 'menu' ? (
         <View>
+          {target.mine && target.kind === 'post' ? (
+            <Row
+              leading={<Pencil size={20} strokeWidth={1.8} color={colors.text.primary} />}
+              title="Editar el texto"
+              onPress={() => setStep('edit')}
+            />
+          ) : null}
           {target.mine ? (
             <Row
               leading={<Trash2 size={20} strokeWidth={1.8} color={colors.ember.deep} />}
@@ -236,6 +279,31 @@ export function ContentActions({
               {`Máximo ${REPORT_DETAILS_MAX} caracteres.`}
             </TextV2>
           ) : null}
+        </View>
+      ) : null}
+
+      {step === 'edit' ? (
+        <View style={styles.reportBody}>
+          <View style={[styles.notes, { backgroundColor: colors.surface.muted }]}>
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="¿Qué quieres contar?"
+              placeholderTextColor={colors.text.tertiary}
+              multiline
+              autoFocus
+              accessibilityLabel="Texto de la publicación"
+              selectionColor={colors.text.primary}
+              style={[styles.notesInput, { color: colors.text.primary }]}
+            />
+          </View>
+          <TextV2
+            variant="caption"
+            color={POST_BODY_MAX - draft.length < 0 ? colors.ember.deep : colors.text.tertiary}
+            align="right"
+          >
+            {String(POST_BODY_MAX - draft.length)}
+          </TextV2>
         </View>
       ) : null}
 
