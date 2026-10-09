@@ -22,6 +22,8 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-52 | Comunidad | ~~Subidas huérfanas de `social-photos`~~ | — | **Resuelto** (2026-10-07) |
 | BT-41 | Perfil | ~~`profiles_gender_check` debe aceptar `other`~~ | — | **Resuelto** (2026-10-06) |
 | BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
+| BT-57 | Comunidad | Enlace de un entreno publicado a su rutina ("Ver rutina") | Baja | No |
+| BT-56 | Comunidad / Ruta | Tipo de post `route` en `create_post` y recorte de inicio y final en el servidor (Fase 5) | Media | No (la app solo lo muestra con datos de ejemplo) |
 | BT-55 | Retos oficiales | Datos reales del reto oficial: portada, badge, puntos, unidad y retos en la base (Fase 4) | Media | No (Inicio usa datos de ejemplo solo en desarrollo) |
 | BT-54 | Inicio | Preferencia "Core 33 como prioridad" del hero | Baja | No (la app ya acepta la opción, desactivada) |
 | BT-53 | Wear | Lista de espera real para "Avísame del lanzamiento" | Baja | No (hoy solo visual) |
@@ -399,6 +401,18 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Qué falta:** una preferencia por usuario, p. ej. `profiles.home_priority text` con `CHECK (home_priority IN ('auto','core33'))` y valor por defecto `'auto'`, editable por el propio usuario (RLS actual de `profiles`). Y decidir con diseño dónde se cambia (no hay pantalla definida).
 - **Prioridad:** Baja. **No bloquea:** sin ella el orden es siempre Retomar → Entreno → Core 33.
 
+## Comunidad (v2.12)
+
+### BT-56 · Tipo de post `route` (Fase 5)
+- **Estado:** el diseño v2.12 trae un tipo de publicación Ruta (SOCIAL_16: mapa con la ruta recortada, cifra, línea de métricas, "Ruta planificada · …" y "Nueva mejor marca"). `create_post` solo acepta `workout, record, routine, achievement, challenge, photo` (BACKEND_SUMMARY). La app tiene el tipo `route` y su composición (`RouteBody`), pero solo la dibuja con los datos de ejemplo (dev); en la app real un post de un tipo que no conoce **no se muestra** (`isRenderablePost`).
+- **Qué falta:** aceptar `route` en `create_post` con un adjunto-instantánea (`sport`, `distance_km`, `duration_sec`, `pace_label`, `elevation_m`, `planned_name`, `new_best` y una polilínea simplificada) y el **recorte de inicio y final en el servidor** para quien no es el dueño ("Ocultar inicio y final": si el cliente manda el recorrido entero, cualquiera lo ve). Además la tabla de actividades de Ruta (ver V2_12_DELTA).
+- **Prioridad:** Media (Fase 5). **No bloquea.**
+
+### BT-57 · Enlace de un entreno publicado a su rutina
+- **Estado:** el prototipo pone "Ver rutina →" en los posts de entreno. El adjunto de entreno (`WorkoutAttachment`) no trae el id de la rutina ni de la sesión, así que el CTA no se puede dibujar sin inventarlo: no está en la app.
+- **Qué falta:** `workout_template_id` (o `routine_id`) en el adjunto de `create_post` para entrenos de una rutina, respetando su privacidad (solo si la rutina es compartible).
+- **Prioridad:** Baja. **No bloquea.**
+
 ## Retos oficiales
 
 ### BT-55 · Datos reales del reto oficial (Fase 4)
@@ -438,6 +452,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-06: BT-43 (Términos y soporte de Comunidad, antes de TestFlight).
 - 2026-10-07: BT-44 y BT-52 (Comunidad) resueltos; `remove_friend` aplicada (ver `BACKEND_SUMMARY`).
 - 2026-10-09: BT-53 (lista de espera de Wear, solo visual en la app).
+- 2026-10-09: BT-56 y BT-57 (Comunidad v2.12: tipo `route` y enlace de un entreno a su rutina).
 - 2026-10-09: BT-55 (datos reales del reto oficial, Fase 4).
 - 2026-10-09: BT-54 (preferencia "Core 33 como prioridad" del hero de Inicio).
 - 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.

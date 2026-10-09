@@ -2527,3 +2527,35 @@ Sustituye a la primera versión (D-127, D-128, DA-178 y DA-179). Referencias: HO
 - **DA-191** · Datos: "días restantes" desde `ends_at`, `participants_total`, `points` y `badge_id` (el bloque del badge se oculta si no hay ni puntos ni badge; si hay puntos sin badge, el hexágono muestra solo los puntos). El nombre del badge sale de `ALL_BADGES`, o "Badge" si el id no está.
 - **DA-192** · Sin retos oficiales en la base: en `__DEV__`, datos de ejemplo iguales a la referencia (100 dominadas, 74 / 100, Carlos a 81, +150 pts "Semana de tracción", 18.420 atletas, 3 días restantes) y escenarios `athelete://dev/home?scenario=challengeInvite|challengeJoined|challengeCompleted` (o el argumento de arranque `-homeChallenge`); en release la sección no aparece.
 - **D-140** · Placeholder para la Fase 4: foto de portada `reto-overhead.jpg` (gris horneado), tres avatares de reserva `athlete-1..3.jpg` y hexágono genérico con chevrones (`cover_path` y artwork de badges, BT-55). El recorte de la foto se calcula a mano (centrado), como en Wear.
+
+## v2.12 · Fase 3 · Comunidad rediseñada · 2026-10-09
+
+Checkpoint: [`V212_F3_CHECKPOINT.md`](V212_F3_CHECKPOINT.md). Solo UI; la capa de datos de W1 a W7 no se tocó. Backend pendiente: BT-56 y BT-57.
+
+- **D-141** · Cabecera y pestañas de Comunidad según v2.12: "Comunidad" 34/800 con el resumen; campana (con el contador de W6, que se mantiene aunque el diseño no la muestre), Privacidad y avatar con anillo Ember (→ Perfil). Pestañas subrayadas (`UnderlineTabs`) en lugar del control segmentado; el "+" sale de la cabecera y la fila de avatares de amigos desaparece.
+- **D-142** · Composer "¿Qué entrenaste hoy?" con "+" Ember de 48 pt, mismo flujo de publicar (W4). El botón de elegir foto de la fila anterior se retira de aquí (la foto se elige ya en el flujo de publicar).
+- **D-143** · El texto del post pasa a ser el **pie** ("**Nombre** texto", debajo de las reacciones) y el tipo se escribe en mayúsculas en la cabecera (Ember en Ruta, Récord y Logro). 52 pt entre posts.
+- **D-144** · Composiciones por tipo a ancho completo y sin tarjeta donde el diseño lo pide: entreno con foto (480 pt), entreno sin foto (tipográfico), récord (340 pt), rutina, logro y reto (banda con medalla de 96 pt), ruta y foto sola. El entreno usa `volume_kg`, `prs_count` y `top_pr` si existen; en posts viejos el volumen es "—" y no hay línea de récord.
+- **DA-193** · **Tipo `route`:** existe en `PostType` y `RouteAttachment` y se dibuja solo con datos de ejemplo (fixtures y dev). En la app real, un post de un tipo desconocido, `route` incluido, **no se muestra** (se descarta de la lista y `PostCard` devuelve nada). `TODO(ruta)`, BT-56.
+- **DA-194** · "Foto sola": v2.12 no la define; se dibuja a sangre con su altura reservada por `photo_width` y `photo_height`.
+- **DA-195** · "Ver rutina →" de los posts de entreno no se dibuja: el adjunto no trae el id de la rutina (BT-57).
+- **D-145** · `CoverImage`: el recorte `object-fit: cover` con `object-position` se calcula a mano en los bloques a sangre (como en Wear, D-134). El hero del reto oficial (lista y detalle) usa la misma foto en gris, centrada.
+- **D-146** · La actividad de amigos pasa a una línea sin tarjeta (avatares de 36 pt, texto 15/500 y punto Ember).
+- **DA-196** · Dev: `athelete://dev/social?screen=feedY1…feedY5`, `postRoute` y fixtures nuevas (2 rutas, 1 foto, 1 tipo desconocido que no debe verse).
+
+### Checklist de QA de Comunidad: pasos que cambian por el rediseño
+
+Los pasos 1 a 46 del checklist unificado W1 a W7 siguen vigentes; cambian de texto:
+
+- **8:** la entrada de publicar ya no es "Comparte tu último entreno" sino la fila **"¿Qué entrenaste hoy?"** (o su "+" Ember) bajo las pestañas.
+- **15:** en el feed de B, el entreno compartido se ve como una composición a sangre: con foto, "COMPLETADO", título y trío (duración, ejercicios, volumen); sin foto, la regla de 2 pt y el trío. La línea de récord es la etiqueta "NUEVO RÉCORD" + `top_pr` (o "N récords en la sesión" si solo hay `prs_count`). El texto del autor está **debajo** de las reacciones, con su nombre en negrita.
+- **39:** la campana con el contador está en la cabecera, **a la izquierda de Privacidad y del avatar**.
+- **Pasos con "tarjeta"** (33, 34): las invitaciones a retos siguen como filas con Aceptar y Ahora no; no cambia.
+
+Pasos nuevos (47 en adelante):
+47. Comunidad: las pestañas Feed, Retos y Amigos se subrayan y el indicador Ember se desliza al cambiar; los contadores de Retos (invitaciones) y Amigos (solicitudes) aparecen en Ember.
+48. Cada tipo de post se ve con su composición: entreno con foto, entreno sin foto, récord, rutina (Guardar rutina / Ver rutina), logro, reto y foto sola; los de foto, récord y logro llegan a los bordes de la pantalla y su altura no salta al cargar la foto.
+49. Un entreno publicado **antes de BT-44** (sin `volume_kg`, `prs_count` ni `top_pr`) se ve completo: volumen "—" y sin línea de récord.
+50. Me gusta: el corazón se llena en Ember al instante y vuelve atrás con un aviso si falla (con avión).
+51. Dev (solo con datos de ejemplo): los posts de ruta se ven; en la app real (cuenta de QA) no aparece ninguno y un tipo desconocido tampoco.
+52. El detalle de una publicación (SOCIAL_03) muestra el mismo diseño, con el texto bajo las reacciones, los comentarios planos y el campo fijo.
