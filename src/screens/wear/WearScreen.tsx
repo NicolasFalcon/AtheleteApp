@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   wordmark: { alignItems: 'center', gap: 6 },
   athelete: {
     fontSize: 64,
-    lineHeight: 56,
+    lineHeight: 60,
     fontWeight: '800',
     letterSpacing: -2.56,
     color: '#FFFFFF',
