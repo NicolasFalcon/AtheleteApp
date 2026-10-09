@@ -35,18 +35,24 @@ export const FEED_PAGE_SIZE = 10;
 
 // ── Which body a post gets ─────────────────────────────────────────────────
 export type PostBodyKind =
-  | 'workoutPhoto' // photo + metric summary (dark, 400 pt)
-  | 'workoutLight' // white card, no photo
-  | 'record' // dark block with the figure
-  | 'routine' // movement chips
-  | 'achievement' // medal
-  | 'challenge'
-  | 'photo'; // photo only
+  | 'workoutPhoto' // full-bleed photo + title + three figures
+  | 'workoutLight' // typographic, no card
+  | 'record' // dark plate with the figure
+  | 'routine' // four thumbnails + title + buttons
+  | 'achievement' // band with the medal
+  | 'challenge' // band with the medal (finished challenge)
+  | 'photo' // photo only
+  | 'route' // map with the route cut out (fixtures only for now)
+  | 'unknown'; // a type this app does not know: not shown
 
-export function postBodyKind(post: {
-  type: PostType;
-  photo_path: string | null;
-}): PostBodyKind {
+// Route posts: the backend has no `route` type yet. They are drawn only in the
+// dev fixtures; flip this when Ruta exists. TODO(ruta): Fase 5.
+export const ROUTE_POSTS_ENABLED = false;
+
+export function postBodyKind(
+  post: { type: string; photo_path: string | null },
+  options: { routeEnabled?: boolean } = {},
+): PostBodyKind {
   switch (post.type) {
     case 'workout':
       return post.photo_path ? 'workoutPhoto' : 'workoutLight';
@@ -60,11 +66,24 @@ export function postBodyKind(post: {
       return 'challenge';
     case 'photo':
       return 'photo';
+    case 'route':
+      return options.routeEnabled || ROUTE_POSTS_ENABLED ? 'route' : 'unknown';
+    default:
+      return 'unknown';
   }
 }
 
-// "Nuevo récord · hace 1 h": the first part of the author's second line.
-export function postKindLabel(type: PostType): string {
+// A post the feed can draw. Unknown types (a newer server, or `route` without
+// Ruta) are dropped from the list instead of showing an empty card.
+export function isRenderablePost(
+  post: { type: string; photo_path: string | null },
+  options: { routeEnabled?: boolean } = {},
+): boolean {
+  return postBodyKind(post, options) !== 'unknown';
+}
+
+// "NUEVO RÉCORD · hace 1 h": the first part of the author's second line.
+export function postKindLabel(type: PostType, sport?: 'running' | 'cycling'): string {
   switch (type) {
     case 'workout':
       return 'Entrenamiento';
@@ -78,7 +97,14 @@ export function postKindLabel(type: PostType): string {
       return 'Reto';
     case 'photo':
       return 'Foto';
+    case 'route':
+      return sport === 'cycling' ? 'Ciclismo' : 'Carrera';
   }
+}
+
+// Types whose label is drawn in Ember (v2.12 · Ruta, Récord and Logro).
+export function isHighlightedKind(type: PostType): boolean {
+  return type === 'route' || type === 'record' || type === 'achievement';
 }
 
 // ── create_post errors, each with a clear message ──────────────────────────

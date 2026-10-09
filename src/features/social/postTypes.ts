@@ -19,7 +19,10 @@ export type PostType =
   | 'routine'
   | 'achievement'
   | 'challenge'
-  | 'photo';
+  | 'photo'
+  // TODO(ruta): the backend has no `route` type yet (Fase 5). It only exists
+  // in the dev fixtures; in the real app a post of this type is not shown.
+  | 'route';
 
 // `attachment` is a snapshot the server writes (never editable by the app).
 export type WorkoutAttachment = {
@@ -91,12 +94,27 @@ export type ChallengeAttachment = {
   badge_id?: string | null;
 };
 
+// Route post (v2.12 · SOCIAL_16). Fixtures only until Ruta exists (Fase 5).
+export type RouteAttachment = {
+  sport: 'running' | 'cycling';
+  distance_km: number;
+  duration_sec: number;
+  // "5:08 /km" or "27,3 km/h".
+  pace_label: string;
+  elevation_m: number | null;
+  // Name of the planned route this activity followed ("Parque 5K").
+  planned_name: string | null;
+  // "Nueva mejor marca" line, when the activity beat one.
+  new_best: string | null;
+};
+
 export type PostAttachment =
   | WorkoutAttachment
   | RecordAttachment
   | RoutineAttachment
   | AchievementAttachment
-  | ChallengeAttachment;
+  | ChallengeAttachment
+  | RouteAttachment;
 
 // One post of `get_feed`: the row, its author and `liked_by_me`. The author
 // profile may be absent from `get_social_profiles` (SOCIAL_PLAN §8.1).
