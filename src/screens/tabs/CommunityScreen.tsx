@@ -256,6 +256,14 @@ export function CommunityScreen({
               body="Cuando tus amigos entrenen, lo verás aquí. Tú decides qué compartes."
               onSearch={() => setSegment('amigos')}
               onInvite={openInvite}
+              meanwhile={
+                challenges.data?.official
+                  ? {
+                      title: challenges.data.official.challenge.title,
+                      onPress: () => setSegment('retos'),
+                    }
+                  : null
+              }
             />
           ) : (
             <FeedView

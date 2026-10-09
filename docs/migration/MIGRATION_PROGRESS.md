@@ -2541,6 +2541,9 @@ Checkpoint: [`V212_F3_CHECKPOINT.md`](V212_F3_CHECKPOINT.md). Solo UI; la capa d
 - **DA-195** · "Ver rutina →" de los posts de entreno no se dibuja: el adjunto no trae el id de la rutina (BT-57).
 - **D-145** · `CoverImage`: el recorte `object-fit: cover` con `object-position` se calcula a mano en los bloques a sangre (como en Wear, D-134). El hero del reto oficial (lista y detalle) usa la misma foto en gris, centrada.
 - **D-146** · La actividad de amigos pasa a una línea sin tarjeta (avatares de 36 pt, texto 15/500 y punto Ember).
+- **D-147** · Estado sin amigos (STATE_04): tres retratos tenues en blanco y negro (fotos decorativas del paquete, no usuarios: DA-119 sigue vigente), botones centrados y la tarjeta "Mientras tanto · Reto oficial · {título}" de 96 pt, **solo con un reto oficial real** (`get_my_challenges.official`); al tocarla abre la pestaña Retos.
+- **D-148** · El botón del feed vacío con amigos pasa de "Comparte tu último entreno" a "Publicar un entreno" (el composer ya dice "¿Qué entrenaste hoy?") y se centra.
+- **DA-197** · Verificado: Comunidad usa `supabaseSocialService` en la app real; las fixtures solo se activan con `socialFixtureStore.reset`, llamado únicamente por los deep links y el menú dev; `usesFixtures()` exige `__DEV__`; el estado vuelve a la fuente real en cada arranque (test `socialSource.test.ts`).
 - **DA-196** · Dev: `athelete://dev/social?screen=feedY1…feedY5`, `postRoute` y fixtures nuevas (2 rutas, 1 foto, 1 tipo desconocido que no debe verse).
 
 ### Checklist de QA de Comunidad: pasos que cambian por el rediseño

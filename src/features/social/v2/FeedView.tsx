@@ -170,7 +170,12 @@ export function FeedView({
           title="Aún no hay publicaciones"
           body="Cuando tus amigos compartan un entreno, un récord o una rutina, lo verás aquí. Tú decides qué compartes."
         >
-          <Button label="Comparte tu último entreno" size="md" onPress={onCompose} />
+          <Button
+            label="Publicar un entreno"
+            size="md"
+            onPress={onCompose}
+            style={styles.centered}
+          />
         </SegmentPlaceholder>
       ) : null}
 
@@ -261,6 +266,7 @@ const styles = StyleSheet.create({
   root: { gap: 30 },
   // Posts are 52 pt apart, with no dividers.
   posts: { gap: 52 },
+  centered: { alignSelf: 'center' },
   composeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   composeTexts: { flex: 1, gap: 1 },
   composeTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.17 },
