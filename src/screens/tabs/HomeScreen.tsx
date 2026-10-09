@@ -14,12 +14,10 @@ import {
 import {
   DEFAULT_WATER_GOAL_GLASSES,
   allDoneLine,
-  bestMarkParts,
   buildDayRings,
   homeDateLine,
   isChallengeActive,
   isCoreClosedToday,
-  prCurve,
   quizMastery,
   resolveHomeMode,
   sessionActiveSeconds,
@@ -28,10 +26,6 @@ import {
   type DayRingKind,
   type HomeChallengeState,
 } from '@app/features/home/homePriority';
-import {
-  BestMarkCard,
-  type BestMark,
-} from '@app/features/home/v2/BestMarkCard';
 import { Core33InviteCard } from '@app/features/home/v2/Core33InviteCard';
 import { DayRingsCard } from '@app/features/home/v2/DayRingsCard';
 import {
@@ -48,18 +42,16 @@ import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal
 import { useHomeModeOverride } from '@app/dev/homeModeOverride';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
 import { useUnreadNotifications } from '@app/features/social/useSocial';
 import { useNotificationsOverview } from '@app/hooks/useNotificationsOverview';
 import { useHydration } from '@app/hooks/useHydration';
-import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { useQuizCategories } from '@app/hooks/useQuizCategories';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
 import { getGreeting, getLocalDateKey } from '@app/lib/date';
-import { getBestPR, type Workout } from '@app/shared';
+import type { Workout } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Home'>;
@@ -87,8 +79,6 @@ export function HomeScreen({ navigation }: Props) {
   const { profile } = useAuth();
   const homeQuery = useHomeFeed();
   const workoutsQuery = useWorkoutLibrary();
-  const recordsQuery = usePersonalRecords();
-  const exercisesQuery = useExerciseLibrary();
   const ellieData = useEllieData();
   const notifications = useNotificationsOverview();
   // Social notifications only add to the dot of the bell: no new screen. When
@@ -113,7 +103,6 @@ export function HomeScreen({ navigation }: Props) {
       }
       homeQuery.refetch().catch(() => {});
       ellieData.overviewQuery.refetch().catch(() => {});
-      recordsQuery.refetch().catch(() => {});
       quizQuery.refetch().catch(() => {});
       workoutsQuery.refetch().catch(() => {});
       // refetch functions are stable; listing the query objects would
@@ -232,32 +221,6 @@ export function HomeScreen({ navigation }: Props) {
     },
     hydration: { todayMl, goalGlasses },
   });
-
-  // ── Tu mejor marca ──────────────────────────────────────────────────────
-  const latestRecord = recordsQuery.latestRecord;
-  const bestMark = useMemo<BestMark | null>(() => {
-    if (!latestRecord) {
-      return null;
-    }
-    const exerciseRecords = recordsQuery.records.filter(
-      record => record.exerciseId === latestRecord.exerciseId,
-    );
-    const best =
-      getBestPR(exerciseRecords, latestRecord.prType) ?? latestRecord;
-    const parts = bestMarkParts(best);
-    const exerciseName =
-      (exercisesQuery.data || []).find(
-        exercise => exercise.id === latestRecord.exerciseId,
-      )?.name || 'Ejercicio';
-
-    return {
-      exerciseName,
-      value: parts.value,
-      unit: parts.unit,
-      isNew: parts.isNew,
-      curve: prCurve(exerciseRecords, latestRecord.prType),
-    };
-  }, [exercisesQuery.data, latestRecord, recordsQuery.records]);
 
   // ── Navigation ──────────────────────────────────────────────────────────
   const openWorkouts = () => navigation.navigate(TAB_ROUTES.Workouts);
@@ -445,23 +408,6 @@ export function HomeScreen({ navigation }: Props) {
             }}
             orbSize={48}
             style={{ marginHorizontal: -layout.gutter }}
-          />
-
-          <BestMarkCard
-            loading={recordsQuery.isLoading}
-            error={Boolean(recordsQuery.error)}
-            onRetry={() => {
-              recordsQuery.refetch().catch(() => {});
-            }}
-            mark={bestMark}
-            onOpenRecords={() =>
-              navigation.navigate(APP_ROUTES.PersonalRecords)
-            }
-            onRegister={() =>
-              navigation.navigate(APP_ROUTES.RegisterPr, {
-                showExercisePicker: true,
-              })
-            }
           />
 
           <WeekCarousel

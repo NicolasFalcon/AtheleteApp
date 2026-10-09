@@ -2438,3 +2438,11 @@ Miniaturas de anatomía por `exercise_id` (`PostBodies`, `SocialRoutineScreen`) 
 45. Repetir con otro post y "Mantener y cerrar reportes": el post sigue visible y el reporte se cierra. Un reporte sobre un usuario solo ofrece "Descartar reportes".
 46. Si M deja de ser moderador con la pantalla abierta, la siguiente acción dice "No tienes acceso".
 
+
+## v2.12 · Fase 1a · Navbar y Inicio · 2026-10-09
+
+Detalle del cambio: [`V2_12_DELTA.md`](V2_12_DELTA.md) (bloques A y B).
+
+- **D-110** · **Excepción a D-32 (Lucide):** los iconos del tab bar son propios (`icons/tab-*.svg` del handoff v2.12, `src/navigation/tabIcons.tsx` con `react-native-svg`). El resto de la app sigue con Lucide.
+- **D-111** · Tab bar: activo sin fondo ni pill, icono `-on` (trazo Ember con relleno suave) y label Ember 600; inactivo con icono al 50 %. ELLIE se dibuja con el `EllieOrb` actual (marcador de posición hasta el Living Halo). Altura (68 pt) y radio sin tocar: el handoff pide 64 pt y radio 26.
+- **D-112** · Inicio ya no muestra "Tu mejor marca" (`BestMarkCard`); Inicio deja de pedir `usePersonalRecords` y `useExerciseLibrary`. Las marcas viven en Progreso, Detalle de ejercicio y Resumen.

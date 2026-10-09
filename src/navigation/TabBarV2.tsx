@@ -1,39 +1,29 @@
 import { useEffect, useState } from 'react';
 import { Keyboard, Platform, StyleSheet, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import {
-  Dumbbell,
-  House,
-  Sparkles,
-  TrendingUp,
-  Users,
-  type LucideIcon,
-} from 'lucide-react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
-} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+  EllieOrb,
   GlassSurface,
   PressableScale,
   TextV2,
   haptics,
   useThemeV2,
 } from '@app/components/v2';
+import { TabIcon, type TabIconName } from '@app/navigation/tabIcons';
 import { TAB_ROUTES } from '@app/constants/routes';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import type { MainTabParamList } from '@app/types/navigation';
 
 type TabName = keyof MainTabParamList;
 
-const TAB_ITEMS: Record<TabName, { label: string; icon: LucideIcon }> = {
-  [TAB_ROUTES.Home]: { label: 'Inicio', icon: House },
-  [TAB_ROUTES.Workouts]: { label: 'Entrenos', icon: Dumbbell },
-  [TAB_ROUTES.Ellie]: { label: 'ELLIE', icon: Sparkles },
-  [TAB_ROUTES.Progress]: { label: 'Progreso', icon: TrendingUp },
-  [TAB_ROUTES.Community]: { label: 'Comunidad', icon: Users },
+// `icon: null` = ELLIE, drawn with its orb instead of an SVG.
+const TAB_ITEMS: Record<TabName, { label: string; icon: TabIconName | null }> = {
+  [TAB_ROUTES.Home]: { label: 'Inicio', icon: 'home' },
+  [TAB_ROUTES.Workouts]: { label: 'Entrenos', icon: 'workouts' },
+  [TAB_ROUTES.Ellie]: { label: 'ELLIE', icon: null },
+  [TAB_ROUTES.Progress]: { label: 'Progreso', icon: 'progress' },
+  [TAB_ROUTES.Community]: { label: 'Comunidad', icon: 'community' },
 };
 
 // Distance from the screen bottom to the floating bar (shell: 24, or the
@@ -71,15 +61,9 @@ type TabItemProps = {
 
 function TabItem({ name, focused, onPress, onLongPress }: TabItemProps) {
   const { colors, radius } = useThemeV2();
-  const { label, icon: Icon } = TAB_ITEMS[name];
-  const active = useSharedValue(focused ? 1 : 0);
-
-  useEffect(() => {
-    active.value = withTiming(focused ? 1 : 0, { duration: 250 });
-  }, [active, focused]);
-
-  const fillStyle = useAnimatedStyle(() => ({ opacity: active.value }));
-  const contentColor = focused ? colors.cta.primaryText : colors.text.primary;
+  const { label, icon } = TAB_ITEMS[name];
+  // Active: no background, Ember icon and label. Inactive: icon at 50 %.
+  const labelColor = focused ? colors.ember.base : colors.text.secondary;
 
   return (
     <PressableScale
@@ -90,17 +74,25 @@ function TabItem({ name, focused, onPress, onLongPress }: TabItemProps) {
       onLongPress={onLongPress}
       style={[styles.item, { borderRadius: radius.tabItem }]}
     >
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          { borderRadius: radius.tabItem, backgroundColor: colors.cta.primary },
-          fillStyle,
-        ]}
-      />
-      <View style={[styles.itemContent, !focused && styles.inactive]}>
-        <Icon size={22} color={contentColor} strokeWidth={2} />
-        <TextV2 variant="micro" color={contentColor} numberOfLines={1}>
+      <View style={styles.itemContent}>
+        <View style={[styles.icon, !focused && styles.inactiveIcon]}>
+          {icon ? (
+            <TabIcon
+              name={icon}
+              active={focused}
+              color={colors.text.primary}
+              ember={colors.ember.base}
+            />
+          ) : (
+            <EllieOrb size={24} />
+          )}
+        </View>
+        <TextV2
+          variant="micro"
+          color={labelColor}
+          style={focused ? styles.labelActive : styles.label}
+          numberOfLines={1}
+        >
           {label}
         </TextV2>
       </View>
@@ -109,7 +101,7 @@ function TabItem({ name, focused, onPress, onLongPress }: TabItemProps) {
 }
 
 // v2 floating tab bar (shell): glass pill 68 pt, 16 from the sides, items
-// 62×56 with the active one filled with the primary CTA colour. Hidden while
+// 62×56 with the active one in Ember (no pill). Hidden while
 // the keyboard is open and while a screen asks for it (ELLIE chat).
 export function TabBarV2({ state, navigation }: BottomTabBarProps) {
   const { radius, shadow, layout } = useThemeV2();
@@ -202,7 +194,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
   },
-  inactive: {
-    opacity: 0.72,
+  icon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inactiveIcon: {
+    opacity: 0.5,
+  },
+  label: {
+    fontWeight: '500',
+  },
+  labelActive: {
+    fontWeight: '600',
   },
 });
