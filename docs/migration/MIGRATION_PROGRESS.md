@@ -2494,15 +2494,13 @@ Checkpoint: [`V212_F2_CHECKPOINT.md`](V212_F2_CHECKPOINT.md). Solo UI con datos 
 - **DA-180** · Card de Ruta solo en estado de invitación; el mapa es un placeholder en datos SVG (`routeMapData.ts`); toca → `RouteSoon` ("Ruta · Próximamente", `TODO(ruta)`). Sin "Última · km". El estado "tu ruta de hoy" es Fase 5.
 - **DA-181** · Dev: `-homeScroll N` (argumento de arranque iOS) y entradas `homeChallenge` / `homeChallengeInvite` en `athelete://dev/social`.
 
-### v2.12 · Fase 2 · ATHELETE Wear (añadido) · 2026-10-09
+### v2.12 · Fase 2 · ATHELETE Wear (versión final) · 2026-10-09
 
-UI sin backend; detalle en [`V212_F2_CHECKPOINT.md`](V212_F2_CHECKPOINT.md) y [`V2_12_DELTA.md`](V2_12_DELTA.md) (bloque I). Backend pendiente: BT-53.
+La primera implementación (colección con productos y ficha; D-132 a D-136 y DA-182 de esa versión) **se retiró**: el diseño aprobado es solo la presentación "Próximamente". Detalle en [`V212_F2_CHECKPOINT.md`](V212_F2_CHECKPOINT.md) y [`V2_12_DELTA.md`](V2_12_DELTA.md) (bloque I). Backend pendiente: BT-53.
 
-- **D-131** · La card "Hecho para durar. · Ver colección →" (`WearCard`) sustituye a `WearBannerV2` en Inicio y abre `WearCollection`. `WearBannerV2` y `WearPreviewModal` quedan sin uso y sin borrar (pendientes de confirmación).
-- **D-132** · `Wear.dc.html` y el handoff aún describen la presentación sin productos ("En pausa: no se enlaza hasta el lanzamiento"); las capturas WEAR_01 a 03 y el índice muestran colección y ficha. Se siguió lo último. Bajo el hero de la colección no hay captura: se compuso con las variantes del Wear Product Tile del handoff (base 440, rejilla 236, horizontal 132), el orden de los productos del prototipo y la pausa editorial del handoff.
-- **D-133** · La colección lleva una píldora "Próximamente" sobre el eyebrow (la referencia no la muestra; se añade por petición).
-- **D-134** · Estado "con talla" (sin captura, descrito en el handoff): la pill elegida se rellena, la línea dice "Talla M · disponible" y, como la tienda no abre (`WEAR_STORE_OPEN = false`), el CTA queda **inactivo y en "Próximamente"** (sin compra ni enlace). Con la tienda abierta sería "Comprar en ATHELETE Wear" (`TODO(wear)`).
-- **D-135** · Estado "agotada" (sin captura): la talla agotada va tachada, con contorno tenue y sin poder elegirse; la línea dice "XL agotada" o "S, M agotadas". Un producto con todas las tallas agotadas (no existe en el catálogo de ejemplo) mostraría "Agotado" y "Sin existencias por ahora." (texto propio, no del diseño). Una talla única se preselecciona.
-- **D-136** · Galería: tres recortes (escala y desplazamiento) de la misma foto de reserva; fotos B/N horneadas (gris, contraste 1,1, brillo 0,88) en `assets/v2/photos/wear/`. Catálogo de ejemplo en `wearCatalog.ts` con `TODO(wear)`.
-- **DA-182** · "Avísame del lanzamiento" (cierre de la colección) es solo visual: alterna "Te avisaremos", muestra un aviso y no guarda nada (`TODO(wear)`); lista de espera real en BT-53. Las fichas de producto no llevan "Avísame" (la referencia no lo muestra).
-- **DA-183** · Dev: `athelete://dev/wear?screen=collection|productNoSize|productSize|productSoldOutSize|productSoon|productSingle|sizesNone|sizesChosen|sizesSoldOut|sizesSoon`.
+- **D-131** · La card "Hecho para durar. · Ver colección →" (`WearCard`) sustituye a `WearBannerV2` en Inicio y abre `Wear`. `WearBannerV2` y `WearPreviewModal` quedan sin uso y sin borrar (pendientes de confirmación).
+- **D-132** · Wear es solo la **presentación** de la marca (`Wear.dc.html` `wear`): hero B/N, mosaico Hombre / Mujer / Accesorios sin interacción, "MENOS RUIDO. MÁS ENTRENAMIENTO." y hoja de cierre con "Avísame". Sin productos, precios, tallas ni ficha. Sustituye a la colección y la ficha de la primera versión, no aprobadas y retiradas (con su catálogo, lógica de tallas y tests).
+- **D-133** · Animación de entrada del título: la foto del hero se asienta (1,08 → 1 en 8 s) y el bloque sube 10 pt con fundido en 0,7 s tras 0,2 s; "Te avisaremos" entra con rebote. Con "Reducir movimiento", todo en reposo.
+- **D-134** · Las fotos de reserva (overhead, culturismo, barra-mujer, mancuernas) llevan el gris horneado; el oscurecimiento del prototipo (`brightness`) es una capa. El recorte (`object-fit` y `object-position`) se calcula a mano porque `resizeMode="cover"` solo centraba mal en estas pantallas.
+- **DA-182** · "Avísame del lanzamiento" es solo visual: alterna "Te avisaremos", muestra un aviso y no guarda nada (`TODO(wear)`); lista de espera real en BT-53.
+- **DA-183** · Dev: `athelete://dev/wear?screen=wear|wearMosaic|wearEnd`.

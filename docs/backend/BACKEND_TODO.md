@@ -393,8 +393,8 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 ## Wear
 
 ### BT-53 · Lista de espera real para "Avísame del lanzamiento"
-- **Estado:** en la app (colección de ATHELETE Wear, "Sé de los primeros") el botón es solo visual: cambia a "Te avisaremos", muestra un aviso (toast) y se olvida al salir. No se guarda ni se envía nada (`TODO(wear)`).
-- **Qué falta:** una lista de espera por usuario: tabla (p. ej. `wear_waitlist` con `user_id`, `created_at`, `topic`) con RLS de solo el dueño, y alta y baja idempotentes (el segundo toque lo desactiva). Opcional: un aviso push o correo el día del lanzamiento y el catálogo real (productos, tallas, existencias, fechas), hoy de ejemplo en `src/features/wear/wearCatalog.ts`.
+- **Estado:** en la app (presentación de ATHELETE Wear, "Sé de los primeros") el botón es solo visual: cambia a "Te avisaremos", muestra un aviso (toast) y se olvida al salir. No se guarda ni se envía nada (`TODO(wear)`).
+- **Qué falta:** una lista de espera por usuario: tabla (p. ej. `wear_waitlist` con `user_id`, `created_at`, `topic`) con RLS de solo el dueño, y alta y baja idempotentes (el segundo toque lo desactiva). Opcional: un aviso push o correo el día del lanzamiento. La app no tiene catálogo (Wear es solo la presentación hasta el lanzamiento).
 - **Prioridad:** Baja. **No bloquea.** Hasta que exista, el botón sigue como está.
 
 ## Historial

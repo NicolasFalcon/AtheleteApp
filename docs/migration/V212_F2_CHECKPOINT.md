@@ -49,10 +49,12 @@ Diferencias con la referencia:
 - Fase 5: Ruta real, su estado "tu ruta de hoy" y el mapa de SDK.
 - Android sin compilar (§8.1).
 
-## Wear (añadido a la Fase 2)
+## Wear (añadido a la Fase 2; versión final)
 
-- **Archivos:** `features/wear/{wearCatalog,wearProductModel,WearCard}`, `components/v2/WearProductTile`, `screens/wear/{WearCollectionScreen,WearProductScreen}`, fotos B/N en `assets/v2/photos/wear/`, rutas `WearCollection` y `WearProduct`, dev `athelete://dev/wear?screen=…`.
-- **Inicio:** `WearCard` sustituye a `WearBannerV2` y lleva a la colección. `WearBannerV2` y `WearPreviewModal` quedan sin uso, sin borrar.
-- **Ficha:** lógica pura en `wearProductModel.ts` (talla, agotada, próximamente; 13 tests). `WEAR_STORE_OPEN = false`: el CTA con talla dice "Próximamente".
-- **Capturas (simulador, Light y Dark):** card de Inicio, colección, ficha sin talla (WEAR_02), con talla, con una talla agotada y Próximamente (WEAR_03). Comparadas con WEAR_01 a 03: coinciden estructura y tipografía. Diferencias: la foto del hero es la misma placeholder pero con otro encuadre; la parte baja de la colección (rejilla, pausa editorial, cierre) no tiene captura de referencia, se compuso desde el handoff; la rejilla, la pausa editorial y el cierre de la colección no se capturaron en el simulador (no se puede desplazar la pantalla).
-- **Pendiente:** fotografía real de Wear, catálogo y existencias reales, tienda externa y lista de espera (BT-53).
+Solo la presentación "Próximamente" de la marca (la colección con productos y la ficha de una primera versión **no estaban aprobadas** y se retiraron).
+
+- **Archivos:** `screens/wear/WearScreen.tsx`, `features/wear/WearCard.tsx`, fotos B/N en `assets/v2/photos/wear/` (overhead, culturismo, barra-mujer, mancuernas), ruta `Wear`, dev `athelete://dev/wear?screen=wear|wearMosaic|wearEnd`.
+- **Inicio:** `WearCard` ("Hecho para durar." · "Ver colección →") sustituye a `WearBannerV2` y abre `Wear`. `WearBannerV2` y `WearPreviewModal` quedan sin uso, sin borrar.
+- **Animación de entrada:** foto del hero 1,08 → 1 en 8 s y bloque del título que sube 10 pt con fundido en 0,7 s tras 0,2 s (Reanimated, hilo de UI); sin ella con "Reducir movimiento".
+- **Capturas (simulador, Light):** hero, mosaico y cierre, comparadas con las capturas de diseño: coinciden (foto, wordmark, etiquetas, frase con acentos y hoja de cierre). Sin tests: no hay lógica propia.
+- **Pendiente:** fotografía real de Wear y lista de espera real (BT-53); capturas en Dark (la pantalla es oscura en ambos modos).

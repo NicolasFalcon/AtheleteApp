@@ -128,16 +128,15 @@ Reglas relevantes: las rutas guardadas son siempre privadas; el post y las pieza
 
 ---
 
-### I · ATHELETE Wear (añadido el 2026-10-09, Fase 2) · M
+### I · ATHELETE Wear (añadido el 2026-10-09, Fase 2; corregido el mismo día) · S
 
-Corrección: la primera versión de este documento daba Wear por sin cambios. v2.12 sí lo toca: la card de Inicio pasa a "Hecho para durar. · Ver colección →" y hay colección y ficha de producto (WEAR_01 a 03). Sigue siendo línea de ropa, no un dispositivo ni una tienda dentro de la app (no hay carrito, pago ni pedidos).
+Corrección: la primera versión de este documento daba Wear por sin cambios, y una segunda implementación inventó una colección con ficha de producto, que **no está aprobada**. La versión final de v2.12 es solo la **presentación "Próximamente"** de la marca (confirmado con las capturas de diseño). Sigue siendo línea de ropa, no un dispositivo ni una tienda dentro de la app: sin productos, precios, tallas, carrito ni pago.
 
-- **Card de Inicio** (156 pt, foto B/N, wordmark, "Ver colección →") → colección. Sustituye al banner "Próximamente".
-- **Colección** (WEAR_01): hero B/N "Hecho para durar.", "Seis piezas para entrenar todos los días…", pieza base a ancho completo, rejilla de dos columnas, pausa editorial ("Menos ruido. Más entrenamiento."), accesorio en tile horizontal y cierre "Sé de los primeros" con "Avísame del lanzamiento".
-- **Ficha** (WEAR_02 y 03): galería de 3 fotos (540 pt), nombre, precio, descripción, tallas en pills (la agotada tachada), tres datos en filas y pie fijo con el CTA y una nota. Estados: sin talla, con talla, talla agotada, talla única y Próximamente (con fecha).
-- **Wear Product Tile** (3 variantes: base 440, rejilla 236, horizontal 132); solo "Próximamente" se marca; sin Ember.
-- **Sin backend:** catálogo de ejemplo local (`wearCatalog.ts`, `TODO(wear)`); el CTA final queda en "Próximamente" y "Avísame" es visual (BT-53).
-- **Contradicción a vigilar:** el handoff ("En pausa: no se enlaza desde la presentación hasta el lanzamiento") y `Wear.dc.html` (presentación sin productos) siguen describiendo la versión anterior; las capturas WEAR_01 a 03 y el índice muestran colección y ficha. Se siguió lo último.
+- **Card de Inicio** (156 pt, foto B/N, wordmark, "Hecho para durar." y "Ver colección →") → pantalla Wear.
+- **Presentación** (`Wear.dc.html` `wear`): fondo negro continuo `#0C0B0A`; hero B/N de 780 pt con "PRÓXIMAMENTE", wordmark ATHELETE a 64 pt (800) con WEAR espaciado y "Ropa y accesorios para entrenar."; mosaico con margen de 8 pt (Hombre y Mujer en dos columnas de 420, Accesorios a lo ancho de 220, solo etiqueta, sin interacción); "MENOS RUIDO. MÁS ENTRENAMIENTO." a 38 pt; hoja clara de cierre con "SÉ DE LOS PRIMEROS" y "Avísame del lanzamiento" (pasa a "Te avisaremos"; tocar de nuevo lo desactiva).
+- **Animación de entrada:** la foto del hero se asienta (8 s, escala 1,08 → 1) y el bloque del título sube 10 pt con fundido (0,7 s, tras 0,2 s). Con "Reducir movimiento" todo aparece en reposo. "Te avisaremos" entra con un rebote (0,6 → 1,12 → 1).
+- **Sin backend:** fotos de reserva; "Avísame" es solo visual (BT-53).
+- **Fuera de alcance:** colección con productos y ficha de producto (el handoff las deja "en pausa hasta el lanzamiento").
 
 ## 4. Lo que **no** cambia (no tocar)
 
