@@ -1,3 +1,4 @@
+import { isWearDevScreen, openWearDevScreen } from '@app/dev/devWearScreens';
 import { useEffect, useRef, useState } from 'react';
 import {
   DevSettings,
@@ -185,6 +186,18 @@ function openQuizFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/wear?screen=<key>: navigates (no overlay).
+function openWearFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/wear')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'collection';
+  if (isWearDevScreen(screen)) {
+    openWearDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 // athelete://dev/social?screen=<key>: navigates (no overlay).
 function openSocialFromUrl(url: string | null): boolean {
   if (!url || !url.startsWith('athelete://dev/social')) {
@@ -208,7 +221,8 @@ function toolFromUrl(url: string | null): DevToolState | null {
     openNutritionFromUrl(url) ||
     openCore33FromUrl(url) ||
     openQuizFromUrl(url) ||
-    openSocialFromUrl(url)
+    openSocialFromUrl(url) ||
+    openWearFromUrl(url)
   ) {
     return null;
   }
