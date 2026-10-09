@@ -442,3 +442,33 @@ export function bestMarkParts(
       };
   }
 }
+
+// ── Order of the sections under the hero (v2.12) ───────────────────────────
+// Tu día → Tu ruta → [Core 33] → banda de ELLIE → [reto oficial] → Para
+// entrenar esta semana → Quiz → Wear. "Tu mejor marca" no longer exists.
+export type HomeSectionKey =
+  | 'rings'
+  | 'route'
+  | 'core33Invite'
+  | 'ellie'
+  | 'challenge'
+  | 'routines'
+  | 'quiz'
+  | 'wear';
+
+export function homeSectionOrder(options: {
+  core33Invite: boolean;
+  challenge: boolean;
+}): HomeSectionKey[] {
+  const order: (HomeSectionKey | null)[] = [
+    'rings',
+    'route',
+    options.core33Invite ? 'core33Invite' : null,
+    'ellie',
+    options.challenge ? 'challenge' : null,
+    'routines',
+    'quiz',
+    'wear',
+  ];
+  return order.filter((key): key is HomeSectionKey => key !== null);
+}

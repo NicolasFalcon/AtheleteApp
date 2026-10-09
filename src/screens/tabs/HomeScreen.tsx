@@ -1,9 +1,7 @@
-import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
-import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { EllieSurface, StatusBarV2, useThemeV2 } from '@app/components/v2';
+import { StatusBarV2, useThemeV2, useToast } from '@app/components/v2';
 import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import { resolveCore33Invite } from '@app/features/core33/core33Invite';
 import { useCore33InviteDismissals } from '@app/features/core33/useCore33InviteDismissals';
@@ -16,6 +14,7 @@ import {
   allDoneLine,
   buildDayRings,
   homeDateLine,
+  homeSectionOrder,
   isChallengeActive,
   isCoreClosedToday,
   quizMastery,
@@ -26,6 +25,11 @@ import {
   type DayRingKind,
   type HomeChallengeState,
 } from '@app/features/home/homePriority';
+import { homeChallengeCard } from '@app/features/home/homeChallengeSection';
+import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
+import { EllieBand } from '@app/features/home/v2/EllieBand';
+import { OfficialChallengeSection } from '@app/features/home/v2/OfficialChallengeSection';
+import { RouteInviteCard } from '@app/features/home/v2/RouteInviteCard';
 import { Core33InviteCard } from '@app/features/home/v2/Core33InviteCard';
 import { DayRingsCard } from '@app/features/home/v2/DayRingsCard';
 import {
@@ -39,7 +43,7 @@ import { WearBannerV2 } from '@app/features/home/v2/WearBannerV2';
 import { WeekCarousel } from '@app/features/home/v2/WeekCarousel';
 import { recommendRoutines } from '@app/features/workouts/workoutsModel';
 import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
-import { useHomeModeOverride } from '@app/dev/homeModeOverride';
+import { devHomeScroll, useHomeModeOverride } from '@app/dev/homeModeOverride';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
@@ -56,7 +60,6 @@ import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Home'>;
 
-const ELLIE_FALLBACK = 'ELLIE está lista para ayudarte con tu progreso de hoy.';
 
 function toHeroWorkout(workout: Workout | null): HeroWorkout | null {
   return workout
@@ -92,8 +95,30 @@ export function HomeScreen({ navigation }: Props) {
   const modeOverride = homeOverride?.mode ?? null;
   const inviteDismissals = useCore33InviteDismissals();
   const [wearVisible, setWearVisible] = useState(false);
+  // Official challenge section (cache shared with Comunidad: joining updates
+  // both at once through the service's optimistic layer).
+  const toast = useToast();
+  const socialService = useSocialService();
+  const challenges = useSocialResource('getMyChallenges', service =>
+    service.getMyChallenges(),
+  );
+  const challengeCard = useMemo(
+    () => homeChallengeCard(challenges.data),
+    [challenges.data],
+  );
+  const [joining, setJoining] = useState(false);
 
   // Refresh everything when coming back to Inicio (not on the first mount).
+  // Development only: open already scrolled (`-homeScroll N`), for captures.
+  const scrollRef = useRef<ScrollView>(null);
+  useEffect(() => {
+    const y = devHomeScroll();
+    if (y > 0) {
+      const id = setTimeout(() => scrollRef.current?.scrollTo({ y, animated: false }), 900);
+      return () => clearTimeout(id);
+    }
+  }, []);
+
   const firstFocus = useRef(true);
   useFocusEffect(
     useCallback(() => {
@@ -105,6 +130,7 @@ export function HomeScreen({ navigation }: Props) {
       ellieData.overviewQuery.refetch().catch(() => {});
       quizQuery.refetch().catch(() => {});
       workoutsQuery.refetch().catch(() => {});
+      challenges.reload();
       // refetch functions are stable; listing the query objects would
       // re-run this effect on every render.
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -152,7 +178,6 @@ export function HomeScreen({ navigation }: Props) {
     : null;
   // Development-only visual override ("Ver modos de Inicio"); null in prod.
   const mode = modeOverride ?? realMode;
-  const openEllieChat = useOpenEllieChat();
   const isNewUser = mode === 'new';
 
   // Core 33 discovery card (HOME_10 / HOME_11): only without a current
@@ -281,6 +306,37 @@ export function HomeScreen({ navigation }: Props) {
     }
   };
 
+  const sections = homeSectionOrder({
+    core33Invite: Boolean(core33Invite),
+    challenge: challengeCard !== null,
+  });
+
+  // Optimistic: the service flips `official.mine` in the cache at once and
+  // rolls it back (with a toast) if the server refuses.
+  const joinOfficial = async () => {
+    if (!challengeCard || joining) {
+      return;
+    }
+    setJoining(true);
+    try {
+      const result = await socialService.joinOfficialChallenge(challengeCard.id);
+      if (!result.ok) {
+        toast.show(
+          result.error === 'not_available'
+            ? 'Este reto ya no está disponible'
+            : 'No se pudo completar la acción',
+          { tone: 'error' },
+        );
+        return;
+      }
+      toast.show('Te uniste al reto');
+    } catch {
+      toast.show('No se pudo completar la acción', { tone: 'error' });
+    } finally {
+      setJoining(false);
+    }
+  };
+
   const completedWorkout = findWorkout(completedToday?.workoutId);
   const points =
     ellieData.context?.achievements.totalPoints ??
@@ -291,6 +347,7 @@ export function HomeScreen({ navigation }: Props) {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 style="light" />
       <ScrollView
+        ref={scrollRef}
         onScroll={tabBarMotion.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -368,69 +425,99 @@ export function HomeScreen({ navigation }: Props) {
             },
           ]}
         >
-          <DayRingsCard
-            loading={homeQuery.isLoading}
-            error={Boolean(homeQuery.error)}
-            onRetry={() => {
-              homeQuery.refetch().catch(() => {});
-            }}
-            rings={rings}
-            dayPct={dayPct}
-            isNewUser={isNewUser}
-            addingWater={homeQuery.isAddingHydration}
-            onAddWater={addWater}
-            onOpenRing={openRing}
-          />
-
-          {core33Invite ? (
-            <Core33InviteCard
-              variant={core33Invite}
-              completedCount={Math.max(core33History?.completedCount ?? 0, 1)}
-              onPress={() =>
-                openCore33Discovery(core33History?.completedCount ?? 0)
-              }
-              onDismiss={() =>
-                inviteDismissals.dismiss()
-              }
-            />
-          ) : null}
-
-          <EllieSurface
-            message={ellieData.heroInsight?.text ?? ELLIE_FALLBACK}
-            action={{
-              label: 'Hablar con ELLIE',
-              onPress: () =>
-                openEllieChat(
-                  mode === 'workoutDone' || mode === 'allDone'
-                    ? ELLIE_ASKS.recovery
-                    : ELLIE_ASKS.adjustToday,
-                ),
-            }}
-            orbSize={48}
-            style={{ marginHorizontal: -layout.gutter }}
-          />
-
-          <WeekCarousel
-            loading={workoutsQuery.isLoading}
-            error={Boolean(workoutsQuery.error)}
-            onRetry={() => {
-              workoutsQuery.refetch().catch(() => {});
-            }}
-            workouts={recommended}
-            onOpenWorkout={workoutId =>
-              navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId })
+          {sections.map(key => {
+            switch (key) {
+              case 'rings':
+                return (
+                  <DayRingsCard
+                    key={key}
+                    loading={homeQuery.isLoading}
+                    error={Boolean(homeQuery.error)}
+                    onRetry={() => {
+                      homeQuery.refetch().catch(() => {});
+                    }}
+                    rings={rings}
+                    dayPct={dayPct}
+                    isNewUser={isNewUser}
+                    addingWater={homeQuery.isAddingHydration}
+                    onAddWater={addWater}
+                    onOpenRing={openRing}
+                  />
+                );
+              case 'route':
+                // TODO(ruta): the Ruta flow replaces this placeholder (Fase 5).
+                return (
+                  <RouteInviteCard
+                    key={key}
+                    onPress={() => navigation.navigate(APP_ROUTES.RouteSoon)}
+                  />
+                );
+              case 'core33Invite':
+                return core33Invite ? (
+                  <Core33InviteCard
+                    key={key}
+                    variant={core33Invite}
+                    completedCount={Math.max(core33History?.completedCount ?? 0, 1)}
+                    onPress={() =>
+                      openCore33Discovery(core33History?.completedCount ?? 0)
+                    }
+                    onDismiss={() => inviteDismissals.dismiss()}
+                  />
+                ) : null;
+              case 'ellie':
+                // Opens the chat; nothing is sent.
+                return (
+                  <EllieBand
+                    key={key}
+                    onPress={() =>
+                      navigation.navigate(APP_ROUTES.EllieChat, { focusInput: true })
+                    }
+                  />
+                );
+              case 'challenge':
+                return challengeCard ? (
+                  <OfficialChallengeSection
+                    key={key}
+                    card={challengeCard}
+                    joining={joining}
+                    onPress={() =>
+                      navigation.navigate(APP_ROUTES.SocialChallenge, {
+                        challengeId: challengeCard.id,
+                      })
+                    }
+                    onJoin={joinOfficial}
+                  />
+                ) : null;
+              case 'routines':
+                return (
+                  <WeekCarousel
+                    key={key}
+                    loading={workoutsQuery.isLoading}
+                    error={Boolean(workoutsQuery.error)}
+                    onRetry={() => {
+                      workoutsQuery.refetch().catch(() => {});
+                    }}
+                    workouts={recommended}
+                    onOpenWorkout={workoutId =>
+                      navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId })
+                    }
+                    onOpenAll={openWorkouts}
+                  />
+                );
+              case 'quiz':
+                return (
+                  <QuizBanner
+                    key={key}
+                    loading={ellieData.overviewQuery.isLoading || quizQuery.isLoading}
+                    points={points}
+                    mastery={quizQuery.data ? quizMastery(quizQuery.data) : null}
+                    onPress={() => navigation.navigate(APP_ROUTES.QuizLanding)}
+                  />
+                );
+              case 'wear':
+                return <WearBannerV2 key={key} onPress={() => setWearVisible(true)} />;
             }
-            onOpenAll={openWorkouts}
-          />
-
-          <QuizBanner
-            loading={ellieData.overviewQuery.isLoading || quizQuery.isLoading}
-            points={points}
-            mastery={quizQuery.data ? quizMastery(quizQuery.data) : null}
-            onPress={() => navigation.navigate(APP_ROUTES.QuizLanding)}
-          />
-
-          <WearBannerV2 onPress={() => setWearVisible(true)} />
+          })}
         </View>
       </ScrollView>
 

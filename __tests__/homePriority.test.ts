@@ -1,6 +1,7 @@
 import {
   allDoneLine,
   bestMarkParts,
+  homeSectionOrder,
   buildDayRings,
   homeDateLine,
   formatThousands,
@@ -347,5 +348,37 @@ describe('hasCompletedEver', () => {
     // Really nothing completed.
     expect(hasCompletedEver(0, false)).toBe(false);
     expect(hasCompletedEver(null, false)).toBe(false);
+  });
+});
+
+describe('homeSectionOrder', () => {
+  it('follows v2.12: Tu día → Tu ruta → ELLIE → Para entrenar → Quiz → Wear', () => {
+    expect(homeSectionOrder({ core33Invite: false, challenge: false })).toEqual([
+      'rings',
+      'route',
+      'ellie',
+      'routines',
+      'quiz',
+      'wear',
+    ]);
+  });
+
+  it('puts the Core 33 invitation after the route and the challenge after ELLIE', () => {
+    expect(homeSectionOrder({ core33Invite: true, challenge: true })).toEqual([
+      'rings',
+      'route',
+      'core33Invite',
+      'ellie',
+      'challenge',
+      'routines',
+      'quiz',
+      'wear',
+    ]);
+  });
+
+  it('never has a best-mark section', () => {
+    expect(homeSectionOrder({ core33Invite: true, challenge: true })).not.toContain(
+      'bestMark' as never,
+    );
   });
 });
