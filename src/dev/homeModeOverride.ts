@@ -74,3 +74,13 @@ export function useHomeModeOverride(): HomeOverride | null {
   const value = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   return __DEV__ ? value : null;
 }
+
+// iOS dev launch argument to open Inicio already scrolled (for screenshots of
+// the sections under the hero): `-homeScroll 900`. 0 in production builds.
+export function devHomeScroll(): number {
+  if (!__DEV__ || Platform.OS !== 'ios') {
+    return 0;
+  }
+  const value = Number(Settings.get('homeScroll'));
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
