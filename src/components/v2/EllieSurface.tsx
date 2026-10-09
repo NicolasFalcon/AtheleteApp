@@ -1,7 +1,8 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { ArrowRight } from 'lucide-react-native';
-import { EllieOrb, type EllieOrbState } from '@app/components/v2/EllieOrb';
+import { LivingHalo, type LivingHaloState } from '@app/components/v2/LivingHalo';
+import { EllieActionButton } from '@app/components/v2/EllieActionButton';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { Eyebrow, TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -9,42 +10,48 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 export type EllieSurfaceProps = {
   message: string;
   eyebrow?: string;
-  action?: { label: string; onPress: () => void };
+  // `ai`: the action calls the AI → compact Halo action (§22.2).
+  action?: { label: string; onPress: () => void; ai?: boolean };
   orbSize?: number;
-  orbState?: EllieOrbState;
+  orbState?: LivingHaloState;
   style?: StyleProp<ViewStyle>;
 };
 
-// Full-bleed linen band with the orb and ELLIE's voice (17/400, no bubble).
-// ELLIE's material is identity, not a card: no radius, no border.
+// Full-bleed band with the Living Halo and ELLIE's voice (17/400, no bubble).
+// No radius, border or dividers; only a very soft Ember wash behind it.
 export function EllieSurface({
   message,
   eyebrow = 'ELLIE',
   action,
   orbSize = 44,
-  orbState = 'breathing',
+  orbState = 'idle',
   style,
 }: EllieSurfaceProps) {
   const { colors, layout } = useThemeV2();
-  const linen = colors.ellie.linen.slice(0, 2);
 
   return (
     <View style={[styles.band, { paddingHorizontal: layout.gutter }, style]}>
       {/* Background only: on Fabric a padded LinearGradient used as a
           container offsets itself and its children by the padding. */}
       <LinearGradient
-        colors={linen.length > 1 ? linen : [linen[0], linen[0]]}
+        colors={[...colors.ellie.wash]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <EllieOrb size={orbSize} state={orbState} />
+      <LivingHalo size={orbSize} state={orbState} />
       <View style={styles.texts}>
         {eyebrow ? (
           <Eyebrow color={colors.ellie.textSecondary}>{eyebrow}</Eyebrow>
         ) : null}
         <TextV2 variant="voice">{message}</TextV2>
-        {action ? (
+        {action?.ai ? (
+          <EllieActionButton
+            label={action.label}
+            variant="compact"
+            onPress={action.onPress}
+          />
+        ) : action ? (
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel={action.label}

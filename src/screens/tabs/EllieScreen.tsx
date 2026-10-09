@@ -3,7 +3,6 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   EllieComposer,
-  EllieLinen,
   PressableScale,
   Skeleton,
   SkeletonGroup,
@@ -79,7 +78,7 @@ export function EllieScreen({ navigation, route }: Props) {
   );
 
   return (
-    <EllieLinen>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 />
       <ScrollView
         onScroll={tabBarMotion.onScroll}
@@ -95,7 +94,7 @@ export function EllieScreen({ navigation, route }: Props) {
         <EllieOpening
           eyebrow="ELLIE · TU COACH"
           voice={voice}
-          orbState={failed ? 'offline' : 'breathing'}
+          orbState={failed ? 'offline' : 'idle'}
           onAsk={open}
           showAnswers
         />
@@ -148,13 +147,15 @@ export function EllieScreen({ navigation, route }: Props) {
           onPress={() =>
             navigation.navigate(APP_ROUTES.EllieChat, { focusInput: true })
           }
+          onVoice={() => navigation.navigate(APP_ROUTES.EllieVoice)}
         />
       </View>
-    </EllieLinen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   retry: { alignItems: 'center' },
   composer: { position: 'absolute' },
 });

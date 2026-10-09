@@ -13,7 +13,8 @@ import Svg, { Circle } from 'react-native-svg';
 import { Check, ChevronDown } from 'lucide-react-native';
 import {
   Button,
-  EllieOrb,
+  EllieActionButton,
+  LivingHalo,
   PressableScale,
   TextV2,
   useThemeV2,
@@ -43,7 +44,7 @@ export function EllieVoice({
     <View style={styles.voiceRow}>
       <View style={styles.voiceOrb}>
         {showOrb ? (
-          <EllieOrb size={24} state={muted ? 'offline' : 'breathing'} />
+          <LivingHalo size={24} state={muted ? 'offline' : 'idle'} />
         ) : null}
       </View>
       <TextV2
@@ -141,7 +142,7 @@ export function ThinkingIndicator() {
       accessibilityLabel="ELLIE está escribiendo"
     >
       <View style={styles.voiceOrb}>
-        <EllieOrb size={24} state="thinking" />
+        <LivingHalo size={24} state="thinking" />
       </View>
       <View style={styles.dots}>
         <Dot index={0} />
@@ -325,20 +326,18 @@ export function NutritionPlanCard({
             </TextV2>
           ) : null}
           <View style={styles.pair}>
-            <Button
+            <EllieActionButton
               label="Otra versión"
-              variant="secondary"
-              size="md"
+              variant="compact"
               loading={regenerating}
               loadingLabel="Generando"
               disabled={busy}
               onPress={onAnother}
               style={styles.flex}
             />
-            <Button
+            <EllieActionButton
               label="Ajustar"
-              variant="outline"
-              size="md"
+              variant="compact"
               disabled={busy}
               onPress={onAdjust}
               style={styles.flex}
@@ -414,10 +413,9 @@ export function RoutineCard({
               onPress={onSave}
               style={styles.flex}
             />
-            <Button
+            <EllieActionButton
               label="Otra versión"
-              variant="secondary"
-              size="md"
+              variant="compact"
               loading={regenerating}
               loadingLabel="Generando"
               disabled={stage === 'saving' || regenerating}

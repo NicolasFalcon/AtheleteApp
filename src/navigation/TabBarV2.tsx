@@ -3,7 +3,7 @@ import { Keyboard, Platform, StyleSheet, View } from 'react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  EllieOrb,
+  LivingHalo,
   GlassSurface,
   PressableScale,
   TextV2,
@@ -75,7 +75,7 @@ function TabItem({ name, focused, onPress, onLongPress }: TabItemProps) {
       style={[styles.item, { borderRadius: radius.tabItem }]}
     >
       <View style={styles.itemContent}>
-        <View style={[styles.icon, !focused && styles.inactiveIcon]}>
+        <View style={[styles.icon, !focused && icon ? styles.inactiveIcon : null]}>
           {icon ? (
             <TabIcon
               name={icon}
@@ -84,7 +84,7 @@ function TabItem({ name, focused, onPress, onLongPress }: TabItemProps) {
               ember={colors.ember.base}
             />
           ) : (
-            <EllieOrb size={24} />
+            <LivingHalo size={24} tab active={focused} />
           )}
         </View>
         <TextV2

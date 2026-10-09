@@ -21,7 +21,7 @@ import {
 import {
   BackButton,
   Button,
-  EllieOrb,
+  LivingHalo,
   EllieSurface,
   Eyebrow,
   GlassHeader,
@@ -271,9 +271,9 @@ function CatalogContent({ onClose }: { onClose: () => void }) {
 
       <Section title="ELLIE">
         <View style={styles.inline}>
-          <EllieOrb size={72} />
-          <EllieOrb size={48} state="thinking" />
-          <EllieOrb size={48} state="offline" />
+          <LivingHalo size={72} />
+          <LivingHalo size={48} state="thinking" />
+          <LivingHalo size={48} state="offline" />
         </View>
       </Section>
       <EllieSurface

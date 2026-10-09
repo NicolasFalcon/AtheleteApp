@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight } from 'lucide-react-native';
 import {
   Button,
-  EllieOrb,
+  LivingHalo,
   Eyebrow,
   PressableScale,
   StatusBarV2,
@@ -35,7 +35,7 @@ export type EllieWelcomeProps = {
 
 const FIRST_SESSION_PHOTO = require('@app/assets/v2/photos/movilidad.jpg');
 
-// ONB_03 · Bienvenida de ELLIE (Auth.dc.html · bienvenida): ELLIE's linen,
+// ONB_03 · Bienvenida de ELLIE (Auth.dc.html · bienvenida): ELLIE's neutral Ember wash,
 // the breathing orb, her voice at 26/400, the starting point in three
 // figures and the first session. Two ways out: Inicio or a conversation.
 // The profile is saved in the background while this is shown; both ways out
@@ -55,9 +55,7 @@ export function EllieWelcome({
   const { colors, mode } = useThemeV2();
   const insets = useSafeAreaInsets();
   const isLight = mode === 'light';
-  const background = isLight
-    ? [colors.ellie.linenAlt[0], colors.ellie.linenAlt[1], colors.bg]
-    : [colors.ellie.linen[2], colors.ellie.linen[3], colors.bg];
+  const background = [colors.ellie.wash[0], colors.ellie.wash[1], colors.bg];
   const hairline = isLight ? 'rgba(18,18,18,.08)' : colors.border.onDarkStrong;
   const name = answers.name.trim() || 'hola';
   const duration =
@@ -94,7 +92,7 @@ export function EllieWelcome({
       <StatusBarV2 />
       <View style={styles.center}>
         <Animated.View entering={FadeInDown.duration(600)}>
-          <EllieOrb size={128} />
+          <LivingHalo size={128} />
         </Animated.View>
         <Animated.View
           entering={FadeInDown.duration(500).delay(200)}

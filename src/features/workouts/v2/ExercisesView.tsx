@@ -2,7 +2,7 @@ import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Camera, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
 import {
-  EllieOrb,
+  LivingHalo,
   EquipmentBubble,
   PressableScale,
   SearchField,
@@ -225,7 +225,7 @@ function ScanCard() {
       </View>
       <View style={styles.scanTexts}>
         <View style={styles.scanEyebrow}>
-          <EllieOrb size={18} />
+          <LivingHalo size={18} />
           <TextV2 variant="eyebrow" color="#A8A6A1">
             Con ELLIE
           </TextV2>

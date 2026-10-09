@@ -9,7 +9,8 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import {
-  EllieOrb,
+  EllieActionButton,
+  LivingHalo,
   PressableScale,
   TextV2,
   useThemeV2,
@@ -60,7 +61,7 @@ export function EllieOpening({
 }: {
   eyebrow: string;
   voice: string;
-  orbState: 'breathing' | 'thinking' | 'offline';
+  orbState: 'idle' | 'thinking' | 'offline';
   onAsk: (ask: EllieAsk) => void;
   showAnswers: boolean;
 }) {
@@ -70,7 +71,7 @@ export function EllieOpening({
   return (
     <View style={styles.opening}>
       <View style={styles.orb}>
-        <EllieOrb size={116} state={orbState} />
+        <LivingHalo size={116} state={orbState} />
       </View>
       <View style={styles.voiceBlock}>
         <TextV2
@@ -86,15 +87,10 @@ export function EllieOpening({
         </TextV2>
         {showAnswers ? (
           <View style={styles.answers}>
-            <PressableScale
-              accessibilityRole="button"
+            <EllieActionButton
+              label={primary.text}
               onPress={() => onAsk(primary)}
-              style={[styles.pill, { backgroundColor: colors.cta.primary }]}
-            >
-              <TextV2 variant="bodyStrong" color={colors.cta.primaryText}>
-                {primary.text}
-              </TextV2>
-            </PressableScale>
+            />
             <PressableScale
               accessibilityRole="button"
               onPress={() => onAsk(secondary)}
@@ -136,9 +132,8 @@ export function AlsoCanList({ onAsk }: { onAsk: (ask: EllieAsk) => void }) {
         >
           <item.icon
             size={20}
-            color={colors.text.primary}
+            color={colors.ember.base}
             strokeWidth={1.8}
-            style={styles.rowIcon}
           />
           <TextV2 variant="cta" style={styles.rowText}>
             {item.text}

@@ -13,8 +13,7 @@ import {
   BackButton,
   Button,
   EllieComposer,
-  EllieLinen,
-  EllieOrb,
+  LivingHalo,
   IconButton,
   PressableScale,
   Sheet,
@@ -150,7 +149,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
   });
 
   return (
-    <EllieLinen>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 />
       <View
         style={[
@@ -160,7 +159,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
       >
         <BackButton variant="muted" onPress={() => navigation.goBack()} />
         <View style={styles.title} accessibilityRole="header">
-          <EllieOrb size={28} state={offline ? 'offline' : 'breathing'} />
+          <LivingHalo size={28} state={offline ? 'offline' : 'idle'} />
           <View>
             <TextV2 variant="bodyStrong">ELLIE</TextV2>
             <TextV2 variant="caption" color={colors.ellie.textSecondary}>
@@ -244,6 +243,8 @@ export function EllieChatScreen({ navigation, route }: Props) {
             canSend={chat.composer.canSend}
             disabled={chat.composer.disabled}
             autoFocus={autoFocus}
+            haloState={state.thinking ? 'thinking' : 'idle'}
+            onVoice={() => navigation.navigate(APP_ROUTES.EllieVoice)}
           />
         </View>
       </KeyboardAvoidingView>
@@ -288,11 +289,12 @@ export function EllieChatScreen({ navigation, route }: Props) {
           una nueva.
         </TextV2>
       </Sheet>
-    </EllieLinen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',

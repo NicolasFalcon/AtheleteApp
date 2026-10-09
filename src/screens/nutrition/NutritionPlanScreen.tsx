@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Plus, Sparkles } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import {
+  EllieActionButton,
   ArcGauge,
   BackButton,
   Button,
@@ -211,12 +212,8 @@ export function NutritionPlanScreen({ navigation, route }: Props) {
                 {kcalLine(totals)}
               </TextV2>
               {!totals.hasPlan ? (
-                <Button
+                <EllieActionButton
                   label="Crear con ELLIE"
-                  icon={Sparkles}
-                  iconPosition="start"
-                  size="md"
-                  fullWidth={false}
                   onPress={() => openEllieChat(ELLIE_ASKS.nutritionPlan)}
                   style={styles.create}
                 />
@@ -259,6 +256,7 @@ export function NutritionPlanScreen({ navigation, route }: Props) {
                 orbSize={36}
                 action={{
                   label: 'Ajustar con ELLIE',
+                  ai: true,
                   onPress: () => openEllieChat(ELLIE_ASKS.adjustNutrition),
                 }}
                 style={{ marginHorizontal: -layout.gutter }}

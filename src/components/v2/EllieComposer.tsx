@@ -6,8 +6,8 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { ArrowUp } from 'lucide-react-native';
-import { EllieOrb } from '@app/components/v2/EllieOrb';
+import { ArrowUp, Mic } from 'lucide-react-native';
+import { LivingHalo, type LivingHaloState } from '@app/components/v2/LivingHalo';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -22,6 +22,9 @@ export type EllieComposerProps = {
   onSend?: () => void;
   onPress?: () => void;
   canSend?: boolean;
+  // Voice mode entry (neutral mic chip, left of send). Hidden when absent.
+  onVoice?: () => void;
+  haloState?: LivingHaloState;
   // Inactive field (no connection, limit): dimmed and not editable.
   disabled?: boolean;
   autoFocus?: boolean;
@@ -40,6 +43,8 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
       onSend,
       onPress,
       canSend = false,
+      onVoice,
+      haloState = 'idle',
       disabled = false,
       autoFocus,
       style,
@@ -49,6 +54,18 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
     const { colors, shadow } = useThemeV2();
     const button = variant === 'button';
     const active = button || canSend;
+
+    const mic = onVoice ? (
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel="Modo voz"
+        disabled={disabled}
+        onPress={onVoice}
+        style={[styles.send, { backgroundColor: colors.ellie.chip }]}
+      >
+        <Mic size={19} strokeWidth={2} color={colors.text.primary} />
+      </PressableScale>
+    ) : null;
 
     const send = (
       <PressableScale
@@ -75,7 +92,7 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
 
     const body = (
       <>
-        {button ? <EllieOrb size={36} state="breathing" /> : null}
+        <LivingHalo size="input" state={haloState} />
         {button ? (
           <TextV2
             variant="bodyL"
@@ -101,6 +118,7 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
             style={[styles.input, { color: colors.text.primary }]}
           />
         )}
+        {mic}
         {send}
       </>
     );
@@ -130,12 +148,12 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  buttonBar: { height: 56, borderRadius: 28, paddingLeft: 10, paddingRight: 6 },
+  bar: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  buttonBar: { height: 56, borderRadius: 28, paddingLeft: 10, paddingRight: 6, gap: 8 },
   inputBar: {
     minHeight: 54,
     borderRadius: 27,
-    paddingLeft: 20,
+    paddingLeft: 10,
     paddingRight: 5,
     paddingVertical: 5,
   },
