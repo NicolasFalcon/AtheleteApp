@@ -83,6 +83,95 @@ export function resolveHomeMode({
   return 'workout';
 }
 
+// ── Hero slides (v2.12 · carrusel de estados) ──────────────────────────────
+// One slide per thing of the day: first the pending ones (Retomar | Entreno,
+// Core 33), then those already closed today. Nothing pending → a single
+// "Día completo". A new user → a single "Primera sesión".
+export type HomeSlideKind =
+  | 'resume'
+  | 'workout'
+  | 'core33'
+  | 'workoutDone'
+  | 'core33Closed'
+  | 'allDone'
+  | 'new';
+
+export type HomeSlide = {
+  kind: HomeSlideKind;
+  // Name in the capsule of the indicator.
+  label: string;
+  // Closed today: the capsule carries an Ember dot.
+  closed: boolean;
+};
+
+export type HomeSlidesInput = HomeModeInput & {
+  // The user pinned Core 33 as the priority: it goes first unless there is a
+  // saved session. TODO(core33-priority): no such preference exists yet (BT-54).
+  core33FirstPriority?: boolean;
+};
+
+const SLIDES: Record<HomeSlideKind, HomeSlide> = {
+  resume: { kind: 'resume', label: 'Retomar', closed: false },
+  workout: { kind: 'workout', label: 'Entreno', closed: false },
+  core33: { kind: 'core33', label: 'Core 33', closed: false },
+  workoutDone: { kind: 'workoutDone', label: 'Entreno', closed: true },
+  core33Closed: { kind: 'core33Closed', label: 'Core 33', closed: true },
+  allDone: { kind: 'allDone', label: 'Día completo', closed: false },
+  new: { kind: 'new', label: 'Primera sesión', closed: false },
+};
+
+export function slideFor(kind: HomeSlideKind): HomeSlide {
+  return SLIDES[kind];
+}
+
+export function resolveHomeSlides({
+  hasCompletedEver,
+  workoutDoneToday,
+  hasResumableSession,
+  challenge,
+  core33FirstPriority = false,
+}: HomeSlidesInput): HomeSlide[] {
+  // First session: a single slide (a half-done session still goes first).
+  if (!hasResumableSession && !hasCompletedEver) {
+    return [SLIDES.new];
+  }
+
+  const coreActive = isChallengeActive(challenge);
+  const coreClosed = isCoreClosedToday(challenge);
+
+  const workoutSlot: HomeSlide | null = hasResumableSession
+    ? SLIDES.resume
+    : workoutDoneToday
+    ? null
+    : SLIDES.workout;
+  const coreSlot: HomeSlide | null =
+    coreActive && !coreClosed ? SLIDES.core33 : null;
+
+  const pending: HomeSlide[] =
+    core33FirstPriority && !hasResumableSession
+      ? [coreSlot, workoutSlot].filter((slide): slide is HomeSlide => slide !== null)
+      : [workoutSlot, coreSlot].filter((slide): slide is HomeSlide => slide !== null);
+
+  if (pending.length === 0) {
+    return [SLIDES.allDone];
+  }
+
+  const closed: HomeSlide[] = [];
+  if (workoutDoneToday) {
+    closed.push(SLIDES.workoutDone);
+  }
+  if (coreActive && coreClosed) {
+    closed.push(SLIDES.core33Closed);
+  }
+  return [...pending, ...closed];
+}
+
+// Changes when the set or the order of slides changes (to bring the carousel
+// back to the first one, the next pending action).
+export function slidesKey(slides: readonly HomeSlide[]): string {
+  return slides.map(slide => slide.kind).join('|');
+}
+
 // ── Training time: active seconds of a session (pauses excluded) ─────────
 export type SessionTiming = {
   status: string;

@@ -9,6 +9,8 @@ import {
   prCurve,
   quizMastery,
   resolveHomeMode,
+  resolveHomeSlides,
+  slidesKey,
   sessionActiveSeconds,
   toGlasses,
   trainedMinutesToday,
@@ -380,5 +382,103 @@ describe('homeSectionOrder', () => {
     expect(homeSectionOrder({ core33Invite: true, challenge: true })).not.toContain(
       'bestMark' as never,
     );
+  });
+});
+
+describe('resolveHomeSlides · carrusel de estados', () => {
+  const kinds = (patch: Partial<HomeModeInput & { core33FirstPriority: boolean }>) =>
+    resolveHomeSlides({
+      hasCompletedEver: true,
+      workoutDoneToday: false,
+      hasResumableSession: false,
+      challenge: null,
+      ...patch,
+    }).map(slide => slide.kind);
+
+  it('a new user gets a single "Primera sesión"', () => {
+    expect(kinds({ hasCompletedEver: false })).toEqual(['new']);
+    // Even with an open Core 33: one slide.
+    expect(kinds({ hasCompletedEver: false, challenge: openCore })).toEqual(['new']);
+  });
+
+  it('a half-done session goes first, even for a new user', () => {
+    expect(kinds({ hasResumableSession: true })).toEqual(['resume']);
+    expect(kinds({ hasResumableSession: true, hasCompletedEver: false })).toEqual(['resume']);
+    expect(kinds({ hasResumableSession: true, challenge: openCore })).toEqual([
+      'resume',
+      'core33',
+    ]);
+  });
+
+  it('a pending workout alone is one slide; with an open Core 33 it comes first', () => {
+    expect(kinds({})).toEqual(['workout']);
+    expect(kinds({ challenge: openCore })).toEqual(['workout', 'core33']);
+  });
+
+  it('a closed Core 33 goes to the end, marked as closed', () => {
+    const slides = resolveHomeSlides({
+      hasCompletedEver: true,
+      workoutDoneToday: false,
+      hasResumableSession: false,
+      challenge: closedCore,
+    });
+    expect(slides.map(slide => slide.kind)).toEqual(['workout', 'core33Closed']);
+    expect(slides.map(slide => slide.closed)).toEqual([false, true]);
+  });
+
+  it('the pinned Core 33 goes first, but not before a saved session', () => {
+    expect(kinds({ challenge: openCore, core33FirstPriority: true })).toEqual([
+      'core33',
+      'workout',
+    ]);
+    expect(
+      kinds({ challenge: openCore, core33FirstPriority: true, hasResumableSession: true }),
+    ).toEqual(['resume', 'core33']);
+  });
+
+  it('a finished workout moves to the closed group', () => {
+    expect(kinds({ workoutDoneToday: true, challenge: openCore })).toEqual([
+      'core33',
+      'workoutDone',
+    ]);
+    // A session saved after finishing one: pending first, closed last.
+    expect(
+      kinds({ workoutDoneToday: true, hasResumableSession: true, challenge: openCore }),
+    ).toEqual(['resume', 'core33', 'workoutDone']);
+  });
+
+  it('nothing pending is a single "Día completo"', () => {
+    expect(kinds({ workoutDoneToday: true })).toEqual(['allDone']);
+    expect(kinds({ workoutDoneToday: true, challenge: closedCore })).toEqual(['allDone']);
+  });
+
+  it('completing something changes the set and the first slide is the next action', () => {
+    const before = resolveHomeSlides({
+      hasCompletedEver: true,
+      workoutDoneToday: false,
+      hasResumableSession: false,
+      challenge: openCore,
+    });
+    const after = resolveHomeSlides({
+      hasCompletedEver: true,
+      workoutDoneToday: true,
+      hasResumableSession: false,
+      challenge: openCore,
+    });
+    expect(slidesKey(before)).not.toBe(slidesKey(after));
+    expect(before[0].kind).toBe('workout');
+    expect(after[0].kind).toBe('core33');
+    expect(after[after.length - 1]).toMatchObject({ kind: 'workoutDone', closed: true });
+  });
+
+  it('names the capsules', () => {
+    expect(
+      resolveHomeSlides({
+        hasCompletedEver: true,
+        workoutDoneToday: false,
+        hasResumableSession: true,
+        challenge: openCore,
+      }).map(slide => slide.label),
+    ).toEqual(['Retomar', 'Core 33']);
   });
 });
