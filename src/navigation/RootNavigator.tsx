@@ -8,8 +8,7 @@ import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen'
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
 import { EllieVoiceScreen } from '@app/screens/ellie/EllieVoiceScreen';
 import { RouteSoonScreen } from '@app/screens/home/RouteSoonScreen';
-import { WearCollectionScreen } from '@app/screens/wear/WearCollectionScreen';
-import { WearProductScreen } from '@app/screens/wear/WearProductScreen';
+import { WearScreen } from '@app/screens/wear/WearScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet } from 'react-native';
@@ -250,8 +249,7 @@ export function RootNavigator() {
             options={{ animation: 'fade', gestureEnabled: false }}
           />
           <Stack.Screen name={APP_ROUTES.RouteSoon} component={RouteSoonScreen} />
-          <Stack.Screen name={APP_ROUTES.WearCollection} component={WearCollectionScreen} />
-          <Stack.Screen name={APP_ROUTES.WearProduct} component={WearProductScreen} />
+          <Stack.Screen name={APP_ROUTES.Wear} component={WearScreen} />
           <Stack.Screen
             name={APP_ROUTES.EditProfile}
             component={EditProfileScreen}

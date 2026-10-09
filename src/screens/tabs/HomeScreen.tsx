@@ -516,7 +516,7 @@ export function HomeScreen({ navigation }: Props) {
                 return (
                   <WearCard
                     key={key}
-                    onPress={() => navigation.navigate(APP_ROUTES.WearCollection)}
+                    onPress={() => navigation.navigate(APP_ROUTES.Wear)}
                   />
                 );
             }

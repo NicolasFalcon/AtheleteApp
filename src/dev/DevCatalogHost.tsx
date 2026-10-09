@@ -191,7 +191,7 @@ function openWearFromUrl(url: string | null): boolean {
   if (!url || !url.startsWith('athelete://dev/wear')) {
     return false;
   }
-  const screen = queryParam(url, 'screen') ?? 'collection';
+  const screen = queryParam(url, 'screen') ?? 'wear';
   if (isWearDevScreen(screen)) {
     openWearDevScreen(screen).catch(() => {});
   }

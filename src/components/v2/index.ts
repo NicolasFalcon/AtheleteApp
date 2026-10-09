@@ -11,7 +11,6 @@ export * from '@app/components/v2/EllieComposer';
 export * from '@app/components/v2/LivingHalo';
 export * from '@app/components/v2/livingHaloModel';
 export * from '@app/components/v2/EllieActionButton';
-export * from '@app/components/v2/WearProductTile';
 export * from '@app/components/v2/EllieSurface';
 export * from '@app/components/v2/EquipmentBubble';
 export * from '@app/components/v2/ExerciseRow';
