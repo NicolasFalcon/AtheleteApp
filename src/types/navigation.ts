@@ -196,6 +196,12 @@ export type EllieChatRouteParams = {
     | 'historyError';
 };
 
+// ELLIE voice scene (UI only). `devState` (__DEV__) opens it in one of the
+// four visual states.
+export type EllieVoiceRouteParams = {
+  devState?: 'idle' | 'listening' | 'thinking' | 'speaking';
+};
+
 export type CommunitySegment = 'feed' | 'retos' | 'amigos';
 
 export type CommunityTabParams = {
@@ -279,6 +285,7 @@ export type AppStackParamList = {
   QuizQuestion: QuizQuestionRouteParams;
   QuizResult: QuizResultRouteParams;
   EllieChat: EllieChatRouteParams | undefined;
+  EllieVoice: EllieVoiceRouteParams | undefined;
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;
   NutritionPlan: NutritionPlanRouteParams | undefined;

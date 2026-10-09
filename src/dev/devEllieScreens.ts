@@ -1,7 +1,10 @@
 import { StackActions } from '@react-navigation/native';
 import { waitForApp } from '@app/dev/devWorkoutsScreens';
 import { navigationRef } from '@app/navigation/navigationRef';
-import type { EllieChatRouteParams } from '@app/types/navigation';
+import type {
+  EllieChatRouteParams,
+  EllieVoiceRouteParams,
+} from '@app/types/navigation';
 
 // Development only: each ELLIE screen and state with sample conversations:
 // nothing is sent to ELLIE or stored. Used by the dev menu ("Ver pantallas de
@@ -25,6 +28,10 @@ export const ELLIE_DEV_SCREENS = [
   { key: 'limit', label: 'Chat · límite alcanzado' },
   { key: 'loading', label: 'Chat · cargando' },
   { key: 'historyError', label: 'Chat · historial no cargó' },
+  { key: 'voiceIdle', label: 'Voz · reposo (ELLIE_04)' },
+  { key: 'voiceListening', label: 'Voz · escuchando (ELLIE_05)' },
+  { key: 'voiceThinking', label: 'Voz · procesando (ELLIE_06)' },
+  { key: 'voiceSpeaking', label: 'Voz · respondiendo (ELLIE_07)' },
 ] as const;
 
 export type EllieDevScreen = (typeof ELLIE_DEV_SCREENS)[number]['key'];
@@ -42,6 +49,15 @@ const TAB_STATES: Partial<
   homeError: 'error',
 };
 
+const VOICE_DEV_STATES: Partial<
+  Record<EllieDevScreen, NonNullable<EllieVoiceRouteParams['devState']>>
+> = {
+  voiceIdle: 'idle',
+  voiceListening: 'listening',
+  voiceThinking: 'thinking',
+  voiceSpeaking: 'speaking',
+};
+
 export async function openEllieDevScreen(screen: EllieDevScreen): Promise<boolean> {
   if (!__DEV__ || !(await waitForApp())) {
     return false;
@@ -51,6 +67,13 @@ export async function openEllieDevScreen(screen: EllieDevScreen): Promise<boolea
       screen: 'Ellie',
       params: { devState: TAB_STATES[screen] },
     });
+    return true;
+  }
+  const voice = VOICE_DEV_STATES[screen];
+  if (voice) {
+    navigationRef.dispatch(
+      StackActions.push('EllieVoice' as never, { devState: voice } as never),
+    );
     return true;
   }
   const params: EllieChatRouteParams = {

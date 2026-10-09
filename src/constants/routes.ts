@@ -55,6 +55,7 @@ export const APP_ROUTES = {
   ExerciseList: 'ExerciseList',
   RoutineList: 'RoutineList',
   EllieChat: 'EllieChat',
+  EllieVoice: 'EllieVoice',
   CreateRoutine: 'CreateRoutine',
   EditRoutine: 'EditRoutine',
   AddExerciseToRoutine: 'AddExerciseToRoutine',

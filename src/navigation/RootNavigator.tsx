@@ -6,6 +6,7 @@ import { Core33ReadyScreen } from '@app/screens/core33/Core33ReadyScreen';
 import { SettingsScreen } from '@app/screens/profile/SettingsScreen';
 import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen';
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
+import { EllieVoiceScreen } from '@app/screens/ellie/EllieVoiceScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet } from 'react-native';
@@ -239,6 +240,11 @@ export function RootNavigator() {
             name={APP_ROUTES.EllieChat}
             component={EllieChatScreen}
             options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.EllieVoice}
+            component={EllieVoiceScreen}
+            options={{ animation: 'fade', gestureEnabled: false }}
           />
           <Stack.Screen
             name={APP_ROUTES.EditProfile}
