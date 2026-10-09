@@ -64,6 +64,34 @@ export function buildPostFixtures(
     who === 'me' ? 'self' : who === 'irene' ? 'none' : 'friends';
 
   const seeds: PostSeed[] = [
+    // v2.12 · Route posts (SOCIAL_16). Fixtures only: the backend has no
+    // `route` type yet, so the real app never shows them. TODO(ruta): Fase 5.
+    {
+      id: 'fx-r1', who: 'andrea', type: 'route', ago: 40 * 60_000,
+      body: 'Antes de trabajar. Viento de cara a la vuelta.',
+      attachment: {
+        sport: 'cycling', distance_km: 42.1, duration_sec: 5560, pace_label: '27,3 km/h',
+        elevation_m: 386, planned_name: null, new_best: null,
+      },
+      likes: 22, comments: 0,
+    },
+    {
+      id: 'fx-r2', who: 'carlos', type: 'route', ago: 3 * HOUR + 20 * 60_000,
+      attachment: {
+        sport: 'running', distance_km: 10.05, duration_sec: 3100, pace_label: '5:08 /km',
+        elevation_m: 62, planned_name: 'Parque 5K', new_best: '10 km en 51:40',
+      },
+      likes: 15, comments: 0,
+    },
+    // A type this app does not know: it must not appear in the feed.
+    {
+      id: 'fx-unknown', who: 'sofia', type: 'story' as unknown as PostType, ago: 20 * 60_000,
+      body: 'Este tipo no se muestra.', attachment: null, likes: 0, comments: 0,
+    },
+    {
+      id: 'fx-photo', who: 'lucia', type: 'photo', ago: 6 * HOUR, photo: 'fx://overhead',
+      body: 'Mañana de barra.', attachment: null, likes: 8, comments: 1,
+    },
     {
       id: 'fx-p1', who: 'carlos', type: 'record', ago: 1 * HOUR,
       body: 'Por fin. Llevaba tres semanas atascado en 135.',

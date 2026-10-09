@@ -21,7 +21,7 @@ type Entry = {
 const tab = (
   segment: 'feed' | 'retos' | 'amigos',
   devQuery = '',
-  devScroll?: 'end',
+  devScroll?: 'end' | number,
 ): Target => ({
   tab: 'Community',
   params: { segment, devQuery, devScroll, devNonce: Date.now() },
@@ -39,6 +39,11 @@ const SCREENS: Entry[] = [
   { key: 'feedNoPosts', label: 'Feed · con amigos y sin publicaciones', scenario: 'feedEmpty', target: tab('feed') },
   { key: 'feedLoading', label: 'Feed · cargando (STATE_01)', scenario: 'feedLoading', target: tab('feed') },
   { key: 'feedError', label: 'Feed · error con reintento (STATE_07)', scenario: 'feedError', target: tab('feed') },
+  { key: 'feedY1', label: 'Feed · desplazado 1 (v2.12)', scenario: 'default', target: tab('feed', '', 900) },
+  { key: 'feedY2', label: 'Feed · desplazado 2 (v2.12)', scenario: 'default', target: tab('feed', '', 1900) },
+  { key: 'feedY3', label: 'Feed · desplazado 3 (v2.12)', scenario: 'default', target: tab('feed', '', 2900) },
+  { key: 'feedY4', label: 'Feed · desplazado 4 (v2.12)', scenario: 'default', target: tab('feed', '', 3900) },
+  { key: 'feedY5', label: 'Feed · desplazado 5 (v2.12)', scenario: 'default', target: tab('feed', '', 4900) },
   { key: 'feedMore', label: 'Feed · siguiente página (scroll al final)', scenario: 'default', target: tab('feed', '', 'end') },
   { key: 'feedMoreError', label: 'Feed · error al cargar más', scenario: 'feedMoreError', target: tab('feed', '', 'end') },
   { key: 'feedEnd', label: 'Feed · fin de la lista', scenario: 'feedShort', target: tab('feed', '', 'end') },
@@ -73,6 +78,7 @@ const SCREENS: Entry[] = [
   { key: 'inviteLimit', label: 'Invitar amigos · 5 enlaces activos', scenario: 'inviteLimit', target: route('SocialInvite') },
   { key: 'inviteEmpty', label: 'Invitar amigos · sin enlaces', scenario: 'noFriends', target: route('SocialInvite') },
   { key: 'post', label: 'Publicación y comentarios (SOCIAL_03)', scenario: 'default', target: route('SocialPost', { postId: 'fx-p1' }) },
+  { key: 'postRoute', label: 'Publicación · ruta (SOCIAL_16, solo ejemplo)', scenario: 'default', target: route('SocialPost', { postId: 'fx-r1' }) },
   { key: 'postPhoto', label: 'Publicación · entreno con foto', scenario: 'default', target: route('SocialPost', { postId: 'fx-p2' }) },
   { key: 'postRoutine', label: 'Publicación · rutina compartida', scenario: 'default', target: route('SocialPost', { postId: 'fx-p3' }) },
   { key: 'postAchievement', label: 'Publicación · logro', scenario: 'default', target: route('SocialPost', { postId: 'fx-p4' }) },
