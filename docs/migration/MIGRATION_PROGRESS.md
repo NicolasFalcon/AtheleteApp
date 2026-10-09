@@ -2307,7 +2307,7 @@ Sin migraciones, sin `npx supabase`, sin escrituras de prueba y sin commits. **S
 Tests: `publishPost.test.ts` (mapeo de errores de `create_post`, validación de la foto y cálculo del tamaño al redimensionar).
 
 ### `TODO(social-wire)` que quedan tras W4
-W5 retos (el detalle solo con ranking, sin actividad por reto) · W6 notificaciones (contador de no leídas con `count` sobre `read_at is null`) · W7 moderación · miniaturas de anatomía por `exercise_id` (`PostBodies`, `SocialRoutineScreen`) · `OfficialChallengeHero` (`cover_path`) · pasar la aceptación de los Términos al servidor (`TODO(testflight)`, BT-43) · borrar `fixtureSocialService.ts` al terminar. **Por verificar con datos reales:** que la política de `social-photos` admite `{uid}/{uuid}/photo.jpg` con `contentType` PNG o WebP bajo ese nombre; que el servidor acepta `core33:<participation_id>` como fuente de un logro (`BACKEND_SUMMARY`); y el comportamiento de la foto en Android.
+W5 retos (el detalle solo con ranking, sin actividad por reto) · W6 notificaciones (contador de no leídas con `count` sobre `read_at is null`) · W7 moderación · miniaturas de anatomía por `exercise_id` (`PostBodies`, `SocialRoutineScreen`) · `OfficialChallengeHero` (`cover_path`) · pasar la aceptación de los Términos al servidor (`TODO(testflight)`, BT-43) · borrar `fixtureSocialService.ts` al terminar. **Por verificar con datos reales:** que la política de `social-photos` admite `{uid}/{uuid}/photo.<ext>` (el nombre ya sigue al tipo real: `photo.jpg`, `.png` o `.webp`, pendiente cerrado en W5–W7); que el servidor acepta `core33:<participation_id>` como fuente de un logro (`BACKEND_SUMMARY`); y el comportamiento de la foto en Android.
 
 ### Checklist de QA unificado W1 a W4 (dos cuentas)
 **A** = falcon1989, **B** = la cuenta nueva (sin fila en `social_settings`). Reemplaza a los listados de W1, W2 y W3. Nunca la misma cuenta en las dos sesiones. Para tener qué compartir, A necesita un entreno completado con series (volumen) y un récord de esa sesión, una rutina propia, un logro y, si se puede, un reto completado.
@@ -2361,3 +2361,80 @@ W5 retos (el detalle solo con ranking, sin actividad por reto) · W6 notificacio
 28. A: Invitar → compartir el enlace (`athelete://amigo/…`) → aparece en "Enlaces activos"; "Revocar" lo quita y el contador baja. Con 5 activos el sexto dice "Ya tienes 5 enlaces activos".
 29. Cambiar de cuenta (cerrar sesión de A, entrar con B): no queda nada de A en pantalla.
 30. Con sesión caducada al abrir un post: la app cierra sesión.
+
+---
+
+## Comunidad · conexión W5 (retos), W6 (notificaciones) y W7 (moderación) · 2026-10-08
+
+Sin migraciones, sin `npx supabase`, sin escrituras de prueba. Checkpoint: `docs/migration/SOCIAL_W57_CHECKPOINT.md`. **Sin dependencias nuevas.**
+
+### Pendiente de W4 cerrado
+`photoFileName(mime)` (`postModel`): la subida va a `{uid}/{uuid}/photo.jpg`, `.png` o `.webp` según el tipo real de la foto. Test en `postModel.test.ts`.
+
+### W5 · Retos
+| Pieza | Cómo |
+|---|---|
+| Lista | `get_my_challenges`. Las filas no traen personas ni líder: se pide `get_challenge_board` de cada reto oficial, invitación y activo (tope 12; si uno falla, esa fila sale sin avatares). Los completados son filas simples. El oficial viene como lista: participas si su id está en `active`. |
+| Detalle | `get_challenge_board` + mi fila de `social_challenge_participants` (`celebrated_at`, puesto) + para el oficial mis `social_challenge_contributions` de la semana (barras y "hoy a mano", `source = 'manual'`). **Solo ranking**: `activity` va vacío. `null` → "Reto no disponible". |
+| Crear | `create_friend_challenge`. Errores `invalid_metric`, `goal_out_of_range` (con `min`/`max` en el mensaje), `invalid_duration`, `no_invitees`, `invitee_not_friend`: se muestra el aviso y se vuelve al paso que lo arregla. |
+| Invitación | `respond_challenge_invite`; `no_invite` ("ya no existe") e `invite_expired` ("caducó") devuelven la lista a su estado y la refrescan. |
+| Salir / cancelar | `leave_challenge` y `cancel_friend_challenge` (`ok:false` = nada que cambiar). Salir solo en un reto activo; cancelar solo el creador y solo en `pending`: en uno activo no se ofrece. |
+| Oficial | `join_official_challenge` (`not_available`); `add_manual_contribution` +5/+10/+15 solo con `allow_manual`; `amount_out_of_range`, `not_allowed` y `daily_limit` (con "te quedan N"). |
+| Celebración | Reto completado llama a `mark_challenge_celebrated` y vibra **solo si `celebrated_at` es null** (idempotente). |
+| Optimista | `relationMachine`: aceptar, rechazar, salir, cancelar, unirse al oficial y celebrar actualizan la caché de retos y del detalle al instante y vuelven atrás si el servidor falla o responde `ok:false`. Toda escritura invalida la caché social; el feed se recarga al volver el foco. |
+
+**Rangos del servidor** (ya coincidían con la UI de la tanda C, ahora con test): `workouts` 1–14, `strength_sessions` 1–10, `minutes_trained` 30–900, `core33_habit_days` 1–14, `mobility_minutes` 15–300; duración 3, 7 o 14; solo amigos.
+
+### W6 · Notificaciones
+- Tabla `social_notifications` por `created_at` desc, 30 por página (`useInfiniteQuery`, botón "Ver más"). Actores con `get_social_profiles` (sin foto real para quien manda una solicitud, DA-119).
+- Siete tipos: `post_like`, `post_comment`, `friend_request`, `friend_accepted`, `challenge_invite`, `challenge_started`, `content_removed` (sin actor ni destino). Un tipo desconocido se descarta sin fallar. Los me gusta de un post forman una línea.
+- No leídas = `count` con `read_at is null`. Marcar una (al abrir) o todas: `UPDATE read_at = now()` con `recipient_id = yo` y `read_at is null`. Borrar: `DELETE` (mantener pulsada una fila → "Eliminar"; en una línea de me gusta borra todos los de ese post).
+- Contador en la campana del hub (`IconButton.badgeCount`, "9+") y punto en la de Inicio; si solo hay sociales, esa campana abre las sociales (sin pantalla nueva). Se refresca al volver el foco.
+
+### W7 · Moderación
+- Rol: fila propia de `app_moderators` (o `is_moderator()` si no se puede leer). Cola: vista `moderation_queue` **en el orden del servidor**; muestra `reasons[]`, `open_reports` y `author_prior_removals`; las fotos se firman (`social-photos`). Historial: `moderation_actions` por `created_at` desc.
+- `moderate_content`: post y comentario → `restore` / `remove`; usuario → `dismiss`. Nota opcional (≤ 500). `invalid_arguments` e `invalid_action_for_*` → aviso; `not_moderator` → "No tienes acceso".
+
+### Decisiones nuevas
+- **DA-173** · Retos: una consulta de ranking por reto listado (N+1, tope 12) porque `get_my_challenges` no trae personas ni líder. *Petición al backend si pesa:* incluirlas en la lista.
+- **DA-174** · Crear reto no repite el máximo de invitados del servidor (no lo hay documentado): el tope de 10 es solo de la UI.
+- **DA-175** · Las notificaciones aceptan `post_liked` como alias de `post_like` (la muestra de `SOCIAL_RPC_SHAPES` lo escribe así y la tabla de tipos no).
+- **DA-176** · "Hoy a mano" del oficial se cuenta con el día local del teléfono; el servidor manda con `daily_limit` y `remaining`.
+- **D-104** · Detalle del reto: sin "Actividad reciente" (el servidor solo da ranking; BT-46 c). La sección se oculta sola.
+- **D-105** · Moderación de posts y comentarios: "Descartar reportes" desaparece (el servidor responde `invalid_action_for_content`); "Restaurar" sirve también para contenido solo reportado y entonces se llama "Mantener y cerrar reportes". La cola ya no se reordena en la app.
+- **D-106** · "Salir del reto" solo en retos activos; el creador de uno que nadie aceptó lo cancela (no lo abandona).
+- **D-107** · Notificaciones: se quitan `challenge_completed` y `challenge_ending` (el servidor no los escribe).
+- **D-108** · Notificaciones: "Ver más" y "mantener pulsado para eliminar"; campana del hub con contador.
+- **D-109** · Crear reto: los errores del servidor devuelven al paso que corresponde, con el rango real en el mensaje.
+
+### Por verificar con datos reales
+Que un moderador puede firmar fotos de `social-photos` ajenas (si no, se ve el recuadro "Foto reportada"); que `get_challenge_board` de una invitación devuelve el tablero a quien aún no aceptó; el valor de `source` de los aportes manuales (`manual`); y el reparto de días del aporte a mano entre la hora local y la del servidor.
+
+### `TODO(social-wire)` que quedan
+Miniaturas de anatomía por `exercise_id` (`PostBodies`, `SocialRoutineScreen`) · `OfficialChallengeHero` y el detalle oficial (`cover_path`; la foto sigue siendo la de la app) · el texto fijo del oficial ("100 dominadas", "Semana de tracción") sale del reto · `useFeed` sigue siendo un cargador local (no `useInfiniteQuery`) · Términos al servidor (BT-43) · borrar `fixtureSocialService.ts` y los escenarios dev tras el QA.
+
+### Checklist de QA unificado W1 a W7 (dos cuentas + moderador)
+**A** = falcon1989, **B** = la cuenta nueva, **M** = nicolas.falcon0 (moderador en `app_moderators`). Los pasos **1 a 30** son los del checklist W1 a W4 de arriba; estos los continúan. Nunca la misma cuenta en dos sesiones.
+
+*Retos (W5)*
+31. A: Comunidad → Retos → "Crear reto" (si A y B no son amigos, antes hacerlos amigos). Tipo "Entrenamientos", objetivo 2, "3 días", invita a B → "Crear". Se abre el reto "Esperando a que acepten" y A ve "Cancelar reto" en ··· (y no "Salir").
+32. Intentar objetivos fuera de rango: 15 entrenos, 11 sesiones de fuerza, 29 min, 301 min de movilidad → el selector no pasa del límite del tipo. El tipo "Repeticiones" no aparece. Sin amigos marcados no se puede crear.
+33. B: ve la invitación en Retos y en el hub (tarjeta con Aceptar / Ahora no). Con avión al aceptar: vuelve atrás con aviso. B pulsa "Unirme": el reto pasa a activo, con fechas, y A lo ve activo al recargar. En ··· ya no hay "Cancelar".
+34. Probar una invitación ya resuelta: A crea otro reto para B y lo cancela antes de que B responda; B pulsa Aceptar → "Esta invitación ya no existe" y la tarjeta desaparece.
+35. A y B entrenan (una sesión completada cada uno): vuelven a Retos y el ranking muestra el progreso de ambos; el detalle no muestra "Actividad reciente". Con un amigo de por medio que no es de B, B solo ve a A y a sí mismo.
+36. Si alguien llega a la meta: pantalla "Reto completado" con vibración **una sola vez**; al volver a abrirla no vuelve a vibrar (`celebrated_at`). "Compartir" abre el composer con ese reto.
+37. A pulsa "Salir del reto" en el activo (confirmación): sale y desaparece de su lista; B sigue viéndolo y ya no ve a A en el ranking.
+38. Oficial: unirse (si no estabas), registrar +5, +10, +15: el progreso sube y las barras de la semana también; llegar a 300 en un día → "Hoy solo puedes registrar N más" / "máximo de registros de hoy". Un oficial sin aporte manual no muestra los botones.
+
+*Notificaciones (W6)*
+39. B da me gusta y comenta un post de A, y A tiene una solicitud de un tercero (o B reenvía): el hub de A muestra el contador en la campana (y Inicio el punto, sin pantalla nueva). Los me gusta del mismo post forman una línea.
+40. A abre cada notificación: me gusta/comentario → el post; solicitud → Amigos; invitación/reto iniciado → el reto; amistad aceptada → el perfil. Al abrirla se marca como leída y el contador baja.
+41. "Marcar todo" deja el contador a 0 en el hub y en Inicio. Mantener pulsada una fila → Eliminar: desaparece y no vuelve al recargar.
+42. Con más de 30 notificaciones, "Ver más" carga la siguiente página sin repetir filas.
+
+*Moderación (W7)*
+43. B reporta un post de A (motivo "Spam"). M abre Ajustes → Moderación (A y B no ven esa fila): aparece el post con 1 reporte, el motivo, las retiradas anteriores de A y su foto si la tiene. A abre el mismo enlace de moderación (dev) o la ruta: "No tienes acceso".
+44. M pulsa "Retirar" con una nota: toast "Contenido retirado"; el post sale de la cola y del feed de A y B; A recibe la notificación "Retiramos una publicación tuya…" (sin actor, sin destino); el historial de M muestra la acción con la nota.
+45. Repetir con otro post y "Mantener y cerrar reportes": el post sigue visible y el reporte se cierra. Un reporte sobre un usuario solo ofrece "Descartar reportes".
+46. Si M deja de ser moderador con la pantalla abierta, la siguiente acción dice "No tienes acceso".
+

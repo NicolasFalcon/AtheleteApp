@@ -139,3 +139,71 @@ Resumen para la app — get_post(_id uuid)
 - Solo ejecutable por usuarios con sesión (revocado para anónimos).
 
 Pruebas: el autor vio su post con liked_by_me: false ✓; un usuario sin amistad recibió null ✓; tras marcar el post como borrado, el autor también recibió null ✓. No pude probar el caso "amigo lo ve" porque no hay amistades en la base de datos, pero usa exactamente la misma condición are_friends que get_feed, ya probada antes.
+
+
+Respuesta completa, solo lectura, sin aplicar nada.
+
+RETOS (W5)
+
+`create_friend_challenge(_metric text, _goal int, _duration_days int, _invitee_ids uuid[])`
+- Métricas válidas y rangos de meta:
+  - `workouts`: 1–14 · `strength_sessions`: 1–10 · `minutes_trained`: 30–900 · `core33_habit_days`: 1–14 · `mobility_minutes`: 15–300. (`exercise_reps` no existe — rechazada.)
+- Duraciones válidas: solo `3`, `7` o `14`.
+- Invitados: todos deben ser amigos del creador, sin bloqueo, y no puede invitarse a sí mismo.
+- OK → `{"ok":true,"challenge_id":"<uuid>","title":"3 entrenamientos en 1 semana"}` (el reto queda `pending` con `invite_expires_at` = ahora + 7 días; el creador entra `active`).
+- Errores (HTTP 200, `ok:false`): `invalid_metric`, `goal_out_of_range` (incluye `min`/`max`), `invalid_duration`, `no_invitees`, `invitee_not_friend` (incluye `user_id`). Sin sesión → excepción `not_authenticated` (HTTP 400).
+
+`respond_challenge_invite(_challenge_id uuid, _accept boolean)`
+- Requiere tener participación `invited` en ese reto.
+- Aceptar → `{"ok":true,"status":"active"}`: el reto pasa a `active`, `starts_at=now()`, `ends_at=now()+duration_days`; los demás invitados quedan `expired`; cada participante activo recibe notificación `challenge_started`.
+- Rechazar → `{"ok":true,"status":"declined"}`.
+- Errores: `no_invite` (no existe o no fuiste invitado), `invite_expired` (vencida o el reto ya no está `pending`; tu participación queda `expired`).
+
+`leave_challenge(_challenge_id uuid)` → `{"ok":true|false}` (`ok:false` si no tenías participación `active`). Solo cambia TU fila a `left`; el reto sigue.
+
+`cancel_friend_challenge(_challenge_id uuid)` → `{"ok":true|false}`. Solo el creador, solo retos entre amigos en `pending`: reto → `cancelled`, invitados → `expired`, y borra las notificaciones `challenge_invite` del reto. Un reto ya `active` no se puede cancelar con esta RPC.
+
+`join_official_challenge(_challenge_id uuid)` → `{"ok":true}`. Solo retos `kind='official'`, `status='active'` y no vencidos. Error: `not_available`. Si ya habías salido (`left`), reactiva tu participación; si estabas `completed`, no la toca.
+
+`add_manual_contribution(_challenge_id uuid, _amount int)`
+- Solo retos con `allow_manual=true`, `active`, y tú participante `active`. `_amount` entre 1 y 100.
+- OK → `{"ok":true,"contribution_id":"<uuid>","progress":12}`.
+- Errores: `amount_out_of_range`, `not_allowed` (reto sin aporte manual, no activo o no participas), `daily_limit` (máx. 300 manuales/día; incluye `remaining`).
+
+`mark_challenge_celebrated(_challenge_id uuid)`
+- Pone `celebrated_at=now()` (con `COALESCE`, no sobrescribe si ya estaba) en tu fila si tu participación está `completed`.
+- OK → `{"ok":true}`; si no cumples la condición `{"ok":false}`. Idempotente.
+
+Consulta de retos: `get_my_challenges()` → `{active, invitations, recently_completed, official}` y `get_challenge_board(_challenge_id)` → `{challenge, participants_total, board}` (ranking solo con tú y tus amigos).
+
+NOTIFICACIONES (W6)
+
+Valores de `type` y campos que llenan (la tabla está vacía ahora; esto sale de los triggers y funciones que las crean):
+
+| type | Llenado | Cuándo |
+|---|---|---|
+| `post_like` | `post_id`, `actor_id` | Alguien da me gusta a tu post (se borra si quita el like) |
+| `post_comment` | `post_id`, `comment_id`, `actor_id` | Comentario en tu post |
+| `friend_request` | `request_id`, `actor_id` | Solicitud de amistad recibida (se borra si se cancela/declina) |
+| `friend_accepted` | `request_id` (o nada, por invitación de enlace), `actor_id` | Tu solicitud aceptada, o alguien canjeó tu enlace |
+| `challenge_invite` | `challenge_id`, `actor_id` | Te invitan a un reto entre amigos (se borra si el creador cancela) |
+| `challenge_started` | `challenge_id`, `actor_id` | Otro invitado aceptó y el reto arrancó |
+| `content_removed` | `actor_id` NULL | Moderación retiró tu post o comentario |
+
+Todos llevan `dedupe_key` (UNIQUE con `recipient_id`) y `read_at` NULL hasta que se lee.
+
+No existe RPC "marcar todas como leídas". Se marca directo con RLS: `UPDATE social_notifications SET read_at = now() WHERE recipient_id = auth.uid() AND read_at IS NULL` (una o en lote; la política solo permite escribir sobre tus filas).
+
+MODERACIÓN (W7)
+
+Leer la cola: vista `moderation_queue` (security_invoker, así aplican las RLS de las tablas base; solo un moderador ve filas porque `content_reports` solo lee al dueño del reporte o moderadores). Una fila por contenido con reportes abiertos:
+`target_type, target_id, author_id, author_username, body, photo_path, post_type, post_id, open_reports, reasons[], first_reported_at, last_reported_at, hidden_at, removed_at, author_prior_removals`.
+Ordenada: primero lo no oculto, más reportes primero. Un no-moderador obtiene 0 filas (o error de permiso si consulta tablas directas).
+
+`moderate_content(_target_type text, _target_id uuid, _action text, _note text DEFAULT NULL)`
+- Acciones válidas: `restore`, `remove`, `dismiss`.
+- `post`/`comment`: solo `restore`/`remove` (`dismiss` → `invalid_action_for_content`). `user`: solo `dismiss` (`remove` → `invalid_action_for_user`).
+- `remove`: marca `removed_at` en post/comentario, borra sus likes/notificaciones, cierra reportes como `actioned` y notifica al autor (`content_removed`). `restore`: quita `hidden_at`, cierra reportes como `dismissed`. `dismiss` (user): cierra los reportes sobre ese usuario.
+- Siempre registra en `moderation_actions`. OK → `{"ok":true}`. Errores: `invalid_arguments`; sin ser moderador → excepción `not_moderator` (HTTP 400).
+
+Historial: `SELECT * FROM moderation_actions ORDER BY created_at DESC` — legible solo por moderadores (política `is_moderator()`); un usuario normal no obtiene filas.
