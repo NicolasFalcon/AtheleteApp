@@ -2562,3 +2562,13 @@ Pasos nuevos (47 en adelante):
 50. Me gusta: el corazón se llena en Ember al instante y vuelve atrás con un aviso si falla (con avión).
 51. Dev (solo con datos de ejemplo): los posts de ruta se ven; en la app real (cuenta de QA) no aparece ninguno y un tipo desconocido tampoco.
 52. El detalle de una publicación (SOCIAL_03) muestra el mismo diseño, con el texto bajo las reacciones, los comentarios planos y el campo fijo.
+
+## v2.12 · Corrección de la portada de ELLIE · 2026-10-09
+
+Referencia: ELLIE_01_HOME y `Ellie.dc.html` (`is.ellie`). Solo UI.
+
+- **D-149** · Orden de la portada: Halo → "ELLIE · TU COACH" → frase → respuestas rápidas → "TAMBIÉN PUEDO" (3 filas) → tarjeta de Scan (placeholder: el mismo aviso que en Entrenos) → "PARA LEER CON ELLIE" → "Retomar conversación" **al final**, con su fecha relativa. Separación de 30 pt, márgenes de 24 pt, frase 22/400 (interlineado 1,38, tracking −.005em), etiqueta 11/600 con tracking .1em.
+- **D-150** · Respuestas rápidas: dos pills en **una sola fila** (mitad y mitad), con los textos reales de `CANNED_PROMPTS` (D de BT-28). Como el texto real es largo ("Ajustar mi rutina de hoy"), cada pill puede ocupar dos líneas dentro de 48 pt. **Sin Halo mini**: la referencia no lo muestra en estas respuestas (el handoff §22.2 lo pide para las acciones de IA en general, y la fila "ELLIE · portada" de la tabla solo describe "Sí, ajústalo Ember + blanco"). El principal usa `ember.strong` (D-119, 4,64:1 con el texto blanco) y no `#FF5B1F`.
+- **D-151** · Halo: el arco de luz solo aparece al pensar; en reposo, escuchando y respondiendo el contorno Ember es parejo. Se quita la media luna de reflejo desplazada a la izquierda; queda un brillo suave arriba a la izquierda (más marcado a 100 pt o más) y, en la portada (`shadow`), una sombra difusa debajo. Tamaño 128 (`cover`).
+- **D-152** · El scroll deja `bottomClearance + 104` de margen inferior: nada queda bajo el compositor flotante ni la barra de pestañas.
+- **D-153** · Animación de entrada (`useEllieEntry`, `ellieEntryModel`), con los valores del prototipo: el Halo sale del icono del tab (24 pt, abajo al centro, opacidad .9) y crece a 128 pt en **520 ms**, `cubic-bezier(.22,.9,.24,1)`, sin rebote (`flipFromTab`, solo al llegar desde la barra de pestañas); etiqueta, frase y respuestas suben 10 pt con fundido como **un solo bloque** (`athUp .5s .1s ease`: 500 ms tras 100 ms). Se reproduce cada vez que se abre la pestaña (el prototipo redibuja la pantalla), no solo la primera vez por sesión; al volver del chat solo sube el bloque. Todo en el hilo de UI; con "Reducir movimiento", sin animación. Tests de los valores en `ellieEntryModel.test.ts`.

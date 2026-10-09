@@ -14,7 +14,8 @@ export type EllieActionButtonProps = {
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'compact';
-  size?: 'lg' | 'md';
+  // `pill`: the compact 48 pt answer of the ELLIE cover (15/600).
+  size?: 'lg' | 'md' | 'pill';
   loading?: boolean;
   loadingLabel?: string;
   disabled?: boolean;
@@ -26,6 +27,7 @@ export type EllieActionButtonProps = {
 const SIZES = {
   lg: { height: 56, paddingX: 24, halo: 22, text: 'cta' },
   md: { height: 48, paddingX: 20, halo: 20, text: 'bodyStrong' },
+  pill: { height: 48, paddingX: 22, halo: 20, text: 'bodyStrong' },
 } as const;
 
 export function EllieActionButton({
@@ -75,7 +77,12 @@ export function EllieActionButton({
       ]}
     >
       <LivingHalo size={sizing.halo} state={loading ? 'thinking' : 'idle'} />
-      <TextV2 variant={sizing.text} color={fg} numberOfLines={1}>
+      <TextV2
+        variant={sizing.text}
+        color={fg}
+        numberOfLines={1}
+        style={size === 'pill' ? styles.pillText : undefined}
+      >
         {shown}
       </TextV2>
     </PressableScale>
@@ -83,6 +90,7 @@ export function EllieActionButton({
 }
 
 const styles = StyleSheet.create({
+  pillText: { fontSize: 15 },
   base: {
     flexDirection: 'row',
     alignItems: 'center',

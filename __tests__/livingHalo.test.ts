@@ -33,6 +33,10 @@ describe('Living Halo · states', () => {
   it('keeps speaking halo under 17 % and the arc fully lit only when thinking', () => {
     expect(HALO_TARGETS.speaking.halo).toBeLessThanOrEqual(0.17);
     expect(HALO_TARGETS.thinking.arc).toBe(1);
+    // The arc of light only shows while thinking; at rest it is an even rim.
+    expect(HALO_TARGETS.idle.arc).toBe(0);
+    expect(HALO_TARGETS.listening.arc).toBe(0);
+    expect(HALO_TARGETS.speaking.arc).toBe(0);
     expect(HALO_TARGETS.idle.halo).toBe(0);
     expect(HALO_TARGETS.listening.ring).toBeGreaterThan(HALO_TARGETS.idle.ring);
   });

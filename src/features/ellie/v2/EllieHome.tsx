@@ -1,4 +1,12 @@
-import { Image, ScrollView, StyleSheet, View } from 'react-native';
+import type { ComponentProps } from 'react';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+} from 'react-native';
+import Animated from 'react-native-reanimated';
 import {
   ArrowRight,
   BedDouble,
@@ -9,7 +17,6 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import {
-  EllieActionButton,
   LivingHalo,
   PressableScale,
   TextV2,
@@ -18,6 +25,8 @@ import {
 import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
 import { SCAN_IMAGE } from '@app/features/workouts/workoutAssets';
 import { CANNED_PROMPTS, type EllieMode } from '@app/features/ellie/chatModel';
+
+type AnimatedViewStyle = ComponentProps<typeof Animated.View>['style'];
 
 export type EllieAsk = { text: string; mode?: EllieMode };
 
@@ -58,22 +67,30 @@ export function EllieOpening({
   orbState,
   onAsk,
   showAnswers,
+  haloStyle,
+  onHaloLayout,
+  blockStyle,
 }: {
   eyebrow: string;
   voice: string;
   orbState: 'idle' | 'thinking' | 'offline';
   onAsk: (ask: EllieAsk) => void;
   showAnswers: boolean;
+  // Entry animation (the cover): the halo grows from the tab, then the label,
+  // the voice and the answers rise as one block.
+  haloStyle?: AnimatedViewStyle;
+  onHaloLayout?: (event: LayoutChangeEvent) => void;
+  blockStyle?: AnimatedViewStyle;
 }) {
   const { colors } = useThemeV2();
   const [primary, secondary] = CANNED_PROMPTS;
 
   return (
     <View style={styles.opening}>
-      <View style={styles.orb}>
-        <LivingHalo size={116} state={orbState} />
-      </View>
-      <View style={styles.voiceBlock}>
+      <Animated.View style={[styles.orb, haloStyle]} onLayout={onHaloLayout}>
+        <LivingHalo size="cover" state={orbState} shadow />
+      </Animated.View>
+      <Animated.View style={[styles.voiceBlock, blockStyle]}>
         <TextV2
           variant="eyebrow"
           color={colors.ellie.textSecondary}
@@ -82,15 +99,22 @@ export function EllieOpening({
         >
           {eyebrow}
         </TextV2>
-        <TextV2 variant="title22" align="center" style={styles.voice}>
+        <TextV2 align="center" style={styles.voice}>
           {voice}
         </TextV2>
         {showAnswers ? (
           <View style={styles.answers}>
-            <EllieActionButton
-              label={primary.text}
+            {/* The reference shows no mini Halo in these two answers, so none
+                is drawn (D-150); both share one row. */}
+            <PressableScale
+              accessibilityRole="button"
               onPress={() => onAsk(primary)}
-            />
+              style={[styles.pill, { backgroundColor: colors.ember.strong }]}
+            >
+              <TextV2 variant="bodyStrong" color="#FFFFFF" align="center" style={styles.pillText}>
+                {primary.text}
+              </TextV2>
+            </PressableScale>
             <PressableScale
               accessibilityRole="button"
               onPress={() => onAsk(secondary)}
@@ -98,15 +122,17 @@ export function EllieOpening({
                 styles.pill,
                 {
                   backgroundColor: colors.ellie.input,
-                  boxShadow: `inset 0 0 0 1px ${colors.outline.strong}`,
+                  boxShadow: `inset 0 0 0 1px ${colors.ellie.divider}`,
                 },
               ]}
             >
-              <TextV2 variant="bodyStrong">{secondary.text}</TextV2>
+              <TextV2 variant="bodyStrong" align="center" style={styles.pillText}>
+                {secondary.text}
+              </TextV2>
             </PressableScale>
           </View>
         ) : null}
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -272,16 +298,21 @@ const styles = StyleSheet.create({
   orb: { alignItems: 'center', paddingTop: 24 },
   voiceBlock: { gap: 18, alignItems: 'center' },
   tracked: { letterSpacing: 1.1 },
-  voice: { fontWeight: '400', lineHeight: 30, maxWidth: 330 },
-  answers: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    justifyContent: 'center',
+  // 22/400, line height 1.38, tracking -.005em.
+  voice: {
+    fontSize: 22,
+    fontWeight: '400',
+    lineHeight: 30,
+    letterSpacing: -0.11,
+    maxWidth: 330,
   },
+  pillText: { fontSize: 15, lineHeight: 18 },
+  answers: { flexDirection: 'row', gap: 8, alignSelf: 'stretch' },
   pill: {
-    height: 48,
-    paddingHorizontal: 22,
+    flex: 1,
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',

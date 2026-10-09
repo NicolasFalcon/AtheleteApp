@@ -40,3 +40,6 @@ No capturado: estados "pensando" del chat, Nutrición sin plan y la bienvenida d
 - Fijar el copy de la banda de Inicio ("Siempre aquí para tu entrenamiento." / "Hablar con ELLIE →") y su padding 28/20: es Inicio (fase siguiente).
 - Confirmar si se borran `EllieOrb.tsx`, `BestMarkCard`, `RecentPRCard`, `bestMarkParts` y `prCurve`.
 - Android sin compilar (sigue pendiente §8.1).
+
+## Corrección de la portada de ELLIE (2026-10-09)
+Orden, respuestas rápidas en una fila sin Halo mini, Halo sin arco ni media luna con sombra, margen inferior y animación de entrada: ver D-149 a D-153 en MIGRATION_PROGRESS.

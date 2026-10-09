@@ -15,6 +15,7 @@ import Animated, {
 import Svg, {
   Circle,
   Defs,
+  Ellipse,
   LinearGradient,
   RadialGradient,
   Stop,
@@ -54,6 +55,8 @@ export type LivingHaloProps = {
   // "Lit" finish (Inicio band): diffuse outer glow and a partial, asymmetric
   // Ember light inside, bottom-right. Static, no extra loops.
   lit?: boolean;
+  // Soft diffuse shadow under the sphere (ELLIE cover).
+  shadow?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -67,6 +70,7 @@ export function LivingHalo({
   tab = false,
   active = false,
   lit = false,
+  shadow = false,
   style,
 }: LivingHaloProps) {
   const size = resolveHaloSize(sizeProp);
@@ -290,7 +294,7 @@ export function LivingHalo({
   // The voice-scene Halo keeps a narrower outer glow (reference ELLIE_05).
   const haloSize = size * (size >= 120 ? 1.45 : 1.6);
   const stroke = Math.max(1.4, size * 0.03);
-  const ringStroke = Math.max(1.2, size * 0.015);
+  const ringStroke = Math.max(1.2, size * 0.02);
   const r = size / 2 - stroke / 2;
   const circumference = 2 * Math.PI * r;
 
@@ -346,6 +350,23 @@ export function LivingHalo({
         />
       ))}
 
+      {shadow && !offline ? (
+        <Svg
+          pointerEvents="none"
+          width={size * 1.3}
+          height={size * 0.3}
+          style={[styles.abs, { left: -size * 0.15, top: size * 0.92 }]}
+        >
+          <Defs>
+            <RadialGradient id="llShadow" cx="50%" cy="50%" r="50%">
+              <Stop offset="0" stopColor="#000000" stopOpacity={0.26} />
+              <Stop offset="1" stopColor="#000000" stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Ellipse cx={size * 0.65} cy={size * 0.15} rx={size * 0.65} ry={size * 0.15} fill="url(#llShadow)" />
+        </Svg>
+      ) : null}
+
       {lit && !offline ? (
         <Svg
           pointerEvents="none"
@@ -378,7 +399,7 @@ export function LivingHalo({
               <Stop offset="1" stopColor={h.core[2]} />
             </RadialGradient>
             <RadialGradient id="llSheen" cx="34%" cy="26%" r="46%">
-              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.1} />
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={size >= 100 ? 0.2 : 0.1} />
               <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
             </RadialGradient>
           </Defs>
@@ -466,20 +487,6 @@ export function LivingHalo({
         ) : null}
 
         <Svg width={size} height={size} style={styles.abs} pointerEvents="none">
-          {/* Smoked-glass reflex: a pale crescent hugging the upper-left edge. */}
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={size / 2 - size * 0.045}
-            stroke="#FFFFFF"
-            strokeOpacity={0.2}
-            strokeWidth={Math.max(1, size * 0.022)}
-            strokeLinecap="round"
-            strokeDasharray={`${(size - size * 0.09) * Math.PI * 0.2} ${size * Math.PI}`}
-            rotation={195}
-            origin={`${size / 2}, ${size / 2}`}
-            fill="none"
-          />
           <Circle
             cx={size / 2}
             cy={size / 2}

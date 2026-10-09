@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -20,6 +20,7 @@ import {
   ResumeRow,
   type EllieAsk,
 } from '@app/features/ellie/v2/EllieHome';
+import { useEllieEntry } from '@app/features/ellie/v2/useEllieEntry';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useEllieHistory } from '@app/hooks/useEllieHistory';
@@ -49,6 +50,12 @@ export function EllieScreen({ navigation, route }: Props) {
   const ellieData = useEllieData();
   const history = useEllieHistory();
   const dev = __DEV__ ? route.params?.devState : undefined;
+  const scrollRef = useRef<ScrollView>(null);
+  const contentPaddingTop = insets.top;
+  const entry = useEllieEntry(navigation, () =>
+    scrollRef.current?.scrollTo({ y: 0, animated: false }),
+  );
+  entry.setContentTop(contentPaddingTop);
 
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? '';
   const voice =
@@ -81,14 +88,17 @@ export function EllieScreen({ navigation, route }: Props) {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 />
       <ScrollView
+        ref={scrollRef}
         onScroll={tabBarMotion.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + 12,
+          paddingTop: contentPaddingTop,
           paddingHorizontal: layout.gutter + 4,
-          paddingBottom: bottomClearance + 96,
-          gap: 36,
+          // Clear of the tab bar AND of the floating field (56 pt + its 8 pt
+          // gap + 40 pt of air), so nothing ends up underneath.
+          paddingBottom: bottomClearance + 104,
+          gap: 30,
         }}
       >
         <EllieOpening
@@ -97,7 +107,19 @@ export function EllieScreen({ navigation, route }: Props) {
           orbState={failed ? 'offline' : 'idle'}
           onAsk={open}
           showAnswers
+          haloStyle={entry.haloStyle}
+          onHaloLayout={entry.onHaloLayout}
+          blockStyle={entry.blockStyle}
         />
+
+        <AlsoCanList onAsk={open} />
+        {/* Scan placeholder: the same notice as in Entrenos. */}
+        <ScanCard
+          onPress={() =>
+            toast.show('Pronto podrás escanear máquinas', { withTabBar: true })
+          }
+        />
+        <ReadWithEllie onAsk={open} />
 
         {loading ? (
           <SkeletonGroup>
@@ -121,14 +143,6 @@ export function EllieScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate(APP_ROUTES.EllieChat, {})}
           />
         ) : null}
-
-        <AlsoCanList onAsk={open} />
-        <ScanCard
-          onPress={() =>
-            toast.show('Pronto podrás escanear máquinas', { withTabBar: true })
-          }
-        />
-        <ReadWithEllie onAsk={open} />
       </ScrollView>
 
       <View
