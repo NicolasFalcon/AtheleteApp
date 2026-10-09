@@ -105,9 +105,9 @@ export function HomeScreen({ navigation }: Props) {
   const homeOverride = useHomeModeOverride();
   const modeOverride = homeOverride?.mode ?? null;
   const inviteDismissals = useCore33InviteDismissals();
-  // Official challenge section (cache shared with Comunidad). In __DEV__ and
-  // only when the database has no official challenge, the sample of the
-  // reference is shown (or the scenario forced with athelete://dev/home).
+  // Official challenge section (cache shared with Comunidad). Real data only;
+  // the sample of the reference appears only when forced with a dev deep link
+  // (athelete://dev/home?scenario=challengeInvite|challengeJoined|challengeCompleted).
   const challenges = useSocialResource('getMyChallenges', service =>
     service.getMyChallenges(),
   );
@@ -130,10 +130,9 @@ export function HomeScreen({ navigation }: Props) {
     if (realCard) {
       return withFriend(realCard, friendLeader(board.data));
     }
-    return __DEV__ && challenges.status !== 'loading'
-      ? sampleChallengeCard('challengeJoined')
-      : null;
-  }, [board.data, challenges.status, challengeScenario, realCard]);
+    // No real official challenge: the section does not appear (as in release).
+    return null;
+  }, [board.data, challengeScenario, realCard]);
 
   // Refresh everything when coming back to Inicio (not on the first mount).
   // Development only: open already scrolled (`-homeScroll N`), for captures.
