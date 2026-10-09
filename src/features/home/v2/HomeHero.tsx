@@ -1,5 +1,16 @@
-import type { ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
+import { devHomeSlide } from '@app/dev/homeModeOverride';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, Bell, Check, Play } from 'lucide-react-native';
@@ -14,7 +25,12 @@ import {
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
-import type { HomeMode } from '@app/features/home/homePriority';
+import {
+  slidesKey,
+  type HomeMode,
+  type HomeSlide,
+  type HomeSlideKind,
+} from '@app/features/home/homePriority';
 import { HERO_PHOTO } from '@app/features/home/v2/homePhotos';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { ProfileIdentity } from '@app/types/profileIdentity';
@@ -53,7 +69,9 @@ export type HomeHeroData = {
 };
 
 export type HomeHeroProps = {
-  mode: HomeMode | null; // null while the first load is in progress
+  // Ordered slides of the day (resolveHomeSlides); null while the first load
+  // is in progress.
+  slides: HomeSlide[] | null;
   error: boolean;
   onRetry: () => void;
   greeting: string;
@@ -69,30 +87,201 @@ export type HomeHeroProps = {
   onOpenProgress: () => void;
 };
 
-// Inicio hero (Home.dc.html): 500 pt photographic scene with the 6 modes.
+// Photo of each slide (the six designs keep their own photo).
+const SLIDE_PHOTO: Record<HomeSlideKind, HomeMode> = {
+  resume: 'resume',
+  workout: 'workout',
+  core33: 'core33',
+  core33Closed: 'core33',
+  workoutDone: 'workoutDone',
+  allDone: 'allDone',
+  new: 'new',
+};
+
+// Slide content sits 58 pt from the bottom; with several slides it rises to
+// 100 pt to leave room for the indicator.
+const CONTENT_BOTTOM_ONE = 58;
+const CONTENT_BOTTOM_MANY = 100;
+// Nudge shown once per app session: 56 pt and back.
+const PEEK_PT = 56;
+let peekShown = false;
+
+// Inicio hero (Home.dc.html, v2.12): 500 pt photographic scene. With one
+// slide it is the hero as always; with several it becomes a full-bleed
+// carousel (one slide per state, snap, no autoplay) with a named indicator.
+// Greeting, date, profile and bell stay fixed above it.
 export function HomeHero(props: HomeHeroProps) {
   const insets = useSafeAreaInsets();
-  const photo = HERO_PHOTO[props.mode ?? 'workout'];
+  const { width } = useWindowDimensions();
+  const reduceMotion = useReducedMotion();
+  const scrollRef = useRef<ScrollView>(null);
+  const touched = useRef(false);
+  const [index, setIndex] = useState(0);
+
+  const slides = props.error ? null : props.slides;
+  const multi = Boolean(slides && slides.length > 1);
+  const key = slides ? slidesKey(slides) : '';
+
+  // When the set of slides changes (something was completed) the first slide
+  // is the next pending action again.
+  useEffect(() => {
+    setIndex(0);
+    scrollRef.current?.scrollTo({ x: 0, animated: false });
+  }, [key]);
+
+  // Development only: open on a slide (`-homeSlide N`), for captures.
+  useEffect(() => {
+    const target = devHomeSlide();
+    if (multi && target > 0) {
+      peekShown = true; // no nudge while a capture asks for a slide
+      const id = setTimeout(() => {
+        scrollRef.current?.scrollTo({ x: target * width, animated: false });
+        setIndex(target);
+      }, 600);
+      return () => clearTimeout(id);
+    }
+  }, [multi, width]);
+
+  // A single small nudge per app session, never with reduced motion.
+  useEffect(() => {
+    if (!multi || peekShown || reduceMotion) {
+      return;
+    }
+    const out = setTimeout(() => {
+      peekShown = true;
+      scrollRef.current?.scrollTo({ x: PEEK_PT, animated: true });
+    }, 700);
+    const back = setTimeout(() => {
+      if (!touched.current) {
+        scrollRef.current?.scrollTo({ x: 0, animated: true });
+      }
+    }, 1300);
+    return () => {
+      clearTimeout(out);
+      clearTimeout(back);
+    };
+  }, [multi, reduceMotion]);
+
+  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const next = Math.round(event.nativeEvent.contentOffset.x / width);
+    if (next !== index && next >= 0) {
+      setIndex(next);
+    }
+  };
+
+  const goTo = (target: number) => {
+    touched.current = true;
+    setIndex(target);
+    scrollRef.current?.scrollTo({ x: target * width, animated: true });
+  };
+
+  const pages: (HomeSlide | null)[] = slides && slides.length > 0 ? slides : [null];
 
   return (
     <SceneScope>
       <HeroFrame>
-        {props.mode ? (
-          <Image
-            source={photo.source}
-            resizeMode="cover"
-            style={styles.photo}
-            accessibilityIgnoresInvertColors
-          />
-        ) : null}
-        <WarmHalo />
-        <Scrim variant="hero" style={StyleSheet.absoluteFill} />
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          snapToInterval={width}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          disableIntervalMomentum
+          scrollEnabled={multi}
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={onScroll}
+          onScrollBeginDrag={() => {
+            touched.current = true;
+          }}
+          style={StyleSheet.absoluteFill}
+        >
+          {pages.map((slide, position) => (
+            <View key={slide?.kind ?? 'state'} style={{ width, height: HERO_HEIGHT }}>
+              {slide ? (
+                <Image
+                  source={HERO_PHOTO[SLIDE_PHOTO[slide.kind]].source}
+                  resizeMode="cover"
+                  style={styles.photo}
+                  accessibilityIgnoresInvertColors
+                />
+              ) : null}
+              <WarmHalo id={`homeHeroHalo${position}`} />
+              <Scrim variant="hero" style={StyleSheet.absoluteFill} />
+              <View
+                style={[
+                  styles.bottom,
+                  { bottom: multi ? CONTENT_BOTTOM_MANY : CONTENT_BOTTOM_ONE },
+                ]}
+              >
+                <HeroContent {...props} slide={slide} />
+              </View>
+            </View>
+          ))}
+        </ScrollView>
         <HeroTop {...props} top={insets.top + 8} />
-        <View style={styles.bottom}>
-          <HeroContent {...props} />
-        </View>
+        {multi && slides ? (
+          <HeroPager slides={slides} index={index} onSelect={goTo} />
+        ) : null}
       </HeroFrame>
     </SceneScope>
+  );
+}
+
+// Named capsules, one per slide: the active one white with dark text, the
+// rest glass; the ones closed today carry an Ember dot. "1 / N" on the right.
+function HeroPager({
+  slides,
+  index,
+  onSelect,
+}: {
+  slides: HomeSlide[];
+  index: number;
+  onSelect: (index: number) => void;
+}) {
+  const { colors, scene } = useThemeV2();
+
+  return (
+    <View style={styles.pager} pointerEvents="box-none">
+      {slides.map((slide, position) => {
+        const active = position === index;
+        return (
+          <Pressable
+            key={slide.kind}
+            accessibilityRole="button"
+            accessibilityLabel={`${slide.label}${slide.closed ? ', completado' : ''}, ${
+              position + 1
+            } de ${slides.length}`}
+            accessibilityState={{ selected: active }}
+            onPress={() => onSelect(position)}
+            style={styles.capsuleHit}
+          >
+            <View
+              style={[
+                styles.capsule,
+                {
+                  backgroundColor: active ? scene.cta.onScene : scene.glass.onPhoto,
+                },
+              ]}
+            >
+              {slide.closed ? (
+                <View style={[styles.capsuleDot, { backgroundColor: colors.ember.base }]} />
+              ) : null}
+              <TextV2
+                variant="metaStrong"
+                color={active ? scene.cta.onSceneText : scene.onDark.primary}
+              >
+                {slide.label}
+              </TextV2>
+            </View>
+          </Pressable>
+        );
+      })}
+      <TextV2 variant="meta" color={scene.onDark.tertiary} style={styles.position}>
+        {`${index + 1} / ${slides.length}`}
+      </TextV2>
+    </View>
   );
 }
 
@@ -107,12 +296,12 @@ function HeroFrame({ children }: { children: ReactNode }) {
 }
 
 // radial-gradient(70% 55% at 78% 18%, rgba(255,150,90,.14), transparent 70%)
-function WarmHalo() {
+function WarmHalo({ id }: { id: string }) {
   return (
     <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
       <Defs>
         <RadialGradient
-          id="homeHeroHalo"
+          id={id}
           cx="78%"
           cy="18%"
           rx="70%"
@@ -124,7 +313,7 @@ function WarmHalo() {
           <Stop offset="0.7" stopColor="rgb(20,19,18)" stopOpacity={0} />
         </RadialGradient>
       </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill="url(#homeHeroHalo)" />
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
     </Svg>
   );
 }
@@ -178,8 +367,8 @@ function HeroTop({
   );
 }
 
-function HeroContent(props: HomeHeroProps) {
-  const { mode, error, onRetry, data } = props;
+function HeroContent(props: HomeHeroProps & { slide: HomeSlide | null }) {
+  const { slide, error, onRetry, data } = props;
 
   if (error) {
     return (
@@ -196,7 +385,7 @@ function HeroContent(props: HomeHeroProps) {
     );
   }
 
-  if (!mode) {
+  if (!slide) {
     return (
       <SkeletonGroup>
         <View style={styles.content}>
@@ -209,8 +398,9 @@ function HeroContent(props: HomeHeroProps) {
     );
   }
 
-  switch (mode) {
+  switch (slide.kind) {
     case 'core33':
+    case 'core33Closed':
       return <CoreContent {...props} core={data.core} />;
     case 'workout':
       return <WorkoutContent {...props} workout={data.workout} />;
@@ -309,7 +499,7 @@ function CoreContent({
             : `${left} ${left === 1 ? 'hábito' : 'hábitos'} para terminar`}
         </TextV2>
         <Button
-          label="Cerrar el día"
+          label={left === 0 ? 'Ver reto' : 'Cerrar el día'}
           variant="onScene"
           size="md"
           icon={ArrowRight}
@@ -437,7 +627,7 @@ function DoneContent({
           </TextV2>
         </View>
       </View>
-      {data.core ? (
+      {data.core && data.core.left > 0 ? (
         <Button
           label="Siguiente: cerrar Core 33"
           variant="secondary"
@@ -550,7 +740,37 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 20,
     right: 20,
-    bottom: 58,
+  },
+  pager: {
+    position: 'absolute',
+    left: 14,
+    right: 14,
+    bottom: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  capsuleHit: {
+    height: 44,
+    paddingHorizontal: 3,
+    justifyContent: 'center',
+  },
+  capsule: {
+    height: 28,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  capsuleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  position: {
+    marginLeft: 'auto',
+    paddingRight: 6,
   },
   content: {
     gap: 18,

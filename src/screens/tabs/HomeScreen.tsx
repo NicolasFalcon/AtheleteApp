@@ -19,6 +19,8 @@ import {
   isCoreClosedToday,
   quizMastery,
   resolveHomeMode,
+  resolveHomeSlides,
+  slideFor,
   sessionActiveSeconds,
   trainedMinutesToday,
   toGlasses,
@@ -59,6 +61,10 @@ import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Home'>;
 
+
+// TODO(core33-priority): the user cannot pin Core 33 as the priority yet (no
+// such preference in the profile, BT-54). When it exists, read it here.
+const CORE33_FIRST_PRIORITY = false;
 
 function toHeroWorkout(workout: Workout | null): HeroWorkout | null {
   return workout
@@ -176,6 +182,17 @@ export function HomeScreen({ navigation }: Props) {
     : null;
   // Development-only visual override ("Ver modos de Inicio"); null in prod.
   const mode = modeOverride ?? realMode;
+  // Hero carousel: one slide per state of the day.
+  const realSlides = overview
+    ? resolveHomeSlides({
+        hasCompletedEver: overview.hasCompletedEver,
+        workoutDoneToday: Boolean(overview.completedToday),
+        hasResumableSession: Boolean(overview.resumable),
+        challenge: challengeState,
+        core33FirstPriority: CORE33_FIRST_PRIORITY,
+      })
+    : null;
+  const slides = homeOverride ? homeOverride.slides.map(slideFor) : realSlides;
   const isNewUser = mode === 'new';
 
   // Core 33 discovery card (HOME_10 / HOME_11): only without a current
@@ -352,7 +369,7 @@ export function HomeScreen({ navigation }: Props) {
         contentContainerStyle={{ paddingBottom: bottomClearance }}
       >
         <HomeHero
-          mode={homeQuery.error && !modeOverride ? null : mode}
+          slides={homeQuery.error && !homeOverride ? null : slides}
           error={Boolean(homeQuery.error) && !modeOverride}
           onRetry={() => {
             homeQuery.refetch().catch(() => {});
