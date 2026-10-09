@@ -1,6 +1,7 @@
 import {
   Platform,
   StyleSheet,
+  Text,
   View,
   type StyleProp,
   type ViewStyle,
@@ -20,6 +21,8 @@ export type IconButtonProps = {
   variant?: IconButtonVariant;
   size?: 44 | 36;
   badge?: boolean;
+  // A small counter instead of the dot ("9+" past nine); nothing at zero.
+  badgeCount?: number;
   // Fills the icon (e.g. an active favourite heart).
   filled?: boolean;
   disabled?: boolean;
@@ -34,6 +37,7 @@ export function IconButton({
   variant = 'muted',
   size = 44,
   badge = false,
+  badgeCount,
   filled = false,
   disabled = false,
   style,
@@ -106,7 +110,21 @@ export function IconButton({
         size={size === 44 ? 20 : 18}
         strokeWidth={2}
       />
-      {badge ? (
+      {badgeCount !== undefined && badgeCount > 0 ? (
+        <View
+          style={[
+            styles.counter,
+            {
+              backgroundColor: colors.ember.base,
+              borderColor: variant === 'glass' ? scene.dotRing : background,
+            },
+          ]}
+        >
+          <Text style={styles.counterText} allowFontScaling={false}>
+            {badgeCount > 9 ? '9+' : String(badgeCount)}
+          </Text>
+        </View>
+      ) : badge && badgeCount === undefined ? (
         <View
           style={[
             styles.badge,
@@ -150,6 +168,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  counter: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  counterText: { fontSize: 10, lineHeight: 12, fontWeight: '700', color: '#FFFFFF' },
   badge: {
     position: 'absolute',
     // 8 pt dot + 2 pt ring, as in the prototype.

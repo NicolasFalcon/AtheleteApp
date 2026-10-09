@@ -20,9 +20,9 @@ import {
   REASON_LABEL,
   TARGET_LABEL,
   moderatorPermissions,
+  openQueue,
+  parseModerationTarget,
   queueState,
-  sortQueue,
-  type ModerationTarget,
 } from '@app/features/social/moderationModel';
 import { timeAgo } from '@app/features/social/postModel';
 import { useSocialResource } from '@app/features/social/useSocial';
@@ -52,7 +52,8 @@ export function SocialModerationScreen({ navigation, route }: Props) {
     s => (permissions.canSeePanel ? s.getModerationHistory() : Promise.resolve([])),
     [permissions.canSeePanel],
   );
-  const rows = sortQueue(queue.data ?? []);
+  // The view already comes ordered: the app keeps that order.
+  const rows = openQueue(queue.data ?? []);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -131,7 +132,7 @@ export function SocialModerationScreen({ navigation, route }: Props) {
               ) : null}
               {rows.map(item => {
                 const state = queueState(item);
-                const target = (item.target_type ?? 'post') as ModerationTarget;
+                const target = parseModerationTarget(item.target_type);
                 return (
                   <PressableScale
                     key={`${item.target_type}-${item.target_id}`}
@@ -191,7 +192,7 @@ export function SocialModerationScreen({ navigation, route }: Props) {
                 <View key={action.id} style={[styles.historyRow, { borderTopColor: colors.divider }]}>
                   <View style={styles.flex}>
                     <TextV2 variant="bodyStrong">
-                      {`${ACTION_LABEL[action.action as keyof typeof ACTION_LABEL] ?? action.action} · ${TARGET_LABEL[action.target_type as ModerationTarget] ?? action.target_type}`}
+                      {`${ACTION_LABEL[action.action as keyof typeof ACTION_LABEL] ?? action.action} · ${TARGET_LABEL[parseModerationTarget(action.target_type)]}`}
                     </TextV2>
                     {action.note ? (
                       <TextV2 variant="meta" tone="secondary" selectable={false}>

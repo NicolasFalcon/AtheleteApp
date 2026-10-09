@@ -240,7 +240,8 @@ describe('state of a challenge', () => {
     expect(challengeActions('active', official, false)).toMatchObject({ canLeave: true, canAddManual: true });
     expect(challengeActions('notJoined', official, false)).toMatchObject({ canJoin: true });
     expect(challengeActions('waiting', friends, true)).toMatchObject({ canCancel: true, canLeave: false });
-    expect(challengeActions('waiting', friends, false)).toMatchObject({ canCancel: false, canLeave: true });
+    // W5: leave_challenge only works on an active participation.
+    expect(challengeActions('waiting', friends, false)).toMatchObject({ canCancel: false, canLeave: false });
     expect(challengeActions('completed', friends, false)).toMatchObject({ canShare: true, canLeave: false });
     const none = challengeActions('expired', friends, true);
     expect(Object.values(none).some(Boolean)).toBe(false);

@@ -32,8 +32,10 @@ import {
   daysLeftLabel,
   distanceLine,
   officialLeftLine,
+  manualErrorMessage,
   progressPct,
   rankBoard,
+  respondErrorMessage,
   weekBarHeight,
 } from '@app/features/social/challengeModel';
 import { formatThousands, timeAgo } from '@app/features/social/postModel';
@@ -66,7 +68,10 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
   const back = () => safeGoBack(navigation, BACK_FALLBACKS);
   const now = new Date();
   const state = data ? challengeViewState(data.challenge, data.mine, now) : 'notJoined';
-  const isCreator = Boolean(data && data.board.some(entry => entry.isMe) && data.challenge.kind === 'friends' && data.challenge.creator_id !== null && data.challenge.creator_id === data.board.find(entry => entry.isMe)?.user_id);
+  const myId = data?.board.find(entry => entry.isMe)?.user_id ?? null;
+  const isCreator = Boolean(
+    data && data.challenge.kind === 'friends' && myId !== null && data.challenge.creator_id === myId,
+  );
   const actions = data
     ? challengeActions(state, data.challenge, isCreator)
     : null;
@@ -91,45 +96,65 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
 
   const accept = () =>
     run(async () => {
-      await service.respondChallengeInvite(challengeId, true);
+      const result = await service.respondChallengeInvite(challengeId, true);
+      if (!result.ok) {
+        toast.show(respondErrorMessage(result.error), { tone: 'error' });
+        return;
+      }
       toast.show(`Te uniste al reto de ${firstName(data?.inviter?.name ?? 'tu amigo')}`);
     });
   const decline = () =>
     run(async () => {
-      await service.respondChallengeInvite(challengeId, false);
+      const result = await service.respondChallengeInvite(challengeId, false);
+      if (!result.ok) {
+        toast.show(respondErrorMessage(result.error), { tone: 'error' });
+        return;
+      }
       back();
     });
   const leave = () =>
     run(async () => {
-      await service.leaveChallenge(challengeId);
+      const left = await service.leaveChallenge(challengeId);
       setSheet(null);
+      if (!left) {
+        // ok:false: no active participation to leave (the cache refreshes).
+        toast.show('Ya no participas en este reto', { tone: 'error' });
+        return;
+      }
       toast.show('Saliste del reto');
       back();
     });
   const cancel = () =>
     run(async () => {
-      await service.cancelFriendChallenge(challengeId);
+      const cancelled = await service.cancelFriendChallenge(challengeId);
       setSheet(null);
+      if (!cancelled) {
+        // Only the creator can, and only while nobody accepted.
+        toast.show('Este reto ya no se puede cancelar', { tone: 'error' });
+        return;
+      }
       toast.show('Reto cancelado');
       back();
     });
   const join = () =>
     run(async () => {
-      await service.joinOfficialChallenge(challengeId);
+      const result = await service.joinOfficialChallenge(challengeId);
+      if (!result.ok) {
+        toast.show(
+          result.error === 'not_available'
+            ? 'Este reto ya no está disponible'
+            : 'No se pudo completar la acción',
+          { tone: 'error' },
+        );
+        return;
+      }
       toast.show('Te uniste al reto');
     });
   const add = (amount: number) =>
     run(async () => {
       const result = await service.addManualContribution(challengeId, amount);
       if (!result.ok) {
-        toast.show(
-          result.error === 'daily_limit'
-            ? 'Has llegado al máximo de registros de hoy'
-            : result.error === 'amount_out_of_range'
-            ? 'Cantidad no válida'
-            : 'Este reto no admite registro manual',
-          { tone: 'error' },
-        );
+        toast.show(manualErrorMessage(result), { tone: 'error' });
       } else if (data && result.progress >= data.challenge.goal) {
         navigation.replace(APP_ROUTES.SocialChallengeDone, { challengeId });
       }

@@ -9,16 +9,32 @@ import type { SocialProfileRow } from '@app/features/social/socialTypes';
 
 export type SocialNotificationRow = Tables<'social_notifications'>;
 
-export type SocialNotificationType =
-  | 'friend_request'
-  | 'friend_accepted'
-  | 'post_like'
-  | 'post_comment'
-  | 'challenge_invite'
-  | 'challenge_started'
-  | 'challenge_completed'
-  | 'challenge_ending'
-  | 'content_removed';
+// The seven types the server writes (SOCIAL_RPC_SHAPES, W6). Any other value
+// is ignored, never an error: a newer server can add types.
+export const NOTIFICATION_TYPES = [
+  'friend_request',
+  'friend_accepted',
+  'post_like',
+  'post_comment',
+  'challenge_invite',
+  'challenge_started',
+  'content_removed',
+] as const;
+
+export type SocialNotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+// The one spelling the sample payload of the docs uses for a like.
+const TYPE_ALIASES: Record<string, SocialNotificationType> = { post_liked: 'post_like' };
+
+export function parseNotificationType(value: unknown): SocialNotificationType | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const known = (NOTIFICATION_TYPES as readonly string[]).includes(value)
+    ? (value as SocialNotificationType)
+    : null;
+  return known ?? TYPE_ALIASES[value] ?? null;
+}
 
 export type SocialNotification = Pick<
   SocialNotificationRow,
@@ -33,6 +49,12 @@ export type SocialNotification = Pick<
 > & {
   type: SocialNotificationType;
   actor: SocialProfileRow | null;
+};
+
+export type NotificationPage = {
+  items: SocialNotification[];
+  // `created_at` of the last row when there may be more; null at the end.
+  nextCursor: string | null;
 };
 
 export type NotificationDestination =
@@ -97,10 +119,6 @@ function textFor(
       return `${who} te invita a un reto`;
     case 'challenge_started':
       return 'Tu reto entre amigos ha empezado';
-    case 'challenge_completed':
-      return `${who} completó el reto`;
-    case 'challenge_ending':
-      return 'Tu reto termina pronto';
     case 'content_removed':
       return 'Retiramos una publicación tuya por incumplir las normas';
   }
@@ -117,12 +135,14 @@ export function destinationOf(item: SocialNotification): NotificationDestination
       return item.post_id ? { kind: 'post', postId: item.post_id } : { kind: 'none' };
     case 'challenge_invite':
     case 'challenge_started':
-    case 'challenge_completed':
-    case 'challenge_ending':
       return item.challenge_id
         ? { kind: 'challenge', challengeId: item.challenge_id }
         : { kind: 'none' };
+    // Moderation removed something of mine: there is no actor and no
+    // destination (the content is gone).
     case 'content_removed':
+      return { kind: 'none' };
+    default:
       return { kind: 'none' };
   }
 }
@@ -135,6 +155,10 @@ export function groupNotifications(items: SocialNotification[]): NotificationGro
   const likes = new Map<string, SocialNotification[]>();
 
   items.forEach(item => {
+    // A type this version does not know is skipped without failing.
+    if (parseNotificationType(item.type) === null) {
+      return;
+    }
     if (item.type === 'post_like' && item.post_id) {
       likes.set(item.post_id, [...(likes.get(item.post_id) ?? []), item]);
       return;
@@ -187,4 +211,73 @@ export function unreadIds(
   return items
     .filter(item => isUnread(item) && (!scope || scope.has(item.id)))
     .map(item => item.id);
+}
+
+// ── Rows of the table → models ─────────────────────────────────────────────
+const asString = (value: unknown): string | null =>
+  typeof value === 'string' && value.length > 0 ? value : null;
+
+// The ids of the actors that need a profile.
+export function notificationActorIds(rows: unknown): string[] {
+  const ids = new Set<string>();
+  (Array.isArray(rows) ? rows : []).forEach(row => {
+    const id = asString((row as { actor_id?: unknown } | null)?.actor_id);
+    if (id) {
+      ids.add(id);
+    }
+  });
+  return Array.from(ids);
+}
+
+// Rows of `social_notifications` (newest first) to the models. A row with an
+// unknown type or no id/date is dropped; an actor without profile stays null.
+export function parseNotifications(
+  rows: unknown,
+  profiles: Map<string, SocialProfileRow>,
+): SocialNotification[] {
+  return (Array.isArray(rows) ? rows : []).flatMap((value): SocialNotification[] => {
+    const row = (value ?? {}) as Record<string, unknown>;
+    const type = parseNotificationType(row.type);
+    const id = asString(row.id);
+    const createdAt = asString(row.created_at);
+    if (!type || !id || !createdAt) {
+      return [];
+    }
+    const actorId = asString(row.actor_id);
+    return [
+      {
+        id,
+        type,
+        actor_id: actorId,
+        post_id: asString(row.post_id),
+        comment_id: asString(row.comment_id),
+        challenge_id: asString(row.challenge_id),
+        request_id: asString(row.request_id),
+        read_at: asString(row.read_at),
+        created_at: createdAt,
+        // content_removed has no actor.
+        actor: type === 'content_removed' || !actorId ? null : (profiles.get(actorId) ?? null),
+      },
+    ];
+  });
+}
+
+export const NOTIFICATIONS_PAGE_SIZE = 30;
+
+// The cursor of the next page: the date of the last row, or null when the
+// page was not full (there is nothing else). Counts the dropped rows too.
+export function nextNotificationCursor(rows: unknown, limit: number): string | null {
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length < limit) {
+    return null;
+  }
+  return asString((list[list.length - 1] as { created_at?: unknown } | null)?.created_at);
+}
+
+// Pages already loaded + a new one, without repeating a notification.
+export function mergeNotificationPages(pages: NotificationPage[]): SocialNotification[] {
+  const seen = new Set<string>();
+  return pages
+    .flatMap(page => page.items)
+    .filter(item => (seen.has(item.id) ? false : (seen.add(item.id), true)));
 }

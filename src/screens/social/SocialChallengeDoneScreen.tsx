@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -64,12 +64,21 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
   const board = useSocialResource('getChallengeBoard', s => s.getChallengeBoard(challengeId), [challengeId]);
   const data = board.data;
 
+  // Celebrate (haptics + mark) only the first time: celebrated_at null. Marking
+  // is idempotent on the server, so a repeated call is harmless.
+  const celebrated = useRef(false);
   useEffect(() => {
-    haptics.success();
-    service.markChallengeCelebrated(challengeId).catch(() => {});
-    // Once on entering.
+    if (!data || celebrated.current) {
+      return;
+    }
+    celebrated.current = true;
+    if (data.mine && data.mine.celebrated_at === null) {
+      haptics.success();
+      service.markChallengeCelebrated(challengeId).catch(() => {});
+    }
+    // The first load of this challenge decides.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [data]);
 
   const challenge = data?.challenge;
   const others = (data?.board ?? []).filter(entry => !entry.isMe && entry.progress >= (challenge?.goal ?? 1));

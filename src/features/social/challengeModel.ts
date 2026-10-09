@@ -4,6 +4,9 @@ import type {
   ChallengeHead,
   ChallengeMetric,
   ChallengeMine,
+  CreateChallengeResult,
+  ManualContributionResult,
+  RespondInviteResult,
 } from '@app/features/social/challengeTypes';
 
 // Pure model of Comunidad · tanda C (retos). Rules: SOCIAL_SCHEMA_PROPOSAL
@@ -287,7 +290,8 @@ export type ChallengeActions = {
 };
 
 // What the detail offers: accept / decline an invitation, join the official
-// challenge, leave, cancel (the creator, while nobody accepted), add repetitions
+// challenge, leave (active only), cancel (the creator, only while `pending`;
+// an active challenge shows no cancel option), add repetitions
 // by hand (only the official one) and share when it is completed.
 export function challengeActions(
   state: ChallengeViewState,
@@ -298,7 +302,9 @@ export function challengeActions(
     canAccept: state === 'invited',
     canDecline: state === 'invited',
     canJoin: state === 'notJoined' && challenge.kind === 'official',
-    canLeave: state === 'active' || (state === 'waiting' && !isCreator),
+    // leave_challenge only works on an active participation: the creator of a
+    // challenge nobody accepted yet cancels it instead.
+    canLeave: state === 'active',
     canCancel: state === 'waiting' && isCreator && challenge.kind === 'friends',
     canAddManual:
       state === 'active' && challenge.kind === 'official' && challenge.allow_manual,
@@ -461,4 +467,80 @@ export function rowLine(input: {
     return `${firstName(leader.name)} va ${diff} ${word} por delante`;
   }
   return 'Vas en cabeza';
+}
+
+// ── Messages for the errors of the challenge RPCs ──────────────────────────
+type CreateFailure = Extract<CreateChallengeResult, { ok: false }>;
+
+export function createErrorMessage(failure: CreateFailure): string {
+  switch (failure.error) {
+    case 'invalid_metric':
+      return 'Ese tipo de reto no está disponible entre amigos.';
+    case 'goal_out_of_range':
+      return failure.min !== undefined && failure.max !== undefined
+        ? `El objetivo debe estar entre ${failure.min} y ${failure.max}.`
+        : STEP_ERRORS.goal_out_of_range;
+    case 'invalid_duration':
+      return 'La duración debe ser de 3, 7 o 14 días.';
+    case 'no_invitees':
+      return STEP_ERRORS.no_invitees;
+    case 'invitee_not_friend':
+      return STEP_ERRORS.not_a_friend;
+    default:
+      return 'No se pudo crear el reto. Inténtalo de nuevo.';
+  }
+}
+
+// The step of Crear reto to go back to for each server error.
+export function createErrorStep(failure: CreateFailure): number | null {
+  switch (failure.error) {
+    case 'invalid_metric':
+      return 0;
+    case 'goal_out_of_range':
+      return 1;
+    case 'invalid_duration':
+      return 2;
+    case 'no_invitees':
+    case 'invitee_not_friend':
+      return 3;
+    default:
+      return null;
+  }
+}
+
+export function respondErrorMessage(
+  error: Extract<RespondInviteResult, { ok: false }>['error'],
+): string {
+  switch (error) {
+    case 'no_invite':
+      return 'Esta invitación ya no existe.';
+    case 'invite_expired':
+      return 'La invitación caducó.';
+    default:
+      return 'No se pudo responder a la invitación';
+  }
+}
+
+export function manualErrorMessage(
+  failure: Extract<ManualContributionResult, { ok: false }>,
+): string {
+  switch (failure.error) {
+    case 'daily_limit':
+      return failure.remaining !== undefined && failure.remaining > 0
+        ? `Hoy solo puedes registrar ${failure.remaining} más`
+        : 'Has llegado al máximo de registros de hoy';
+    case 'amount_out_of_range':
+      return 'Cantidad no válida';
+    case 'not_allowed':
+      return 'Este reto no admite registro manual';
+    default:
+      return 'No se pudo registrar el aporte';
+  }
+}
+
+// A response that says the invitation is gone (so the list must refresh).
+export function inviteIsGone(
+  error: Extract<RespondInviteResult, { ok: false }>['error'],
+): boolean {
+  return error === 'no_invite' || error === 'invite_expired';
 }

@@ -50,6 +50,7 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
+import { useUnreadNotifications } from '@app/features/social/useSocial';
 import { useNotificationsOverview } from '@app/hooks/useNotificationsOverview';
 import { useHydration } from '@app/hooks/useHydration';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
@@ -90,6 +91,9 @@ export function HomeScreen({ navigation }: Props) {
   const exercisesQuery = useExerciseLibrary();
   const ellieData = useEllieData();
   const notifications = useNotificationsOverview();
+  // Social notifications only add to the dot of the bell: no new screen. When
+  // only they are pending, the bell opens them.
+  const socialUnread = useUnreadNotifications();
   const quizQuery = useQuizCategories();
   const { addGlass } = useHydration();
   const openCore33 = useOpenCore33();
@@ -341,7 +345,7 @@ export function HomeScreen({ navigation }: Props) {
             avatarKey: profile?.avatarKey,
             profilePhotoUrl: profile?.profilePhotoUrl,
           }}
-          hasNotifications={notifications.unreadCount > 0}
+          hasNotifications={notifications.unreadCount > 0 || socialUnread > 0}
           data={{
             core: challenge
               ? {
@@ -378,7 +382,11 @@ export function HomeScreen({ navigation }: Props) {
           }}
           onOpenProfile={() => navigation.navigate(APP_ROUTES.Profile)}
           onOpenNotifications={() =>
-            navigation.navigate(APP_ROUTES.Notifications)
+            navigation.navigate(
+              notifications.unreadCount === 0 && socialUnread > 0
+                ? APP_ROUTES.SocialNotifications
+                : APP_ROUTES.Notifications,
+            )
           }
           onOpenCore33={openCore33}
           onStartWorkout={startHeroWorkout}

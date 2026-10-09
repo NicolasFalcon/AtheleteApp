@@ -126,10 +126,41 @@ export type CreateChallengeInput = {
   inviteeIds: string[];
 };
 
+// Errors of create_friend_challenge (HTTP 200, ok:false). goal_out_of_range
+// carries the range of that metric; invitee_not_friend, the offending user.
+export type CreateChallengeError =
+  | 'invalid_metric'
+  | 'goal_out_of_range'
+  | 'invalid_duration'
+  | 'no_invitees'
+  | 'invitee_not_friend'
+  | 'unknown';
+
 export type CreateChallengeResult =
   | { ok: true; challengeId: string; title: string }
-  | { ok: false; error: 'validation' | 'not_friends' | 'unavailable' };
+  | {
+      ok: false;
+      error: CreateChallengeError;
+      min?: number;
+      max?: number;
+      userId?: string;
+    };
+
+// respond_challenge_invite: accepting starts the challenge.
+export type RespondInviteResult =
+  | { ok: true; status: 'active' | 'declined' }
+  | { ok: false; error: 'no_invite' | 'invite_expired' | 'unknown' };
+
+export type JoinOfficialResult =
+  | { ok: true }
+  | { ok: false; error: 'not_available' | 'unknown' };
+
+export type ManualContributionError =
+  | 'amount_out_of_range'
+  | 'daily_limit'
+  | 'not_allowed'
+  | 'unknown';
 
 export type ManualContributionResult =
   | { ok: true; progress: number }
-  | { ok: false; error: 'amount_out_of_range' | 'daily_limit' | 'not_allowed' };
+  | { ok: false; error: ManualContributionError; remaining?: number };

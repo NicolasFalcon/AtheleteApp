@@ -162,6 +162,19 @@ export function normalizePhotoMime(mime: string | null | undefined): string {
   return value === 'image/jpg' || value === 'image/pjpeg' ? 'image/jpeg' : value;
 }
 
+// File name of the upload by its real type: the object path ends in the
+// extension of what is sent (photo.jpg, photo.png or photo.webp).
+export function photoFileName(mime: string | null | undefined): string {
+  switch (normalizePhotoMime(mime)) {
+    case 'image/png':
+      return 'photo.png';
+    case 'image/webp':
+      return 'photo.webp';
+    default:
+      return 'photo.jpg';
+  }
+}
+
 // Size after fitting the photo in a MAX × MAX box without enlarging it and
 // keeping its proportions (what the picker does with maxWidth / maxHeight).
 export function resizedSize(

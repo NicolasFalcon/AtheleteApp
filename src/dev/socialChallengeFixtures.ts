@@ -190,7 +190,7 @@ export function buildChallengeFixtures(
     note('fx-n5', 'post_comment', 4 * HOUR, 'carlos', { post_id: 'fx-p7', comment_id: 'fx-c8' }),
     note('fx-n6', 'challenge_invite', 6 * HOUR, 'andrea', { challenge_id: 'fx-ch-mov' }),
     note('fx-n7', 'friend_request', 26 * HOUR, 'valeria', { request_id: 'fx-req-valeria', read_at: iso(20 * HOUR) }),
-    note('fx-n8', 'challenge_completed', 27 * HOUR, 'carlos', { challenge_id: 'fx-ch-ent', read_at: iso(20 * HOUR) }),
+    note('fx-n8', 'challenge_started', 27 * HOUR, 'carlos', { challenge_id: 'fx-ch-ent', read_at: iso(20 * HOUR) }),
     note('fx-n9', 'friend_accepted', 2 * DAY, 'lucia', { read_at: iso(DAY) }),
     note('fx-n10', 'content_removed', 3 * DAY, null, { read_at: iso(2 * DAY) }),
   ];

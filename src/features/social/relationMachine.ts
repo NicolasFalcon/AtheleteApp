@@ -5,6 +5,16 @@ import type {
   RelationshipState,
   SendFriendRequestStatus,
 } from '@app/features/social/socialTypes';
+import type {
+  ChallengeBoard,
+  ChallengeMine,
+  ChallengeSummary,
+  MyChallenges,
+} from '@app/features/social/challengeTypes';
+import type {
+  NotificationPage,
+  SocialNotification,
+} from '@app/features/social/notificationModel';
 import type { ProfileLookup } from '@app/services/social/socialService';
 
 // State machine of the relationship with another person and the optimistic
@@ -101,12 +111,31 @@ export type SocialAction =
   | { type: 'cancel'; requestId: string }
   | { type: 'remove'; friendId: string }
   | { type: 'unblock'; target: string }
-  | { type: 'revokeInvite'; inviteId: string };
+  | { type: 'revokeInvite'; inviteId: string }
+  // W5 · retos
+  | { type: 'respondInvite'; challengeId: string; accept: boolean }
+  | { type: 'leaveChallenge'; challengeId: string }
+  | { type: 'cancelChallenge'; challengeId: string }
+  | { type: 'joinOfficial'; challengeId: string }
+  | { type: 'celebrate'; challengeId: string }
+  // W6 · notificaciones
+  | { type: 'readNotifications'; ids: string[] }
+  | { type: 'readAllNotifications' }
+  | { type: 'deleteNotifications'; ids: string[] };
 
 // Which service call is which action (the rest of the writes are not
 // optimistic: they create things the screen cannot draw yet).
 export function actionFor(method: string, args: unknown[]): SocialAction | null {
   const [first, second] = args;
+  if (method === 'markNotificationsRead' || method === 'deleteNotifications') {
+    const ids = Array.isArray(first) ? first.filter((id): id is string => typeof id === 'string') : [];
+    return ids.length > 0
+      ? { type: method === 'deleteNotifications' ? 'deleteNotifications' : 'readNotifications', ids }
+      : null;
+  }
+  if (method === 'markAllNotificationsRead') {
+    return { type: 'readAllNotifications' };
+  }
   if (typeof first !== 'string') {
     return null;
   }
@@ -123,6 +152,16 @@ export function actionFor(method: string, args: unknown[]): SocialAction | null 
       return { type: 'unblock', target: first };
     case 'revokeInvite':
       return { type: 'revokeInvite', inviteId: first };
+    case 'respondChallengeInvite':
+      return { type: 'respondInvite', challengeId: first, accept: second !== false };
+    case 'leaveChallenge':
+      return { type: 'leaveChallenge', challengeId: first };
+    case 'cancelFriendChallenge':
+      return { type: 'cancelChallenge', challengeId: first };
+    case 'joinOfficialChallenge':
+      return { type: 'joinOfficial', challengeId: first };
+    case 'markChallengeCelebrated':
+      return { type: 'celebrate', challengeId: first };
     default:
       return null;
   }
@@ -136,7 +175,133 @@ export function shouldRollback(action: SocialAction, result: unknown): boolean {
   if (action.type === 'remove' || action.type === 'revokeInvite') {
     return result === false;
   }
+  // leave_challenge / cancel_friend_challenge answer false when nothing changed.
+  if (action.type === 'leaveChallenge' || action.type === 'cancelChallenge') {
+    return result === false;
+  }
+  // Challenge RPCs that refuse answer {ok:false, error}.
+  if (action.type === 'respondInvite' || action.type === 'joinOfficial') {
+    return (result as { ok?: unknown } | null)?.ok === false;
+  }
   return false;
+}
+
+// ── Challenges (W5) ───────────────────────────────────────────────────────
+function mineWith(mine: ChallengeMine | null, patch: Partial<ChallengeMine>): ChallengeMine | null {
+  return mine ? { ...mine, ...patch } : mine;
+}
+
+const JOINED: ChallengeMine = {
+  status: 'active',
+  progress: 0,
+  invited_by: null,
+  final_rank_among_friends: null,
+  celebrated_at: null,
+};
+
+function challengesWith(data: MyChallenges, action: SocialAction): MyChallenges {
+  switch (action.type) {
+    case 'respondInvite': {
+      const entry = data.invitations.find(item => item.challenge.id === action.challengeId);
+      if (!entry) {
+        return data;
+      }
+      const joined: ChallengeSummary = {
+        ...entry,
+        challenge: { ...entry.challenge, status: 'active' },
+        mine: mineWith(entry.mine, { status: 'active' }),
+      };
+      return {
+        ...data,
+        invitations: data.invitations.filter(item => item !== entry),
+        active: action.accept ? [joined, ...data.active] : data.active,
+      };
+    }
+    case 'leaveChallenge':
+      return {
+        ...data,
+        active: data.active.filter(item => item.challenge.id !== action.challengeId),
+        official:
+          data.official && data.official.challenge.id === action.challengeId
+            ? { ...data.official, mine: mineWith(data.official.mine, { status: 'left' }) }
+            : data.official,
+      };
+    case 'cancelChallenge':
+      return {
+        ...data,
+        active: data.active.filter(item => item.challenge.id !== action.challengeId),
+      };
+    case 'joinOfficial':
+      return data.official && data.official.challenge.id === action.challengeId
+        ? { ...data, official: { ...data.official, mine: JOINED } }
+        : data;
+    case 'celebrate':
+      return {
+        ...data,
+        recently_completed: data.recently_completed.map(item =>
+          item.challenge.id === action.challengeId
+            ? { ...item, mine: mineWith(item.mine, { celebrated_at: new Date().toISOString() }) }
+            : item,
+        ),
+      };
+    default:
+      return data;
+  }
+}
+
+function boardWith(board: ChallengeBoard, challengeId: string, action: SocialAction): ChallengeBoard {
+  if (board.challenge.id !== challengeId) {
+    return board;
+  }
+  switch (action.type) {
+    case 'respondInvite':
+      return {
+        ...board,
+        challenge: action.accept ? { ...board.challenge, status: 'active' } : board.challenge,
+        mine: mineWith(board.mine, { status: action.accept ? 'active' : 'declined' }),
+        board: board.board.map(entry =>
+          entry.isMe ? { ...entry, status: action.accept ? 'active' : 'declined' } : entry,
+        ),
+      };
+    case 'leaveChallenge':
+      return {
+        ...board,
+        mine: mineWith(board.mine, { status: 'left' }),
+        board: board.board.filter(entry => !entry.isMe),
+      };
+    case 'cancelChallenge':
+      return { ...board, challenge: { ...board.challenge, status: 'cancelled' } };
+    case 'joinOfficial':
+      return { ...board, mine: board.mine ?? JOINED };
+    case 'celebrate':
+      return { ...board, mine: mineWith(board.mine, { celebrated_at: new Date().toISOString() }) };
+    default:
+      return board;
+  }
+}
+
+// ── Notifications (W6) ────────────────────────────────────────────────────
+function notificationsWith(
+  items: SocialNotification[],
+  action: SocialAction,
+  now: Date,
+): SocialNotification[] {
+  switch (action.type) {
+    case 'readNotifications':
+      return items.map(item =>
+        action.ids.includes(item.id) && item.read_at === null
+          ? { ...item, read_at: now.toISOString() }
+          : item,
+      );
+    case 'readAllNotifications':
+      return items.map(item =>
+        item.read_at === null ? { ...item, read_at: now.toISOString() } : item,
+      );
+    case 'deleteNotifications':
+      return items.filter(item => !action.ids.includes(item.id));
+    default:
+      return items;
+  }
 }
 
 function overviewWith(
@@ -270,6 +435,28 @@ export function applyAction(
       return blockedWith(data as BlockedEntry[], action);
     case 'getInvites':
       return invitesWith(data as FriendInviteRow[], action, now);
+    case 'getMyChallenges':
+      return challengesWith(data as MyChallenges, action);
+    case 'getChallengeBoard':
+      return typeof keys[0] === 'string'
+        ? boardWith(data as ChallengeBoard, keys[0], action)
+        : data;
+    case 'getNotifications': {
+      // useInfiniteQuery data: { pages: NotificationPage[], pageParams }.
+      const infinite = data as { pages?: NotificationPage[] };
+      if (!Array.isArray(infinite.pages)) {
+        return data;
+      }
+      return {
+        ...infinite,
+        pages: infinite.pages.map(page => ({
+          ...page,
+          items: notificationsWith(page.items, action, now),
+        })),
+      };
+    }
+    case 'getUnreadNotifications':
+      return action.type === 'readAllNotifications' ? 0 : data;
     default:
       return data;
   }

@@ -1,18 +1,22 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, ShieldAlert } from 'lucide-react-native';
 import {
   AvatarStack,
   BackButton,
+  Button,
   Eyebrow,
   GlassHeader,
   PersonAvatar,
   PressableScale,
+  Sheet,
   Skeleton,
   SkeletonGroup,
   StatusBarV2,
   TextV2,
   useThemeV2,
+  useToast,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
@@ -22,7 +26,7 @@ import {
   unreadIds,
   type NotificationGroup,
 } from '@app/features/social/notificationModel';
-import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
+import { useNotificationList, useSocialService } from '@app/features/social/useSocial';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -37,13 +41,28 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 export function SocialNotificationsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
+  const toast = useToast();
   const service = useSocialService();
-  const list = useSocialResource('getNotifications', s => s.getNotifications());
-  const items = list.data ?? [];
+  const list = useNotificationList();
+  const [removing, setRemoving] = useState<NotificationGroup | null>(null);
+  const items = list.items;
   const groups = groupNotifications(items);
   const fresh = groups.filter(group => group.unread);
   const older = groups.filter(group => !group.unread);
   const pending = unreadIds(items);
+
+  const remove = async () => {
+    const group = removing;
+    setRemoving(null);
+    if (!group) {
+      return;
+    }
+    try {
+      await service.deleteNotifications(group.ids);
+    } catch {
+      toast.show('No se pudo eliminar la notificación', { tone: 'error' });
+    }
+  };
 
   const open = async (group: NotificationGroup) => {
     const ids = unreadIds(items, [group]);
@@ -78,6 +97,7 @@ export function SocialNotificationsScreen({ navigation }: Props) {
       accessibilityRole="button"
       accessibilityLabel={`${group.text}. ${notificationWhen(group)}${group.unread ? '. Sin leer' : ''}`}
       onPress={() => open(group)}
+      onLongPress={() => setRemoving(group)}
       style={[styles.row, { borderTopColor: colors.divider }]}
     >
       {group.actors.length > 1 ? (
@@ -128,7 +148,7 @@ export function SocialNotificationsScreen({ navigation }: Props) {
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel="Marcar todo como leído"
-              onPress={() => service.markNotificationsRead(pending).catch(() => {})}
+              onPress={() => service.markAllNotificationsRead().catch(() => {})}
               style={styles.markAll}
             >
               <TextV2 variant="metaStrong">Marcar todo</TextV2>
@@ -181,7 +201,23 @@ export function SocialNotificationsScreen({ navigation }: Props) {
             {older.map(row)}
           </View>
         ) : null}
+        {list.hasMore ? (
+          <Button label="Ver más" variant="secondary" loading={list.loadingMore} onPress={list.loadMore} />
+        ) : null}
       </ScrollView>
+
+      <Sheet
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        title="¿Eliminar la notificación?"
+        footer={<Button label="Eliminar" onPress={remove} style={styles.texts} />}
+      >
+        <TextV2 variant="body" tone="secondary">
+          {removing && removing.ids.length > 1
+            ? 'Se eliminarán también los otros me gusta de esta publicación.'
+            : 'Dejará de aparecer en tu lista.'}
+        </TextV2>
+      </Sheet>
     </View>
   );
 }

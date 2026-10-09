@@ -17,7 +17,6 @@ import {
   type SegmentedOption,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { unreadCount } from '@app/features/social/notificationModel';
 import { hubSubtitle } from '@app/features/social/socialModel';
 import type { FriendsOverview } from '@app/features/social/socialTypes';
 import { useSocialResource } from '@app/features/social/useSocial';
@@ -54,8 +53,10 @@ export function CommunityScreen({
   const settings = useSocialResource('getSettings', service => service.getSettings());
   const overview = useSocialResource('getFriendsOverview', service => service.getFriendsOverview());
   const challenges = useSocialResource('getMyChallenges', service => service.getMyChallenges());
-  const notifications = useSocialResource('getNotifications', service => service.getNotifications());
-  const unread = unreadCount(notifications.data ?? []);
+  const unreadResource = useSocialResource('getUnreadNotifications', service =>
+    service.getUnreadNotifications(),
+  );
+  const unread = unreadResource.data ?? 0;
   const redirected = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const devEndUntil = useRef(0);
@@ -159,7 +160,7 @@ export function CommunityScreen({
           <View style={styles.actions}>
             <IconButton
               icon={Bell}
-              badge={unread > 0}
+              badgeCount={unread}
               accessibilityLabel={unread > 0 ? `Notificaciones, ${unread} sin leer` : 'Notificaciones'}
               onPress={() => navigation.navigate(APP_ROUTES.SocialNotifications)}
             />
@@ -213,7 +214,7 @@ export function CommunityScreen({
               settings.reload();
               overview.reload();
               challenges.reload();
-              notifications.reload();
+              unreadResource.reload();
               if (segment === 'feed') {
                 setRefreshSignal(value => value + 1);
               } else {

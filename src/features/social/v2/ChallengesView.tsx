@@ -19,6 +19,7 @@ import {
   challengeViewState,
   daysLeftLabel,
   officialLeftLine,
+  respondErrorMessage,
   rowLine,
   STATE_TAG,
 } from '@app/features/social/challengeModel';
@@ -63,7 +64,13 @@ export function ChallengesView({
 
   const respond = async (summary: ChallengeSummary, accept: boolean) => {
     try {
-      await service.respondChallengeInvite(summary.challenge.id, accept);
+      const result = await service.respondChallengeInvite(summary.challenge.id, accept);
+      if (!result.ok) {
+        // no_invite / invite_expired: the cache goes back and refreshes, so
+        // the invitation disappears from the list.
+        toast.show(respondErrorMessage(result.error), { tone: 'error', withTabBar: true });
+        return;
+      }
       toast.show(
         accept
           ? `Te uniste al reto de ${firstName(summary.inviter?.name ?? 'tu amigo')}`

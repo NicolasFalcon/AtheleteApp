@@ -11,13 +11,15 @@ import {
   normalizeUsername,
   validateUsername,
 } from '@app/features/social/socialModel';
-import { challengeTitle, challengeViewState, validateManualAmount } from '@app/features/social/challengeModel';
+import { MANUAL_MAX_PER_DAY, challengeTitle, challengeViewState, validateManualAmount } from '@app/features/social/challengeModel';
 import type {
   BoardEntry,
   ChallengeBoard,
   ChallengeSummary,
   CreateChallengeInput,
   CreateChallengeResult,
+  JoinOfficialResult,
+  RespondInviteResult,
   ManualContributionResult,
   MyChallenges,
 } from '@app/features/social/challengeTypes';
@@ -29,9 +31,9 @@ import type {
   ModerationTarget,
   ModeratorRole,
 } from '@app/features/social/moderationModel';
-import { allowedActions } from '@app/features/social/moderationModel';
+import { ModerationError, allowedActions, serverQueueOrder } from '@app/features/social/moderationModel';
 import type { AttachmentFocus } from '@app/services/social/attachmentSources';
-import type { SocialNotification } from '@app/features/social/notificationModel';
+import type { NotificationPage } from '@app/features/social/notificationModel';
 import { validatePost } from '@app/features/social/postModel';
 import type {
   ActivityItem,
@@ -819,7 +821,7 @@ export const fixtureSocialService: SocialService = {
     };
   },
 
-  async respondChallengeInvite(challengeId, accept) {
+  async respondChallengeInvite(challengeId, accept): Promise<RespondInviteResult> {
     await sectionReady('challengesFailure');
     const startsAt = new Date();
     commit(
@@ -839,9 +841,10 @@ export const fixtureSocialService: SocialService = {
         ),
       })),
     );
+    return { ok: true, status: accept ? 'active' : 'declined' };
   },
 
-  async joinOfficialChallenge(challengeId) {
+  async joinOfficialChallenge(challengeId): Promise<JoinOfficialResult> {
     await sectionReady('challengesFailure');
     commit(
       patchChallenge(challengeId, item => ({
@@ -850,9 +853,10 @@ export const fixtureSocialService: SocialService = {
         participants: item.participants.map(entry => (entry.who === 'me' ? { ...entry, progress: 0 } : entry)),
       })),
     );
+    return { ok: true };
   },
 
-  async leaveChallenge(challengeId) {
+  async leaveChallenge(challengeId): Promise<boolean> {
     await sectionReady('challengesFailure');
     commit(
       patchChallenge(challengeId, item => ({
@@ -861,11 +865,13 @@ export const fixtureSocialService: SocialService = {
         participants: item.participants.filter(entry => entry.who !== 'me'),
       })),
     );
+    return true;
   },
 
-  async cancelFriendChallenge(challengeId) {
+  async cancelFriendChallenge(challengeId): Promise<boolean> {
     await sectionReady('challengesFailure');
     commit(patchChallenge(challengeId, item => ({ ...item, head: { ...item.head, status: 'cancelled' } })));
+    return true;
   },
 
   async addManualContribution(challengeId, amount): Promise<ManualContributionResult> {
@@ -876,7 +882,9 @@ export const fixtureSocialService: SocialService = {
     }
     const check = validateManualAmount(amount, item.manualToday);
     if (!check.ok) {
-      return check;
+      return check.error === 'daily_limit'
+        ? { ...check, remaining: Math.max(0, MANUAL_MAX_PER_DAY - item.manualToday) }
+        : check;
     }
     const progress = Math.min(item.head.goal, item.mine.progress + amount);
     const done = progress >= item.head.goal;
@@ -900,7 +908,7 @@ export const fixtureSocialService: SocialService = {
       .filter(([, relation]) => relation === 'friends')
       .map(([id]) => id);
     if (input.inviteeIds.length === 0 || input.inviteeIds.some(id => !friends.includes(id))) {
-      return { ok: false, error: 'not_friends' };
+      return { ok: false, error: input.inviteeIds.length === 0 ? 'no_invitees' : 'invitee_not_friend' };
     }
     sequence += 1;
     const id = `fx-ch-new-${sequence}`;
@@ -938,9 +946,34 @@ export const fixtureSocialService: SocialService = {
     );
   },
 
-  async getNotifications(): Promise<SocialNotification[]> {
+  async getNotifications(cursor, limit): Promise<NotificationPage> {
     await sectionReady('notificationsFailure');
-    return [...state.notifications].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const sorted = [...state.notifications].sort((a, b) => b.created_at.localeCompare(a.created_at));
+    const older = cursor ? sorted.filter(item => item.created_at < cursor) : sorted;
+    const items = older.slice(0, limit);
+    return {
+      items,
+      nextCursor: older.length > limit ? items[items.length - 1].created_at : null,
+    };
+  },
+
+  async getUnreadNotifications(): Promise<number> {
+    await sectionReady('notificationsFailure');
+    return state.notifications.filter(item => item.read_at === null).length;
+  },
+
+  async markAllNotificationsRead() {
+    await ready();
+    const when = new Date().toISOString();
+    commit({
+      ...state,
+      notifications: state.notifications.map(item => (item.read_at === null ? { ...item, read_at: when } : item)),
+    });
+  },
+
+  async deleteNotifications(ids) {
+    await ready();
+    commit({ ...state, notifications: state.notifications.filter(item => !ids.includes(item.id)) });
   },
 
   async markNotificationsRead(ids) {
@@ -962,7 +995,7 @@ export const fixtureSocialService: SocialService = {
   async getModerationQueue(): Promise<ModerationQueueRow[]> {
     await sectionReady('moderationFailure');
     // RLS: a non-moderator gets no rows.
-    return state.moderatorRole ? state.moderationQueue : [];
+    return state.moderatorRole ? serverQueueOrder(state.moderationQueue) : [];
   },
 
   async getModerationHistory(): Promise<ModerationActionRow[]> {
@@ -974,8 +1007,11 @@ export const fixtureSocialService: SocialService = {
     await sectionReady('moderationFailure');
     const item = state.moderationQueue.find(row => row.target_id === targetId);
     // moderate_content checks is_moderator() and what the content allows.
+    if (!state.moderatorRole) {
+      throw new ModerationError('not_moderator');
+    }
     if (!item || !allowedActions(item, state.moderatorRole).includes(action)) {
-      throw new Error('not_allowed');
+      throw new ModerationError('invalid_action');
     }
     const now = new Date().toISOString();
     const entry: ModerationActionRow = {

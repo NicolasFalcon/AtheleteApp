@@ -35,6 +35,8 @@ import {
   STEP_ERRORS,
   canCreate,
   challengeTitle,
+  createErrorMessage,
+  createErrorStep,
   friendMetrics,
   initialDraft,
   metricInfo,
@@ -128,7 +130,13 @@ export function SocialCreateChallengeScreen({ navigation, route }: Props) {
         toast.show('Reto creado. Empieza cuando acepte alguien.');
         navigation.replace(APP_ROUTES.SocialChallenge, { challengeId: result.challengeId });
       } else {
-        toast.show('No se pudo crear el reto', { tone: 'error' });
+        // The server validates again: show what it rejected and go back to
+        // the step that fixes it.
+        toast.show(createErrorMessage(result), { tone: 'error' });
+        const target = createErrorStep(result);
+        if (target !== null) {
+          setStep(target);
+        }
       }
     } catch {
       toast.show('No se pudo crear el reto. Inténtalo de nuevo.', { tone: 'error' });

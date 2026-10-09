@@ -11,7 +11,8 @@ import {
   moderatorPermissions,
   parseModeratorRole,
   queueState,
-  sortQueue,
+  openQueue,
+  serverQueueOrder,
   validateNote,
   type ModerationQueueRow,
 } from '../src/features/social/moderationModel';
@@ -127,23 +128,32 @@ describe('moderator permissions', () => {
     expect(parseModeratorRole(null)).toBeNull();
   });
 
-  it('offers restore only for hidden content and remove never for a user', () => {
-    expect(allowedActions(row({}), 'moderator')).toEqual(['remove', 'dismiss']);
-    expect(allowedActions(row({ hidden_at: at(5) }), 'moderator')).toEqual(['restore', 'remove', 'dismiss']);
-    expect(allowedActions(row({ target_type: 'comment', hidden_at: at(5) }), 'admin')).toEqual(['restore', 'remove', 'dismiss']);
+  it('offers restore / remove for posts and comments and only dismiss for a user', () => {
+    expect(allowedActions(row({}), 'moderator')).toEqual(['restore', 'remove']);
+    expect(allowedActions(row({ hidden_at: at(5) }), 'moderator')).toEqual(['restore', 'remove']);
+    expect(allowedActions(row({ target_type: 'comment', hidden_at: at(5) }), 'admin')).toEqual(['restore', 'remove']);
     expect(allowedActions(row({ target_type: 'user' }), 'moderator')).toEqual(['dismiss']);
     expect(allowedActions(row({ removed_at: at(1) }), 'moderator')).toEqual([]);
   });
 
-  it('sorts the queue: hidden first, more reports, longest waiting; removed leave', () => {
-    const queue = sortQueue([
+  it('keeps the order of the view and drops what is removed', () => {
+    const queue = openQueue([
+      row({ target_id: 'x' }),
+      row({ target_id: 'y', removed_at: at(1) }),
+      row({ target_id: 'a' }),
+    ]);
+    expect(queue.map(item => item.target_id)).toEqual(['x', 'a']);
+  });
+
+  it('the sample data follows the order of the view: not hidden first, more reports, longest waiting', () => {
+    const queue = serverQueueOrder([
       row({ target_id: 'a', open_reports: 1, first_reported_at: at(300) }),
       row({ target_id: 'b', open_reports: 3, hidden_at: at(5) }),
       row({ target_id: 'c', open_reports: 2, first_reported_at: at(500) }),
       row({ target_id: 'd', removed_at: at(1) }),
       row({ target_id: 'e', open_reports: 2, first_reported_at: at(900) }),
     ]);
-    expect(queue.map(item => item.target_id)).toEqual(['b', 'e', 'c', 'a']);
+    expect(queue.map(item => item.target_id)).toEqual(['e', 'c', 'a', 'd', 'b']);
     expect(queueState(row({ hidden_at: at(1) }))).toBe('hidden');
     expect(queueState(row({ removed_at: at(1) }))).toBe('removed');
     expect(queueState(row({}))).toBe('open');

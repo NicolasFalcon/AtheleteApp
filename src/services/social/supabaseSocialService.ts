@@ -4,6 +4,38 @@ import type {
   SocialService,
 } from '@app/services/social/socialService';
 import {
+  buildBoard,
+  buildMyChallenges,
+  inviterIds,
+  listedIds,
+  lookupFromBoard,
+  parseBoard,
+  parseContributions,
+  parseCreateChallenge,
+  parseJoinOfficial,
+  parseManualContribution,
+  parseMineRow,
+  parseMyChallenges,
+  parseOkFlag,
+  parseRespondInvite,
+  weekStart,
+  type BoardLookup,
+} from '@app/features/social/challengeMappers';
+import type { ChallengeBoard, MyChallenges } from '@app/features/social/challengeTypes';
+import {
+  ModerationError,
+  isValidAction,
+  moderationFailure,
+  openQueue,
+  parseModeratorRole,
+} from '@app/features/social/moderationModel';
+import {
+  nextNotificationCursor,
+  notificationActorIds,
+  parseNotifications,
+  type NotificationPage,
+} from '@app/features/social/notificationModel';
+import {
   acceptsRequestsFrom,
   buildBlocked,
   buildFriendsOverview,
@@ -55,6 +87,7 @@ import {
 } from '@app/features/social/feedMappers';
 import {
   normalizePhotoMime,
+  photoFileName,
   PHOTO_MAX_BYTES,
   POST_BODY_MAX,
   validateComment,
@@ -82,22 +115,13 @@ import {
 } from '@app/services/supabase/social-photos';
 import { prefetchProfilePhotoUris } from '@app/services/supabase/profile-photo';
 
-// Supabase implementation of `SocialService` · W1 (personas: lectura, nombre de
-// usuario y privacidad) and W2 (escrituras de personas). Only these methods
-// talk to the backend; everything else is not connected yet (W3 to W7) and answers with an empty value (reads)
-// or rejects (writes), so the real app never mixes in sample data.
-// TODO(social-wire): W3 feed and posts, W4 compose, W5 challenges,
-// W6 notifications, W7 moderation.
+// Supabase implementation of `SocialService`: W1 (personas: lectura, nombre de
+// usuario y privacidad), W2 (escrituras de personas), W3 (feed y publicaciones),
+// W4 (publicar), W5 (retos), W6 (notificaciones) and W7 (moderación). Every
+// method talks to the backend; the sample data only exists in the dev fixtures.
 
 // BT-43 (placeholder): local acceptance of the Terms before the first post.
 const TERMS_KEY = '@athelete/social-terms-accepted';
-
-export class SocialNotWiredError extends Error {
-  constructor(method: string) {
-    super(`Comunidad: ${method} todavía no está conectado`);
-    this.name = 'SocialNotWiredError';
-  }
-}
 
 // 42501 = "no disponible" (no permission): the screens show the content as
 // unavailable, not as a failure with retry.
@@ -193,9 +217,6 @@ async function prefetchPostPhotos(posts: FeedPost[]): Promise<void> {
     prefetchProfilePhotoUris(posts.map(post => post.author?.profile_photo_url)),
   ]).catch(() => undefined);
 }
-
-const unwired = (method: string) => (): Promise<never> =>
-  Promise.reject(new SocialNotWiredError(method));
 
 export const supabaseSocialService: SocialService = {
   // ── W1 · privacidad y nombre de usuario ─────────────────────────────────
@@ -692,7 +713,7 @@ export const supabaseSocialService: SocialService = {
     return loadAttachmentSources(me, settings, focus);
   },
 
-  // The photo goes up first ({uid}/{uuid}/photo.jpg in social-photos), then
+  // The photo goes up first ({uid}/{uuid}/photo.<ext> in social-photos, by its real type), then
   // create_post. If create_post fails the upload is not retried: orphan photos
   // are deleted by the server after 24 h.
   async createPost(input): Promise<CreatePostResult> {
@@ -721,7 +742,7 @@ export const supabaseSocialService: SocialService = {
       if (bytes.byteLength > PHOTO_MAX_BYTES) {
         return { ok: false, error: 'photo_size' };
       }
-      const path = `${me}/${createUuid()}/photo.jpg`;
+      const path = `${me}/${createUuid()}/${photoFileName(photo.mime)}`;
       const upload = await supabase.storage.from('social-photos').upload(path, bytes, {
         contentType: normalizePhotoMime(photo.mime),
         upsert: false,
@@ -816,32 +837,317 @@ export const supabaseSocialService: SocialService = {
     await AsyncStorage.setItem(`${TERMS_KEY}:${me}`, 'true');
   },
 
-  // ── Retos, notificaciones y moderación (W5 a W7) ────────────────────────
-  async getMyChallenges() {
-    return { active: [], invitations: [], recently_completed: [], official: null };
+  // ── Retos (W5) ──────────────────────────────────────────────────────────
+  // The list comes from get_my_challenges; the avatars and the leader of each
+  // row come from its board (one get_challenge_board per listed challenge,
+  // capped). A board that fails only leaves that row without them.
+  async getMyChallenges(): Promise<MyChallenges> {
+    const supabase = client();
+    const { data, error } = await supabase.rpc('get_my_challenges');
+    if (error) {
+      return failed(error);
+    }
+    const parsed = parseMyChallenges(data);
+    const settled = await Promise.allSettled(
+      listedIds(parsed).map(async id => {
+        const board = await supabase.rpc('get_challenge_board', { _challenge_id: id });
+        return [id, board.error ? null : lookupFromBoard(parseBoard(board.data))] as const;
+      }),
+    );
+    const lookups = new Map<string, BoardLookup>();
+    settled.forEach(result => {
+      if (result.status === 'fulfilled' && result.value[1]) {
+        lookups.set(result.value[0], result.value[1]);
+      }
+    });
+    const known = new Set(
+      Array.from(lookups.values()).flatMap(lookup => lookup.board.map(entry => entry.user_id)),
+    );
+    const missing = inviterIds(parsed).filter(id => !known.has(id));
+    const profiles = await fetchProfiles(missing).catch(() => new Map<string, SocialProfileRow>());
+    const result = buildMyChallenges(parsed, lookups, profiles);
+    await prefetchProfilePhotoUris(
+      [result.official, ...result.active, ...result.invitations].flatMap(summary =>
+        summary
+          ? [
+              summary.inviter?.profile_photo_url,
+              ...summary.people.map(person => person.profile?.profile_photo_url),
+            ]
+          : [],
+      ),
+    ).catch(() => undefined);
+    return result;
   },
-  async getChallengeBoard() {
-    return null;
+
+  // Ranking only: the API has no activity per challenge. null = "no disponible".
+  async getChallengeBoard(challengeId): Promise<ChallengeBoard | null> {
+    const me = await currentUserId();
+    const supabase = client();
+    const { data, error } = await supabase.rpc('get_challenge_board', {
+      _challenge_id: challengeId,
+    });
+    if (error) {
+      if (isUnavailable(error)) {
+        return null;
+      }
+      return failed(error);
+    }
+    const parsed = parseBoard(data);
+    if (!parsed) {
+      return null;
+    }
+    const now = new Date();
+    const official = parsed.head.kind === 'official';
+    // My own row (celebrated_at, rank) and, for the official challenge, my
+    // contributions of the week (bars and what I added by hand today).
+    const [participant, contributions] = await Promise.all([
+      supabase
+        .from('social_challenge_participants')
+        .select('*')
+        .eq('challenge_id', challengeId)
+        .eq('user_id', me)
+        .maybeSingle(),
+      official
+        ? supabase
+            .from('social_challenge_contributions')
+            .select('amount,source,occurred_at')
+            .eq('challenge_id', challengeId)
+            .eq('user_id', me)
+            .gte('occurred_at', weekStart(now).toISOString())
+        : Promise.resolve(null),
+    ]);
+    const mine = participant.error ? null : parseMineRow(participant.data);
+    const inviterId = mine?.invited_by ?? null;
+    const inviter = inviterId
+      ? (parsed.board.find(entry => entry.user_id === inviterId)?.profile ??
+        (await fetchProfiles([inviterId]).catch(() => new Map<string, SocialProfileRow>())).get(
+          inviterId,
+        ) ??
+        null)
+      : null;
+    await prefetchProfilePhotoUris(
+      [...parsed.board.map(entry => entry.profile?.profile_photo_url), inviter?.profile_photo_url],
+    ).catch(() => undefined);
+    return buildBoard({
+      parsed,
+      mine,
+      contributions:
+        contributions && !contributions.error ? parseContributions(contributions.data) : null,
+      inviter,
+      now,
+    });
   },
-  respondChallengeInvite: unwired('respondChallengeInvite'),
-  joinOfficialChallenge: unwired('joinOfficialChallenge'),
-  leaveChallenge: unwired('leaveChallenge'),
-  cancelFriendChallenge: unwired('cancelFriendChallenge'),
-  addManualContribution: unwired('addManualContribution'),
-  createFriendChallenge: unwired('createFriendChallenge'),
-  markChallengeCelebrated: unwired('markChallengeCelebrated'),
-  async getNotifications() {
-    return [];
+
+  async respondChallengeInvite(challengeId, accept) {
+    const { data, error } = await client().rpc('respond_challenge_invite', {
+      _challenge_id: challengeId,
+      _accept: accept,
+    });
+    if (error) {
+      return failed(error);
+    }
+    return parseRespondInvite(data, accept);
   },
-  markNotificationsRead: unwired('markNotificationsRead'),
+  async joinOfficialChallenge(challengeId) {
+    const { data, error } = await client().rpc('join_official_challenge', {
+      _challenge_id: challengeId,
+    });
+    if (error) {
+      return failed(error);
+    }
+    return parseJoinOfficial(data);
+  },
+  async leaveChallenge(challengeId) {
+    const { data, error } = await client().rpc('leave_challenge', {
+      _challenge_id: challengeId,
+    });
+    if (error) {
+      return failed(error);
+    }
+    return parseOkFlag(data);
+  },
+  async cancelFriendChallenge(challengeId) {
+    const { data, error } = await client().rpc('cancel_friend_challenge', {
+      _challenge_id: challengeId,
+    });
+    if (error) {
+      return failed(error);
+    }
+    return parseOkFlag(data);
+  },
+  async addManualContribution(challengeId, amount) {
+    const { data, error } = await client().rpc('add_manual_contribution', {
+      _challenge_id: challengeId,
+      _amount: amount,
+    });
+    if (error) {
+      return failed(error);
+    }
+    return parseManualContribution(data);
+  },
+  async createFriendChallenge(input) {
+    const { data, error } = await client().rpc('create_friend_challenge', {
+      _metric: input.metric,
+      _goal: input.goal,
+      _duration_days: input.durationDays,
+      _invitee_ids: Array.from(new Set(input.inviteeIds)),
+    });
+    if (error) {
+      return failed(error);
+    }
+    return parseCreateChallenge(data);
+  },
+  // Idempotent on the server (COALESCE): calling it twice never fails.
+  async markChallengeCelebrated(challengeId) {
+    const { error } = await client().rpc('mark_challenge_celebrated', {
+      _challenge_id: challengeId,
+    });
+    if (error) {
+      return failed(error);
+    }
+  },
+
+  // ── Notificaciones y moderación (W6 y W7) ───────────────────────────────
+  // Newest first, paged by created_at. Unknown types are dropped when parsing.
+  async getNotifications(cursor, limit): Promise<NotificationPage> {
+    const me = await currentUserId();
+    let query = client()
+      .from('social_notifications')
+      .select('*')
+      .eq('recipient_id', me)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (cursor) {
+      query = query.lt('created_at', cursor);
+    }
+    const { data, error } = await query;
+    if (error) {
+      return failed(error);
+    }
+    const profiles = await fetchProfiles(notificationActorIds(data)).catch(
+      () => new Map<string, SocialProfileRow>(),
+    );
+    // A friend request comes from someone who is not a friend yet (DA-119:
+    // no real photo for them).
+    const items = parseNotifications(data, profiles).map(item =>
+      item.actor && item.type === 'friend_request'
+        ? { ...item, actor: withPhotoPolicy(item.actor, 'none') }
+        : item,
+    );
+    await prefetchProfilePhotoUris(items.map(item => item.actor?.profile_photo_url)).catch(
+      () => undefined,
+    );
+    return { items, nextCursor: nextNotificationCursor(data, limit) };
+  },
+  async getUnreadNotifications() {
+    const me = await currentUserId();
+    const { count, error } = await client()
+      .from('social_notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('recipient_id', me)
+      .is('read_at', null);
+    if (error) {
+      return failed(error);
+    }
+    return count ?? 0;
+  },
+  // UPDATE read_at = now() for my unread rows (RLS only lets me write mine).
+  async markNotificationsRead(ids) {
+    if (ids.length === 0) {
+      return;
+    }
+    const me = await currentUserId();
+    const { error } = await client()
+      .from('social_notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('recipient_id', me)
+      .is('read_at', null)
+      .in('id', ids);
+    if (error) {
+      return failed(error);
+    }
+  },
+  async markAllNotificationsRead() {
+    const me = await currentUserId();
+    const { error } = await client()
+      .from('social_notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('recipient_id', me)
+      .is('read_at', null);
+    if (error) {
+      return failed(error);
+    }
+  },
+  async deleteNotifications(ids) {
+    if (ids.length === 0) {
+      return;
+    }
+    const me = await currentUserId();
+    const { error } = await client()
+      .from('social_notifications')
+      .delete()
+      .eq('recipient_id', me)
+      .in('id', ids);
+    if (error) {
+      return failed(error);
+    }
+  },
+  // The panel exists for moderators only. The role comes from my own row of
+  // app_moderators; if that cannot be read, is_moderator() answers yes / no.
+  // The real security is on the server (RLS and moderate_content).
   async getModeratorRole() {
-    return null;
+    const me = await currentUserId();
+    const supabase = client();
+    const row = await supabase
+      .from('app_moderators')
+      .select('role')
+      .eq('user_id', me)
+      .maybeSingle();
+    if (!row.error) {
+      return parseModeratorRole(row.data?.role);
+    }
+    const check = await supabase.rpc('is_moderator');
+    if (check.error) {
+      return failed(check.error);
+    }
+    return check.data === true ? 'moderator' : null;
   },
+  // The view already comes ordered; a non-moderator gets no rows.
   async getModerationQueue() {
-    return [];
+    const { data, error } = await client().from('moderation_queue').select('*');
+    if (error) {
+      return failed(error);
+    }
+    const rows = openQueue(data ?? []);
+    await prefetchSocialPhotoUrls(rows.map(row => row.photo_path)).catch(() => undefined);
+    return rows;
   },
   async getModerationHistory() {
-    return [];
+    const { data, error } = await client()
+      .from('moderation_actions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) {
+      return failed(error);
+    }
+    return data ?? [];
   },
-  moderateContent: unwired('moderateContent'),
+  // restore / remove for a post or comment, dismiss for a user. The server
+  // checks is_moderator() and the action; its refusals become ModerationError.
+  async moderateContent(target, targetId, action, note) {
+    if (!isValidAction(target, action)) {
+      throw new ModerationError('invalid_action');
+    }
+    const { data, error } = await client().rpc('moderate_content', {
+      _target_type: target,
+      _target_id: targetId,
+      _action: action,
+      ...(note ? { _note: note } : {}),
+    });
+    const failure = moderationFailure(data, error);
+    if (failure) {
+      throw new ModerationError(failure);
+    }
+  },
 };

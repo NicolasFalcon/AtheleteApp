@@ -11,6 +11,7 @@ import {
   listedContent,
   mergeFeedPages,
   nextFeedCursor,
+  photoFileName,
   postBodyKind,
   recordDeltaLine,
   retiredCopy,
@@ -317,5 +318,15 @@ describe('text of the cards', () => {
     expect(lines).toContain('Carlos y Sofía entrenaron hoy');
     expect(lines).toContain('Carlos · nuevo récord');
     expect(lines).toHaveLength(2);
+  });
+});
+
+describe('photoFileName', () => {
+  it('names the upload by its real type', () => {
+    expect(photoFileName('image/jpeg')).toBe('photo.jpg');
+    expect(photoFileName('image/jpg')).toBe('photo.jpg');
+    expect(photoFileName('image/png')).toBe('photo.png');
+    expect(photoFileName('IMAGE/WEBP')).toBe('photo.webp');
+    expect(photoFileName(null)).toBe('photo.jpg');
   });
 });

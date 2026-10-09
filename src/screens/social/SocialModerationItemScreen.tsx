@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BackButton,
@@ -19,17 +19,20 @@ import { ROOT_ROUTES } from '@app/constants/routes';
 import {
   ACTION_DONE,
   ACTION_LABEL,
+  MODERATION_ERROR_COPY,
+  ModerationError,
   NOTE_MAX,
   REASON_LABEL,
   TARGET_LABEL,
+  actionLabel,
   allowedActions,
+  parseModerationTarget,
   queueState,
   validateNote,
   type ModerationAction,
-  type ModerationTarget,
 } from '@app/features/social/moderationModel';
 import { timeAgo } from '@app/features/social/postModel';
-import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
+import { usePostPhotoSource, useSocialResource, useSocialService } from '@app/features/social/useSocial';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -38,8 +41,9 @@ type Props = AppScreenProps<'SocialModerationItem'>;
 const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 
 // Un reporte de la cola: el contenido reportado (siempre como texto plano), los
-// motivos y las acciones que `moderate_content` permite: restaurar (si está
-// oculto), retirar y descartar los reportes. Cada acción queda en el historial.
+// motivos y las acciones que `moderate_content` permite según el tipo: restaurar
+// o retirar un post / comentario, descartar los reportes de un usuario. Cada
+// acción queda en el historial.
 export function SocialModerationItemScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -54,9 +58,12 @@ export function SocialModerationItemScreen({ navigation, route }: Props) {
   );
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState<ModerationAction | null>(null);
+  // not_moderator from the server: the access was lost while the screen was open.
+  const [denied, setDenied] = useState(false);
   const item = (queue.data ?? []).find(row => row.target_id === targetId) ?? null;
   const actions = item ? allowedActions(item, role.data ?? null) : [];
   const noteCheck = validateNote(note);
+  const photo = usePostPhotoSource(item?.photo_path ?? null);
 
   const apply = async (action: ModerationAction) => {
     if (!item || !noteCheck.ok || busy) {
@@ -65,15 +72,20 @@ export function SocialModerationItemScreen({ navigation, route }: Props) {
     setBusy(action);
     try {
       await service.moderateContent(
-        (item.target_type ?? 'post') as ModerationTarget,
+        parseModerationTarget(item.target_type),
         targetId,
         action,
         noteCheck.note,
       );
       toast.show(ACTION_DONE[action]);
       safeGoBack(navigation, BACK_FALLBACKS);
-    } catch {
-      toast.show('No se pudo aplicar la acción', { tone: 'error' });
+    } catch (error) {
+      const kind = error instanceof ModerationError ? error.kind : 'unknown';
+      if (kind === 'not_moderator') {
+        setDenied(true);
+      } else {
+        toast.show(MODERATION_ERROR_COPY[kind], { tone: 'error' });
+      }
       setBusy(null);
     }
   };
@@ -102,19 +114,19 @@ export function SocialModerationItemScreen({ navigation, route }: Props) {
         {queue.status === 'error' ? (
           <BlockError message="No pudimos cargar el reporte." onRetry={queue.reload} />
         ) : null}
-        {role.status === 'ready' && !role.data ? (
+        {denied || (role.status === 'ready' && !role.data) ? (
           <RetiredContent title="No tienes acceso" body="Este espacio es solo para el equipo de moderación." />
         ) : null}
         {role.data && queue.status === 'ready' && !item ? (
           <RetiredContent title="Reporte resuelto" body="Ya no está en la cola: otra persona lo resolvió." />
         ) : null}
 
-        {item ? (
+        {item && !denied ? (
           <>
             <View style={[styles.content, { backgroundColor: colors.surface.raised, borderColor: colors.divider }]}>
               <View style={styles.contentTop}>
                 <TextV2 variant="eyebrow" tone="secondary">
-                  {TARGET_LABEL[(item.target_type ?? 'post') as ModerationTarget]}
+                  {TARGET_LABEL[parseModerationTarget(item.target_type)]}
                 </TextV2>
                 <TextV2 variant="caption" tone="tertiary">
                   {queueState(item) === 'hidden' ? 'Oculto para todos' : 'Visible'}
@@ -131,9 +143,18 @@ export function SocialModerationItemScreen({ navigation, route }: Props) {
               )}
               {item.photo_path ? (
                 <View style={[styles.photo, { backgroundColor: colors.surface.muted }]}>
-                  <TextV2 variant="meta" tone="secondary">
-                    Foto reportada
-                  </TextV2>
+                  {photo ? (
+                    <Image
+                      source={photo}
+                      resizeMode="cover"
+                      accessibilityLabel="Foto reportada"
+                      style={StyleSheet.absoluteFill}
+                    />
+                  ) : (
+                    <TextV2 variant="meta" tone="secondary">
+                      Foto reportada
+                    </TextV2>
+                  )}
                 </View>
               ) : null}
               <TextV2 variant="meta" tone="secondary">
@@ -180,7 +201,7 @@ export function SocialModerationItemScreen({ navigation, route }: Props) {
             <View style={styles.actions}>
               {actions.includes('restore') ? (
                 <Button
-                  label={ACTION_LABEL.restore}
+                  label={actionLabel('restore', item)}
                   fullWidth
                   variant="secondary"
                   loading={busy === 'restore'}
@@ -220,7 +241,7 @@ const styles = StyleSheet.create({
   title: { paddingBottom: 6 },
   content: { borderRadius: 20, borderWidth: 1, padding: 18, gap: 12 },
   contentTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  photo: { height: 160, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  photo: { height: 200, borderRadius: 14, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingTop: 10 },
   chip: { height: 30, paddingHorizontal: 12, borderRadius: 15, justifyContent: 'center' },
   noteBox: { gap: 8 },

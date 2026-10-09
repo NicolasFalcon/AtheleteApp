@@ -11,6 +11,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import {
   focusManager,
   keepPreviousData,
+  useInfiniteQuery,
   useQuery,
   useQueryClient,
   type QueryClient,
@@ -24,6 +25,10 @@ import {
   nextFeedCursor,
   type ActivityGroup,
 } from '@app/features/social/postModel';
+import {
+  mergeNotificationPages,
+  NOTIFICATIONS_PAGE_SIZE,
+} from '@app/features/social/notificationModel';
 import type { FeedPost } from '@app/features/social/postTypes';
 import type { SocialLoadState } from '@app/features/social/socialTypes';
 import { socialFixtureStore } from '@app/services/social/fixtureSocialService';
@@ -170,6 +175,76 @@ export function useSocialResource<T>(
   }, [refetch]);
 
   return { status, data: data ?? null, reload };
+}
+
+// ── Notifications (W6) ─────────────────────────────────────────────────────
+// Number of unread social notifications, for the bell of the hub and of Inicio.
+// It reloads when the screen regains focus (like every social resource); while
+// it loads or fails the bell simply shows nothing.
+export function useUnreadNotifications(): number {
+  const unread = useSocialResource('getUnreadNotifications', s => s.getUnreadNotifications());
+  return unread.data ?? 0;
+}
+
+// The list, paged by created_at (newest first). The cache holds the pages so
+// the optimistic read / delete can edit them in place (see relationMachine).
+export function useNotificationList() {
+  ensureFocusManager();
+  const { session } = useAuth();
+  const userId = session?.user.id ?? 'dev';
+  const version = useSyncExternalStore(
+    socialFixtureStore.subscribe,
+    socialFixtureStore.getVersion,
+  );
+  const fixtures = usesFixtures();
+  const query = useInfiniteQuery({
+    queryKey: [SOCIAL_KEY, fixtures ? `fixtures-${version}` : userId, 'getNotifications'],
+    queryFn: ({ pageParam }) =>
+      getSocialService().getNotifications(pageParam, NOTIFICATIONS_PAGE_SIZE),
+    initialPageParam: null as string | null,
+    getNextPageParam: last => last.nextCursor,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    retry: fixtures ? false : 1,
+    placeholderData: fixtures ? keepPreviousData : undefined,
+  });
+  const { refetch } = query;
+
+  const first = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (first.current) {
+        first.current = false;
+        return;
+      }
+      refetch();
+    }, [refetch]),
+  );
+
+  const items = useMemo(
+    () => mergeNotificationPages(query.data?.pages ?? []),
+    [query.data],
+  );
+  const status: SocialLoadState =
+    query.data !== undefined ? 'ready' : query.isError ? 'error' : 'loading';
+
+  return {
+    status,
+    items,
+    hasMore: Boolean(query.hasNextPage),
+    loadingMore: query.isFetchingNextPage,
+    loadMore: () => {
+      if (query.hasNextPage && !query.isFetchingNextPage) {
+        query.fetchNextPage().catch(() => undefined);
+      }
+    },
+    reload: () => {
+      if (usesFixtures()) {
+        socialFixtureStore.clearFailure();
+      }
+      refetch().catch(() => undefined);
+    },
+  };
 }
 
 // Source of a post photo. The real one is a signed URL of `social-photos`;
