@@ -2,19 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bell, Plus, Shield } from 'lucide-react-native';
+import { Bell, Shield } from 'lucide-react-native';
 import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import {
-  AvatarStack,
   GlassSurface,
   IconButton,
-  Segmented,
+  UnderlineTabs,
   Skeleton,
   SkeletonGroup,
   StatusBarV2,
   TextV2,
   useThemeV2,
-  type SegmentedOption,
+  type UnderlineTabOption,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
 import { hubSubtitle } from '@app/features/social/socialModel';
@@ -28,9 +27,9 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import type { CommunitySegment, TabScreenProps } from '@app/types/navigation';
 
-// Comunidad hub (Social.dc.html · feed / retos / amigos): avatar → Perfil,
-// privacy and "+" in the header, "Comunidad" at 28 pt with friends and active
-// challenges, stacked avatars and the Feed · Retos · Amigos segments.
+// Comunidad hub (v2.12 · feed / retos / amigos): "Comunidad" at 34/800 with
+// the summary; bell (W6 counter), privacy and the avatar with an Ember ring
+// (→ Perfil) on the right; Feed · Retos · Amigos as underlined tabs.
 // Tanda UI-B builds the shell and Amigos; Feed (tanda A) and Retos (tanda C)
 // are placeholders. The username is required before using Comunidad.
 export function CommunityScreen({
@@ -87,6 +86,11 @@ export function CommunityScreen({
     if (!__DEV__ || route.params?.devNonce === undefined) {
       return undefined;
     }
+    if (typeof route.params.devScroll === 'number') {
+      const y = route.params.devScroll;
+      const id = setTimeout(() => scrollRef.current?.scrollTo({ y, animated: false }), 900);
+      return () => clearTimeout(id);
+    }
     if (route.params.devScroll !== 'end') {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
       return undefined;
@@ -121,7 +125,7 @@ export function CommunityScreen({
       : noFriends
       ? 'Aún sin amigos'
       : hubSubtitle(friends.length, data?.activeChallenges ?? 0);
-  const options: SegmentedOption<CommunitySegment>[] = [
+  const options: UnderlineTabOption<CommunitySegment>[] = [
     { key: 'feed', label: 'Feed' },
     {
       key: 'retos',
@@ -145,18 +149,14 @@ export function CommunityScreen({
         ]}
       >
         <View style={styles.topRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Perfil"
-            hitSlop={4}
-            onPress={() => navigation.navigate(APP_ROUTES.Profile)}
-          >
-            <ProfileAvatar
-              avatarKey={profile?.avatarKey}
-              profilePhotoUrl={profile?.profilePhotoUrl}
-              size={layout.iconButton}
-            />
-          </Pressable>
+          <View style={styles.titles}>
+            <TextV2 accessibilityRole="header" style={styles.title}>
+              Comunidad
+            </TextV2>
+            <TextV2 variant="meta" tone="secondary">
+              {subtitle}
+            </TextV2>
+          </View>
           <View style={styles.actions}>
             <IconButton
               icon={Bell}
@@ -169,38 +169,22 @@ export function CommunityScreen({
               accessibilityLabel="Privacidad social"
               onPress={() => navigation.navigate(APP_ROUTES.SocialPrivacy)}
             />
-            <IconButton
-              icon={Plus}
-              variant="solid"
-              accessibilityLabel="Publicar"
-              onPress={() => navigation.navigate(APP_ROUTES.SocialCompose, {})}
-            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Perfil"
+              hitSlop={4}
+              onPress={() => navigation.navigate(APP_ROUTES.Profile)}
+              style={[styles.avatarRing, { borderColor: colors.ember.base }]}
+            >
+              <ProfileAvatar
+                avatarKey={profile?.avatarKey}
+                profilePhotoUrl={profile?.profilePhotoUrl}
+                size={layout.iconButton - 8}
+              />
+            </Pressable>
           </View>
         </View>
-        <View style={styles.titleRow}>
-          <View style={styles.titles}>
-            <TextV2 variant="title28" accessibilityRole="header">
-              Comunidad
-            </TextV2>
-            <TextV2 variant="meta" tone="secondary">
-              {subtitle}
-            </TextV2>
-          </View>
-          {friends.length > 0 ? (
-            <AvatarStack
-              size={28}
-              max={4}
-              items={friends.slice(0, 4).map(item => ({
-                key: item.profile.id,
-                name: item.profile.name,
-                avatarKey: item.profile.avatar_key,
-                profilePhotoUrl: item.profile.profile_photo_url,
-                relationship: 'friends' as const,
-              }))}
-            />
-          ) : null}
-        </View>
-        <Segmented options={options} value={segment} onChange={setSegment} />
+        <UnderlineTabs options={options} value={segment} onChange={setSegment} />
       </GlassSurface>
 
       <ScrollView
@@ -240,7 +224,7 @@ export function CommunityScreen({
         }}
         contentContainerStyle={{
           paddingHorizontal: layout.gutter,
-          paddingTop: 16,
+          paddingTop: 18,
           paddingBottom: bottomClearance,
         }}
       >
@@ -302,19 +286,23 @@ export function CommunityScreen({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { paddingBottom: 12, gap: 14 },
+  header: { gap: 10 },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 44,
-  },
-  actions: { flexDirection: 'row', gap: 8 },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
     gap: 12,
+    minHeight: 56,
+  },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  title: { fontSize: 34, fontWeight: '800', letterSpacing: -1, lineHeight: 38 },
+  avatarRing: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titles: { gap: 2, flexShrink: 1 },
   feedSkeleton: {

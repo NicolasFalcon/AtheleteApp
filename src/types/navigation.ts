@@ -209,7 +209,7 @@ export type CommunityTabParams = {
   // Dev only: prefilled search of Amigos.
   devQuery?: string;
   // Dev only: scroll the hub to the bottom (end of the feed, load more).
-  devScroll?: 'end';
+  devScroll?: 'end' | number;
   // Dev only: changes on every dev open, so the same params apply again.
   devNonce?: number;
 };

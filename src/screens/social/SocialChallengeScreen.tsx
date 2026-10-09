@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronsUp, MoreHorizontal } from 'lucide-react-native';
@@ -22,6 +22,7 @@ import {
   TextV2,
   useThemeV2,
   useToast,
+  CoverImage,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
@@ -48,7 +49,7 @@ import type { AppScreenProps } from '@app/types/navigation';
 type Props = AppScreenProps<'SocialChallenge'>;
 
 const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
-const COVER = require('@app/assets/v2/photos/overhead.jpg');
+const COVER = require('@app/assets/v2/photos/home/reto-overhead.jpg');
 const WEEKDAYS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 
 // Detalle del reto: el oficial como escena oscura (SOCIAL_08), los retos entre
@@ -177,7 +178,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
           <StatusBarV2 style="light" />
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 190 }}>
             <View style={styles.officialHero}>
-              <Image source={COVER} resizeMode="cover" style={StyleSheet.absoluteFill} />
+              <CoverImage source={COVER} aspect={900 / 601} x={0.5} y={0.25} />
               <LinearGradient
                 colors={['rgba(20,19,18,.45)', 'rgba(20,19,18,.05)', '#141312']}
                 locations={[0, 0.35, 1]}

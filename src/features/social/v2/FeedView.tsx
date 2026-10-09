@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { ImagePlus } from 'lucide-react-native';
+import { Plus } from 'lucide-react-native';
 import {
   ActivityLine,
   Button,
@@ -15,7 +15,12 @@ import {
   useToast,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { buildFeedEntries, listedContent } from '@app/features/social/postModel';
+import {
+  buildFeedEntries,
+  isRenderablePost,
+  listedContent,
+} from '@app/features/social/postModel';
+import { routePostsEnabled } from '@app/features/social/routePosts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@app/hooks/useAuth';
 import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
@@ -81,8 +86,10 @@ export function FeedView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nearEnd, feed.loadMore]);
 
+  // Unknown post types (or `route` without Ruta) are not shown.
+  const routeEnabled = routePostsEnabled();
   const entries = buildFeedEntries(
-    listedContent(feed.posts),
+    listedContent(feed.posts).filter(post => isRenderablePost(post, { routeEnabled })),
     feed.activity,
     feed.hasMore,
   );
@@ -104,7 +111,7 @@ export function FeedView({
     <View style={styles.root}>
       <PressableScale
         accessibilityRole="button"
-        accessibilityLabel="Comparte tu último entreno"
+        accessibilityLabel="¿Qué entrenaste hoy? Publicar"
         onPress={onCompose}
         style={styles.composeRow}
       >
@@ -115,16 +122,18 @@ export function FeedView({
           relationship="self"
           size={44}
         />
-        <View style={[styles.composePill, { backgroundColor: colors.surface.muted }]}>
-          <TextV2 variant="body" tone="secondary">
-            Comparte tu último entreno
+        <View style={styles.composeTexts}>
+          <TextV2 style={styles.composeTitle}>¿Qué entrenaste hoy?</TextV2>
+          <TextV2 variant="caption" tone="secondary">
+            Entreno, ruta, récord o rutina
           </TextV2>
         </View>
-        <View style={[styles.composeImage, { backgroundColor: colors.surface.muted }]}>
-          <ImagePlus size={18} strokeWidth={1.9} color={colors.text.primary} />
+        <View style={[styles.composePlus, { backgroundColor: colors.ember.base }]}>
+          <Plus size={22} strokeWidth={2.2} color="#FFFFFF" />
         </View>
       </PressableScale>
 
+      <View style={styles.posts}>
       {feed.status === 'loading' ? (
         <SkeletonGroup>
           {[0, 1].map(index => (
@@ -234,6 +243,8 @@ export function FeedView({
         </View>
       ) : null}
 
+      </View>
+
       <ContentActions
         target={target}
         withTabBar
@@ -247,21 +258,19 @@ export function FeedView({
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 36 },
+  root: { gap: 30 },
+  // Posts are 52 pt apart, with no dividers.
+  posts: { gap: 52 },
   composeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  composePill: {
-    flex: 1,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  composeImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  composeTexts: { flex: 1, gap: 1 },
+  composeTitle: { fontSize: 17, fontWeight: '700', letterSpacing: -0.17 },
+  composePlus: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: '0 6px 18px rgba(255,91,31,.28)',
   },
   skeletonPost: { gap: 14 },
   skeletonHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
