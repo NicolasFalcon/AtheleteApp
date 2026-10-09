@@ -2476,3 +2476,20 @@ Checkpoint: [`V212_F1_CHECKPOINT.md`](V212_F1_CHECKPOINT.md). Sin dependencias n
 - **DA-175** · Escena de voz solo UI: en `__DEV__` el botón recorre reposo → escuchando → procesando → respondiendo con textos de ejemplo; en release no hace nada. El texto de reposo ("Pregúntame por tu entreno, tu comida o tu descanso.") es copy real de ELLIE_04. Entra desde el micrófono del compositor; "Escribir" lleva al chat con el campo enfocado.
 - **DA-176** · Ruta nueva `EllieVoice` en el stack raíz, con transición de fundido y sin gesto de retroceso.
 - **DA-177** · `ember.strong` (D-119) se aplica solo a `EllieActionButton`; el botón central de la escena de voz usa el Ember general (`#FF5B1F`), como la referencia (sin texto encima).
+
+## v2.12 · Fase 2 · Inicio · 2026-10-09
+
+Checkpoint: [`V212_F2_CHECKPOINT.md`](V212_F2_CHECKPOINT.md). Solo UI con datos existentes; sin backend ni dependencias nuevas.
+
+**Resumen:** Inicio sigue el orden v2.12 (Tu día → Tu ruta → Core 33 → banda de ELLIE → reto oficial → rutinas → Quiz → Wear), con banda de ELLIE nueva, sección de reto a ancho completo (con reto / invitación), card de Ruta (invitación) y el Halo pulido.
+
+- **D-125** · Sin "Tu mejor marca" en Inicio (ya hecho en D-112). `BestMarkCard`, `RecentPRCard`, `bestMarkParts` y `prCurve` siguen en el repo sin uso en Inicio (no borrados; pendientes de confirmación). El test de `homePriority` añade el orden de secciones y comprueba que no hay sección de marca.
+- **D-126** · `EllieBand` sustituye a `EllieSurface` solo en Inicio, con copy fijo y sin prompt: abre el chat con el campo enfocado. Ya no se usan allí `ELLIE_ASKS.recovery` ni `adjustToday`.
+- **D-127** · Reto de Inicio: foto de reserva (`overhead.jpg`) y hexágono de reserva (`HexMedal` con chevrones); el título se muestra sin el número de la meta. Foto (`cover_path`), badges definitivos y vista "Retos oficiales" → **Fase 4**.
+- **D-128** · Línea inferior del reto: "Te faltan N…" sin avatares ni líder (el oficial no trae `leader`); sin reto, "N atletas dentro" solo si hay `participants_total`.
+- **D-129** · `homeSectionOrder` fija el orden de Inicio; la Ruta va entre Tu día y la invitación a Core 33 (§11B).
+- **D-130** · Halo: acabado `lit`, reflejo de cristal ahumado, arco más intenso y halo exterior de voz más estrecho (≥ 120 pt usa 1,45×). Sin animaciones nuevas.
+- **DA-178** · El reto sale de `get_my_challenges` (caché compartida con Comunidad): el destacado es `official`; participo si su fila `mine` está activa o completada (equivale a que su id esté en `active`); si dejé o rechacé el reto, vuelve a verse como invitación. Recompensa: `points` > 0 y `badge_id` no vacío; sin ninguno, sin línea; nombre del badge por `ALL_BADGES` ("Badge" si el id no está).
+- **DA-179** · "Unirme" usa `joinOfficialChallenge` con la actualización optimista de `relationMachine` (`joinOfficial`), toast y reversión si falla. Tocar la tarjeta o el CTA lleva a `SocialChallenge`.
+- **DA-180** · Card de Ruta solo en estado de invitación; el mapa es un placeholder en datos SVG (`routeMapData.ts`); toca → `RouteSoon` ("Ruta · Próximamente", `TODO(ruta)`). Sin "Última · km". El estado "tu ruta de hoy" es Fase 5.
+- **DA-181** · Dev: `-homeScroll N` (argumento de arranque iOS) y entradas `homeChallenge` / `homeChallengeInvite` en `athelete://dev/social`.
