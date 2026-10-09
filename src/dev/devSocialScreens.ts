@@ -8,7 +8,7 @@ import { socialFixtureStore } from '@app/services/social/fixtureSocialService';
 // data: nothing is read or written. Used by the dev menu ("Ver pantallas de
 // Comunidad") and athelete://dev/social?screen=<key>.
 type Target =
-  | { tab: 'Community' | 'Home'; params: Record<string, unknown> }
+  | { tab: 'Community'; params: Record<string, unknown> }
   | { route: string; params: Record<string, unknown> | undefined };
 
 type Entry = {
@@ -33,12 +33,7 @@ const route = (name: string, params?: Record<string, unknown>): Target => ({
 const profile = (key: string, extra: Record<string, unknown> = {}): Target =>
   route('SocialProfile', { userId: `fx-${key}`, ...extra });
 
-const home: Target = { tab: 'Home', params: {} };
-
 const SCREENS: Entry[] = [
-  // Inicio with the official challenge section (v2.12): joined / invitation.
-  { key: 'homeChallenge', label: 'Inicio · reto oficial con progreso', scenario: 'default', target: home },
-  { key: 'homeChallengeInvite', label: 'Inicio · invitación al reto oficial', scenario: 'officialNotJoined', target: home },
   { key: 'feedEmpty', label: 'Feed sin amigos (STATE_04)', scenario: 'noFriends', target: tab('feed') },
   { key: 'feed', label: 'Feed con publicaciones (SOCIAL_01)', scenario: 'default', target: tab('feed') },
   { key: 'feedNoPosts', label: 'Feed · con amigos y sin publicaciones', scenario: 'feedEmpty', target: tab('feed') },

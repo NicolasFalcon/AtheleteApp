@@ -22,6 +22,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-52 | Comunidad | ~~Subidas huérfanas de `social-photos`~~ | — | **Resuelto** (2026-10-07) |
 | BT-41 | Perfil | ~~`profiles_gender_check` debe aceptar `other`~~ | — | **Resuelto** (2026-10-06) |
 | BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
+| BT-55 | Retos oficiales | Datos reales del reto oficial: portada, badge, puntos, unidad y retos en la base (Fase 4) | Media | No (Inicio usa datos de ejemplo solo en desarrollo) |
 | BT-54 | Inicio | Preferencia "Core 33 como prioridad" del hero | Baja | No (la app ya acepta la opción, desactivada) |
 | BT-53 | Wear | Lista de espera real para "Avísame del lanzamiento" | Baja | No (hoy solo visual) |
 | BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
@@ -398,6 +399,17 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Qué falta:** una preferencia por usuario, p. ej. `profiles.home_priority text` con `CHECK (home_priority IN ('auto','core33'))` y valor por defecto `'auto'`, editable por el propio usuario (RLS actual de `profiles`). Y decidir con diseño dónde se cambia (no hay pantalla definida).
 - **Prioridad:** Baja. **No bloquea:** sin ella el orden es siempre Retomar → Entreno → Core 33.
 
+## Retos oficiales
+
+### BT-55 · Datos reales del reto oficial (Fase 4)
+- **Estado:** la sección de reto oficial de Inicio (HOME_12 y HOME_13) lee `get_my_challenges` y `get_challenge_board` y funciona con lo que hay, pero la base **no tiene retos oficiales reales**: en desarrollo la app muestra un ejemplo igual a la referencia (`athelete://dev/home?scenario=challengeInvite|challengeJoined|challengeCompleted`) y en release la sección no aparece. Faltan datos que el diseño necesita:
+  1. **Foto de portada** del reto: `social_challenges.cover_path` existe pero no se usa; la app pone una foto de reserva en blanco y negro (`TODO(fase-4)`). Falta el bucket o la ruta y quién la sube.
+  2. **Badge:** nombre e icono. Hoy solo hay `badge_id`; el nombre se busca en el catálogo local (`ALL_BADGES`) y el icono es un hexágono genérico. Los 5 badges finales (Semana de tracción, Octubre en ruta, Mes de fuerza, Cuerpo libre, Paso firme) están pendientes de arte. Falta `name`, `icon` y que el `badge_id` exista en `badges`.
+  3. **Puntos del reto oficial:** la columna `points` existe, pero hoy `social_challenge_completed` otorga 0 (BACKEND_SUMMARY §7, sin puntos por social). Decidir si el oficial otorga `points` y con qué evento de gamificación.
+  4. **Unidad de la meta en retos por ejercicio:** "100 dominadas" es una meta de **repeticiones de un ejercicio** (métrica `exercise_reps`). Falta guardar *qué ejercicio* cuenta y calcular el progreso desde `workout_session_sets` (reps del ejercicio durante el reto); la app saca "dominadas" del título quitando el número. Hoy `exercise_reps` no se ofrece entre amigos (BT-45).
+  5. **Retos oficiales reales** en la base: al menos el destacado de la semana (`kind = 'official'`, `status = 'active'`) con fechas, meta, métrica, puntos, badge y portada. Además el catálogo de los siguientes ("Lo que viene", "Avisarme") para la vista "Retos oficiales".
+- **Prioridad:** Media (necesario para la Fase 4). **No bloquea Inicio:** sin retos oficiales en release la sección simplemente no aparece.
+
 ## Wear
 
 ### BT-53 · Lista de espera real para "Avísame del lanzamiento"
@@ -426,5 +438,6 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-06: BT-43 (Términos y soporte de Comunidad, antes de TestFlight).
 - 2026-10-07: BT-44 y BT-52 (Comunidad) resueltos; `remove_friend` aplicada (ver `BACKEND_SUMMARY`).
 - 2026-10-09: BT-53 (lista de espera de Wear, solo visual en la app).
+- 2026-10-09: BT-55 (datos reales del reto oficial, Fase 4).
 - 2026-10-09: BT-54 (preferencia "Core 33 como prioridad" del hero de Inicio).
 - 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.

@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { StatusBarV2, useThemeV2, useToast } from '@app/components/v2';
+import { StatusBarV2, useThemeV2 } from '@app/components/v2';
 import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import { resolveCore33Invite } from '@app/features/core33/core33Invite';
 import { useCore33InviteDismissals } from '@app/features/core33/useCore33InviteDismissals';
@@ -27,8 +27,14 @@ import {
   type DayRingKind,
   type HomeChallengeState,
 } from '@app/features/home/homePriority';
-import { homeChallengeCard } from '@app/features/home/homeChallengeSection';
-import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
+import { useHomeChallengeScenario } from '@app/dev/homeChallengeScenario';
+import {
+  friendLeader,
+  homeChallengeCard,
+  sampleChallengeCard,
+  withFriend,
+} from '@app/features/home/homeChallengeSection';
+import { useSocialResource } from '@app/features/social/useSocial';
 import { EllieBand } from '@app/features/home/v2/EllieBand';
 import { OfficialChallengeSection } from '@app/features/home/v2/OfficialChallengeSection';
 import { RouteInviteCard } from '@app/features/home/v2/RouteInviteCard';
@@ -99,18 +105,35 @@ export function HomeScreen({ navigation }: Props) {
   const homeOverride = useHomeModeOverride();
   const modeOverride = homeOverride?.mode ?? null;
   const inviteDismissals = useCore33InviteDismissals();
-  // Official challenge section (cache shared with Comunidad: joining updates
-  // both at once through the service's optimistic layer).
-  const toast = useToast();
-  const socialService = useSocialService();
+  // Official challenge section (cache shared with Comunidad). In __DEV__ and
+  // only when the database has no official challenge, the sample of the
+  // reference is shown (or the scenario forced with athelete://dev/home).
   const challenges = useSocialResource('getMyChallenges', service =>
     service.getMyChallenges(),
   );
-  const challengeCard = useMemo(
+  const challengeScenario = useHomeChallengeScenario();
+  const realCard = useMemo(
     () => homeChallengeCard(challenges.data),
     [challenges.data],
   );
-  const [joining, setJoining] = useState(false);
+  // Joined: the friend furthest along, from the challenge board.
+  const boardId = realCard?.state === 'joined' ? realCard.id : null;
+  const board = useSocialResource(
+    'homeOfficialBoard',
+    service => (boardId ? service.getChallengeBoard(boardId) : Promise.resolve(null)),
+    [boardId],
+  );
+  const challengeCard = useMemo(() => {
+    if (challengeScenario) {
+      return sampleChallengeCard(challengeScenario);
+    }
+    if (realCard) {
+      return withFriend(realCard, friendLeader(board.data));
+    }
+    return __DEV__ && challenges.status !== 'loading'
+      ? sampleChallengeCard('challengeJoined')
+      : null;
+  }, [board.data, challenges.status, challengeScenario, realCard]);
 
   // Refresh everything when coming back to Inicio (not on the first mount).
   // Development only: open already scrolled (`-homeScroll N`), for captures.
@@ -326,32 +349,6 @@ export function HomeScreen({ navigation }: Props) {
     challenge: challengeCard !== null,
   });
 
-  // Optimistic: the service flips `official.mine` in the cache at once and
-  // rolls it back (with a toast) if the server refuses.
-  const joinOfficial = async () => {
-    if (!challengeCard || joining) {
-      return;
-    }
-    setJoining(true);
-    try {
-      const result = await socialService.joinOfficialChallenge(challengeCard.id);
-      if (!result.ok) {
-        toast.show(
-          result.error === 'not_available'
-            ? 'Este reto ya no está disponible'
-            : 'No se pudo completar la acción',
-          { tone: 'error' },
-        );
-        return;
-      }
-      toast.show('Te uniste al reto');
-    } catch {
-      toast.show('No se pudo completar la acción', { tone: 'error' });
-    } finally {
-      setJoining(false);
-    }
-  };
-
   const completedWorkout = findWorkout(completedToday?.workoutId);
   const points =
     ellieData.context?.achievements.totalPoints ??
@@ -494,13 +491,15 @@ export function HomeScreen({ navigation }: Props) {
                   <OfficialChallengeSection
                     key={key}
                     card={challengeCard}
-                    joining={joining}
                     onPress={() =>
-                      navigation.navigate(APP_ROUTES.SocialChallenge, {
-                        challengeId: challengeCard.id,
-                      })
+                      challengeCard.state === 'joined'
+                        ? navigation.navigate(APP_ROUTES.SocialChallenge, {
+                            challengeId: challengeCard.id,
+                          })
+                        : // TODO(retos-oficiales): the "Retos oficiales" view
+                          // arrives in Fase 4; until then, the Retos tab.
+                          navigation.navigate(TAB_ROUTES.Community, { segment: 'retos' })
                     }
-                    onJoin={joinOfficial}
                   />
                 ) : null;
               case 'routines':

@@ -68,3 +68,7 @@ Solo la presentación "Próximamente" de la marca (la colección con productos y
 - **Dev:** `-homeOverride 8|9|10` (2 slides, 3 con uno cerrado, Core 33 cerrado) y `-homeSlide N`.
 - **Capturas (simulador):** 1 slide (Light), 2 slides (Light), 3 slides con el cerrado activo (Light) y 2 slides con Core 33 activo (Dark). Sin capturar: el texto "Ver reto" (los datos de ejemplo del reto tienen hábitos pendientes) y el momento del desplazamiento de 56 pt (solo en código).
 - **Pendiente:** preferencia "Core 33 como prioridad" (`TODO(core33-priority)`, BT-54).
+
+## Reto oficial de Inicio (ajustado al diseño)
+
+Sustituye al "Reto de la semana" de la primera versión: foto B/N de 420 pt a ancho completo y "● RETO OFICIAL" en los dos estados; con reto (retoOn: progreso, CTA al reto en Comunidad) y sin reto o completado (retoOff: meta, "N atletas dentro", CTA a la vista Retos oficiales, hoy la pestaña Retos de Comunidad con `TODO(retos-oficiales)`); sin "Unirme". Datos de `get_my_challenges` y `get_challenge_board`; en `__DEV__` sin retos reales, ejemplo igual a la referencia y escenarios `athelete://dev/home?scenario=…`. BT-55 para la Fase 4. Capturas (Light y Dark) de con reto y sin reto comparadas con HOME_12 y HOME_13; el escenario "completado" usa el mismo diseño que "sin reto".

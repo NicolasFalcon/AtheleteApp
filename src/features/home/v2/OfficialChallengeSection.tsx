@@ -1,54 +1,82 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { ArrowRight, ChevronsUp } from 'lucide-react-native';
-import { HexMedal, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
+import { HexMedal, PersonAvatar, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 import { formatThousands } from '@app/features/home/homePriority';
 import type { HomeChallengeCard } from '@app/features/home/homeChallengeSection';
 
-// Cover of the official challenge: an app photo while the real `cover_path`
-// is not wired. TODO(fase-4): `social_challenges.cover_path` and the final
-// artwork of the badges (placeholder hexagon with chevrons).
-const COVER = require('@app/assets/v2/photos/overhead.jpg');
+// Cover of the official challenge: an app photo (black and white baked in)
+// while the real `cover_path` is not wired. TODO(fase-4): `cover_path` and the
+// final artwork of the badges (placeholder hexagon with chevrons).
+const COVER = require('@app/assets/v2/photos/home/reto-overhead.jpg');
+const COVER_ASPECT = 900 / 601;
+const HEIGHT = 420;
+// Placeholder athletes of "N atletas dentro" (the official challenge only
+// exposes a total, no names). TODO(fase-4).
+const ATHLETES = [
+  require('@app/assets/v2/photos/home/athlete-1.jpg'),
+  require('@app/assets/v2/photos/home/athlete-2.jpg'),
+  require('@app/assets/v2/photos/home/athlete-3.jpg'),
+];
 
 const INK = '#141312';
 
 export type OfficialChallengeSectionProps = {
   card: HomeChallengeCard;
-  joining: boolean;
   onPress: () => void;
-  onJoin: () => void;
 };
 
-// Inicio · "Reto de la semana" (v2.12 §22.3): full width, 420 pt, no radius
-// or border. Joined: progress as the protagonist. Not joined: invitation to
-// the featured official challenge. Dark in both themes.
-export function OfficialChallengeSection({
-  card,
-  joining,
-  onPress,
-  onJoin,
-}: OfficialChallengeSectionProps) {
+function Athlete({ source, first }: { source: number; first?: boolean }) {
+  return (
+    <Image
+      source={source}
+      accessibilityIgnoresInvertColors
+      style={[styles.avatar, !first && styles.avatarOverlap]}
+    />
+  );
+}
+
+// Inicio · official challenge (v2.12 §22.3, HOME_12 / HOME_13): a full-width
+// 420 pt black and white photo, dark in both themes, "● RETO OFICIAL" in both
+// states.
+// - retoOn (joined, not finished): my progress, the CTA opens the challenge.
+// - retoOff (not joined, or already completed): the goal without progress,
+//   "N atletas dentro" and the CTA towards the official challenges.
+export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSectionProps) {
   const { colors } = useThemeV2();
+  const { width } = useWindowDimensions();
   const joined = card.state === 'joined';
   const reward = card.reward;
   const athletes =
     card.participants !== null && card.participants > 0
       ? `${formatThousands(card.participants)} atletas dentro`
       : null;
+  const friend = card.friend;
+  // object-fit: cover, centred (the woman is at the middle of the photo).
+  const photoWidth = HEIGHT * COVER_ASPECT;
 
   return (
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`Reto oficial. ${card.title}. ${
-        joined ? `${card.progress} de ${card.goal}` : 'Ver reto'
+        joined ? `${card.progress} de ${card.goal}` : 'Ver retos oficiales'
       }`}
       onPress={onPress}
       style={styles.section}
     >
-      <Image source={COVER} resizeMode="cover" style={StyleSheet.absoluteFill} />
-      {/* Black and white photo: iOS has no grayscale filter (D-29), so a dark
-          layer stands in for "brightness .66". */}
+      <Image
+        source={COVER}
+        resizeMode="cover"
+        accessibilityIgnoresInvertColors
+        style={{
+          position: 'absolute',
+          top: 0,
+          height: HEIGHT,
+          width: photoWidth,
+          left: (width - photoWidth) / 2,
+        }}
+      />
       <View style={[StyleSheet.absoluteFill, styles.dim]} />
       <LinearGradient
         pointerEvents="none"
@@ -74,9 +102,7 @@ export function OfficialChallengeSection({
       <View style={styles.top}>
         <View style={styles.eyebrowRow}>
           <View style={[styles.dot, { backgroundColor: colors.ember.base }]} />
-          <TextV2 style={styles.eyebrow}>
-            {joined ? 'RETO DE LA SEMANA' : 'RETO OFICIAL'}
-          </TextV2>
+          <TextV2 style={styles.eyebrow}>RETO OFICIAL</TextV2>
         </View>
         <TextV2 variant="body" color="#E4E2DD" style={styles.days}>
           {card.daysLabel}
@@ -85,9 +111,7 @@ export function OfficialChallengeSection({
 
       {reward ? (
         <View style={styles.reward}>
-          {reward.badgeId ? (
-            <HexMedal icon={ChevronsUp} size={56} accessibilityLabel="Badge del reto" />
-          ) : null}
+          <HexMedal icon={ChevronsUp} size={56} accessibilityLabel="Badge del reto" />
           {reward.points ? (
             <TextV2 style={styles.rewardPoints}>{`+${reward.points} pts`}</TextV2>
           ) : null}
@@ -106,9 +130,7 @@ export function OfficialChallengeSection({
               <TextV2 style={styles.number}>
                 {String(joined ? card.progress : card.goal)}
               </TextV2>
-              {joined ? (
-                <TextV2 style={styles.goal}>{`/ ${card.goal}`}</TextV2>
-              ) : null}
+              {joined ? <TextV2 style={styles.goal}>{`/ ${card.goal}`}</TextV2> : null}
             </View>
             <TextV2 style={styles.title} numberOfLines={2}>
               {card.label}
@@ -123,37 +145,42 @@ export function OfficialChallengeSection({
           <>
             <View style={styles.track}>
               <View
-                style={[
-                  styles.fill,
-                  { width: `${card.pct}%`, backgroundColor: colors.ember.base },
-                ]}
+                style={[styles.fill, { width: `${card.pct}%`, backgroundColor: colors.ember.base }]}
               />
             </View>
-            <TextV2 variant="body" color="#E4E2DD">
-              {card.line}
-            </TextV2>
+            <View style={styles.line}>
+              {friend ? (
+                friend.profile ? (
+                  <View style={styles.avatar}>
+                    <PersonAvatar
+                      name={friend.name}
+                      avatarKey={friend.profile.avatar_key}
+                      profilePhotoUrl={friend.profile.profile_photo_url}
+                      relationship="friends"
+                      size={26}
+                    />
+                  </View>
+                ) : (
+                  <Athlete source={ATHLETES[0]} first />
+                )
+              ) : null}
+              <TextV2 variant="body" color="#E4E2DD" style={styles.lineText}>
+                {friend ? `${friend.name} acaba de llegar a ${friend.progress}.` : card.line}
+              </TextV2>
+            </View>
           </>
-        ) : (
-          <View style={styles.joinRow}>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Unirme al reto"
-              disabled={joining}
-              onPress={onJoin}
-              hitSlop={4}
-              style={[styles.join, joining && styles.joining]}
-            >
-              <TextV2 variant="bodyStrong" color="#121212">
-                {joining ? 'Uniéndome…' : 'Unirme'}
-              </TextV2>
-            </PressableScale>
-            {athletes ? (
-              <TextV2 variant="body" color="#E4E2DD" style={styles.athletes}>
-                {athletes}
-              </TextV2>
-            ) : null}
+        ) : athletes ? (
+          <View style={styles.line}>
+            <View style={styles.stack}>
+              {ATHLETES.map((source, index) => (
+                <Athlete key={index} source={source} first={index === 0} />
+              ))}
+            </View>
+            <TextV2 variant="body" color="#E4E2DD" style={styles.lineText}>
+              {athletes}
+            </TextV2>
           </View>
-        )}
+        ) : null}
       </View>
     </PressableScale>
   );
@@ -162,12 +189,12 @@ export function OfficialChallengeSection({
 const styles = StyleSheet.create({
   // Breaks out of the sheet's side padding (full bleed).
   section: {
-    height: 420,
+    height: HEIGHT,
     marginHorizontal: -20,
     overflow: 'hidden',
     backgroundColor: INK,
   },
-  dim: { backgroundColor: 'rgba(20,19,18,.34)' },
+  dim: { backgroundColor: 'rgba(20,19,18,.3)' },
   top: {
     position: 'absolute',
     left: 24,
@@ -230,15 +257,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,.2)',
   },
   fill: { height: '100%', borderRadius: 3 },
-  joinRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  join: {
-    height: 44,
-    paddingHorizontal: 20,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+  line: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  lineText: { flex: 1 },
+  stack: { flexDirection: 'row' },
+  avatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: INK,
+    backgroundColor: INK,
   },
-  joining: { opacity: 0.7 },
-  athletes: { flex: 1 },
+  avatarOverlap: { marginLeft: -8 },
 });

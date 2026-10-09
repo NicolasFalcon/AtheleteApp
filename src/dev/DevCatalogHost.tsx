@@ -1,3 +1,6 @@
+import { setHomeChallengeScenario } from '@app/dev/homeChallengeScenario';
+import { openHomeTabDev } from '@app/dev/devHomeNav';
+import { isHomeChallengeScenario } from '@app/features/home/homeChallengeSection';
 import { isWearDevScreen, openWearDevScreen } from '@app/dev/devWearScreens';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -186,6 +189,18 @@ function openQuizFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/home?scenario=challengeInvite|challengeJoined|challengeCompleted:
+// Inicio with the official challenge sample (no overlay).
+function openHomeFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/home')) {
+    return false;
+  }
+  const scenario = queryParam(url, 'scenario');
+  setHomeChallengeScenario(isHomeChallengeScenario(scenario) ? scenario : null);
+  openHomeTabDev().catch(() => {});
+  return true;
+}
+
 // athelete://dev/wear?screen=<key>: navigates (no overlay).
 function openWearFromUrl(url: string | null): boolean {
   if (!url || !url.startsWith('athelete://dev/wear')) {
@@ -222,7 +237,8 @@ function toolFromUrl(url: string | null): DevToolState | null {
     openCore33FromUrl(url) ||
     openQuizFromUrl(url) ||
     openSocialFromUrl(url) ||
-    openWearFromUrl(url)
+    openWearFromUrl(url) ||
+    openHomeFromUrl(url)
   ) {
     return null;
   }

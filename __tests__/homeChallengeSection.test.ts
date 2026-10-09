@@ -1,10 +1,16 @@
 import {
   badgeName,
   challengeLabel,
+  friendLeader,
+  isHomeChallengeScenario,
+  sampleChallengeCard,
+  withFriend,
   homeChallengeCard,
   homeChallengeReward,
 } from '../src/features/home/homeChallengeSection';
 import type {
+  BoardEntry,
+  ChallengeBoard,
   ChallengeHead,
   ChallengeMine,
   ChallengeSummary,
@@ -93,9 +99,18 @@ describe('homeChallengeCard · state of the section', () => {
     ).toBe('invite');
   });
 
-  it('caps the bar at 100 % and ignores a non-active challenge', () => {
-    const done = homeChallengeCard(data(summary(head(), mine({ progress: 140 }))), NOW);
-    expect(done?.pct).toBe(100);
+  it('an already completed challenge reads as the invitation again (retoOff)', () => {
+    const byStatus = homeChallengeCard(
+      data(summary(head(), mine({ status: 'completed', progress: 100 }))),
+      NOW,
+    );
+    const byProgress = homeChallengeCard(data(summary(head(), mine({ progress: 140 }))), NOW);
+    expect(byStatus?.state).toBe('invite');
+    expect(byProgress?.state).toBe('invite');
+    expect(byProgress?.progress).toBe(0);
+  });
+
+  it('ignores a non-active challenge', () => {
     expect(
       homeChallengeCard(data(summary(head({ status: 'expired' }), mine())), NOW),
     ).toBeNull();
@@ -141,5 +156,77 @@ describe('challengeLabel', () => {
     expect(challengeLabel('Semana de tracción', 100)).toBe('Semana de tracción');
     expect(challengeLabel('1000 pasos', 100)).toBe('1000 pasos');
     expect(challengeLabel('100', 100)).toBe('100');
+  });
+});
+
+const entry = (patch: Partial<BoardEntry>): BoardEntry => ({
+  user_id: 'u',
+  profile: null,
+  progress: 0,
+  status: 'active',
+  completed_at: null,
+  isMe: false,
+  relationship: 'friends',
+  ...patch,
+});
+
+const board = (entries: BoardEntry[]): ChallengeBoard => ({
+  challenge: head(),
+  mine: mine(),
+  participants_total: 10,
+  board: entries,
+  week: null,
+  manualToday: 0,
+  activity: [],
+  inviter: null,
+});
+
+describe('friendLeader · "acaba de llegar a N"', () => {
+  it('is the friend (not me) furthest along', () => {
+    const friend = friendLeader(
+      board([
+        entry({ isMe: true, progress: 90 }),
+        entry({ user_id: 'a', progress: 40 }),
+        entry({ user_id: 'b', progress: 81 }),
+      ]),
+    );
+    expect(friend?.progress).toBe(81);
+  });
+
+  it('is null without a board or without friends with progress', () => {
+    expect(friendLeader(null)).toBeNull();
+    expect(friendLeader(board([entry({ isMe: true, progress: 5 })]))).toBeNull();
+    expect(friendLeader(board([entry({ progress: 0 })]))).toBeNull();
+  });
+
+  it('only joined cards carry the friend', () => {
+    const joined = homeChallengeCard(data(summary(head(), mine())), NOW);
+    const invite = homeChallengeCard(data(summary(head(), null)), NOW);
+    const friend = { name: 'Carlos', progress: 81, profile: null };
+    expect(joined && withFriend(joined, friend).friend).toEqual(friend);
+    expect(invite && withFriend(invite, friend).friend).toBeNull();
+  });
+});
+
+describe('dev samples (same as the reference)', () => {
+  it('has the three scenarios', () => {
+    expect(isHomeChallengeScenario('challengeInvite')).toBe(true);
+    expect(isHomeChallengeScenario('challengeJoined')).toBe(true);
+    expect(isHomeChallengeScenario('challengeCompleted')).toBe(true);
+    expect(isHomeChallengeScenario('other')).toBe(false);
+    expect(isHomeChallengeScenario(null)).toBe(false);
+  });
+
+  it('joined = 74 / 100 with Carlos at 81; invite and completed = the goal without progress', () => {
+    const joined = sampleChallengeCard('challengeJoined');
+    expect(joined).toMatchObject({ state: 'joined', progress: 74, label: 'dominadas' });
+    expect(joined.friend).toMatchObject({ name: 'Carlos', progress: 81 });
+    for (const scenario of ['challengeInvite', 'challengeCompleted'] as const) {
+      const card = sampleChallengeCard(scenario);
+      expect(card.state).toBe('invite');
+      expect(card.progress).toBe(0);
+      expect(card.participants).toBe(18420);
+      expect(card.reward).toMatchObject({ points: 150, badgeName: 'Semana de tracción' });
+    }
   });
 });
