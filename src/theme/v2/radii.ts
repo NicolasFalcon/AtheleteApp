@@ -3,7 +3,7 @@ export const radiusV2 = {
   pill: 999,
   circle44: 22,
   circle36: 18,
-  tabBar: 34,
+  tabBar: 26,
   lightbox: 34,
   tabItem: 28,
   sheet: 28,

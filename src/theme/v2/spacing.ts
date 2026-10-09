@@ -31,7 +31,7 @@ export const layoutV2 = {
   sheetCloseButton: 36,
   primaryCtaHeight: 56,
   secondaryCtaHeight: 48,
-  tabBarHeight: 68,
+  tabBarHeight: 64,
   tabBarBottom: 24,
   tabBarClearance: 120,
 } as const;

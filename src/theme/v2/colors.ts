@@ -40,6 +40,7 @@ export type ColorsV2 = {
     onText: string;
     textOnDark: string;
     deep: string;
+    strong: string;
     glow: readonly string[];
   };
   recovery: {
@@ -52,13 +53,20 @@ export type ColorsV2 = {
     gradient: readonly string[];
   };
   ellie: {
-    linen: readonly string[];
-    linenAlt: readonly string[];
     textSecondary: string;
-    orb: readonly string[];
-    halo: string;
-    shadow: string;
+    chip: string;
+    divider: string;
+    voiceBg: string;
     input: string;
+    // Soft Ember wash behind ELLIE bands (top → clear).
+    wash: readonly [string, string];
+    // Living Halo material (same in Light and Dark; only the glow changes).
+    halo: {
+      core: readonly [string, string, string];
+      rim: string;
+      ember: string;
+      arcHot: string;
+    };
   };
   overlay: string;
   glass: {
@@ -80,6 +88,7 @@ const shared = {
     onText: palette.ink,
     textOnDark: palette.emberTextOnDark,
     deep: palette.emberDeep,
+    strong: palette.emberStrong,
     glow: alpha.emberGlow,
   },
   scrim: [alpha.scrimTop, alpha.scrimBottom] as const,
@@ -131,13 +140,18 @@ export const lightColorsV2: ColorsV2 = {
     gradient: gradients.recovery,
   },
   ellie: {
-    linen: gradients.ellieLinenLight,
-    linenAlt: gradients.ellieLinenAlt,
     textSecondary: palette.ellieTextSecondary,
-    orb: gradients.ellieOrb,
-    halo: alpha.ellieHalo,
-    shadow: alpha.ellieShadow,
+    chip: palette.ellieChip,
+    divider: palette.ellieDivider,
+    voiceBg: palette.ellieVoiceBg,
     input: alpha.ellieInputLight,
+    wash: [alpha.ellieWash, alpha.ellieWashClear],
+    halo: {
+      core: [palette.haloCore, palette.haloCoreMid, palette.haloCoreEdge],
+      rim: palette.haloRim,
+      ember: palette.ember,
+      arcHot: palette.haloArcHot,
+    },
   },
   overlay: alpha.overlayLight,
   glass: {
@@ -198,13 +212,18 @@ export const darkColorsV2: ColorsV2 = {
     gradient: gradients.recovery,
   },
   ellie: {
-    linen: gradients.ellieLinenDark,
-    linenAlt: gradients.ellieLinenDark,
     textSecondary: palette.ellieTextSecondaryDark,
-    orb: gradients.ellieOrb,
-    halo: alpha.ellieHaloDark,
-    shadow: alpha.ellieShadow,
+    chip: palette.ellieChipDark,
+    divider: palette.ellieDividerDark,
+    voiceBg: palette.ellieVoiceBg,
     input: alpha.ellieInputDark,
+    wash: [alpha.ellieWashDark, alpha.ellieWashClear],
+    halo: {
+      core: [palette.haloCore, palette.haloCoreMid, palette.haloCoreEdge],
+      rim: palette.haloRim,
+      ember: palette.ember,
+      arcHot: palette.haloArcHot,
+    },
   },
   overlay: alpha.overlayDark,
   glass: {

@@ -54,6 +54,7 @@ export const palette = {
   ember: '#FF5B1F',
   emberTextOnDark: '#FF8A5C',
   emberDeep: '#C23D0B', // D-14, D-23
+  emberStrong: '#D2420E', // white text 4.64:1; fill of the ELLIE action (D-119)
 
   // Recovery Blue
   recovery: '#6E8FB3',
@@ -64,8 +65,20 @@ export const palette = {
   recoverySurface: '#1A2129',
 
   // ELLIE
-  ellieTextSecondary: '#72655A', // D-17 (prototype #8A7B6C, 3.3:1)
-  ellieTextSecondaryDark: '#B3A594',
+  // v2.12 "Lino neutro frío": no peach/sand/beige; supersedes D-17.
+  ellieTextSecondary: '#6B6964',
+  ellieTextSecondaryDark: '#8E8B86',
+  ellieChip: '#EFEEEA',
+  ellieChipDark: '#262422',
+  ellieDivider: '#E4E2DD',
+  ellieDividerDark: '#3A3835',
+  ellieVoiceBg: '#0E0D0C',
+  // Living Halo: smoked graphite core, Ember contour (handoff §6).
+  haloCore: '#1C1A17',
+  haloCoreMid: '#141210',
+  haloCoreEdge: '#0B0A09',
+  haloRim: '#3A3430',
+  haloArcHot: '#FFAA6E',
 
   // Studio background of MoveKit videos
   studio: ['#FAFAF8', '#F0EFEC', '#E7E5E1'] as const,
@@ -96,12 +109,11 @@ export const alpha = {
   glassOnPhotoStrong: 'rgba(255,255,255,.16)',
   scrimTop: 'rgba(20,19,18,.55)',
   scrimBottom: 'rgba(20,19,18,.96)',
-  ellieHalo: 'rgba(255,150,90,.28)',
-  ellieHaloDark: 'rgba(255,150,90,.2)',
-  ellieShadow: 'rgba(120,80,50,.12)',
+  ellieWash: 'rgba(255,91,31,.07)',
+  ellieWashDark: 'rgba(255,91,31,.10)',
+  ellieWashClear: 'rgba(255,91,31,0)',
   ellieInputLight: 'rgba(255,255,255,.82)',
   ellieInputDark: 'rgba(28,27,25,.82)', // D-13
-  ellieLinenAlt: 'rgba(237,228,216,.78)',
 } as const;
 
 export const gradients = {
@@ -114,17 +126,5 @@ export const gradients = {
     '#1E2E42',
     '#EDF1F6',
     '#141B23',
-  ] as const,
-  ellieLinenLight: ['#EFE7DD', '#F3EEE7'] as const,
-  ellieLinenDark: ['#221B15', '#171411', '#241E18', '#1A1714'] as const,
-  ellieLinenAlt: ['#EDE4D8', '#F3EDE5', '#E2D7CA'] as const,
-  ellieOrb: [
-    '#FFFFFF',
-    '#F6E9DE',
-    '#F8EDE3',
-    '#E6CCB8',
-    '#E9D1BE',
-    '#CFAE95',
-    '#CFAC92',
   ] as const,
 } as const;

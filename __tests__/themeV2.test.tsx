@@ -119,18 +119,19 @@ describe('theme v2 · colors', () => {
     expect(
       contrast(colors.ember.onText, colors.ember.base),
     ).toBeGreaterThanOrEqual(4.5);
+    // ELLIE action (v2.12): white text on the stronger Ember fill.
+    expect(
+      contrast('#FFFFFF', colors.ember.strong),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
-  it('keeps ELLIE secondary text readable on linen (D-17)', () => {
-    for (const linen of lightColorsV2.ellie.linen) {
-      expect(
-        contrast(lightColorsV2.ellie.textSecondary, linen),
-      ).toBeGreaterThanOrEqual(4.5);
-    }
-    for (const linen of darkColorsV2.ellie.linen) {
-      expect(
-        contrast(darkColorsV2.ellie.textSecondary, linen),
-      ).toBeGreaterThanOrEqual(4.5);
+  it('keeps ELLIE secondary text readable on the neutral surfaces (v2.12)', () => {
+    for (const theme of [lightColorsV2, darkColorsV2]) {
+      for (const background of [theme.bg, theme.ellie.chip]) {
+        expect(
+          contrast(theme.ellie.textSecondary, background),
+        ).toBeGreaterThanOrEqual(4.5);
+      }
     }
   });
 });
@@ -156,8 +157,8 @@ describe('theme v2 · typography, spacing and radii', () => {
 
     expect(layout.gutter).toBe(20);
     expect(layout.sectionGap).toBe(32);
-    expect(layout.tabBarHeight).toBe(68);
-    expect(radius.tabBar).toBe(34);
+    expect(layout.tabBarHeight).toBe(64);
+    expect(radius.tabBar).toBe(26);
     expect(radius.card).toBe(24);
     expect(space.s14).toBe(14);
   });
