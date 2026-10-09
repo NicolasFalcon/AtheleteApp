@@ -51,6 +51,9 @@ export type LivingHaloProps = {
   // Ember halo and contour, still.
   tab?: boolean;
   active?: boolean;
+  // "Lit" finish (Inicio band): diffuse outer glow and a partial, asymmetric
+  // Ember light inside, bottom-right. Static, no extra loops.
+  lit?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -63,6 +66,7 @@ export function LivingHalo({
   level,
   tab = false,
   active = false,
+  lit = false,
   style,
 }: LivingHaloProps) {
   const size = resolveHaloSize(sizeProp);
@@ -253,7 +257,7 @@ export function LivingHalo({
     transform: [{ rotate: `${angle.value % 360}deg` }],
   }));
   const arcGlowStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, arc.value) * 0.75 * pulse.value,
+    opacity: Math.min(1, arc.value) * 0.9 * pulse.value,
     transform: [{ rotate: `${angle.value % 360}deg` }],
   }));
 
@@ -283,7 +287,8 @@ export function LivingHalo({
   }));
 
   const h = colors.ellie.halo;
-  const haloSize = size * 1.6;
+  // The voice-scene Halo keeps a narrower outer glow (reference ELLIE_05).
+  const haloSize = size * (size >= 120 ? 1.45 : 1.6);
   const stroke = Math.max(1.4, size * 0.03);
   const ringStroke = Math.max(1.2, size * 0.015);
   const r = size / 2 - stroke / 2;
@@ -313,8 +318,8 @@ export function LivingHalo({
             <Defs>
               <RadialGradient id="llGlow" cx="50%" cy="50%" r="50%">
                 <Stop offset="0.5" stopColor={h.ember} stopOpacity={0} />
-                <Stop offset="0.72" stopColor={h.ember} stopOpacity={0.9} />
-                <Stop offset="0.84" stopColor={h.ember} stopOpacity={0.28} />
+                <Stop offset="0.72" stopColor={h.ember} stopOpacity={0.7} />
+                <Stop offset="0.84" stopColor={h.ember} stopOpacity={0.2} />
                 <Stop offset="1" stopColor={h.ember} stopOpacity={0} />
               </RadialGradient>
             </Defs>
@@ -341,6 +346,29 @@ export function LivingHalo({
         />
       ))}
 
+      {lit && !offline ? (
+        <Svg
+          pointerEvents="none"
+          width={size * 1.6}
+          height={size * 1.6}
+          style={[styles.abs, { left: -size * 0.3, top: -size * 0.3 }]}
+        >
+          <Defs>
+            <RadialGradient id="llLitGlow" cx="60%" cy="63%" r="50%">
+              <Stop offset="0" stopColor={h.ember} stopOpacity={0.16} />
+              <Stop offset="0.5" stopColor={h.ember} stopOpacity={0.07} />
+              <Stop offset="1" stopColor={h.ember} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Circle
+            cx={size * 0.8}
+            cy={size * 0.8}
+            r={size * 0.8}
+            fill="url(#llLitGlow)"
+          />
+        </Svg>
+      ) : null}
+
       <Animated.View style={[styles.fill, wrapStyle, offline && styles.offline]}>
         <Svg width={size} height={size} style={styles.abs}>
           <Defs>
@@ -356,6 +384,23 @@ export function LivingHalo({
           </Defs>
           <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#llCore)" />
           <Circle cx={size / 2} cy={size / 2} r={size / 2} fill="url(#llSheen)" />
+          {lit && !offline ? (
+            <>
+              <Defs>
+                <RadialGradient id="llWarm" cx="76%" cy="84%" r="62%">
+                  <Stop offset="0" stopColor={h.ember} stopOpacity={0.34} />
+                  <Stop offset="0.46" stopColor="#FF6E32" stopOpacity={0.1} />
+                  <Stop offset="1" stopColor={h.ember} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Circle
+                cx={size / 2}
+                cy={size / 2}
+                r={size / 2}
+                fill="url(#llWarm)"
+              />
+            </>
+          ) : null}
         </Svg>
 
         {!offline ? (
@@ -392,8 +437,8 @@ export function LivingHalo({
             </Animated.View>
 
             {[
-              { s: arcGlowStyle, w: stroke * 3, o: 0.35 },
-              { s: arcStyle, w: stroke * 1.2, o: 1 },
+              { s: arcGlowStyle, w: stroke * 4, o: 0.45 },
+              { s: arcStyle, w: stroke * 1.4, o: 1 },
             ].map((layer, i) => (
               <Animated.View key={i} style={[styles.abs, styles.fill, layer.s]}>
                 <Svg width={size} height={size}>
@@ -421,6 +466,20 @@ export function LivingHalo({
         ) : null}
 
         <Svg width={size} height={size} style={styles.abs} pointerEvents="none">
+          {/* Smoked-glass reflex: a pale crescent hugging the upper-left edge. */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={size / 2 - size * 0.045}
+            stroke="#FFFFFF"
+            strokeOpacity={0.2}
+            strokeWidth={Math.max(1, size * 0.022)}
+            strokeLinecap="round"
+            strokeDasharray={`${(size - size * 0.09) * Math.PI * 0.2} ${size * Math.PI}`}
+            rotation={195}
+            origin={`${size / 2}, ${size / 2}`}
+            fill="none"
+          />
           <Circle
             cx={size / 2}
             cy={size / 2}
