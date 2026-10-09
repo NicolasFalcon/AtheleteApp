@@ -39,10 +39,9 @@ import {
 } from '@app/features/home/v2/HomeHero';
 import { workoutTypeLabel } from '@app/features/home/v2/homeLabels';
 import { QuizBanner } from '@app/features/home/v2/QuizBanner';
-import { WearBannerV2 } from '@app/features/home/v2/WearBannerV2';
+import { WearCard } from '@app/features/wear/WearCard';
 import { WeekCarousel } from '@app/features/home/v2/WeekCarousel';
 import { recommendRoutines } from '@app/features/workouts/workoutsModel';
-import { WearPreviewModal } from '@app/features/home/components/WearPreviewModal';
 import { devHomeScroll, useHomeModeOverride } from '@app/dev/homeModeOverride';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
@@ -94,7 +93,6 @@ export function HomeScreen({ navigation }: Props) {
   const homeOverride = useHomeModeOverride();
   const modeOverride = homeOverride?.mode ?? null;
   const inviteDismissals = useCore33InviteDismissals();
-  const [wearVisible, setWearVisible] = useState(false);
   // Official challenge section (cache shared with Comunidad: joining updates
   // both at once through the service's optimistic layer).
   const toast = useToast();
@@ -515,16 +513,16 @@ export function HomeScreen({ navigation }: Props) {
                   />
                 );
               case 'wear':
-                return <WearBannerV2 key={key} onPress={() => setWearVisible(true)} />;
+                return (
+                  <WearCard
+                    key={key}
+                    onPress={() => navigation.navigate(APP_ROUTES.WearCollection)}
+                  />
+                );
             }
           })}
         </View>
       </ScrollView>
-
-      <WearPreviewModal
-        visible={wearVisible}
-        onClose={() => setWearVisible(false)}
-      />
     </View>
   );
 }

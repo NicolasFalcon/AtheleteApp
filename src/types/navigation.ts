@@ -287,6 +287,9 @@ export type AppStackParamList = {
   EllieChat: EllieChatRouteParams | undefined;
   EllieVoice: EllieVoiceRouteParams | undefined;
   RouteSoon: undefined;
+  WearCollection: undefined;
+  // `devSize` (__DEV__): opens with that size chosen.
+  WearProduct: { productId: string; devSize?: string; devScroll?: number };
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;
   NutritionPlan: NutritionPlanRouteParams | undefined;

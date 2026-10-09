@@ -57,6 +57,8 @@ export const APP_ROUTES = {
   EllieChat: 'EllieChat',
   EllieVoice: 'EllieVoice',
   RouteSoon: 'RouteSoon',
+  WearCollection: 'WearCollection',
+  WearProduct: 'WearProduct',
   CreateRoutine: 'CreateRoutine',
   EditRoutine: 'EditRoutine',
   AddExerciseToRoutine: 'AddExerciseToRoutine',
