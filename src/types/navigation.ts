@@ -286,6 +286,7 @@ export type AppStackParamList = {
   QuizResult: QuizResultRouteParams;
   EllieChat: EllieChatRouteParams | undefined;
   EllieVoice: EllieVoiceRouteParams | undefined;
+  RouteSoon: undefined;
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;
   NutritionPlan: NutritionPlanRouteParams | undefined;

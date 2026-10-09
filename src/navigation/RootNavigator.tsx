@@ -7,6 +7,7 @@ import { SettingsScreen } from '@app/screens/profile/SettingsScreen';
 import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen';
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
 import { EllieVoiceScreen } from '@app/screens/ellie/EllieVoiceScreen';
+import { RouteSoonScreen } from '@app/screens/home/RouteSoonScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StyleSheet } from 'react-native';
@@ -246,6 +247,7 @@ export function RootNavigator() {
             component={EllieVoiceScreen}
             options={{ animation: 'fade', gestureEnabled: false }}
           />
+          <Stack.Screen name={APP_ROUTES.RouteSoon} component={RouteSoonScreen} />
           <Stack.Screen
             name={APP_ROUTES.EditProfile}
             component={EditProfileScreen}
