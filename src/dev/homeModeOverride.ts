@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import { Platform, Settings } from 'react-native';
 import type { Core33InviteVariant } from '@app/features/core33/core33Invite';
-import type { HomeMode } from '@app/features/home/homePriority';
+import type { HomeMode, HomeSlideKind } from '@app/features/home/homePriority';
 
 // Development-only visual override for Inicio ("Ver modos de Inicio" in the
 // dev menu): hero mode + Core 33 discovery card. In-memory, never persisted,
@@ -9,27 +9,54 @@ import type { HomeMode } from '@app/features/home/homePriority';
 
 export type HomeOverride = {
   mode: HomeMode;
+  // Slides of the hero carousel for this override.
+  slides: HomeSlideKind[];
   // Card forced by the override (null = hidden), ignoring "Ahora no".
   core33Card: Core33InviteVariant | null;
   label: string;
 };
 
 const OVERRIDES: HomeOverride[] = [
-  { mode: 'new', core33Card: null, label: 'Usuario nuevo' },
+  { mode: 'new', slides: ['new'], core33Card: null, label: 'Usuario nuevo' },
   {
     mode: 'new',
+    slides: ['new'],
     core33Card: 'invite',
     label: 'Usuario nuevo + Core 33 invitación',
   },
-  { mode: 'allDone', core33Card: null, label: 'Todo completado' },
-  { mode: 'workoutDone', core33Card: null, label: 'Entreno hecho' },
-  { mode: 'resume', core33Card: null, label: 'Sesión guardada' },
-  { mode: 'core33', core33Card: null, label: 'Core 33 prioridad' },
-  { mode: 'workout', core33Card: null, label: 'Entreno pendiente' },
+  { mode: 'allDone', slides: ['allDone'], core33Card: null, label: 'Todo completado' },
+  {
+    mode: 'workoutDone',
+    slides: ['core33', 'workoutDone'],
+    core33Card: null,
+    label: 'Entreno hecho + Core 33 pendiente (2)',
+  },
+  { mode: 'resume', slides: ['resume'], core33Card: null, label: 'Sesión guardada' },
+  { mode: 'core33', slides: ['core33'], core33Card: null, label: 'Core 33 prioridad' },
+  { mode: 'workout', slides: ['workout'], core33Card: null, label: 'Entreno pendiente' },
   {
     mode: 'workout',
+    slides: ['workout'],
     core33Card: 'again',
     label: 'Entreno pendiente + empezar otro Core 33',
+  },
+  {
+    mode: 'workout',
+    slides: ['workout', 'core33'],
+    core33Card: null,
+    label: 'Entreno + Core 33 (2)',
+  },
+  {
+    mode: 'resume',
+    slides: ['resume', 'core33', 'workoutDone'],
+    core33Card: null,
+    label: 'Retomar + Core 33 + Entreno hecho (3, uno cerrado)',
+  },
+  {
+    mode: 'workout',
+    slides: ['workout', 'core33Closed'],
+    core33Card: null,
+    label: 'Entreno + Core 33 cerrado (2, uno cerrado)',
   },
 ];
 
@@ -83,4 +110,14 @@ export function devHomeScroll(): number {
   }
   const value = Number(Settings.get('homeScroll'));
   return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+// iOS dev launch argument to open the hero carousel on a slide (for
+// screenshots): `-homeSlide 1`. 0 in production builds.
+export function devHomeSlide(): number {
+  if (!__DEV__ || Platform.OS !== 'ios') {
+    return 0;
+  }
+  const value = Number(Settings.get('homeSlide'));
+  return Number.isInteger(value) && value > 0 ? value : 0;
 }
