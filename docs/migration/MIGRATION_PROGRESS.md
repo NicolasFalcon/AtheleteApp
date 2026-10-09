@@ -2446,3 +2446,33 @@ Detalle del cambio: [`V2_12_DELTA.md`](V2_12_DELTA.md) (bloques A y B).
 - **D-110** · **Excepción a D-32 (Lucide):** los iconos del tab bar son propios (`icons/tab-*.svg` del handoff v2.12, `src/navigation/tabIcons.tsx` con `react-native-svg`). El resto de la app sigue con Lucide.
 - **D-111** · Tab bar: activo sin fondo ni pill, icono `-on` (trazo Ember con relleno suave) y label Ember 600; inactivo con icono al 50 %. ELLIE se dibuja con el `EllieOrb` actual (marcador de posición hasta el Living Halo). Altura (68 pt) y radio sin tocar: el handoff pide 64 pt y radio 26.
 - **D-112** · Inicio ya no muestra "Tu mejor marca" (`BestMarkCard`); Inicio deja de pedir `usePersonalRecords` y `useExerciseLibrary`. Las marcas viven en Progreso, Detalle de ejercicio y Resumen.
+
+## v2.12 · Fase 1b · Living Halo y ELLIE neutra · 2026-10-09
+
+Detalle: [`V2_12_DELTA.md`](V2_12_DELTA.md) (bloque C).
+
+- **D-113** · `EllieOrb` pasa a ser el **Living Halo** (react-native-svg + Reanimated, sin Skia): estados `idle | listening | thinking | speaking | offline`, todo el movimiento en el hilo de UI (transform/opacidad) y "Reducir movimiento" sin escala, deformación, ondas ni deriva (el arco de "pensando" late en opacidad). Las ondas y la energía de voz solo reaccionan si se pasa `level` (SharedValue 0–1); sin él, escuchar y responder muestran un nivel fijo. `'breathing'` se renombra a `'idle'`.
+- **D-114** · Eliminados los tokens peach/lino: `ellie.linen`, `linenAlt`, `orb`, `halo` (string), `shadow`, las paletas `ellieLinen*`, `ellieOrb`, `ellieHalo*`, `ellieShadow` y el componente `EllieLinen`. Nuevos: `ellie.chip`, `divider`, `voiceBg`, `wash`, `halo{core,rim,ember,arcHot}`. `ellie.textSecondary` pasa a `#6B6964` / `#8E8B86` (sustituye a D-17 para ELLIE). `shadow.ellie` neutra. `ellie.input` conserva D-13.
+- **D-115** · ELLIE sin fondo propio: portada y chat usan `colors.bg`; `EllieSurface` y `EllieWelcome` solo llevan un lavado Ember muy suave (`ellie.wash`).
+- **D-116** · Acciones de IA (§22.2): `Button` admite `variant="ellie"` (pill Ember, texto blanco, Halo mini a la izquierda, gap 10) y `"ellieText"` (compacta, acento Ember). Aplicado a "Crear con ELLIE" (Nutrición) y a la respuesta principal de la portada de ELLIE (que pasa de negro a Ember).
+
+### Ajustes finales de la fase 1b · 2026-10-09
+
+- **D-117** · Living Halo en modo `tab` (`<EllieOrb tab active />`): inactivo = esfera quieta sin glow; activo = contorno y halo Ember suaves, quietos (sin bucle de respiración). `TabBarV2` pasa `active={focused}`.
+- **D-118** · "Otra versión" (plan nutricional y rutina) y "Ajustar" del chat pasan a `variant="ellieText"`, por regenerar o ajustar con IA (§22.2).
+- **D-119** · Token `ember.strong` = `#D2420E` (palette `emberStrong`), solo como relleno de la variante `ellie` (y de la respuesta principal de la portada de ELLIE). Texto blanco: **4,64:1** en Light y Dark (el relleno es el mismo en ambos). El Ember general (`#FF5B1F`, 3,1:1 con blanco) no cambia. Caso añadido al test de contraste de `themeV2`.
+
+## v2.12 · Fase 1 · Navbar e identidad de ELLIE (cierre) · 2026-10-09
+
+Checkpoint: [`V212_F1_CHECKPOINT.md`](V212_F1_CHECKPOINT.md). Sin dependencias nuevas, sin backend.
+
+**Resumen:** `LivingHalo` (nuevo, con lógica de estados testeable en `livingHaloModel.ts`) sustituye al orbe en todos sus usos; `EllieOrb` queda como envoltorio sin uso. Botón de IA propio (`EllieActionButton`). ELLIE sin fondo propio. Tab bar a 64 pt y radio 26. Escena de voz (solo UI). Los D-110 a D-119 de arriba siguen vigentes; esto los completa.
+
+- **D-120** · `LivingHalo` sustituye a `EllieOrb` (D-113): tamaños con nombre (`mini` 20, `tab` 24, `chat` 28, `input` 32, `band` 56, `cover` 128, `voice` 176) y `EllieOrb.tsx` queda sin uso y sin borrar, pendiente de confirmación. Con "Reducir movimiento" las transiciones de estado son instantáneas.
+- **D-121** · Tab bar de 64 pt y radio 26 (handoff v2.12; antes 68 y 34). El orbe de ELLIE inactivo no lleva el 50 % de opacidad de los demás iconos (se veía gris).
+- **D-122** · `EllieActionButton` sustituye a las variantes `ellie`/`ellieText` de `Button` (D-116, D-118, que se retiran): principal y compacto. "Ajustar con ELLIE" en la banda de Nutrición pasa a compacto (`EllieSurface action.ai`). No se pasa a acción de IA "Activar plan" (no llama a la IA).
+- **D-123** · El compositor de ELLIE lleva el Halo de 32 y un chip de micrófono neutro (referencia 03 del handoff) en portada y chat; el micrófono abre la escena de voz.
+- **D-124** · Los iconos de "También puedo" (portada de ELLIE) pasan a Ember, como pide el handoff.
+- **DA-175** · Escena de voz solo UI: en `__DEV__` el botón recorre reposo → escuchando → procesando → respondiendo con textos de ejemplo; en release no hace nada. El texto de reposo ("Pregúntame por tu entreno, tu comida o tu descanso.") es copy real de ELLIE_04. Entra desde el micrófono del compositor; "Escribir" lleva al chat con el campo enfocado.
+- **DA-176** · Ruta nueva `EllieVoice` en el stack raíz, con transición de fundido y sin gesto de retroceso.
+- **DA-177** · `ember.strong` (D-119) se aplica solo a `EllieActionButton`; el botón central de la escena de voz usa el Ember general (`#FF5B1F`), como la referencia (sin texto encima).
