@@ -8,6 +8,7 @@ import {
   PhotoBody,
   RecordBody,
   RoutineBody,
+  RouteBody,
   WorkoutLightBody,
   WorkoutPhotoBody,
 } from '@app/components/v2/PostBodies';
@@ -19,6 +20,7 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 import { useToast } from '@app/components/v2/Toast';
 import {
   contentState,
+  isHighlightedKind,
   isWorkoutAttachment,
   postBodyKind,
   postKindLabel,
@@ -34,7 +36,9 @@ import type {
   FeedPost,
   RecordAttachment,
   RoutineAttachment,
+  RouteAttachment,
 } from '@app/features/social/postTypes';
+import { routePostsEnabled } from '@app/features/social/routePosts';
 import { useSocialService } from '@app/features/social/useSocial';
 
 export type PostCardProps = {
@@ -107,9 +111,18 @@ export function PostCard({
   };
 
   const name = post.author?.name ?? 'Usuario';
-  const kind = postBodyKind(post);
+  const kind = postBodyKind(post, { routeEnabled: routePostsEnabled() });
+  // A type this app does not know (or `route` without Ruta) is not shown.
+  if (kind === 'unknown') {
+    return null;
+  }
   const attachment = post.attachment;
   const open = detail ? undefined : onOpenPost;
+  const sport =
+    kind === 'route' && attachment && 'sport' in attachment
+      ? (attachment as RouteAttachment).sport
+      : undefined;
+  const label = postKindLabel(post.type, sport).toUpperCase();
 
   return (
     <View style={styles.card}>
@@ -123,7 +136,7 @@ export function PostCard({
         >
           <PersonAvatar
             name={name}
-            size={44}
+            size={40}
             avatarKey={post.author?.avatar_key}
             profilePhotoUrl={post.author?.profile_photo_url}
             relationship={post.relationship}
@@ -132,9 +145,19 @@ export function PostCard({
             <TextV2 variant="bodyStrong" numberOfLines={1}>
               {name}
             </TextV2>
-            <TextV2 variant="meta" tone="secondary" numberOfLines={1}>
-              {`${postKindLabel(post.type)} · ${timeAgo(post.created_at)}`}
-            </TextV2>
+            <View style={styles.kindRow}>
+              <TextV2
+                style={[
+                  styles.kind,
+                  { color: isHighlightedKind(post.type) ? colors.ember.base : colors.text.secondary },
+                ]}
+              >
+                {label}
+              </TextV2>
+              <TextV2 variant="caption" color={colors.text.secondary} numberOfLines={1}>
+                {`· ${timeAgo(post.created_at)}`}
+              </TextV2>
+            </View>
           </View>
         </PressableScale>
         {onMore ? (
@@ -149,14 +172,14 @@ export function PostCard({
         ) : null}
       </View>
 
-      {post.body ? (
-        <TextV2 variant="bodyL" selectable={false}>
-          {post.body}
-        </TextV2>
-      ) : null}
-
       {kind === 'workoutPhoto' && isWorkoutAttachment(attachment) && post.photo_path ? (
-        <WorkoutPhotoBody attachment={attachment} photoPath={post.photo_path} onPress={open} />
+        <WorkoutPhotoBody
+          attachment={attachment}
+          photoPath={post.photo_path}
+          width={post.photo_width}
+          height={post.photo_height}
+          onPress={open}
+        />
       ) : null}
       {kind === 'workoutLight' && isWorkoutAttachment(attachment) ? (
         <WorkoutLightBody attachment={attachment} onPress={open} />
@@ -178,6 +201,9 @@ export function PostCard({
       {kind === 'challenge' && attachment ? (
         <ChallengeBody attachment={attachment as ChallengeAttachment} onPress={open} />
       ) : null}
+      {kind === 'route' && attachment ? (
+        <RouteBody attachment={attachment as RouteAttachment} onPress={open} />
+      ) : null}
       {kind === 'photo' && post.photo_path ? (
         <PhotoBody
           photoPath={post.photo_path}
@@ -193,6 +219,13 @@ export function PostCard({
         onLike={onLike}
         onComment={onComment ?? onOpenPost}
       />
+
+      {post.body ? (
+        <TextV2 variant="bodyL" selectable={false} style={styles.caption}>
+          <TextV2 variant="bodyL" style={styles.captionName}>{`${name} `}</TextV2>
+          {post.body}
+        </TextV2>
+      ) : null}
     </View>
   );
 }
@@ -201,5 +234,10 @@ const styles = StyleSheet.create({
   card: { gap: 14 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   author: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
-  authorTexts: { flex: 1, gap: 1 },
+  authorTexts: { flex: 1, gap: 2 },
+  kindRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  kind: { fontSize: 12, fontWeight: '700', letterSpacing: 0.7 },
+  // The text is the footer: "**Nombre** texto".
+  caption: { fontSize: 15, lineHeight: 22, marginTop: -4 },
+  captionName: { fontSize: 15, fontWeight: '700' },
 });

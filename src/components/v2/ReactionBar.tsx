@@ -58,7 +58,7 @@ export function ReactionBar({
       >
         <Animated.View style={heartStyle}>
           <Heart
-            size={21}
+            size={24}
             strokeWidth={1.9}
             color={liked ? colors.ember.base : colors.text.primary}
             fill={liked ? colors.ember.base : 'transparent'}
@@ -74,7 +74,7 @@ export function ReactionBar({
         onPress={onComment}
         style={styles.item}
       >
-        <MessageCircle size={20} strokeWidth={1.9} color={colors.text.primary} />
+        <MessageCircle size={23} strokeWidth={1.9} color={colors.text.primary} />
         <TextV2 variant="bodyStrong">{String(comments)}</TextV2>
       </PressableScale>
       <View style={styles.spacer} />

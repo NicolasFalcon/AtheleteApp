@@ -1,12 +1,12 @@
-import { StyleSheet } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
+import { StyleSheet, View } from 'react-native';
 import { AvatarStack, type AvatarStackItem } from '@app/components/v2/AvatarStack';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
-// Minor friend activity: one line, no likes, no comments, not a post
-// ("Carlos · nuevo récord"; handoff §5 Social Post).
+// Minor friend activity (v2.12): a line with stacked avatars, the text at
+// 15/500 and an Ember dot; no card, no likes, no comments, not a post
+// ("Carlos · nuevo récord").
 export function ActivityLine({
   people,
   text,
@@ -24,32 +24,19 @@ export function ActivityLine({
       accessibilityLabel={text}
       disabled={!onPress}
       onPress={onPress}
-      style={[styles.row, { backgroundColor: colors.surface.muted }]}
+      style={styles.row}
     >
-      <AvatarStack
-        items={people}
-        size={32}
-        max={3}
-        ringColor={colors.surface.muted}
-      />
-      <TextV2 variant="body" style={styles.text}>
+      <AvatarStack items={people} size={36} max={3} ringColor={colors.bg} />
+      <TextV2 variant="bodyStrong" style={styles.text}>
         {text}
       </TextV2>
-      {onPress ? (
-        <ChevronRight size={16} strokeWidth={2} color={colors.text.tertiary} />
-      ) : null}
+      <View style={[styles.dot, { backgroundColor: colors.ember.base }]} />
     </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 22,
-  },
-  text: { flex: 1 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  text: { flex: 1, fontWeight: '500', lineHeight: 21 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
 });

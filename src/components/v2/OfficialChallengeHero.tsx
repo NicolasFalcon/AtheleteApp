@@ -1,5 +1,6 @@
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import { CoverImage } from '@app/components/v2/CoverImage';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -8,7 +9,7 @@ import { progressPct } from '@app/features/social/challengeModel';
 
 // Cover of the official challenge: an app asset (the real `cover_path` comes
 // with the challenge). TODO(social-wire): `social_challenges.cover_path`.
-const COVER = require('@app/assets/v2/photos/overhead.jpg');
+const COVER = require('@app/assets/v2/photos/home/reto-overhead.jpg');
 
 // "Λ OFICIAL ATHELETE": glass pill with the brand mark.
 export function OfficialBadge({ label = 'OFICIAL ATHELETE' }: { label?: string }) {
@@ -63,7 +64,7 @@ export function OfficialChallengeHero({
       onPress={onPress}
       style={[styles.card, { backgroundColor: scene.plate }]}
     >
-      <Image source={COVER} resizeMode="cover" style={StyleSheet.absoluteFill} />
+      <CoverImage source={COVER} aspect={900 / 601} x={0.5} y={0.3} />
       <LinearGradient
         colors={['rgba(20,19,18,.55)', 'rgba(20,19,18,.3)', 'rgba(20,19,18,.94)']}
         locations={[0, 0.35, 1]}
@@ -133,6 +134,7 @@ const styles = StyleSheet.create({
   bottom: { position: 'absolute', left: 20, right: 20, bottom: 20, gap: 12 },
   title: { fontSize: 28, fontWeight: '700', letterSpacing: -0.4, lineHeight: 30 },
   badge: {
+    alignSelf: 'flex-start',
     height: 26,
     paddingLeft: 6,
     paddingRight: 10,
