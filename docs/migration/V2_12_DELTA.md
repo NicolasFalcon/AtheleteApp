@@ -128,9 +128,20 @@ Reglas relevantes: las rutas guardadas son siempre privadas; el post y las pieza
 
 ---
 
+### I · ATHELETE Wear (añadido el 2026-10-09, Fase 2) · M
+
+Corrección: la primera versión de este documento daba Wear por sin cambios. v2.12 sí lo toca: la card de Inicio pasa a "Hecho para durar. · Ver colección →" y hay colección y ficha de producto (WEAR_01 a 03). Sigue siendo línea de ropa, no un dispositivo ni una tienda dentro de la app (no hay carrito, pago ni pedidos).
+
+- **Card de Inicio** (156 pt, foto B/N, wordmark, "Ver colección →") → colección. Sustituye al banner "Próximamente".
+- **Colección** (WEAR_01): hero B/N "Hecho para durar.", "Seis piezas para entrenar todos los días…", pieza base a ancho completo, rejilla de dos columnas, pausa editorial ("Menos ruido. Más entrenamiento."), accesorio en tile horizontal y cierre "Sé de los primeros" con "Avísame del lanzamiento".
+- **Ficha** (WEAR_02 y 03): galería de 3 fotos (540 pt), nombre, precio, descripción, tallas en pills (la agotada tachada), tres datos en filas y pie fijo con el CTA y una nota. Estados: sin talla, con talla, talla agotada, talla única y Próximamente (con fecha).
+- **Wear Product Tile** (3 variantes: base 440, rejilla 236, horizontal 132); solo "Próximamente" se marca; sin Ember.
+- **Sin backend:** catálogo de ejemplo local (`wearCatalog.ts`, `TODO(wear)`); el CTA final queda en "Próximamente" y "Avísame" es visual (BT-53).
+- **Contradicción a vigilar:** el handoff ("En pausa: no se enlaza desde la presentación hasta el lanzamiento") y `Wear.dc.html` (presentación sin productos) siguen describiendo la versión anterior; las capturas WEAR_01 a 03 y el índice muestran colección y ficha. Se siguió lo último.
+
 ## 4. Lo que **no** cambia (no tocar)
 
-Auth y onboarding, Sesión (pausa, descanso, resumen), Core 33 (salvo el orden en Inicio), Nutrición (salvo el botón), Quiz, Perfil/Ajustes, Wear, Scan, Apple Health, Entrenos, Comunidad W1 a W7 (datos, reglas, notificaciones, moderación), D-55 y las demás decisiones de `MIGRATION_PROGRESS`.
+Auth y onboarding, Sesión (pausa, descanso, resumen), Core 33 (salvo el orden en Inicio), Nutrición (salvo el botón), Quiz, Perfil/Ajustes, Scan, Apple Health, Entrenos, Comunidad W1 a W7 (datos, reglas, notificaciones, moderación), D-55 y las demás decisiones de `MIGRATION_PROGRESS`.
 
 ## 5. Orden de trabajo sugerido
 

@@ -22,6 +22,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-52 | Comunidad | ~~Subidas huérfanas de `social-photos`~~ | — | **Resuelto** (2026-10-07) |
 | BT-41 | Perfil | ~~`profiles_gender_check` debe aceptar `other`~~ | — | **Resuelto** (2026-10-06) |
 | BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
+| BT-53 | Wear | Lista de espera real para "Avísame del lanzamiento" | Baja | No (hoy solo visual) |
 | BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
 | BT-08 | Social | Proceso de moderación (revisión de reportes en 24 h, contacto de soporte) | Alta antes de lanzar Comunidad | Sí, para publicar Comunidad |
 | BT-09 | Storage | Tipos de archivo en `social-photos` y `profile-photos`, 5 MB en `profile-photos` | Media | No (la app valida) |
@@ -388,6 +389,14 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Cuándo:** cuando haya build en TestFlight.
 - **Prioridad:** Media. **No bloquea.**
 
+
+## Wear
+
+### BT-53 · Lista de espera real para "Avísame del lanzamiento"
+- **Estado:** en la app (colección de ATHELETE Wear, "Sé de los primeros") el botón es solo visual: cambia a "Te avisaremos", muestra un aviso (toast) y se olvida al salir. No se guarda ni se envía nada (`TODO(wear)`).
+- **Qué falta:** una lista de espera por usuario: tabla (p. ej. `wear_waitlist` con `user_id`, `created_at`, `topic`) con RLS de solo el dueño, y alta y baja idempotentes (el segundo toque lo desactiva). Opcional: un aviso push o correo el día del lanzamiento y el catálogo real (productos, tallas, existencias, fechas), hoy de ejemplo en `src/features/wear/wearCatalog.ts`.
+- **Prioridad:** Baja. **No bloquea.** Hasta que exista, el botón sigue como está.
+
 ## Historial
 - 2026-10-02: documento creado con BT-01 a BT-11.
 - 2026-10-03: BT-12 a BT-16 (módulo Entrenos).
@@ -408,4 +417,5 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-04: BT-38 sube a prioridad alta (puntos del quiz calculados por el servidor); BT-39 verificado: el servidor no otorga `quiz_master` solo.
 - 2026-10-06: BT-43 (Términos y soporte de Comunidad, antes de TestFlight).
 - 2026-10-07: BT-44 y BT-52 (Comunidad) resueltos; `remove_friend` aplicada (ver `BACKEND_SUMMARY`).
+- 2026-10-09: BT-53 (lista de espera de Wear, solo visual en la app).
 - 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.

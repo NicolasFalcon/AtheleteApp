@@ -13,6 +13,7 @@ Fuente: `Home.dc.html`, handoff §22.3 / §11B e índice (HOME_12 a HOME_17) y [
 | Card de Ruta (invitación) + placeholder "Ruta · Próximamente" | ✅ |
 | Pulido del Halo (contorno, reflejo, halo exterior de voz, acabado `lit`) | ✅ |
 | Orden de Inicio v2.12 (`homeSectionOrder`) | ✅ |
+| ATHELETE Wear: card de Inicio, colección y ficha de producto (UI, sin backend) | ✅ |
 | "Tu ruta real" (actividad de hoy) | ⏳ Fase 5 |
 | Foto/badges definitivos del reto, vista "Retos oficiales" | ⏳ Fase 4 |
 
@@ -47,3 +48,11 @@ Diferencias con la referencia:
 - Fase 4: `cover_path` y artwork de los 5 badges; vista "Retos oficiales" (la flecha del CTA va hoy al detalle, no a la lista); texto del reto desde datos.
 - Fase 5: Ruta real, su estado "tu ruta de hoy" y el mapa de SDK.
 - Android sin compilar (§8.1).
+
+## Wear (añadido a la Fase 2)
+
+- **Archivos:** `features/wear/{wearCatalog,wearProductModel,WearCard}`, `components/v2/WearProductTile`, `screens/wear/{WearCollectionScreen,WearProductScreen}`, fotos B/N en `assets/v2/photos/wear/`, rutas `WearCollection` y `WearProduct`, dev `athelete://dev/wear?screen=…`.
+- **Inicio:** `WearCard` sustituye a `WearBannerV2` y lleva a la colección. `WearBannerV2` y `WearPreviewModal` quedan sin uso, sin borrar.
+- **Ficha:** lógica pura en `wearProductModel.ts` (talla, agotada, próximamente; 13 tests). `WEAR_STORE_OPEN = false`: el CTA con talla dice "Próximamente".
+- **Capturas (simulador, Light y Dark):** card de Inicio, colección, ficha sin talla (WEAR_02), con talla, con una talla agotada y Próximamente (WEAR_03). Comparadas con WEAR_01 a 03: coinciden estructura y tipografía. Diferencias: la foto del hero es la misma placeholder pero con otro encuadre; la parte baja de la colección (rejilla, pausa editorial, cierre) no tiene captura de referencia, se compuso desde el handoff; la rejilla, la pausa editorial y el cierre de la colección no se capturaron en el simulador (no se puede desplazar la pantalla).
+- **Pendiente:** fotografía real de Wear, catálogo y existencias reales, tienda externa y lista de espera (BT-53).
