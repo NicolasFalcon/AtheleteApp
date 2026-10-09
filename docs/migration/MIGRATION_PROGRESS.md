@@ -2504,3 +2504,15 @@ La primera implementación (colección con productos y ficha; D-132 a D-136 y DA
 - **D-134** · Las fotos de reserva (overhead, culturismo, barra-mujer, mancuernas) llevan el gris horneado; el oscurecimiento del prototipo (`brightness`) es una capa. El recorte (`object-fit` y `object-position`) se calcula a mano porque `resizeMode="cover"` solo centraba mal en estas pantallas.
 - **DA-182** · "Avísame del lanzamiento" es solo visual: alterna "Te avisaremos", muestra un aviso y no guarda nada (`TODO(wear)`); lista de espera real en BT-53.
 - **DA-183** · Dev: `athelete://dev/wear?screen=wear|wearMosaic|wearEnd`.
+
+### v2.12 · Fase 2 · Hero de Inicio como carrusel de estados · 2026-10-09
+
+Detalle en [`V212_F2_CHECKPOINT.md`](V212_F2_CHECKPOINT.md) y [`V2_12_DELTA.md`](V2_12_DELTA.md) (bloque J). Solo UI y lógica de prioridad con los datos que ya existen; backend pendiente: BT-54.
+
+- **DA-184** · `resolveHomeSlides` devuelve la lista ordenada de slides: pendientes (Retomar si hay sesión guardada o en curso, si no Entreno; luego Core 33 si el reto está activo y el día sin cerrar) y al final los cerrados hoy (Entreno hecho; Core 33 con el día cerrado). Sin pendientes, un solo "Día completo" (cerrados incluidos); usuario nuevo sin sesión guardada, un solo "Primera sesión" aunque haya Core 33. `resolveHomeMode` se conserva para el saludo, los anillos y las vistas de desarrollo.
+- **DA-185** · La preferencia "Core 33 como prioridad" **no existe** (se buscó en `profiles`, en el código y en los documentos de backend). La opción `core33FirstPriority` ya está cableada y probada, pero Inicio la pasa en `false` (`TODO(core33-priority)`). **BT-54** propone `profiles.home_priority` y falta decidir con diseño dónde se cambia.
+- **D-137** · Slide de Core 33 cerrado: usa el diseño de Core 33 existente con "Día cerrado" y la CTA "Ver reto" (antes "Cerrar el día"). En el slide "Entreno hecho", "Siguiente: cerrar Core 33" solo aparece si a Core 33 le quedan hábitos.
+- **DA-186** · Carrusel: `ScrollView` horizontal con `pagingEnabled`, `snapToInterval = ancho` y `disableIntervalMomentum` (un slide por gesto en iOS y Android), sin autoplay; índice activo = `round(scrollX / ancho)`; saludo, fecha, avatar y campana fijos encima; base del contenido a 100 pt con varios slides y 58 con uno; con uno, sin carrusel ni indicador. Cuando cambia el conjunto de slides (se completó algo) vuelve al primero.
+- **DA-187** · Desplazamiento de 56 pt y vuelta: una vez por sesión de la app (marca a nivel de módulo, no se repite al volver a Inicio), nunca con "Reducir movimiento", y si el usuario toca el carrusel no se fuerza la vuelta.
+- **D-138** · Indicador con tokens de escena: activa `cta.onScene` / `cta.onSceneText`, inactivas `glass.onPhoto` (blanco al 14 %) con `onDark.primary`, posición `onDark.tertiary` (`#8C8A85`), punto `ember.base`. El vidrio es un relleno translúcido, sin el desenfoque del prototipo. Etiquetas de accesibilidad "Retomar, 1 de 3" (+ ", completado" en las cerradas).
+- **DA-188** · Dev: nuevos `-homeOverride 8, 9 y 10` (2 slides; 3 con uno cerrado; Core 33 cerrado) y `-homeSlide N` para abrir el carrusel en un slide.

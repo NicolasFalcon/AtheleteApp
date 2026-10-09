@@ -14,6 +14,7 @@ Fuente: `Home.dc.html`, handoff §22.3 / §11B e índice (HOME_12 a HOME_17) y [
 | Pulido del Halo (contorno, reflejo, halo exterior de voz, acabado `lit`) | ✅ |
 | Orden de Inicio v2.12 (`homeSectionOrder`) | ✅ |
 | ATHELETE Wear: card de Inicio, colección y ficha de producto (UI, sin backend) | ✅ |
+| Hero de Inicio como carrusel de estados (`resolveHomeSlides`, carrusel, indicador) | ✅ |
 | "Tu ruta real" (actividad de hoy) | ⏳ Fase 5 |
 | Foto/badges definitivos del reto, vista "Retos oficiales" | ⏳ Fase 4 |
 
@@ -58,3 +59,12 @@ Solo la presentación "Próximamente" de la marca (la colección con productos y
 - **Animación de entrada:** foto del hero 1,08 → 1 en 8 s y bloque del título que sube 10 pt con fundido en 0,7 s tras 0,2 s (Reanimated, hilo de UI); sin ella con "Reducir movimiento".
 - **Capturas (simulador, Light):** hero, mosaico y cierre, comparadas con las capturas de diseño: coinciden (foto, wordmark, etiquetas, frase con acentos y hoja de cierre). Sin tests: no hay lógica propia.
 - **Pendiente:** fotografía real de Wear y lista de espera real (BT-53); capturas en Dark (la pantalla es oscura en ambos modos).
+
+## Hero de Inicio · carrusel de estados (añadido a la Fase 2)
+
+- **Modelo** (`homePriority.ts`): `resolveHomeSlides`, `slideFor`, `slidesKey`; 11 tests nuevos (orden en cada combinación, prioridad Core 33, cerrados al final, todo cerrado, usuario nuevo, y que al completar algo cambia el conjunto y el primer slide es la siguiente acción). `resolveHomeMode` se mantiene (saludo y anillos).
+- **Carrusel** (`HomeHero.tsx`): `ScrollView` horizontal con snap (`snapToInterval` + `disableIntervalMomentum`, un slide por gesto en iOS y Android), índice = `round(scrollX / width)`, saludo y campana fijos, base de 100 pt con varios slides y 58 con uno, vuelta al primer slide cuando cambia el conjunto, desplazamiento de 56 pt una vez por sesión (no con "Reducir movimiento"; se cancela la vuelta si el usuario toca).
+- **Indicador** (`HeroPager`): cápsulas con tokens de escena (`cta.onScene`, `glass.onPhoto`, `onDark.primary`, `onDark.tertiary` = `#8C8A85`), punto Ember en las cerradas, "1 / N", área táctil de 44 pt y etiquetas "Retomar, 1 de 3".
+- **Dev:** `-homeOverride 8|9|10` (2 slides, 3 con uno cerrado, Core 33 cerrado) y `-homeSlide N`.
+- **Capturas (simulador):** 1 slide (Light), 2 slides (Light), 3 slides con el cerrado activo (Light) y 2 slides con Core 33 activo (Dark). Sin capturar: el texto "Ver reto" (los datos de ejemplo del reto tienen hábitos pendientes) y el momento del desplazamiento de 56 pt (solo en código).
+- **Pendiente:** preferencia "Core 33 como prioridad" (`TODO(core33-priority)`, BT-54).

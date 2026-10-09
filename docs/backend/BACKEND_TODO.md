@@ -22,6 +22,7 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 | BT-52 | Comunidad | ~~Subidas huérfanas de `social-photos`~~ | — | **Resuelto** (2026-10-07) |
 | BT-41 | Perfil | ~~`profiles_gender_check` debe aceptar `other`~~ | — | **Resuelto** (2026-10-06) |
 | BT-42 | Scan | Scan comida + Scan máquina (pendiente de TestFlight) | Media | No |
+| BT-54 | Inicio | Preferencia "Core 33 como prioridad" del hero | Baja | No (la app ya acepta la opción, desactivada) |
 | BT-53 | Wear | Lista de espera real para "Avísame del lanzamiento" | Baja | No (hoy solo visual) |
 | BT-07 | Social | Decidir si `exercise_reps` cuenta en retos entre amigos | Baja | No (producto) |
 | BT-08 | Social | Proceso de moderación (revisión de reportes en 24 h, contacto de soporte) | Alta antes de lanzar Comunidad | Sí, para publicar Comunidad |
@@ -390,6 +391,13 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - **Prioridad:** Media. **No bloquea.**
 
 
+## Inicio
+
+### BT-54 · Preferencia "Core 33 como prioridad" del hero de Inicio
+- **Estado:** el hero de Inicio es un carrusel con un slide por estado del día (Retomar o Entreno, Core 33…). El diseño dice que, si el usuario fijó Core 33 como prioridad y no hay sesión guardada, Core 33 va primero. **Esa preferencia no existe** (ni columna en `profiles`, ni ajuste en la app, ni en el diseño de Ajustes). La app ya recibe la opción (`core33FirstPriority` en `resolveHomeSlides`) pero la deja en `false` (`TODO(core33-priority)`).
+- **Qué falta:** una preferencia por usuario, p. ej. `profiles.home_priority text` con `CHECK (home_priority IN ('auto','core33'))` y valor por defecto `'auto'`, editable por el propio usuario (RLS actual de `profiles`). Y decidir con diseño dónde se cambia (no hay pantalla definida).
+- **Prioridad:** Baja. **No bloquea:** sin ella el orden es siempre Retomar → Entreno → Core 33.
+
 ## Wear
 
 ### BT-53 · Lista de espera real para "Avísame del lanzamiento"
@@ -418,4 +426,5 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-06: BT-43 (Términos y soporte de Comunidad, antes de TestFlight).
 - 2026-10-07: BT-44 y BT-52 (Comunidad) resueltos; `remove_friend` aplicada (ver `BACKEND_SUMMARY`).
 - 2026-10-09: BT-53 (lista de espera de Wear, solo visual en la app).
+- 2026-10-09: BT-54 (preferencia "Core 33 como prioridad" del hero de Inicio).
 - 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.

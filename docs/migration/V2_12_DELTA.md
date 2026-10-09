@@ -138,6 +138,15 @@ Corrección: la primera versión de este documento daba Wear por sin cambios, y 
 - **Sin backend:** fotos de reserva; "Avísame" es solo visual (BT-53).
 - **Fuera de alcance:** colección con productos y ficha de producto (el handoff las deja "en pausa hasta el lanzamiento").
 
+### J · Hero de Inicio como carrusel de estados (añadido el 2026-10-09, Fase 2) · M
+
+Cada estado del hero (Entreno, Retomar, Core 33, Entreno hecho, Primera sesión, Día completo) conserva su diseño; cuando el día tiene más de un estado el hero pasa a ser un carrusel a sangre de 500 pt, un slide por estado, con indicador de cápsulas con nombre. Un modo único pasa a ser una **lista de slides** (`resolveHomeSlides`).
+
+- **Orden:** pendientes (Retomar o Entreno → Core 33; Core 33 primero si el usuario lo fijó y no hay sesión guardada) y, al final, los cerrados hoy (Entreno hecho, Core 33 con "Ver reto"). Sin pendientes: un solo "Día completo". Primera sesión: un solo slide.
+- **Mecánica:** snap, un slide por gesto, sin autoplay; saludo, fecha, avatar y campana fijos; base del contenido a 100 pt con varios slides y 58 con uno (sin carrusel ni indicador); desplazamiento de 56 pt una vez por sesión de la app (nunca con "Reducir movimiento"); al completar algo, el primer slide vuelve a ser la siguiente acción.
+- **Indicador:** cápsula activa blanca con texto negro, inactivas en vidrio, punto Ember en las cerradas, "1 / N" a la derecha, 44 pt de alto táctil.
+- **Impacta lógica ya conectada:** solo en Inicio (la lógica de prioridad de `homePriority`; datos, Core 33 y Sesión no cambian). **Pendiente de backend/diseño:** la preferencia "Core 33 como prioridad" no existe (BT-54).
+
 ## 4. Lo que **no** cambia (no tocar)
 
 Auth y onboarding, Sesión (pausa, descanso, resumen), Core 33 (salvo el orden en Inicio), Nutrición (salvo el botón), Quiz, Perfil/Ajustes, Scan, Apple Health, Entrenos, Comunidad W1 a W7 (datos, reglas, notificaciones, moderación), D-55 y las demás decisiones de `MIGRATION_PROGRESS`.
