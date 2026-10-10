@@ -287,6 +287,15 @@ export type AppStackParamList = {
   EllieChat: EllieChatRouteParams | undefined;
   EllieVoice: EllieVoiceRouteParams | undefined;
   RouteSoon: undefined;
+  // Ruta (phase 5a). `dev` (__DEV__): a scenario of the sample data.
+  RoutePrep: { dev?: string } | undefined;
+  RouteGen: { dev?: string } | undefined;
+  RouteManual: { dev?: string } | undefined;
+  RoutePreview: { dev?: string } | undefined;
+  RouteSaved: { dev?: string } | undefined;
+  RouteActive: { dev?: string } | undefined;
+  RouteResult: { dev?: string; activityId?: string; viewer?: boolean } | undefined;
+  RouteShare: { activityId?: string } | undefined;
   // `devScroll` (__DEV__): opens already scrolled, for captures.
   Wear: { devScroll?: number } | undefined;
   PersonalRecords: PersonalRecordsRouteParams | undefined;

@@ -1,6 +1,7 @@
 import { setHomeChallengeScenario } from '@app/dev/homeChallengeScenario';
 import { openHomeTabDev } from '@app/dev/devHomeNav';
 import { isHomeChallengeScenario } from '@app/features/home/homeChallengeSection';
+import { isRouteDevScreen, openRouteDevScreen } from '@app/dev/devRouteScreens';
 import { isWearDevScreen, openWearDevScreen } from '@app/dev/devWearScreens';
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -213,6 +214,18 @@ function openWearFromUrl(url: string | null): boolean {
   return true;
 }
 
+// athelete://dev/route?screen=<key>: navigates (no overlay).
+function openRouteFromUrl(url: string | null): boolean {
+  if (!url || !url.startsWith('athelete://dev/route')) {
+    return false;
+  }
+  const screen = queryParam(url, 'screen') ?? 'select';
+  if (isRouteDevScreen(screen)) {
+    openRouteDevScreen(screen).catch(() => {});
+  }
+  return true;
+}
+
 // athelete://dev/social?screen=<key>: navigates (no overlay).
 function openSocialFromUrl(url: string | null): boolean {
   if (!url || !url.startsWith('athelete://dev/social')) {
@@ -238,6 +251,7 @@ function toolFromUrl(url: string | null): DevToolState | null {
     openQuizFromUrl(url) ||
     openSocialFromUrl(url) ||
     openWearFromUrl(url) ||
+    openRouteFromUrl(url) ||
     openHomeFromUrl(url)
   ) {
     return null;

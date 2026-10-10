@@ -8,6 +8,14 @@ import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen'
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
 import { EllieVoiceScreen } from '@app/screens/ellie/EllieVoiceScreen';
 import { RouteSoonScreen } from '@app/screens/home/RouteSoonScreen';
+import { RouteActiveScreen } from '@app/screens/route/RouteActiveScreen';
+import { RouteGenScreen } from '@app/screens/route/RouteGenScreen';
+import { RouteManualScreen } from '@app/screens/route/RouteManualScreen';
+import { RoutePrepScreen } from '@app/screens/route/RoutePrepScreen';
+import { RoutePreviewScreen } from '@app/screens/route/RoutePreviewScreen';
+import { RouteResultScreen } from '@app/screens/route/RouteResultScreen';
+import { RouteSavedScreen } from '@app/screens/route/RouteSavedScreen';
+import { RouteShareScreen } from '@app/screens/route/RouteShareScreen';
 import { WearScreen } from '@app/screens/wear/WearScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -249,6 +257,18 @@ export function RootNavigator() {
             options={{ animation: 'fade', gestureEnabled: false }}
           />
           <Stack.Screen name={APP_ROUTES.RouteSoon} component={RouteSoonScreen} />
+          <Stack.Screen name={APP_ROUTES.RoutePrep} component={RoutePrepScreen} />
+          <Stack.Screen name={APP_ROUTES.RouteGen} component={RouteGenScreen} />
+          <Stack.Screen name={APP_ROUTES.RouteManual} component={RouteManualScreen} />
+          <Stack.Screen name={APP_ROUTES.RoutePreview} component={RoutePreviewScreen} />
+          <Stack.Screen name={APP_ROUTES.RouteSaved} component={RouteSavedScreen} />
+          <Stack.Screen
+            name={APP_ROUTES.RouteActive}
+            component={RouteActiveScreen}
+            options={{ gestureEnabled: false }}
+          />
+          <Stack.Screen name={APP_ROUTES.RouteResult} component={RouteResultScreen} />
+          <Stack.Screen name={APP_ROUTES.RouteShare} component={RouteShareScreen} />
           <Stack.Screen name={APP_ROUTES.Wear} component={WearScreen} />
           <Stack.Screen
             name={APP_ROUTES.EditProfile}

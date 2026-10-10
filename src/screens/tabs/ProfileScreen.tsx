@@ -40,6 +40,10 @@ import {
   StatsTrio,
   Timeline,
 } from '@app/features/profile/v2/ProfileViews';
+import { useHomeRouteScenario } from '@app/dev/homeRouteScenario';
+import { ACTIVITY_BIKE, ACTIVITY_RUN, SAMPLE_OUTDOOR_MONTH } from '@app/dev/routeFixtures';
+import { routeStore } from '@app/features/route/routeStore';
+import { RecentActivity } from '@app/features/route/v2/RecentActivity';
 import { useAuth } from '@app/hooks/useAuth';
 import { useBadgeShelves } from '@app/hooks/useBadgeShelves';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
@@ -64,6 +68,9 @@ export function ProfileScreen({ navigation, route }: Props) {
   const openEllieChat = useOpenEllieChat();
   const openCore33 = useOpenCore33();
   const dev = __DEV__ ? route.params?.devState : undefined;
+  // Sample outdoor activity only with the dev deep link (athelete://dev/route?screen=profile).
+  // TODO(route-wire): RouteService.getRecentActivities / getOutdoorMonth.
+  const routeSamples = useHomeRouteScenario();
   const now = useMemo(() => new Date(), []);
 
   const badges = useBadgeShelves();
@@ -281,6 +288,16 @@ export function ProfileScreen({ navigation, route }: Props) {
                 onOpenAll={() => navigation.navigate(APP_ROUTES.Achievements)}
                 onOpen={setSelected}
               />
+              {routeSamples ? (
+                <RecentActivity
+                  activities={[ACTIVITY_RUN, ACTIVITY_BIKE]}
+                  month={SAMPLE_OUTDOOR_MONTH}
+                  onOpen={activity => {
+                    routeStore.reset({ finished: activity, sport: activity.sport });
+                    navigation.navigate(APP_ROUTES.RouteResult, { activityId: activity.id });
+                  }}
+                />
+              ) : null}
               <View style={styles.trajectory}>
                 <TextV2 variant="section">Tu trayectoria</TextV2>
                 <Timeline entries={timeline} now={now} />

@@ -28,6 +28,10 @@ import {
   type HomeChallengeState,
 } from '@app/features/home/homePriority';
 import { useHomeChallengeScenario } from '@app/dev/homeChallengeScenario';
+import { useHomeRouteScenario } from '@app/dev/homeRouteScenario';
+import { ACTIVITY_RUN } from '@app/dev/routeFixtures';
+import { RouteDoneCard } from '@app/features/home/v2/RouteDoneCard';
+import { routeStore } from '@app/features/route/routeStore';
 import {
   friendLeader,
   homeChallengeCard,
@@ -112,6 +116,9 @@ export function HomeScreen({ navigation }: Props) {
     service.getMyChallenges(),
   );
   const challengeScenario = useHomeChallengeScenario();
+  // "Tu ruta real" only with the dev deep link; the real card stays an invitation
+  // until the Ruta backend exists. TODO(route-wire): today's activity from the service.
+  const routeScenario = useHomeRouteScenario();
   const realCard = useMemo(
     () => homeChallengeCard(challenges.data),
     [challenges.data],
@@ -456,7 +463,22 @@ export function HomeScreen({ navigation }: Props) {
                   />
                 );
               case 'route':
-                // TODO(ruta): the Ruta flow replaces this placeholder (Fase 5).
+                // TODO(route-wire): the real entry opens RoutePrep once the Ruta
+                // backend and the real LocationSource exist (5c/5d).
+                if (routeScenario) {
+                  return (
+                    <RouteDoneCard
+                      key={key}
+                      activity={ACTIVITY_RUN}
+                      ago="hace 2 h"
+                      onOpen={() => {
+                        routeStore.reset({ finished: ACTIVITY_RUN });
+                        navigation.navigate(APP_ROUTES.RouteResult, { activityId: ACTIVITY_RUN.id });
+                      }}
+                      onOther={() => navigation.navigate(APP_ROUTES.RoutePrep)}
+                    />
+                  );
+                }
                 return (
                   <RouteInviteCard
                     key={key}
