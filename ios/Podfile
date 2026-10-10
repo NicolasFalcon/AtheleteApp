@@ -31,6 +31,10 @@ target 'Athelete' do
       # :ccache_enabled => true
     )
 
+    # MapLibre Native (iOS) is pulled in as a Swift package: this adds it to
+    # the Pods and app targets (maplibre-react-native v11 setup).
+    $MLRN.post_install(installer)
+
     # Xcode 27 rejects deployment targets below 15.0 (some pod resource
     # bundles still declare 9.0–13.0). Raise only those to the app minimum.
     installer.pods_project.targets.each do |target|
