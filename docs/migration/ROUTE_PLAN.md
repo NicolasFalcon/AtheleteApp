@@ -85,3 +85,16 @@ Fuera de V1 (el diseño lo dice): clubs, segmentos, rankings, heatmaps, navegaci
 ## 7. Orden recomendado (con Calorías)
 
 Ver [`CALORIES_PLAN.md`](CALORIES_PLAN.md) §7: Calorías primero (simulador), un único lote de backend para ambas, y Ruta después (iPhone y decisiones de coste).
+
+## 8. Decisiones tomadas (2026-10-10, fase 5a)
+
+Detalle y verificación en [`ROUTE_5A_CHECKPOINT.md`](ROUTE_5A_CHECKPOINT.md).
+
+1. **Mapa**: MapLibre v11 (`@maplibre/maplibre-react-native` 11.5.0). Compatible con RN 0.85.2 y la New Architecture en iOS (compila y corre); Android sin probar. En iOS el SDK nativo entra como paquete Swift: el Podfile llama a `$MLRN.post_install(installer)`.
+2. **Teselas**: OpenFreeMap primero (sin clave, uso comercial permitido, atribución obligatoria, sin SLA); MapTiler queda como alternativa con la clave en variables de entorno (mismo mecanismo que Supabase, nunca en git). Para producción hay que decidir: seguir con OpenFreeMap, alojar las teselas o pasar a MapTiler (clave a crear: "Cloud API key" restringida por bundle id).
+3. **Estilo propio** (lino, carbón, Ember; Light/Dark) en un solo archivo (`mapStyle.ts`).
+4. **Privacidad**: recorte de 200 m al inicio y al final lo aplica el servidor; la UI de otros usuarios recibe el trazado ya recortado. El dueño ve el trazado completo con los tramos ocultos punteados.
+5. **Desvío**: más de 40 m (correr) o 60 m (bici) durante 10 s. Solo informa; no pausa ni bloquea.
+6. **Una Ruta cuenta como entreno** (anillo, racha, workouts y km de retos), **no** para Core 33; puntos como un entreno.
+7. **iOS**: sin permiso "Siempre"; "Al usar la app" más ubicación en segundo plano mientras graba (5d).
+8. Cierra las decisiones 1, 4 y 5 de la sección 6 (MapLibre, cómo cuenta, metros de recorte). Siguen abiertas: 2 (servicio de rutas y coste), 3 (ubicación en segundo plano) y 6 (retención).

@@ -2572,3 +2572,24 @@ Referencia: ELLIE_01_HOME y `Ellie.dc.html` (`is.ellie`). Solo UI.
 - **D-151** · Halo: el arco de luz solo aparece al pensar; en reposo, escuchando y respondiendo el contorno Ember es parejo. Se quita la media luna de reflejo desplazada a la izquierda; queda un brillo suave arriba a la izquierda (más marcado a 100 pt o más) y, en la portada (`shadow`), una sombra difusa debajo. Tamaño 128 (`cover`).
 - **D-152** · El scroll deja `bottomClearance + 104` de margen inferior: nada queda bajo el compositor flotante ni la barra de pestañas.
 - **D-153** · Animación de entrada (`useEllieEntry`, `ellieEntryModel`), con los valores del prototipo: el Halo sale del icono del tab (24 pt, abajo al centro, opacidad .9) y crece a 128 pt en **520 ms**, `cubic-bezier(.22,.9,.24,1)`, sin rebote (`flipFromTab`, solo al llegar desde la barra de pestañas); etiqueta, frase y respuestas suben 10 pt con fundido como **un solo bloque** (`athUp .5s .1s ease`: 500 ms tras 100 ms). Se reproduce cada vez que se abre la pestaña (el prototipo redibuja la pantalla), no solo la primera vez por sesión; al volver del chat solo sube el bloque. Todo en el hilo de UI; con "Reducir movimiento", sin animación. Tests de los valores en `ellieEntryModel.test.ts`.
+
+## v2.13 · Ruta · fase 5a (mapa real y UI con datos de ejemplo) · 2026-10-10
+
+Referencia: ROUTE_01 a ROUTE_25 y `Route.dc.html`. Sin backend y sin GPS real. Checkpoint: [`ROUTE_5A_CHECKPOINT.md`](ROUTE_5A_CHECKPOINT.md). Decisiones de producto en [`ROUTE_PLAN.md`](ROUTE_PLAN.md) §8.
+
+- **D-154** · Mapa: MapLibre v11 (`@maplibre/maplibre-react-native` 11.5.0), única dependencia nueva. Compatible con RN 0.85.2 y la New Architecture en iOS; en iOS el SDK nativo es un paquete Swift y el Podfile añade `$MLRN.post_install(installer)` (sin esa línea falla `MapLibre/MapLibre.h`). Android sin probar.
+- **D-155** · Teselas: OpenFreeMap (sin clave; atribución obligatoria, que muestra el botón "i" del mapa; sin SLA). Alternativa MapTiler con clave por variable de entorno, sin usar. Decisión de producción pendiente.
+- **D-156** · Estilo del mapa propio en un solo archivo (`mapStyle.ts`), paletas Light/Dark. Las escenas de grabación y compartir fuerzan el estilo oscuro en ambos temas (como el handoff).
+- **D-157** · Mover un punto de la ruta a mano: `Marker` de MapLibre no se arrastra; se elige el punto y se toca el mapa. El texto del diseño ("Arrastra para moverlo") cambia a "Toca el mapa para moverlo".
+- **D-158** · Estados sin diseño: ubicación denegada ("Necesitamos tu ubicación" + Abrir Ajustes, dentro del panel), sin señal GPS (aviso sobre la grabación; el tiempo sigue) y mapa sin conexión (aviso con Reintentar).
+- **D-159** · Ritmo (correr) o velocidad (bici); pausa automática y privacidad como chips; "Comenzar" sigue siendo Ember (`commit`) y "Generar ruta" Ember con mini Halo; el resto de acciones usan el botón oscuro del tema, como la referencia.
+- **D-160** · Una salida de menos de 100 m se descarta al finalizar; el resto se guarda y abre el resultado.
+- **D-161** · El código de ejemplo (`routeFixtures`, `routeSamplePolylines`, `SimulatedLocationSource`, escenarios dev) va en el bundle pero no es alcanzable en la app real: Inicio mantiene la invitación y Perfil no muestra "Actividad reciente" sin el deep link.
+- **DA-198** · Dev: `athelete://dev/route?screen=<clave>` (tabla ROUTE_xx → clave en el checkpoint) más `permissionDenied`, `noSignal`, `mapOffline`, `homeCardActive`, `homeCardInvite`, `planConfigBike`.
+- **DA-199** · `LocationSource` es la única costura con la ubicación (5c/5d: `ExpoLocationSource` en `locationSourceFactory`); `RouteService` con `useRouteService` es la única con el backend.
+- **DA-200** · Tests de lógica pura: distancia (haversine), ritmo y velocidad, tiempo activo con pausas, detección de desvío (umbral + 10 s), recorte de 200 m, distancia de ruta a mano, reductor del tracker (32 tests nuevos).
+- **DA-201** · Pendiente en 5a: pieza de Compartir como imagen y hoja del sistema, selector de foto, bloqueo de pantalla, "Al aire libre" en Progreso, y prueba en iPhone real y Android.
+
+### TODO(route-wire) por lo que necesitará el backend (base del lote de Lovable)
+
+Lista completa y agrupada en [`ROUTE_5A_CHECKPOINT.md`](ROUTE_5A_CHECKPOINT.md): (1) tablas `route_activities` y `planned_routes` y privacidad por defecto; (2) funciones `get_route_for_viewer` (recorte 200 m), `generate_route`, ajuste a calles y altitud, recálculo al subir; (3) efectos de entreno (anillo, racha, workouts, km de retos, sin Core 33, puntos); (4) post `route` de Comunidad (BT-56); (5) `getTodayActivity`, `getRecentActivities`, `getOutdoorMonth` e imagen estática del mapa; (6) fuera del backend: `ExpoLocationSource`, compartir fuera, proveedor de teselas.
