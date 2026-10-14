@@ -35,6 +35,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     )
   }
 
+  func application(
+    _ application: UIApplication,
+    supportedInterfaceOrientationsFor window: UIWindow?
+  ) -> UIInterfaceOrientationMask {
+    Orientation.getOrientation()
+  }
+
   // Universal links. Inactive until an Associated Domains entitlement exists.
   func application(
     _ application: UIApplication,

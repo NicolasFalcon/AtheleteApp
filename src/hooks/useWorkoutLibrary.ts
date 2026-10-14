@@ -6,7 +6,7 @@ export function useWorkoutLibrary() {
   const {profile} = useAuth();
 
   return useQuery({
-    queryKey: ['workouts', 'library', profile?.id ?? 'guest'],
+    queryKey: ['workouts', 'library', 'official-v1', profile?.id ?? 'guest'],
     queryFn: async () => fetchWorkoutLibrary(profile?.id),
   });
 }

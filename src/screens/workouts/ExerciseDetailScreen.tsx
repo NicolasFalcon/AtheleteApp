@@ -176,6 +176,8 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
       >
         <MoveKitPlayer
           title={exercise.name}
+          posterUrl={exercise.thumbnailUrl}
+          videoUrl={exercise.videoUrl}
           variant={lightbox ? 'lightbox' : 'bleed'}
           fullscreen={fullscreen}
           onFullscreenChange={setFullscreen}

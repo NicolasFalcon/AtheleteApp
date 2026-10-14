@@ -57,6 +57,14 @@ function exercise(
     recommendedSetsReps: { hypertrophy: '3x10' },
     usedInRoutines: [],
     category: 'strength',
+    shortDescription: null,
+    longDescription: null,
+    benefits: [],
+    tags: [],
+    movementPatterns: [],
+    trackingMetrics: [],
+    isUnilateral: false,
+    prEligible: false,
     ...patch,
   };
 }

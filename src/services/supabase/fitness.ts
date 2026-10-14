@@ -8,7 +8,6 @@ import {
   getChallengeDay,
   getCompletedChallengeDays,
   getCurrentChallengeStreak,
-  mapDbExerciseRow,
   mapTemplateExerciseRowToExercise,
   mapTemplateRowToWorkout,
   type DailyNutritionLog,
@@ -20,6 +19,7 @@ import {
   type WorkoutExercise,
   type WorkoutSession,
 } from '@app/shared';
+import { fetchExerciseCatalog } from '@app/services/supabase/exerciseCatalog';
 import {
   DEFAULT_WATER_GOAL_GLASSES,
   GLASS_ML,
@@ -33,7 +33,6 @@ type DailyHydrationLogRow =
   Database['public']['Tables']['daily_hydration_logs']['Row'];
 type DailyNutritionLogRow =
   Database['public']['Tables']['daily_nutrition_logs']['Row'];
-type ExerciseRow = Database['public']['Tables']['exercises']['Row'];
 type HabitLogRow = Database['public']['Tables']['habit_logs']['Row'];
 type NutritionPlanRow = Database['public']['Tables']['nutrition_plans']['Row'];
 type TemplateExerciseRow =
@@ -349,16 +348,16 @@ function buildHabitLogMap(
   return map;
 }
 
-export async function fetchWorkoutLibrary(userId?: string): Promise<Workout[]> {
+export async function fetchWorkoutLibrary(_userId?: string): Promise<Workout[]> {
   const client = getClient();
   let builder = client
     .from('workout_templates')
     .select('*')
     .order('created_at', { ascending: false });
 
-  builder = userId
-    ? builder.or(`created_by.eq.${userId},is_public.eq.true,created_by.is.null`)
-    : builder.or('is_public.eq.true,created_by.is.null');
+  // The product library is the official V1 catalog. Public/user/ELLIE
+  // templates are separate collections and must not inflate this list.
+  builder = builder.is('created_by', null);
 
   const { data: templates, error: templateError } = await builder;
 
@@ -375,7 +374,7 @@ export async function fetchWorkoutLibrary(userId?: string): Promise<Workout[]> {
   const templateIds = templateRows.map(template => template.id);
   const { data: exerciseRows, error: exerciseError } = await client
     .from('template_exercises')
-    .select('*')
+    .select('*, exercises(id, exercise_translations(locale, name))')
     .in('template_id', templateIds)
     .order('sort_order');
 
@@ -422,7 +421,7 @@ export async function fetchWorkoutLibraryPage(
     .range(from, to);
 
   if (params.source === 'library') {
-    builder = builder.or('created_by.is.null,is_public.eq.true');
+    builder = builder.is('created_by', null);
   } else {
     if (!params.userId) {
       return { items: [], total: 0, nextPage: undefined };
@@ -770,46 +769,8 @@ export async function resumeWorkoutSession(
 }
 
 export async function fetchExerciseLibrary(): Promise<LibraryExercise[]> {
-  const client = getClient();
-  let from = 0;
-  const pageSize = 500;
-  const rows: ExerciseRow[] = [];
-  let hasMore = true;
-
-  while (hasMore) {
-    const { data, error } = await client
-      .from('exercises')
-      .select('*')
-      .order('name')
-      .range(from, from + pageSize - 1);
-
-    if (error) {
-      throw error;
-    }
-
-    rows.push(...((data as ExerciseRow[]) || []));
-    hasMore = (data?.length || 0) === pageSize;
-    from += pageSize;
-  }
-
-  return rows.map(mapDbExerciseRow);
+  return fetchExerciseCatalog('es');
 }
-
-const equipmentDbValues: Record<string, string> = {
-  dumbbells: 'dumbbells',
-  machines: 'machine',
-  bands: 'resistance_band',
-  kettlebells: 'kettlebell',
-};
-
-const bodyPartDbValues: Record<string, string[]> = {
-  legs: ['legs', 'calves', 'glutes'],
-  glutes: ['glutes'],
-  shoulders: ['shoulders', 'traps'],
-  arms: ['biceps', 'triceps', 'forearms'],
-  core: ['core', 'lower_back'],
-  fullbody: ['full_body'],
-};
 
 export async function fetchExerciseLibraryPage(
   params: ExerciseLibraryPageParams,
@@ -818,57 +779,38 @@ export async function fetchExerciseLibraryPage(
     return { items: [], total: 0, nextPage: undefined };
   }
 
-  const client = getClient();
   const pageSize = params.pageSize || EXERCISE_LIBRARY_PAGE_SIZE;
   const from = params.page * pageSize;
-  const to = from + pageSize - 1;
-  let builder = client
-    .from('exercises')
-    .select('*', { count: 'exact' })
-    .order('name')
-    .range(from, to);
-
   const normalizedSearch = params.search.trim();
-
-  if (normalizedSearch) {
-    builder = builder.ilike('name', `%${normalizedSearch}%`);
-  }
-
-  if (params.equipment !== 'all') {
-    builder = builder.eq(
-      'equipment',
-      equipmentDbValues[params.equipment] || params.equipment,
-    );
-  }
-
-  if (params.bodyPart !== 'all') {
-    const values = bodyPartDbValues[params.bodyPart] || [params.bodyPart];
-    builder =
-      values.length === 1
-        ? builder.eq('muscle_group', values[0])
-        : builder.in('muscle_group', values);
-  }
-
-  if (params.level !== 'all') {
-    builder = builder.eq('difficulty', params.level);
-  }
-
-  if (params.favoriteIds && params.favoriteIds.length > 0) {
-    builder = builder.in('id', params.favoriteIds);
-  }
-
-  const { data, error, count } = await builder;
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data || []) as ExerciseRow[];
+  const favoriteIds = params.favoriteIds
+    ? new Set(params.favoriteIds)
+    : null;
+  const rows = (await fetchExerciseCatalog('es')).filter(exercise => {
+    if (
+      normalizedSearch &&
+      !exercise.name.toLocaleLowerCase('es').includes(
+        normalizedSearch.toLocaleLowerCase('es'),
+      )
+    ) {
+      return false;
+    }
+    if (params.equipment !== 'all' && exercise.equipment !== params.equipment) {
+      return false;
+    }
+    if (params.bodyPart !== 'all' && exercise.bodyPart !== params.bodyPart) {
+      return false;
+    }
+    if (params.level !== 'all' && exercise.level !== params.level) {
+      return false;
+    }
+    return !favoriteIds || favoriteIds.has(exercise.id);
+  });
+  const items = rows.slice(from, from + pageSize);
 
   return {
-    items: rows.map(mapDbExerciseRow),
-    total: count || 0,
-    nextPage: rows.length === pageSize ? params.page + 1 : undefined,
+    items,
+    total: rows.length,
+    nextPage: from + items.length < rows.length ? params.page + 1 : undefined,
   };
 }
 

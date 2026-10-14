@@ -7,10 +7,15 @@ import {
 } from '@app/shared/domain/types';
 
 export function mapTemplateExerciseRowToExercise(exerciseRow: any): WorkoutExercise {
+  const translations = exerciseRow.exercises?.exercise_translations || [];
+  const localized =
+    translations.find((item: any) => item.locale === 'es') ||
+    translations.find((item: any) => item.locale === 'en');
+
   return {
     id: exerciseRow.id,
     exerciseId: exerciseRow.exercise_id || null,
-    name: exerciseRow.name,
+    name: localized?.name || exerciseRow.name,
     sets: exerciseRow.sets ?? undefined,
     reps: exerciseRow.reps ?? undefined,
     duration: exerciseRow.duration ?? undefined,

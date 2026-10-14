@@ -98,7 +98,11 @@ export function ExerciseListScreen({ navigation, route }: Props) {
       equipment={equipmentLabel(item.equipment)}
       levelLabel={LEVEL_LABELS[item.level] ?? levelLabel(item.level)}
       levelBars={levelBars(item.level)}
-      thumbnail={exerciseThumbnail(item.bodyPart)}
+      thumbnail={
+        item.thumbnailUrl
+          ? { uri: item.thumbnailUrl }
+          : exerciseThumbnail(item.bodyPart)
+      }
       favorite={favorites.isExerciseFavorite(item.id)}
       onPress={() =>
         navigation.navigate(APP_ROUTES.ExerciseDetail, { exerciseId: item.id })

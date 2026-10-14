@@ -380,7 +380,9 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
                     key: exercise.id,
                     title: exercise.name,
                     subtitle: pathMeta(exercise, libraryExercise?.recommendedSetsReps),
-                    thumbnail: exerciseThumbnail(libraryExercise?.bodyPart),
+                    thumbnail: libraryExercise?.thumbnailUrl
+                      ? { uri: libraryExercise.thumbnailUrl }
+                      : exerciseThumbnail(libraryExercise?.bodyPart),
                     trailing: libraryExercise ? (
                       <ChevronRight
                         size={18}

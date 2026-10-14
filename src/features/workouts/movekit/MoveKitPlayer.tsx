@@ -1,15 +1,21 @@
-import { useState } from 'react';
-import { Image, Modal, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useEffect, useState } from 'react';
+import {
+  Image,
+  Modal,
+  StatusBar,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import { Maximize2, Minimize2, Pause, X } from 'lucide-react-native';
-import {
-  IconButton,
-  PressableScale,
-  StatusBarV2,
-  TextV2,
-  useThemeV2,
-} from '@app/components/v2';
+import Video, {
+  type OnLoadData,
+  type ReactVideoPosterSource,
+} from 'react-native-video';
+import Orientation from 'react-native-orientation-locker';
+import { Maximize2, Minimize2, Pause, Play } from 'lucide-react-native';
+import { PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 import { MOVEKIT_POSTER } from '@app/features/workouts/workoutAssets';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +40,8 @@ export type MoveKitVariant = 'bleed' | 'lightbox';
 
 type MoveKitPlayerProps = {
   title: string;
+  posterUrl?: string | null;
+  videoUrl?: string | null;
   // Light: full bleed over the studio background, fading into the screen.
   // Dark: floating light box (margin 10, radius 34), the asset is not dimmed.
   variant: MoveKitVariant;
@@ -46,6 +54,8 @@ type MoveKitPlayerProps = {
 
 export function MoveKitPlayer({
   title,
+  posterUrl,
+  videoUrl,
   variant,
   fullscreen,
   onFullscreenChange,
@@ -56,47 +66,87 @@ export function MoveKitPlayer({
   const { colors } = useThemeV2();
   const { width } = useWindowDimensions();
   const [speed, setSpeed] = useState<'1×' | '0,5×'>('1×');
+  const [paused, setPaused] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
   const lightbox = variant === 'lightbox';
+
+  useEffect(() => {
+    setVideoFailed(false);
+  }, [videoUrl]);
 
   return (
     <>
       <View
         style={
-          lightbox
-            ? [styles.lightbox, { marginTop: topInset }]
-            : styles.bleed
+          lightbox ? [styles.lightbox, { marginTop: topInset }] : styles.bleed
         }
       >
-        <View style={[StyleSheet.absoluteFill, lightbox && styles.lightboxClip]}>
-          {/* Poster = PLACEHOLDER of the MoveKit video. */}
-          <Image
-            source={MOVEKIT_POSTER}
-            resizeMode="cover"
-            style={lightbox ? [styles.posterLightbox, { width }] : styles.poster}
-            accessibilityLabel={`Video de técnica de ${title} (próximamente)`}
-          />
+        <View
+          style={[StyleSheet.absoluteFill, lightbox && styles.lightboxClip]}
+        >
+          {videoUrl && !videoFailed ? (
+            <Video
+              source={{ uri: videoUrl }}
+              resizeMode="cover"
+              repeat
+              muted
+              paused={paused}
+              rate={speed === '1×' ? 1 : 0.5}
+              poster={{
+                source: (posterUrl
+                  ? { uri: posterUrl }
+                  : MOVEKIT_POSTER) as ReactVideoPosterSource,
+                resizeMode: 'cover',
+              }}
+              onError={() => setVideoFailed(true)}
+              style={
+                lightbox ? [styles.posterLightbox, { width }] : styles.poster
+              }
+            />
+          ) : (
+            <Image
+              source={posterUrl ? { uri: posterUrl } : MOVEKIT_POSTER}
+              resizeMode="cover"
+              style={
+                lightbox ? [styles.posterLightbox, { width }] : styles.poster
+              }
+              accessibilityLabel={`Video de técnica de ${title}`}
+            />
+          )}
           {!lightbox ? (
             <LinearGradient
               pointerEvents="none"
-              colors={['rgba(247,246,243,0)', 'rgba(247,246,243,.9)', colors.bg]}
+              colors={[
+                'rgba(247,246,243,0)',
+                'rgba(247,246,243,.9)',
+                colors.bg,
+              ]}
               locations={[0, 0.7, 1]}
               style={styles.fade}
             />
           ) : null}
         </View>
-        <TextV2 variant="micro" color="#7A7772" style={styles.mockLabel}>
-          VIDEO MOVEKIT · PLACEHOLDER
-        </TextV2>
+        {videoUrl ? null : (
+          <TextV2 variant="micro" color="#7A7772" style={styles.mockLabel}>
+            VIDEO NO DISPONIBLE
+          </TextV2>
+        )}
         <View style={styles.controls}>
           <PhaseSegments height={2} />
           <View style={styles.buttons}>
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Velocidad ${speed}`}
-              onPress={() => setSpeed(current => (current === '1×' ? '0,5×' : '1×'))}
+              onPress={() =>
+                setSpeed(current => (current === '1×' ? '0,5×' : '1×'))
+              }
               style={styles.speed}
             >
-              <TextV2 variant="captionStrong" color="#6B6964" style={styles.bold}>
+              <TextV2
+                variant="captionStrong"
+                color="#6B6964"
+                style={styles.bold}
+              >
                 {speed}
               </TextV2>
             </PressableScale>
@@ -106,19 +156,30 @@ export function MoveKitPlayer({
               onPress={() => onFullscreenChange(true)}
               style={styles.small}
             >
-              <Maximize2 size={15} color="#121212" strokeWidth={2} style={styles.dimIcon} />
+              <Maximize2
+                size={15}
+                color="#121212"
+                strokeWidth={2}
+                style={styles.dimIcon}
+              />
             </PressableScale>
-            <View
+            <PressableScale
               accessibilityRole="button"
-              accessibilityLabel="Reproducir o pausar (próximamente)"
-              accessibilityState={{ disabled: true }}
+              accessibilityLabel={paused ? 'Reproducir' : 'Pausar'}
+              onPress={() => setPaused(current => !current)}
               style={[styles.small, styles.playSmall]}
             >
-              <Pause size={13} color="#121212" strokeWidth={2} />
-            </View>
+              {paused ? (
+                <Play size={13} color="#121212" strokeWidth={2} />
+              ) : (
+                <Pause size={13} color="#121212" strokeWidth={2} />
+              )}
+            </PressableScale>
           </View>
         </View>
-        <View style={[styles.top, lightbox ? styles.topBox : { top: topInset + 4 }]}>
+        <View
+          style={[styles.top, lightbox ? styles.topBox : { top: topInset + 4 }]}
+        >
           {topLeft}
           {topRight}
         </View>
@@ -126,9 +187,15 @@ export function MoveKitPlayer({
 
       <MoveKitFullscreen
         visible={fullscreen}
-        title={title}
+        posterUrl={posterUrl}
+        videoUrl={videoFailed ? null : videoUrl}
         speed={speed}
-        onSpeed={() => setSpeed(current => (current === '1×' ? '0,5×' : '1×'))}
+        paused={paused}
+        onSpeedChange={() =>
+          setSpeed(current => (current === '1×' ? '0,5×' : '1×'))
+        }
+        onPauseChange={() => setPaused(current => !current)}
+        onVideoError={() => setVideoFailed(true)}
         onClose={() => onFullscreenChange(false)}
       />
     </>
@@ -151,71 +218,170 @@ function PhaseSegments({ height }: { height: number }) {
   );
 }
 
-// EXERCISE_02: the loop full screen, controls grouped in a glass pill.
+// Fullscreen is intentionally independent from the inline hero layout.
 function MoveKitFullscreen({
   visible,
-  title,
+  posterUrl,
+  videoUrl,
   speed,
-  onSpeed,
+  paused,
+  onSpeedChange,
+  onPauseChange,
+  onVideoError,
   onClose,
 }: {
   visible: boolean;
-  title: string;
+  posterUrl?: string | null;
+  videoUrl?: string | null;
   speed: string;
-  onSpeed: () => void;
+  paused: boolean;
+  onSpeedChange: () => void;
+  onPauseChange: () => void;
+  onVideoError: () => void;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | null>(null);
+
+  useEffect(() => {
+    setVideoAspectRatio(null);
+  }, [videoUrl]);
+
+  // MoveKit's landscape MP4s have a narrower frame than a landscape phone.
+  // Enlarge that frame enough to remove the side bands while keeping the
+  // subject near the bottom of the viewport. The video itself stays contain.
+  const landscapeFrame =
+    width > height &&
+    videoAspectRatio !== null &&
+    videoAspectRatio > 1.5 &&
+    width / height > videoAspectRatio
+      ? (() => {
+          const scale = Math.min(width / (height * videoAspectRatio), 1.3);
+          const frameWidth = height * videoAspectRatio * scale;
+          const frameHeight = height * scale;
+
+          return {
+            position: 'absolute' as const,
+            left: (width - frameWidth) / 2,
+            top: -(frameHeight - height) * 0.9,
+            width: frameWidth,
+            height: frameHeight,
+          };
+        })()
+      : StyleSheet.absoluteFill;
+
+  // Only touch the orientation on real open → close transitions; the detail
+  // screen must not be forced to portrait just by mounting this component.
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    Orientation.lockToLandscape();
+
+    return () => {
+      Orientation.lockToPortrait();
+    };
+  }, [visible]);
+
+  const handleClose = () => {
+    Orientation.lockToPortrait();
+    onClose();
+  };
 
   return (
     <Modal
       visible={visible}
       animationType="fade"
       presentationStyle="fullScreen"
-      onRequestClose={onClose}
+      supportedOrientations={[
+        'portrait',
+        'portrait-upside-down',
+        'landscape-left',
+        'landscape-right',
+      ]}
+      onRequestClose={handleClose}
       statusBarTranslucent
+      navigationBarTranslucent
     >
-      <View style={styles.fullscreen}>
-        <StatusBarV2 style="dark" />
-        <Image source={MOVEKIT_POSTER} resizeMode="cover" style={styles.fullPoster} />
-        <View style={[styles.fullTop, { top: insets.top + 4 }]}>
-          <View style={styles.titlePill}>
-            <TextV2 variant="metaStrong" color="#121212" numberOfLines={1}>
-              {title}
-            </TextV2>
+      <View style={[styles.fullscreen, { width, height }]}>
+        <StatusBar hidden />
+        {videoUrl ? (
+          <Video
+            source={{ uri: videoUrl }}
+            resizeMode="contain"
+            repeat
+            muted
+            paused={paused}
+            rate={speed === '1×' ? 1 : 0.5}
+            poster={{
+              source: (posterUrl
+                ? { uri: posterUrl }
+                : MOVEKIT_POSTER) as ReactVideoPosterSource,
+              resizeMode: 'contain',
+            }}
+            onLoad={({ naturalSize }: OnLoadData) => {
+              if (naturalSize.width > 0 && naturalSize.height > 0) {
+                setVideoAspectRatio(naturalSize.width / naturalSize.height);
+              }
+            }}
+            onError={onVideoError}
+            style={landscapeFrame}
+          />
+        ) : (
+          <Image
+            source={posterUrl ? { uri: posterUrl } : MOVEKIT_POSTER}
+            resizeMode="contain"
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        <View
+          style={[
+            styles.fullControls,
+            {
+              left: insets.left + 20,
+              right: insets.right + 20,
+              bottom: insets.bottom + 16,
+            },
+          ]}
+        >
+          <View style={styles.fullButtons}>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={`Velocidad ${speed}`}
+              onPress={onSpeedChange}
+              style={styles.fullSpeed}
+            >
+              <TextV2
+                variant="metaStrong"
+                color="#6B6964"
+                style={styles.fullSpeedText}
+              >
+                {speed}
+              </TextV2>
+            </PressableScale>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Salir de pantalla completa"
+              onPress={handleClose}
+              style={styles.fullButton}
+            >
+              <Minimize2 size={20} color="#A5A5A5" strokeWidth={2} />
+            </PressableScale>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={paused ? 'Reproducir' : 'Pausar'}
+              onPress={onPauseChange}
+              style={[styles.fullButton, styles.fullPlay]}
+            >
+              {paused ? (
+                <Play size={21} color="#121212" strokeWidth={2.2} />
+              ) : (
+                <Pause size={21} color="#121212" strokeWidth={2.2} />
+              )}
+            </PressableScale>
           </View>
-          <IconButton icon={X} variant="studio" accessibilityLabel="Cerrar" onPress={onClose} />
-        </View>
-        <View style={[styles.fullControls, { bottom: insets.bottom + 14 }]}>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={`Velocidad ${speed}`}
-            onPress={onSpeed}
-            style={styles.fullSpeed}
-          >
-            <TextV2 variant="metaStrong" color="#121212" style={styles.bold}>
-              {speed}
-            </TextV2>
-          </PressableScale>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel="Salir de pantalla completa"
-            onPress={onClose}
-            style={styles.fullButton}
-          >
-            <Minimize2 size={17} color="#121212" strokeWidth={2} />
-          </PressableScale>
-          <View
-            accessibilityRole="button"
-            accessibilityLabel="Reproducir o pausar (próximamente)"
-            accessibilityState={{ disabled: true }}
-            style={[styles.fullButton, styles.fullPlay]}
-          >
-            <Pause size={15} color="#FFFFFF" strokeWidth={2} />
-          </View>
-        </View>
-        <View style={[styles.fullSegments, { bottom: insets.bottom - 4 }]}>
-          <PhaseSegments height={3} />
         </View>
       </View>
     </Modal>
@@ -243,8 +409,8 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  // The poster is composed for the 500 pt bleed area; in the box the figure
-  // sits 54 pt higher (prototype: top 24 instead of 78).
+  // Preserve the original lightbox composition: the 500 pt media frame is
+  // clipped by the 486 pt hero and shifted upward inside its rounded box.
   posterLightbox: {
     position: 'absolute',
     top: -54,
@@ -325,64 +491,41 @@ const styles = StyleSheet.create({
   },
   topBox: { top: 12 },
   fullscreen: {
-    flex: 1,
-    backgroundColor: '#F0EFEC',
-  },
-  fullPoster: {
     position: 'absolute',
-    left: 0,
+    top: 0,
     right: 0,
-    top: 122,
-    height: 500,
-    width: '100%',
-  },
-  fullTop: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  titlePill: {
-    height: 32,
-    paddingHorizontal: 12,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,.72)',
-    justifyContent: 'center',
-    maxWidth: '75%',
+    bottom: 0,
+    left: 0,
+    backgroundColor: '#F0EFEC',
+    overflow: 'hidden',
   },
   fullControls: {
     position: 'absolute',
-    right: 16,
-    height: 48,
-    paddingLeft: 6,
-    paddingRight: 4,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,.72)',
-    boxShadow: '0 0 0 .5px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.08)',
+    zIndex: 2,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    justifyContent: 'flex-end',
+  },
+  fullButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   fullSpeed: {
-    minWidth: 44,
-    height: 40,
+    minWidth: 50,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  fullSpeedText: {
+    fontSize: 18,
   },
   fullButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fullPlay: { backgroundColor: '#121212' },
-  fullSegments: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-  },
+  fullPlay: { backgroundColor: 'rgba(18,18,18,.08)' },
 });

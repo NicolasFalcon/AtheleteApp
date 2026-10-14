@@ -22,6 +22,14 @@ export type LibraryExercise = {
   recommendedSetsReps: Json | null;
   usedInRoutines: string[];
   category: string;
+  shortDescription: string | null;
+  longDescription: string | null;
+  benefits: string[];
+  tags: string[];
+  movementPatterns: string[];
+  trackingMetrics: string[];
+  isUnilateral: boolean;
+  prEligible: boolean;
 };
 
 const muscleGroupToBodyPart: Record<string, string> = {
@@ -40,6 +48,13 @@ const muscleGroupToBodyPart: Record<string, string> = {
   full_body: 'fullbody',
   mobility: 'mobility',
   cardio: 'cardio',
+  quadriceps: 'legs',
+  hamstrings: 'legs',
+  adductors: 'legs',
+  tibialis: 'legs',
+  'lower-back': 'core',
+  trapezius: 'shoulders',
+  neck: 'shoulders',
 };
 
 const equipmentToFilter: Record<string, string> = {
@@ -53,6 +68,9 @@ const equipmentToFilter: Record<string, string> = {
   trx: 'trx',
   medicine_ball: 'medicine_ball',
   smith_machine: 'smith_machine',
+  dumbbell: 'dumbbells',
+  'cable-machine': 'cable',
+  band: 'bands',
 };
 
 export const equipmentLabels: Record<string, string> = {
@@ -88,16 +106,21 @@ export const levelLabels: Record<string, string> = {
 };
 
 export function mapDbExerciseRow(row: any): LibraryExercise {
+  const primaryMuscles = row.primary_muscles || [];
+  const equipment = Array.isArray(row.equipment)
+    ? row.equipment[0] || 'bodyweight'
+    : row.equipment || 'bodyweight';
+  const primaryMuscleSlug = row.muscle_group || row.primary_muscle_slug || '';
+
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
-    equipment: equipmentToFilter[row.equipment] || row.equipment,
-    bodyPart: muscleGroupToBodyPart[row.muscle_group] || row.muscle_group,
+    equipment: equipmentToFilter[equipment] || equipment,
+    bodyPart:
+      muscleGroupToBodyPart[primaryMuscleSlug] || primaryMuscleSlug || 'fullbody',
     level: row.difficulty,
-    thumbnailUrl:
-      row.thumbnail_url ||
-      'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=200&q=80',
+    thumbnailUrl: row.thumbnail_url || '',
     videoUrl: row.video_url || null,
     orientation:
       (row.video_orientation as 'portrait' | 'landscape' | null) || 'landscape',
@@ -105,12 +128,20 @@ export function mapDbExerciseRow(row: any): LibraryExercise {
     coachingCues: row.technique_cues || [],
     commonMistakes: row.common_mistakes || [],
     musclesWorked: {
-      primary: row.primary_muscles || [],
+      primary: primaryMuscles,
       secondary: row.secondary_muscles || [],
     },
     recommendedSetsReps: (row.recommended_sets_reps ?? null) as Json | null,
     usedInRoutines: [],
     category: row.category || 'strength',
+    shortDescription: row.short_description || null,
+    longDescription: row.long_description || null,
+    benefits: row.benefits || [],
+    tags: row.tags || [],
+    movementPatterns: row.movement_patterns || [],
+    trackingMetrics: row.tracking_metrics || [],
+    isUnilateral: Boolean(row.is_unilateral),
+    prEligible: Boolean(row.pr_eligible),
   };
 }
 
