@@ -22,7 +22,8 @@ import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
 // Tus rutas (ROUTE_21): the planned routes you saved, with "Usar", "Cambiar
-// nombre" and "Eliminar". TODO(route-wire): `planned_routes` on the server.
+// nombre" and "Eliminar" (with confirmation). Read and written on the server
+// (`planned_routes`).
 export function RouteSavedScreen({ navigation }: AppScreenProps<'RouteSaved'>) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -32,12 +33,19 @@ export function RouteSavedScreen({ navigation }: AppScreenProps<'RouteSaved'>) {
   const [menu, setMenu] = useState<PlannedRoute | null>(null);
   const [renaming, setRenaming] = useState<PlannedRoute | null>(null);
   const [name, setName] = useState('');
+  const [failed, setFailed] = useState(false);
+  const [removing, setRemoving] = useState<PlannedRoute | null>(null);
 
   const load = useCallback(() => {
+    setFailed(false);
     service
       .getSavedRoutes()
       .then(setItems)
-      .catch(() => setItems([]));
+      .catch(() => {
+        // A failed read is not an empty list.
+        setFailed(true);
+        setItems(current => current ?? []);
+      });
   }, [service]);
 
   useEffect(load, [load]);
@@ -74,7 +82,17 @@ export function RouteSavedScreen({ navigation }: AppScreenProps<'RouteSaved'>) {
         </TextV2>
       </View>
 
-      {items && items.length === 0 ? (
+      {failed && (items ?? []).length === 0 ? (
+        <View style={styles.empty}>
+          <TextV2 variant="title22" style={styles.center}>
+            No pudimos cargar tus rutas
+          </TextV2>
+          <TextV2 variant="body" tone="secondary" style={styles.center}>
+            Revisa tu conexión e inténtalo de nuevo.
+          </TextV2>
+          <Button label="Reintentar" variant="primary" onPress={load} />
+        </View>
+      ) : items && items.length === 0 ? (
         <View style={styles.empty}>
           <TextV2 variant="title22" style={styles.center}>
             Aún no tienes rutas guardadas
@@ -157,20 +175,44 @@ export function RouteSavedScreen({ navigation }: AppScreenProps<'RouteSaved'>) {
             variant="text"
             fullWidth
             onPress={() => {
-              const item = menu;
+              setRemoving(menu);
               setMenu(null);
-              if (item) {
-                service
-                  .deleteRoute(item.id)
-                  .then(() => {
-                    load();
-                    toast.show('Ruta eliminada');
-                  })
-                  .catch(() => toast.show('No pudimos eliminar la ruta'));
-              }
             }}
           />
         </View>
+      </Sheet>
+
+      <Sheet
+        open={Boolean(removing)}
+        onClose={() => setRemoving(null)}
+        title="¿Eliminar esta ruta?"
+        footer={
+          <View style={styles.confirmRow}>
+            <Button label="Cancelar" variant="secondary" style={styles.flex} onPress={() => setRemoving(null)} />
+            <Button
+              label="Eliminar"
+              variant="primary"
+              style={styles.flex}
+              onPress={() => {
+                const item = removing;
+                setRemoving(null);
+                if (item) {
+                  service
+                    .deleteRoute(item.id)
+                    .then(() => {
+                      load();
+                      toast.show('Ruta eliminada');
+                    })
+                    .catch(() => toast.show('No pudimos eliminar la ruta'));
+                }
+              }}
+            />
+          </View>
+        }
+      >
+        <TextV2 variant="body" tone="secondary">
+          {removing?.name} se borra de Tus rutas. Las actividades que hiciste con ella se quedan.
+        </TextV2>
       </Sheet>
 
       <Sheet
@@ -214,5 +256,6 @@ const styles = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 32 },
   center: { textAlign: 'center' },
   menu: { gap: 8 },
+  confirmRow: { flexDirection: 'row', gap: 8 },
   flex: { flex: 1 },
 });

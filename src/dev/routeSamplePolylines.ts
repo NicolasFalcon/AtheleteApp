@@ -1,7 +1,7 @@
 // Sample polylines for the Ruta dev screens: REAL street-following routes in
 // Palermo (Buenos Aires), generated once from OpenStreetMap data (foot / bike
 // routing via routing.openstreetmap.de) and thinned to ~6 m. [lat, lon] pairs.
-// Development only: the real app shows no sample data. TODO(route-wire): real
+// Development only: the real app shows no sample data. TODO(route-5d): real
 // activities and generated routes come from the backend (BT-56 and Ruta plan).
 export type SamplePolyline = ReadonlyArray<readonly [number, number]>;
 

@@ -37,7 +37,6 @@ export type Database = {
       }
       badges: {
         Row: {
-          // 'constancia' | 'retos' | 'fuerza' | 'habitos' (BT-24)
           category: string | null
           description: string
           icon: string
@@ -57,6 +56,30 @@ export type Database = {
           icon?: string
           id?: string
           title?: string
+        }
+        Relationships: []
+      }
+      catalog_translation_errors: {
+        Row: {
+          created_at: string
+          error: string
+          id: string
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          created_at?: string
+          error: string
+          id?: string
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          created_at?: string
+          error?: string
+          id?: string
+          target_id?: string | null
+          target_type?: string
         }
         Relationships: []
       }
@@ -210,66 +233,271 @@ export type Database = {
         }
         Relationships: []
       }
-      exercises: {
+      equipment: {
         Row: {
-          category: string | null
-          common_mistakes: string[] | null
-          created_at: string
-          created_by: string | null
-          difficulty: string | null
-          equipment: string | null
-          how_to_steps: string[] | null
           id: string
-          muscle_group: string
-          name: string
-          primary_muscles: string[] | null
-          recommended_sets_reps: Json | null
-          secondary_muscles: string[] | null
+          name_en: string
+          name_es: string | null
           slug: string
-          technique_cues: string[] | null
-          thumbnail_url: string | null
-          video_orientation: string | null
-          video_url: string | null
         }
         Insert: {
-          category?: string | null
-          common_mistakes?: string[] | null
-          created_at?: string
-          created_by?: string | null
-          difficulty?: string | null
-          equipment?: string | null
-          how_to_steps?: string[] | null
           id?: string
-          muscle_group?: string
-          name: string
-          primary_muscles?: string[] | null
-          recommended_sets_reps?: Json | null
-          secondary_muscles?: string[] | null
+          name_en: string
+          name_es?: string | null
           slug: string
-          technique_cues?: string[] | null
-          thumbnail_url?: string | null
-          video_orientation?: string | null
-          video_url?: string | null
         }
         Update: {
-          category?: string | null
-          common_mistakes?: string[] | null
-          created_at?: string
-          created_by?: string | null
-          difficulty?: string | null
-          equipment?: string | null
-          how_to_steps?: string[] | null
           id?: string
-          muscle_group?: string
-          name?: string
-          primary_muscles?: string[] | null
-          recommended_sets_reps?: Json | null
-          secondary_muscles?: string[] | null
+          name_en?: string
+          name_es?: string | null
           slug?: string
-          technique_cues?: string[] | null
-          thumbnail_url?: string | null
-          video_orientation?: string | null
-          video_url?: string | null
+        }
+        Relationships: []
+      }
+      exercise_equipment: {
+        Row: {
+          equipment_id: string
+          exercise_id: string
+        }
+        Insert: {
+          equipment_id: string
+          exercise_id: string
+        }
+        Update: {
+          equipment_id?: string
+          exercise_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_equipment_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_equipment_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_media: {
+        Row: {
+          checksum: string | null
+          created_at: string
+          duration_seconds: number | null
+          exercise_id: string
+          file_size_bytes: number | null
+          height: number | null
+          id: string
+          is_primary: boolean
+          kind: string
+          mime_type: string | null
+          object_key: string
+          orientation: string | null
+          provider: string | null
+          sort_order: number
+          storage_provider: string | null
+          width: number | null
+        }
+        Insert: {
+          checksum?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          exercise_id: string
+          file_size_bytes?: number | null
+          height?: number | null
+          id?: string
+          is_primary?: boolean
+          kind: string
+          mime_type?: string | null
+          object_key: string
+          orientation?: string | null
+          provider?: string | null
+          sort_order?: number
+          storage_provider?: string | null
+          width?: number | null
+        }
+        Update: {
+          checksum?: string | null
+          created_at?: string
+          duration_seconds?: number | null
+          exercise_id?: string
+          file_size_bytes?: number | null
+          height?: number | null
+          id?: string
+          is_primary?: boolean
+          kind?: string
+          mime_type?: string | null
+          object_key?: string
+          orientation?: string | null
+          provider?: string | null
+          sort_order?: number
+          storage_provider?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_media_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_movement_patterns: {
+        Row: {
+          exercise_id: string
+          movement_pattern_id: string
+        }
+        Insert: {
+          exercise_id: string
+          movement_pattern_id: string
+        }
+        Update: {
+          exercise_id?: string
+          movement_pattern_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_movement_patterns_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_movement_patterns_movement_pattern_id_fkey"
+            columns: ["movement_pattern_id"]
+            isOneToOne: false
+            referencedRelation: "movement_patterns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_muscles: {
+        Row: {
+          exercise_id: string
+          muscle_id: string
+          role: string
+          sort_order: number
+        }
+        Insert: {
+          exercise_id: string
+          muscle_id: string
+          role: string
+          sort_order?: number
+        }
+        Update: {
+          exercise_id?: string
+          muscle_id?: string
+          role?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_muscles_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "exercise_muscles_muscle_id_fkey"
+            columns: ["muscle_id"]
+            isOneToOne: false
+            referencedRelation: "muscles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercise_translations: {
+        Row: {
+          aliases: string[]
+          benefits: string[]
+          common_mistakes: string[]
+          exercise_id: string
+          instructions: string[]
+          locale: string
+          long_description: string | null
+          name: string
+          short_description: string | null
+          tags: string[]
+          use_cases: string[]
+        }
+        Insert: {
+          aliases?: string[]
+          benefits?: string[]
+          common_mistakes?: string[]
+          exercise_id: string
+          instructions?: string[]
+          locale: string
+          long_description?: string | null
+          name: string
+          short_description?: string | null
+          tags?: string[]
+          use_cases?: string[]
+        }
+        Update: {
+          aliases?: string[]
+          benefits?: string[]
+          common_mistakes?: string[]
+          exercise_id?: string
+          instructions?: string[]
+          locale?: string
+          long_description?: string | null
+          name?: string
+          short_description?: string | null
+          tags?: string[]
+          use_cases?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exercise_translations_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exercises: {
+        Row: {
+          created_at: string
+          difficulty: string | null
+          id: string
+          is_unilateral: boolean
+          pr_eligible: boolean
+          slug: string
+          status: string
+          tracking_metrics: string[]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          difficulty?: string | null
+          id?: string
+          is_unilateral?: boolean
+          pr_eligible?: boolean
+          slug: string
+          status?: string
+          tracking_metrics?: string[]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          difficulty?: string | null
+          id?: string
+          is_unilateral?: boolean
+          pr_eligible?: boolean
+          slug?: string
+          status?: string
+          tracking_metrics?: string[]
+          updated_at?: string
         }
         Relationships: []
       }
@@ -560,6 +788,48 @@ export type Database = {
         }
         Relationships: []
       }
+      movement_patterns: {
+        Row: {
+          id: string
+          name_en: string
+          name_es: string | null
+          slug: string
+        }
+        Insert: {
+          id?: string
+          name_en: string
+          name_es?: string | null
+          slug: string
+        }
+        Update: {
+          id?: string
+          name_en?: string
+          name_es?: string | null
+          slug?: string
+        }
+        Relationships: []
+      }
+      muscles: {
+        Row: {
+          id: string
+          name_en: string
+          name_es: string | null
+          slug: string
+        }
+        Insert: {
+          id?: string
+          name_en: string
+          name_es?: string | null
+          slug: string
+        }
+        Update: {
+          id?: string
+          name_en?: string
+          name_es?: string | null
+          slug?: string
+        }
+        Relationships: []
+      }
       nutrition_plans: {
         Row: {
           created_at: string
@@ -678,6 +948,48 @@ export type Database = {
           },
         ]
       }
+      planned_routes: {
+        Row: {
+          created_at: string
+          distance_m: number
+          elevation_gain_m: number | null
+          id: string
+          kind: string
+          name: string
+          origin: string
+          points: Json
+          sport: string
+          surface: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          distance_m: number
+          elevation_gain_m?: number | null
+          id?: string
+          kind: string
+          name: string
+          origin?: string
+          points: Json
+          sport: string
+          surface?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          distance_m?: number
+          elevation_gain_m?: number | null
+          id?: string
+          kind?: string
+          name?: string
+          origin?: string
+          points?: Json
+          sport?: string
+          surface?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           available_equipment: string[] | null
@@ -702,6 +1014,7 @@ export type Database = {
           height: number | null
           id: string
           injury_notes: string | null
+          language: string
           name: string
           notification_prefs: Json
           onboarding_completed: boolean
@@ -738,6 +1051,7 @@ export type Database = {
           height?: number | null
           id: string
           injury_notes?: string | null
+          language?: string
           name?: string
           notification_prefs?: Json
           onboarding_completed?: boolean
@@ -774,6 +1088,7 @@ export type Database = {
           height?: number | null
           id?: string
           injury_notes?: string | null
+          language?: string
           name?: string
           notification_prefs?: Json
           onboarding_completed?: boolean
@@ -913,6 +1228,190 @@ export type Database = {
           },
         ]
       }
+      route_activities: {
+        Row: {
+          avg_hr: number | null
+          calories: number | null
+          client_id: string
+          counted_as_workout: boolean
+          created_at: string
+          distance_m: number
+          elevation_gain_m: number
+          ended_at: string
+          hide_endpoints: boolean
+          id: string
+          moving_sec: number
+          pauses: Json
+          planned_route_id: string | null
+          points_awarded: number
+          preview_track: Json
+          shared_track: Json
+          splits: Json
+          sport: string
+          started_at: string
+          title: string
+          track: Json
+          user_id: string
+          visibility: string
+        }
+        Insert: {
+          avg_hr?: number | null
+          calories?: number | null
+          client_id: string
+          counted_as_workout?: boolean
+          created_at?: string
+          distance_m: number
+          elevation_gain_m?: number
+          ended_at: string
+          hide_endpoints?: boolean
+          id?: string
+          moving_sec: number
+          pauses?: Json
+          planned_route_id?: string | null
+          points_awarded?: number
+          preview_track?: Json
+          shared_track?: Json
+          splits?: Json
+          sport: string
+          started_at: string
+          title: string
+          track: Json
+          user_id: string
+          visibility: string
+        }
+        Update: {
+          avg_hr?: number | null
+          calories?: number | null
+          client_id?: string
+          counted_as_workout?: boolean
+          created_at?: string
+          distance_m?: number
+          elevation_gain_m?: number
+          ended_at?: string
+          hide_endpoints?: boolean
+          id?: string
+          moving_sec?: number
+          pauses?: Json
+          planned_route_id?: string | null
+          points_awarded?: number
+          preview_track?: Json
+          shared_track?: Json
+          splits?: Json
+          sport?: string
+          started_at?: string
+          title?: string
+          track?: Json
+          user_id?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_activities_planned_route_id_fkey"
+            columns: ["planned_route_id"]
+            isOneToOne: false
+            referencedRelation: "planned_routes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_generation_cache: {
+        Row: {
+          cache_key: string
+          created_at: string
+          expires_at: string
+          response: Json
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          expires_at: string
+          response: Json
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          expires_at?: string
+          response?: Json
+        }
+        Relationships: []
+      }
+      route_generation_usage: {
+        Row: {
+          count: number
+          day: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          day: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          day?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      route_personal_bests: {
+        Row: {
+          achieved_at: string
+          activity_id: string | null
+          best_sec: number
+          distance_key: string
+          source: string
+          sport: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          achieved_at: string
+          activity_id?: string | null
+          best_sec: number
+          distance_key: string
+          source: string
+          sport: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          achieved_at?: string
+          activity_id?: string | null
+          best_sec?: number
+          distance_key?: string
+          source?: string
+          sport?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_personal_bests_activity_id_fkey"
+            columns: ["activity_id"]
+            isOneToOne: false
+            referencedRelation: "route_activities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_provider_usage: {
+        Row: {
+          count: number
+          day: string
+          provider: string
+        }
+        Insert: {
+          count?: number
+          day: string
+          provider: string
+        }
+        Update: {
+          count?: number
+          day?: string
+          provider?: string
+        }
+        Relationships: []
+      }
       social_activity: {
         Row: {
           category: string
@@ -1038,6 +1537,7 @@ export type Database = {
           cover_path: string | null
           created_at: string
           creator_id: string | null
+          description: string | null
           duration_days: number
           ends_at: string | null
           exercise_id: string | null
@@ -1048,6 +1548,7 @@ export type Database = {
           metric: string
           points: number
           slug: string | null
+          sport: string | null
           starts_at: string | null
           status: string
           title: string
@@ -1058,6 +1559,7 @@ export type Database = {
           cover_path?: string | null
           created_at?: string
           creator_id?: string | null
+          description?: string | null
           duration_days: number
           ends_at?: string | null
           exercise_id?: string | null
@@ -1068,6 +1570,7 @@ export type Database = {
           metric: string
           points?: number
           slug?: string | null
+          sport?: string | null
           starts_at?: string | null
           status?: string
           title: string
@@ -1078,6 +1581,7 @@ export type Database = {
           cover_path?: string | null
           created_at?: string
           creator_id?: string | null
+          description?: string | null
           duration_days?: number
           ends_at?: string | null
           exercise_id?: string | null
@@ -1088,6 +1592,7 @@ export type Database = {
           metric?: string
           points?: number
           slug?: string | null
+          sport?: string | null
           starts_at?: string | null
           status?: string
           title?: string
@@ -1267,6 +1772,7 @@ export type Database = {
           photo_path: string | null
           photo_width: number | null
           removed_at: string | null
+          route_activity_id: string | null
           routine_template_id: string | null
           source_key: string
           type: string
@@ -1291,6 +1797,7 @@ export type Database = {
           photo_path?: string | null
           photo_width?: number | null
           removed_at?: string | null
+          route_activity_id?: string | null
           routine_template_id?: string | null
           source_key: string
           type: string
@@ -1315,6 +1822,7 @@ export type Database = {
           photo_path?: string | null
           photo_width?: number | null
           removed_at?: string | null
+          route_activity_id?: string | null
           routine_template_id?: string | null
           source_key?: string
           type?: string
@@ -1333,6 +1841,13 @@ export type Database = {
             columns: ["personal_record_id"]
             isOneToOne: false
             referencedRelation: "personal_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_posts_route_activity_id_fkey"
+            columns: ["route_activity_id"]
+            isOneToOne: false
+            referencedRelation: "route_activities"
             referencedColumns: ["id"]
           },
           {
@@ -1356,6 +1871,9 @@ export type Database = {
           allow_friend_requests: boolean
           audience: string
           created_at: string
+          route_auto_pause: boolean
+          route_default_visibility: string
+          route_hide_endpoints_default: boolean
           share_achievements: boolean
           share_body_weight: boolean
           share_photos: boolean
@@ -1370,6 +1888,9 @@ export type Database = {
           allow_friend_requests?: boolean
           audience?: string
           created_at?: string
+          route_auto_pause?: boolean
+          route_default_visibility?: string
+          route_hide_endpoints_default?: boolean
           share_achievements?: boolean
           share_body_weight?: boolean
           share_photos?: boolean
@@ -1384,6 +1905,9 @@ export type Database = {
           allow_friend_requests?: boolean
           audience?: string
           created_at?: string
+          route_auto_pause?: boolean
+          route_default_visibility?: string
+          route_hide_endpoints_default?: boolean
           share_achievements?: boolean
           share_body_weight?: boolean
           share_photos?: boolean
@@ -1513,8 +2037,12 @@ export type Database = {
           item_type: string
           user_id: string
         }
-        // No Update: favourites are inserted or deleted, never updated (RLS).
-        Update: Record<string, never>
+        Update: {
+          created_at?: string
+          item_id?: string
+          item_type?: string
+          user_id?: string
+        }
         Relationships: []
       }
       workout_session_exercises: {
@@ -1679,6 +2207,8 @@ export type Database = {
           id: string
           paused_at: string | null
           paused_total_sec: number
+          route_activity_id: string | null
+          source: string | null
           started_at: string | null
           status: string
           total_exercises: number
@@ -1699,6 +2229,8 @@ export type Database = {
           id?: string
           paused_at?: string | null
           paused_total_sec?: number
+          route_activity_id?: string | null
+          source?: string | null
           started_at?: string | null
           status?: string
           total_exercises?: number
@@ -1719,6 +2251,8 @@ export type Database = {
           id?: string
           paused_at?: string | null
           paused_total_sec?: number
+          route_activity_id?: string | null
+          source?: string | null
           started_at?: string | null
           status?: string
           total_exercises?: number
@@ -1728,6 +2262,13 @@ export type Database = {
           workout_title?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "workout_sessions_route_activity_id_fkey"
+            columns: ["route_activity_id"]
+            isOneToOne: true
+            referencedRelation: "route_activities"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "workout_sessions_workout_id_fkey"
             columns: ["workout_id"]
@@ -1835,11 +2376,6 @@ export type Database = {
       }
     }
     Functions: {
-      get_badge_progress: { Args: Record<PropertyKey, never>; Returns: Json }
-      get_progress_summary: {
-        Args: { _from: string; _tz: string }
-        Returns: Json
-      }
       add_manual_contribution: {
         Args: { _amount: number; _challenge_id: string }
         Returns: Json
@@ -1868,6 +2404,7 @@ export type Database = {
         Returns: Json
       }
       cancel_friend_request: { Args: { _request_id: string }; Returns: Json }
+      challenge_cover_url: { Args: { _path: string }; Returns: string }
       create_friend_challenge: {
         Args: {
           _duration_days: number
@@ -1890,18 +2427,38 @@ export type Database = {
         Returns: Json
       }
       delete_comment: { Args: { _comment_id: string }; Returns: Json }
+      delete_planned_route: { Args: { _id: string }; Returns: Json }
+      delete_route_activity: { Args: { _activity_id: string }; Returns: Json }
       detect_session_prs: { Args: { _session_id: string }; Returns: Json }
       ensure_social_settings: { Args: { _username: string }; Returns: Json }
+      exercise_display_name: { Args: { _id: string }; Returns: string }
+      expire_saved_sessions: { Args: never; Returns: number }
       find_user_by_username: { Args: { _username: string }; Returns: Json }
       gamification_badge_check: {
         Args: { _badge: string; _ref_date?: string; _user: string }
         Returns: boolean
       }
+      get_badge_progress: { Args: never; Returns: Json }
       get_challenge_board: { Args: { _challenge_id: string }; Returns: Json }
       get_feed: { Args: { _before?: string; _limit?: number }; Returns: Json }
       get_friend_activity: { Args: { _limit?: number }; Returns: Json }
       get_my_challenges: { Args: never; Returns: Json }
+      get_my_planned_routes: { Args: never; Returns: Json }
+      get_outdoor_month: {
+        Args: { _tz?: string; _user_id: string }
+        Returns: Json
+      }
       get_post: { Args: { _id: string }; Returns: Json }
+      get_progress_summary: {
+        Args: { _from: string; _tz?: string }
+        Returns: Json
+      }
+      get_recent_activities: {
+        Args: { _limit?: number; _user_id: string }
+        Returns: Json
+      }
+      get_route_for_viewer: { Args: { _activity_id: string }; Returns: Json }
+      get_route_personal_bests: { Args: never; Returns: Json }
       get_social_profile: { Args: { _user_id: string }; Returns: Json }
       get_social_profiles: {
         Args: { _user_ids: string[] }
@@ -1915,6 +2472,7 @@ export type Database = {
           weight: number
         }[]
       }
+      get_today_route_activity: { Args: { _tz?: string }; Returns: Json }
       is_blocked: { Args: { a: string; b: string }; Returns: boolean }
       is_challenge_participant: {
         Args: { _challenge: string; _user: string }
@@ -1941,6 +2499,10 @@ export type Database = {
       }
       redeem_friend_invite: { Args: { _token: string }; Returns: Json }
       remove_friend: { Args: { _friend: string }; Returns: Json }
+      rename_planned_route: {
+        Args: { _id: string; _name: string }
+        Returns: Json
+      }
       respond_challenge_invite: {
         Args: { _accept: boolean; _challenge_id: string }
         Returns: Json
@@ -1949,10 +2511,68 @@ export type Database = {
         Args: { _accept: boolean; _request_id: string }
         Returns: Json
       }
+      route_activity_json: {
+        Args: {
+          _a: Database["public"]["Tables"]["route_activities"]["Row"]
+          _full: boolean
+        }
+        Returns: Json
+      }
+      route_best_efforts: {
+        Args: { _pauses: Json; _track: Json }
+        Returns: Json
+      }
+      route_can_view: {
+        Args: { _owner: string; _viewer: string; _vis: string }
+        Returns: boolean
+      }
+      route_distance_m: { Args: { _key: string }; Returns: number }
+      route_gen_reserve: {
+        Args: {
+          _calls: number
+          _provider: string
+          _provider_limit: number
+          _user: string
+          _user_limit: number
+        }
+        Returns: string
+      }
+      route_haversine_m: {
+        Args: { a_lat: number; a_lon: number; b_lat: number; b_lon: number }
+        Returns: number
+      }
+      route_latlon: { Args: { _pts: Json }; Returns: Json }
+      route_pace_label: { Args: { _m: number; _sec: number }; Returns: string }
+      route_pause_overlap_ms: {
+        Args: { _a: number; _b: number; _pauses: Json }
+        Returns: number
+      }
+      route_shared_track: {
+        Args: { _hide: boolean; _track: Json }
+        Returns: Json
+      }
+      route_simplify: { Args: { _max?: number; _pts: Json }; Returns: Json }
+      route_track_stats: {
+        Args: { _pauses: Json; _track: Json }
+        Returns: Json
+      }
+      route_trim: { Args: { _m: number; _pts: Json }; Returns: Json }
+      routine_category_from_type: { Args: { _type: string }; Returns: string }
+      save_planned_route: { Args: { _payload: Json }; Returns: Json }
+      save_route_activity: { Args: { _payload: Json }; Returns: Json }
       save_shared_routine: { Args: { _post_id: string }; Returns: Json }
       send_friend_request: { Args: { _target: string }; Returns: Json }
       set_moderator: {
         Args: { _role: string; _user_id: string }
+        Returns: Json
+      }
+      set_route_personal_best: {
+        Args: {
+          _achieved_at?: string
+          _distance_key: string
+          _sport: string
+          _time_sec: number
+        }
         Returns: Json
       }
       set_username: { Args: { _username: string }; Returns: Json }
@@ -1973,6 +2593,10 @@ export type Database = {
       social_can_see_identity: {
         Args: { _target: string; _viewer: string }
         Returns: boolean
+      }
+      social_challenge_extra: {
+        Args: { _c: Database["public"]["Tables"]["social_challenges"]["Row"] }
+        Returns: Json
       }
       social_challenges_maintenance: { Args: never; Returns: Json }
       social_make_friends: {
@@ -2008,6 +2632,14 @@ export type Database = {
         Returns: boolean
       }
       social_streak_days: { Args: { _user: string }; Returns: number }
+      update_route_activity_privacy: {
+        Args: {
+          _activity_id: string
+          _hide_endpoints: boolean
+          _visibility: string
+        }
+        Returns: Json
+      }
       verify_cleanup_token: { Args: { _token: string }; Returns: boolean }
     }
     Enums: {

@@ -3,10 +3,12 @@ import type { TrackerState } from '@app/features/route/routeTracker';
 import { trackerActiveSec, trackerElevation } from '@app/features/route/routeTracker';
 import type { RoutePoint, RouteActivity, RouteSplit, RouteVisibility } from '@app/features/route/routeTypes';
 import { formatPace, formatSpeed } from '@app/features/route/routeFormat';
+import { splitBars } from '@app/features/route/routeMappers';
+import { createUuid } from '@app/lib/uuid';
 
-// Turns a finished tracker into the activity shown in the result.
-// TODO(route-wire): the server recomputes distance, elevation, splits and
-// calories from the uploaded track; this is what the app shows meanwhile.
+// Turns a finished tracker into the activity that is saved and shown in the
+// result. The server recomputes distance, elevation and splits from the track;
+// this is what the app shows until it answers (or while the save is queued).
 
 // Per km when running, per 10 km when cycling. The fastest is `best`.
 export function splitsFromTrack(state: TrackerState): RouteSplit[] {
@@ -43,14 +45,9 @@ export function splitsFromTrack(state: TrackerState): RouteSplit[] {
   if (rows.length === 0) {
     return [];
   }
-  const fastest = Math.min(...rows.map(row => row.secPerM));
-  const slowest = Math.max(...rows.map(row => row.secPerM));
-  return rows.map(row => ({
-    label: row.label,
-    value: row.value,
-    fill: Math.round(100 - ((row.secPerM - fastest) / (slowest - fastest || 1)) * 45),
-    best: row.secPerM === fastest && rows.length > 1,
-  }));
+  return splitBars(
+    rows.map(row => ({ label: row.label, value: row.value, secPerKm: row.secPerM * 1000 })),
+  );
 }
 
 function titleFor(state: TrackerState): string {
@@ -64,8 +61,13 @@ export function activityFromTracker(
   options: { visibility: RouteVisibility; hideEndpoints: boolean; plannedRouteId: string | null },
 ): RouteActivity {
   const movingSec = Math.round(trackerActiveSec(state));
+  const clientId = createUuid();
+  const endedAt = state.endedAt ?? state.now ?? Date.now();
   return {
-    id: `act-${state.startedAt ?? Date.now()}`,
+    id: clientId,
+    clientId,
+    endedAt,
+    pauses: state.pauses.map(pause => ({ from: pause.from, to: pause.to ?? endedAt })),
     sport: state.sport,
     title: titleFor(state),
     startedAt: state.startedAt ?? Date.now(),
@@ -73,7 +75,7 @@ export function activityFromTracker(
     distanceM: state.distanceM,
     elevationGainM: trackerElevation(state),
     avgHr: null,
-    calories: Math.round((state.distanceM / 1000) * (state.sport === 'running' ? 62 : 24)),
+    calories: null,
     points: state.points,
     splits: splitsFromTrack(state),
     plannedRouteId: options.plannedRouteId,

@@ -9,7 +9,7 @@ import type { StyleSpecification } from '@maplibre/maplibre-react-native';
 // show "OpenFreeMap © OpenMapTiles Data from OpenStreetMap" (the attribution
 // button of MapLibre does it). If its availability is ever not enough, swap the
 // `TILES_URL` for MapTiler (key in the env, never in git): nothing else changes.
-// TODO(route-wire): decide the production tile provider (ROUTE_PLAN §6).
+// TODO(route-tiles): decide the production tile provider (ROUTE_PLAN §6).
 const TILES_URL = 'https://tiles.openfreemap.org/planet';
 
 export type RouteMapMode = 'light' | 'dark';

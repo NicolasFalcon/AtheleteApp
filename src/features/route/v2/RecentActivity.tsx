@@ -9,8 +9,10 @@ import type { OutdoorMonth } from '@app/services/route/routeService';
 
 // Perfil · "Actividad reciente" (ROUTE_12): last outdoor routes with their
 // thumbnail, and the "Al aire libre" month summary. A thumbnail shows the track
-// the viewer is allowed to see. TODO(route-wire): activities and the month
-// summary come from RouteService.getRecentActivities / getOutdoorMonth.
+// the viewer is allowed to see. Data: RouteService.getRecentActivities /
+// getOutdoorMonth (the Perfil screen reads them).
+const km = (value: number) => (Math.round(value * 10) / 10).toString().replace('.', ',');
+
 export function RecentActivity({
   activities,
   month,
@@ -37,7 +39,8 @@ export function RecentActivity({
       {month ? (
         <View style={styles.month}>
           <TextV2 variant="meta" tone="secondary">
-            Este mes · {String(month.runKm).replace('.', ',')} km corriendo · {String(month.bikeKm).replace('.', ',')} km en bici
+            Este mes · {km(month.runKm)} km corriendo
+            {month.runDeltaKm !== 0 ? ` (${month.runDeltaKm > 0 ? '+' : '−'}${km(Math.abs(month.runDeltaKm))})` : ''} · {km(month.bikeKm)} km en bici
           </TextV2>
         </View>
       ) : null}

@@ -27,7 +27,7 @@ const TARGETS = [
 ] as const;
 
 // Compartir (ROUTE_22): a dark card in three templates and the places to send
-// it. What is shared never includes the hidden start/end. TODO(route-wire):
+// it. What is shared never includes the hidden start/end. TODO(route-share):
 // render the card to an image and open the system share sheet / Stories
 // (needs a view-capture dependency that 5a does not add).
 export function RouteShareScreen({ navigation, route }: AppScreenProps<'RouteShare'>) {

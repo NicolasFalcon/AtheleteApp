@@ -13,12 +13,13 @@ import type {
   RouteSplit,
   RouteSport,
 } from '@app/features/route/routeTypes';
+import type { RoutePersonalBest } from '@app/features/route/routeRecords';
 import type { OutdoorMonth, RouteService } from '@app/services/route/routeService';
 
 // Sample data and the sample RouteService of Ruta (development only: the real
 // app shows none of this; the screens are reached with athelete://dev/route).
 // Routes are real street-following polylines of Palermo, Buenos Aires.
-// TODO(route-wire): replace with the backend implementation of RouteService.
+// The real app uses supabaseRouteService; this one is the dev samples.
 
 const toLatLng = (poly: SamplePolyline): LatLng[] => poly.map(([lat, lon]) => ({ lat, lon }));
 
@@ -222,11 +223,17 @@ export const SAMPLE_ACTIVITIES: Record<string, RouteActivity> = {
   [ACTIVITY_CARLOS.id]: ACTIVITY_CARLOS,
 };
 
+export const SAMPLE_BESTS: RoutePersonalBest[] = [
+  { sport: 'running', distanceKey: '1k', bestSec: 232, activityId: 'act-run', source: 'auto', achievedAt: null },
+  { sport: 'running', distanceKey: '5k', bestSec: 1481, activityId: 'act-run', source: 'auto', achievedAt: null },
+  { sport: 'running', distanceKey: '10k', bestSec: 3140, activityId: null, source: 'manual', achievedAt: null },
+];
+
 export const SAMPLE_OUTDOOR_MONTH: OutdoorMonth = { runKm: 38.4, runDeltaKm: 6.2, bikeKm: 84.1 };
 
 // ── Sample RouteService ─────────────────────────────────────────────────────
 // Keeps its own copy of the saved routes in memory (reset with the dev
-// scenario). TODO(route-wire): the real service talks to Supabase.
+// scenario).
 let saved: PlannedRoute[] = [...SAVED_ROUTES];
 let generated = 0;
 
@@ -277,7 +284,21 @@ export const sampleRouteService: RouteService = {
   async getOutdoorMonth() {
     return SAMPLE_OUTDOOR_MONTH;
   },
+  async updatePrivacy(activityId, visibility, hideEndpoints) {
+    const sample = SAMPLE_ACTIVITIES[activityId];
+    if (sample) {
+      SAMPLE_ACTIVITIES[activityId] = { ...sample, visibility, hideEndpoints };
+    }
+  },
+  async deleteActivity() {},
+  async getPersonalBests() {
+    return SAMPLE_BESTS;
+  },
+  async setPersonalBest() {},
+  async flushPending() {
+    return 0;
+  },
   async shareToCommunity(activityId) {
-    return { postId: `fx-route-${activityId}` };
+    return { postId: `fx-route-${activityId}`, created: true };
   },
 };

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Mountain, Pause, Play, Target } from 'lucide-react-native';
-import { Button, PressableScale, Sheet, TextV2 } from '@app/components/v2';
+import { Button, PressableScale, Sheet, TextV2, useToast } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
 import { getRouteDevConfig } from '@app/dev/routeDevConfig';
 import { SimulatedLocationSource } from '@app/features/route/locationSource';
@@ -30,6 +31,7 @@ import {
 } from '@app/features/route/routeTracker';
 import { preplayTracker, useRouteTracker } from '@app/features/route/useRouteTracker';
 import { BigFigure, DARK } from '@app/features/route/v2/RouteUi';
+import { RouteServiceError } from '@app/services/route/routeService';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -44,6 +46,8 @@ const EMBER = '#FF5A1F';
 export function RouteActiveScreen({ navigation, route }: AppScreenProps<'RouteActive'>) {
   const insets = useSafeAreaInsets();
   const service = useRouteService();
+  const toast = useToast();
+  const queryClient = useQueryClient();
   const session = useRouteSession();
   const dev = getRouteDevConfig();
   const preplayed = __DEV__ && Boolean(route?.params?.dev) && dev.startM > 0;
@@ -119,9 +123,19 @@ export function RouteActiveScreen({ navigation, route }: AppScreenProps<'RouteAc
     try {
       const saved = await service.saveActivity(activity);
       routeStore.patch({ finished: saved, posted: false });
+      // A saved Ruta counts as a workout: the ring, streak, progress, retos
+      // and the Perfil/Inicio cards read it from the server again.
+      queryClient.invalidateQueries().catch(() => {});
       navigation.replace(APP_ROUTES.RouteResult, { activityId: saved.id });
-    } catch {
+    } catch (error) {
+      // A rejection of the server (speed, duration…): there is nothing to retry.
       setSaving(false);
+      toast.show(
+        error instanceof RouteServiceError && error.message !== error.code
+          ? error.message
+          : 'No pudimos guardar la actividad.',
+      );
+      navigation.popToTop();
     }
   };
 

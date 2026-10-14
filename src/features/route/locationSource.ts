@@ -5,7 +5,7 @@ import type { LatLng, RoutePoint, RouteSport } from '@app/features/route/routeTy
 //  - 5a: `SimulatedLocationSource` replays a sample polyline over time.
 //  - 5c/5d: an expo-location implementation ("Al usar la app" + background
 //    updates while recording). The screens do not change.
-// TODO(route-wire): ExpoLocationSource (5c/5d).
+// TODO(route-5d): ExpoLocationSource.
 
 export type LocationPermission = 'undetermined' | 'granted' | 'denied';
 

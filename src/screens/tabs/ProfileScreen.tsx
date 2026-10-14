@@ -41,9 +41,11 @@ import {
   Timeline,
 } from '@app/features/profile/v2/ProfileViews';
 import { useHomeRouteScenario } from '@app/dev/homeRouteScenario';
-import { ACTIVITY_BIKE, ACTIVITY_RUN, SAMPLE_OUTDOOR_MONTH } from '@app/dev/routeFixtures';
 import { routeStore } from '@app/features/route/routeStore';
+import { useOutdoorMonth, usePersonalBests, useRecentActivities } from '@app/features/route/useRouteData';
 import { RecentActivity } from '@app/features/route/v2/RecentActivity';
+import { RouteBests } from '@app/features/route/v2/RouteBests';
+import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { useAuth } from '@app/hooks/useAuth';
 import { useBadgeShelves } from '@app/hooks/useBadgeShelves';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
@@ -68,9 +70,15 @@ export function ProfileScreen({ navigation, route }: Props) {
   const openEllieChat = useOpenEllieChat();
   const openCore33 = useOpenCore33();
   const dev = __DEV__ ? route.params?.devState : undefined;
-  // Sample outdoor activity only with the dev deep link (athelete://dev/route?screen=profile).
-  // TODO(route-wire): RouteService.getRecentActivities / getOutdoorMonth.
+  // Outdoor activity, month and records from the server. The sample ones show
+  // only with the dev deep link (athelete://dev/route?screen=profile).
   const routeSamples = useHomeRouteScenario();
+  const hideRouteSamples = isRouteSampleActive() && !routeSamples;
+  const recentQuery = useRecentActivities(5);
+  const monthQuery = useOutdoorMonth();
+  const bestsQuery = usePersonalBests();
+  const recentRoutes = hideRouteSamples ? [] : (recentQuery.data ?? []);
+  const routeBests = hideRouteSamples ? [] : (bestsQuery.data ?? []);
   const now = useMemo(() => new Date(), []);
 
   const badges = useBadgeShelves();
@@ -288,16 +296,17 @@ export function ProfileScreen({ navigation, route }: Props) {
                 onOpenAll={() => navigation.navigate(APP_ROUTES.Achievements)}
                 onOpen={setSelected}
               />
-              {routeSamples ? (
+              {recentRoutes.length > 0 ? (
                 <RecentActivity
-                  activities={[ACTIVITY_RUN, ACTIVITY_BIKE]}
-                  month={SAMPLE_OUTDOOR_MONTH}
+                  activities={recentRoutes}
+                  month={monthQuery.data ?? null}
                   onOpen={activity => {
                     routeStore.reset({ finished: activity, sport: activity.sport });
                     navigation.navigate(APP_ROUTES.RouteResult, { activityId: activity.id });
                   }}
                 />
               ) : null}
+              {recentRoutes.length > 0 || routeBests.length > 0 ? <RouteBests bests={routeBests} /> : null}
               <View style={styles.trajectory}>
                 <TextV2 variant="section">Tu trayectoria</TextV2>
                 <Timeline entries={timeline} now={now} />

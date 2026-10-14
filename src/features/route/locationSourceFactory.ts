@@ -8,7 +8,7 @@ import type { LatLng, RouteSport } from '@app/features/route/routeTypes';
 
 // The one place that decides which LocationSource the screens use.
 // 5a: always the simulation (the real flow is not reachable yet).
-// TODO(route-wire): 5c/5d return an ExpoLocationSource here (expo-location,
+// TODO(route-5d): return an ExpoLocationSource here (expo-location,
 // "Al usar la app" + background updates while recording); the screens do not
 // change.
 export function createLocationSource(

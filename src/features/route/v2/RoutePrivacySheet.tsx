@@ -8,8 +8,9 @@ import { RouteThumb } from '@app/features/route/v2/RouteThumb';
 
 // Privacy of a route (ROUTE_04): who sees it and "Ocultar inicio y final".
 // What others see is trimmed 200 m at each end **by the server**; the thumbnail
-// only previews it. TODO(route-wire): visibility and hide_endpoints live in
-// `route_activities` and the profile defaults.
+// only previews it. Without `value` it edits the defaults of this and the next
+// outings (the session store, saved to social_settings by the caller); with
+// `value` + `onChange` it edits one saved activity (update_route_activity_privacy).
 const OPTIONS: { key: RouteVisibility; title: string; sub: string; icon: LucideIcon }[] = [
   { key: 'me', title: 'Solo yo', sub: 'Nadie más ve tus rutas', icon: Lock },
   { key: 'friends', title: 'Amigos', sub: 'Tus amigos en Comunidad', icon: Users },
@@ -20,19 +21,42 @@ export function visibilityLabel(visibility: RouteVisibility): string {
   return OPTIONS.find(option => option.key === visibility)?.title ?? 'Amigos';
 }
 
+export type RoutePrivacyValue = { visibility: RouteVisibility; hideEndpoints: boolean };
+
 export function RoutePrivacySheet({
   open,
   onClose,
   preview,
+  value,
+  onChange,
+  busy = false,
 }: {
   open: boolean;
   onClose: () => void;
-  // A sample track for the two thumbnails.
+  // The track for the two thumbnails.
   preview: readonly LatLng[];
+  // One activity: its privacy and what to do when the person changes it.
+  value?: RoutePrivacyValue;
+  onChange?: (next: RoutePrivacyValue) => void;
+  busy?: boolean;
 }) {
   const { colors } = useThemeV2();
   const session = useRouteSession();
-  const others = session.hideEndpoints ? trimEnds(preview, PRIVACY_TRIM_M) : preview;
+  const current: RoutePrivacyValue = value ?? {
+    visibility: session.visibility,
+    hideEndpoints: session.hideEndpoints,
+  };
+  const change = (patch: Partial<RoutePrivacyValue>) => {
+    if (busy) {
+      return;
+    }
+    if (onChange) {
+      onChange({ ...current, ...patch });
+    } else {
+      routeStore.patch(patch);
+    }
+  };
+  const others = current.hideEndpoints ? trimEnds(preview, PRIVACY_TRIM_M) : preview;
 
   return (
     <Sheet
@@ -42,17 +66,17 @@ export function RoutePrivacySheet({
       footer={<Button label="Listo" onPress={onClose} style={styles.footerButton} />}
     >
       <TextV2 variant="body" tone="secondary" style={styles.sub}>
-        Se aplica a esta salida y a las siguientes.
+        {value ? 'Se aplica a esta actividad.' : 'Se aplica a esta salida y a las siguientes.'}
       </TextV2>
       <View style={styles.options}>
         {OPTIONS.map(option => {
-          const on = option.key === session.visibility;
+          const on = option.key === current.visibility;
           return (
             <PressableScale
               key={option.key}
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
-              onPress={() => routeStore.patch({ visibility: option.key })}
+              onPress={() => change({ visibility: option.key })}
               style={[
                 styles.option,
                 on ? { backgroundColor: colors.surface.muted } : { boxShadow: `inset 0 0 0 1px ${colors.divider}` },
@@ -77,8 +101,8 @@ export function RoutePrivacySheet({
 
       <PressableScale
         accessibilityRole="switch"
-        accessibilityState={{ checked: session.hideEndpoints }}
-        onPress={() => routeStore.patch({ hideEndpoints: !session.hideEndpoints })}
+        accessibilityState={{ checked: current.hideEndpoints }}
+        onPress={() => change({ hideEndpoints: !current.hideEndpoints })}
         style={styles.toggle}
       >
         <View style={styles.optionTexts}>
@@ -90,10 +114,10 @@ export function RoutePrivacySheet({
         <View
           style={[
             styles.track,
-            { backgroundColor: session.hideEndpoints ? colors.cta.primary : colors.divider },
+            { backgroundColor: current.hideEndpoints ? colors.cta.primary : colors.divider },
           ]}
         >
-          <View style={[styles.knob, session.hideEndpoints ? styles.knobOn : null]} />
+          <View style={[styles.knob, current.hideEndpoints ? styles.knobOn : null]} />
         </View>
       </PressableScale>
 
@@ -107,7 +131,7 @@ export function RoutePrivacySheet({
         <View style={styles.preview}>
           <RouteThumb points={others.length > 1 ? others : preview} size={132} radius={18} dim={others.length < 2} />
           <TextV2 variant="caption" tone="secondary" align="center">
-            {session.hideEndpoints ? 'Los demás · extremos ocultos' : 'Los demás · recorrido completo'}
+            {current.hideEndpoints ? 'Los demás · extremos ocultos' : 'Los demás · recorrido completo'}
           </TextV2>
         </View>
       </View>

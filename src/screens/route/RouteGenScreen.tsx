@@ -8,14 +8,23 @@ import { getRouteDevConfig } from '@app/dev/routeDevConfig';
 import { PLAN_A, PLAN_B, SAMPLE_ORIGIN } from '@app/dev/routeFixtures';
 import { RouteMap } from '@app/features/route/RouteMap';
 import { KIND_LABEL, SURFACE_LABEL, formatElevation, formatKm } from '@app/features/route/routeFormat';
+import {
+  ORS_ATTRIBUTION,
+  canRetryGenerate,
+  generateErrorCopy,
+  type GenerateRouteError,
+} from '@app/features/route/routeMappers';
 import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import { BigFigure, BottomPanel, RoundButton, StatRow, TopPill } from '@app/features/route/v2/RouteUi';
+import { RouteServiceError } from '@app/services/route/routeService';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
 // Generar ruta con ELLIE (ROUTE_15–17): "Generando…" (~1,5 s), then "Opción N"
-// with "Otra opción" / "Usar esta ruta". The routes come from the RouteService
-// (samples in 5a). TODO(route-wire): real generation (ELLIE + routing engine).
+// with "Otra opción" (another seed) / "Usar esta ruta". The routes come from
+// the generate-route Edge Function through the RouteService (samples only with
+// the dev deep links). Its errors have their own message, and the routing
+// provider's attribution is shown with every generated route.
 const ELEVATION_WORD = { low: 'bajo', balanced: 'medio', any: 'libre' } as const;
 
 export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>) {
@@ -26,18 +35,20 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
   const dev = __DEV__ ? route?.params?.dev : undefined;
   const [seed, setSeed] = useState(dev === 'alt' ? 1 : 0);
   const [loading, setLoading] = useState(dev !== 'result' && dev !== 'alt');
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<GenerateRouteError | null>(null);
   const [mapFailed, setMapFailed] = useState(getRouteDevConfig().mapOffline);
   const plan = session.generated;
+  // generate-route needs where the person is (the LocationSource's fix).
+  const origin = session.origin ?? SAMPLE_ORIGIN;
 
   const generate = useCallback(
     async (nextSeed: number) => {
       setLoading(true);
-      setFailed(false);
+      setFailed(null);
       try {
         const result = await service.generateRoute({
           sport: session.sport,
-          origin: SAMPLE_ORIGIN,
+          origin,
           targetKm: session.config.km,
           kind: session.config.kind,
           elevation: session.config.elevation,
@@ -45,13 +56,15 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
           seed: nextSeed,
         });
         routeStore.patch({ generated: result, generationSeed: nextSeed });
-      } catch {
-        setFailed(true);
+      } catch (error) {
+        setFailed(
+          error instanceof RouteServiceError ? (error.code as GenerateRouteError) : 'unknown',
+        );
       } finally {
         setLoading(false);
       }
     },
-    [service, session.sport, session.config],
+    [service, session.sport, session.config, origin],
   );
 
   useEffect(() => {
@@ -78,12 +91,12 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <RouteMap
         style={StyleSheet.absoluteFill}
-        center={SAMPLE_ORIGIN}
+        center={origin}
         zoom={14}
         fit={plan && !loading ? plan.points : undefined}
         padding={{ top: insets.top + 80, bottom: 380, left: 40, right: 40 }}
         route={plan && !loading ? plan.points : undefined}
-        here={plan && !loading ? undefined : SAMPLE_ORIGIN}
+        here={plan && !loading ? undefined : origin}
         endpoints={Boolean(plan) && !loading}
         dim={loading ? 0.6 : 1}
         onLoadFailed={() => setMapFailed(true)}
@@ -110,8 +123,17 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
           </View>
         ) : failed || !plan ? (
           <View style={styles.loading}>
-            <TextV2 variant="title22">No pudimos generar la ruta</TextV2>
-            <Button label="Reintentar" variant="primary" fullWidth onPress={() => generate(seed).catch(() => {})} />
+            <TextV2 variant="title22" style={styles.center}>
+              No pudimos generar la ruta
+            </TextV2>
+            <TextV2 variant="body" tone="secondary" style={styles.center}>
+              {generateErrorCopy(failed ?? 'unknown')}
+            </TextV2>
+            {!failed || canRetryGenerate(failed) ? (
+              <Button label="Reintentar" variant="primary" fullWidth onPress={() => generate(seed).catch(() => {})} />
+            ) : (
+              <Button label="Cambiar configuración" variant="primary" fullWidth onPress={() => navigation.goBack()} />
+            )}
           </View>
         ) : (
           <View style={styles.body}>
@@ -132,6 +154,9 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
                 { value: SURFACE_LABEL[plan.surface], label: 'Superficie' },
               ]}
             />
+            <TextV2 variant="caption" tone="secondary">
+              {ORS_ATTRIBUTION}
+            </TextV2>
             <View style={styles.actions}>
               <Button
                 label="Otra opción"

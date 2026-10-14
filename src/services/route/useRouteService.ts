@@ -1,11 +1,15 @@
+import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { sampleRouteService } from '@app/dev/routeFixtures';
 import type { RouteService } from '@app/services/route/routeService';
+import { supabaseRouteService } from '@app/services/route/supabaseRouteService';
 
-// The one place that picks the RouteService.
-// 5a: the sample implementation (no backend). It is only reachable from the
-// dev deep links (athelete://dev/route) and the Ruta screens behind them.
-// TODO(route-wire): return the Supabase-backed service when the Ruta tables
-// and endpoints exist (see docs/migration/ROUTE_5A_CHECKPOINT.md).
+// The one place that picks the RouteService: Supabase in the real app; the
+// sample one only after a dev deep link (athelete://dev/route) loaded a
+// scenario (`isRouteSampleActive`, false in release builds).
+export function getRouteService(): RouteService {
+  return isRouteSampleActive() ? sampleRouteService : supabaseRouteService;
+}
+
 export function useRouteService(): RouteService {
-  return sampleRouteService;
+  return getRouteService();
 }

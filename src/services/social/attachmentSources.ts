@@ -29,6 +29,13 @@ const isToday = (iso: string | null) =>
 const dayLabel = (iso: string | null) =>
   iso && isToday(iso) ? 'hoy' : iso ? iso.slice(0, 10) : '—';
 
+// The catalog moved to `exercise_translations`: the name comes from the server
+// in the user's language (exercises.name no longer exists).
+async function exerciseNameOf(id: string): Promise<string | null> {
+  const { data, error } = await client().rpc('exercise_display_name', { _id: id });
+  return error || typeof data !== 'string' || data.length === 0 ? null : data;
+}
+
 async function workoutSource(me: string, id?: string): Promise<AttachmentSource | null> {
   let query = client()
     .from('workout_sessions')
@@ -57,14 +64,10 @@ async function workoutSource(me: string, id?: string): Promise<AttachmentSource 
     .maybeSingle();
   let topRecord: AttachmentSource['record'] = null;
   if (record.data?.value_weight) {
-    const exercise = await client()
-      .from('exercises')
-      .select('name')
-      .eq('id', record.data.exercise_id)
-      .maybeSingle();
-    if (exercise.data) {
+    const exerciseName = await exerciseNameOf(record.data.exercise_id);
+    if (exerciseName) {
       topRecord = {
-        exercise: exercise.data.name,
+        exercise: exerciseName,
         value: record.data.value_weight,
         unit: record.data.unit ?? 'kg',
       };
@@ -99,17 +102,13 @@ async function recordSource(me: string, id?: string): Promise<AttachmentSource |
   if (!data) {
     return null;
   }
-  const exercise = await client()
-    .from('exercises')
-    .select('name')
-    .eq('id', data.exercise_id)
-    .maybeSingle();
+  const recordName = await exerciseNameOf(data.exercise_id);
   const unit = data.unit ?? 'kg';
   return {
     kind: 'record',
     sourceId: data.id,
     over: 'Récord personal',
-    title: exercise.data?.name ?? 'Récord',
+    title: recordName ?? 'Récord',
     stats: [
       {
         value: data.value_weight !== null ? `${data.value_weight} ${unit}` : `${data.value_reps ?? 0} reps`,

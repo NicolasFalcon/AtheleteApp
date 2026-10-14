@@ -9,8 +9,8 @@ import type { RouteActivity } from '@app/features/route/routeTypes';
 
 // Inicio · "Tu ruta" card, real state (HOME_16/17): today's route on the dark
 // map, distance, time and pace, and "Ver actividad". Dark in both themes.
-// TODO(route-wire): a static map snapshot from the server instead of a live
-// map instance inside the scroll.
+// TODO(route-share): a static map snapshot instead of a live map instance
+// inside the scroll.
 export function RouteDoneCard({
   activity,
   ago,
@@ -31,9 +31,9 @@ export function RouteDoneCard({
       <RouteMap
         style={StyleSheet.absoluteFill}
         mode="dark"
-        fit={activity.points}
+        fit={activity.points.length > 1 ? activity.points : undefined}
         padding={{ top: 24, bottom: 150, left: 40, right: 40 }}
-        route={activity.points}
+        route={activity.points.length > 1 ? activity.points : undefined}
         interactive={false}
       />
       <LinearGradient

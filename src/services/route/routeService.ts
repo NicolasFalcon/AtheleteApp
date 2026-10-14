@@ -2,31 +2,58 @@ import type {
   PlannedRoute,
   RouteActivity,
   RouteGenerationParams,
+  RouteVisibility,
 } from '@app/features/route/routeTypes';
+import type { DistanceKey } from '@app/features/route/routeMappers';
+import type { RoutePersonalBest } from '@app/features/route/routeRecords';
 
-// What Ruta needs from the backend. In 5a only the sample implementation
-// exists (`src/dev/routeFixtures.ts`); nothing here is wired.
-// TODO(route-wire): every method below is a backend call (see the list in
-// MIGRATION_PROGRESS, "TODO(route-wire) por lo que necesita el backend").
+// What Ruta needs from the backend. Two implementations: the Supabase one
+// (`supabaseRouteService`, the real app) and the sample one
+// (`src/dev/routeFixtures.ts`, reachable only from the dev deep links).
+// Contracts: docs/backend/ROUTE_RPC_SHAPES.md.
 export interface RouteService {
   // Tus rutas (private planned routes).
-  getSavedRoutes(): Promise<PlannedRoute[]>; // TODO(route-wire): planned_routes
-  saveRoute(route: PlannedRoute): Promise<PlannedRoute>; // TODO(route-wire): planned_routes
-  renameRoute(id: string, name: string): Promise<void>; // TODO(route-wire): planned_routes
-  deleteRoute(id: string): Promise<void>; // TODO(route-wire): planned_routes
+  getSavedRoutes(): Promise<PlannedRoute[]>;
+  saveRoute(route: PlannedRoute): Promise<PlannedRoute>;
+  renameRoute(id: string, name: string): Promise<void>;
+  deleteRoute(id: string): Promise<void>;
 
   // "Generar ruta" con ELLIE: one route per call; `seed` = "Otra opción".
-  generateRoute(params: RouteGenerationParams): Promise<PlannedRoute>; // TODO(route-wire): generate-route
+  // Fails with a `RouteServiceError` whose code is a `GenerateRouteError`.
+  generateRoute(params: RouteGenerationParams): Promise<PlannedRoute>;
 
-  // Activities.
-  saveActivity(activity: RouteActivity): Promise<RouteActivity>; // TODO(route-wire): route_activities
-  getActivity(id: string): Promise<RouteActivity | null>; // TODO(route-wire): get_route_for_viewer (trim for others)
-  getTodayActivity(): Promise<RouteActivity | null>; // TODO(route-wire): Inicio · "Ruta completada hoy"
-  getRecentActivities(limit: number): Promise<RouteActivity[]>; // TODO(route-wire): Perfil · Actividad reciente
-  getOutdoorMonth(): Promise<OutdoorMonth>; // TODO(route-wire): Progreso · Al aire libre
+  // Activities. `saveActivity` is idempotent by client_id; with no network it
+  // is kept in a local queue and comes back with `pending: true`. A rejection
+  // of the server (impossible speed…) throws a `RouteServiceError`.
+  saveActivity(activity: RouteActivity): Promise<RouteActivity>;
+  // The owner gets everything; others the trimmed track. null: not found or
+  // not allowed.
+  getActivity(id: string): Promise<RouteActivity | null>;
+  getTodayActivity(): Promise<RouteActivity | null>;
+  // `userId` omitted = mine (Perfil de otro usuario: the others' view).
+  getRecentActivities(limit: number, userId?: string): Promise<RouteActivity[]>;
+  getOutdoorMonth(userId?: string): Promise<OutdoorMonth>;
+  updatePrivacy(
+    activityId: string,
+    visibility: RouteVisibility,
+    hideEndpoints: boolean,
+  ): Promise<void>;
+  deleteActivity(activityId: string): Promise<void>;
 
-  // Share (TODO(route-wire)): post of type `route` (BT-56) and the 9:16 piece.
-  shareToCommunity(activityId: string): Promise<{ postId: string }>; // TODO(route-wire): create_post('route')
+  // Records (route_personal_bests).
+  getPersonalBests(): Promise<RoutePersonalBest[]>;
+  setPersonalBest(input: {
+    sport: 'running' | 'cycling';
+    distanceKey: DistanceKey;
+    timeSec: number;
+    achievedAt: string;
+  }): Promise<void>;
+
+  // create_post('route', activity_id). `created: false` = it was already shared.
+  shareToCommunity(activityId: string): Promise<{ postId: string; created: boolean }>;
+
+  // Activities waiting for network. Sends what is due; returns how many went up.
+  flushPending(): Promise<number>;
 }
 
 export type OutdoorMonth = {
@@ -34,3 +61,14 @@ export type OutdoorMonth = {
   runDeltaKm: number; // against the previous month
   bikeKm: number;
 };
+
+// An error with a code the screens map to a message.
+export class RouteServiceError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message?: string) {
+    super(message ?? code);
+    this.name = 'RouteServiceError';
+    this.code = code;
+  }
+}

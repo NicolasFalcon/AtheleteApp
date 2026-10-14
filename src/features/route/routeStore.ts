@@ -12,7 +12,7 @@ import type {
 
 // Session state shared by the Ruta screens (sport, plan being built, privacy,
 // the activity just finished). In memory: nothing here is persisted or sent.
-// TODO(route-wire): privacy defaults come from the profile on the server.
+// The privacy defaults come from social_settings (useRouteDefaults).
 
 export type RouteMode = 'now' | 'plan';
 
@@ -37,6 +37,8 @@ export type RouteSession = {
   manualPoints: LatLng[];
   manualSelected: number | null;
   manualEditing: boolean;
+  // Where the person is (from the LocationSource), for generate-route.
+  origin: LatLng | null;
   // Privacy of this and the next outings.
   visibility: RouteVisibility;
   hideEndpoints: boolean;
@@ -62,6 +64,7 @@ export const INITIAL_SESSION: RouteSession = {
   manualPoints: [],
   manualSelected: null,
   manualEditing: false,
+  origin: null,
   visibility: 'friends',
   hideEndpoints: true,
   autoPause: true,

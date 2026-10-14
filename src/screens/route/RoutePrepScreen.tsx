@@ -35,6 +35,8 @@ import {
 import { RoutePrivacySheet, visibilityLabel } from '@app/features/route/v2/RoutePrivacySheet';
 import { SAMPLE_TRACKS } from '@app/dev/routeFixtures';
 import { APP_ROUTES } from '@app/constants/routes';
+import { ORS_ATTRIBUTION } from '@app/features/route/routeMappers';
+import { saveRouteDefaults, useRouteDefaults } from '@app/features/route/useRouteDefaults';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -69,6 +71,7 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
   const insets = useSafeAreaInsets();
   const session = useRouteSession();
   const service = useRouteService();
+  useRouteDefaults();
   const dev = getRouteDevConfig();
   const { sport, mode, config, plan } = session;
   const [privacyOpen, setPrivacyOpen] = useState(__DEV__ && route?.params?.dev === 'privacy');
@@ -110,7 +113,14 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
     let alive = true;
     source
       .getCurrent()
-      .then(fix => alive && setOrigin(fix ? { lat: fix.lat, lon: fix.lon } : null))
+      .then(fix => {
+        if (!alive) {
+          return;
+        }
+        const here = fix ? { lat: fix.lat, lon: fix.lon } : null;
+        setOrigin(here);
+        routeStore.patch({ origin: here });
+      })
       .catch(() => {});
     return () => {
       alive = false;
@@ -260,6 +270,11 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
                     />
                   </View>
                 ) : null}
+                {plan?.origin === 'ellie' ? (
+                  <TextV2 variant="caption" tone="secondary">
+                    {ORS_ATTRIBUTION}
+                  </TextV2>
+                ) : null}
                 <View style={styles.headRow}>
                   <TextV2 variant="eyebrow" tone="secondary">
                     {sportWord}
@@ -285,7 +300,10 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
                   <Chip
                     icon={Pause}
                     label={session.autoPause ? 'Pausa automática' : 'Pausa manual'}
-                    onPress={() => routeStore.patch({ autoPause: !session.autoPause })}
+                    onPress={() => {
+                      routeStore.patch({ autoPause: !session.autoPause });
+                      saveRouteDefaults({ autoPause: !session.autoPause });
+                    }}
                   />
                   <Chip
                     icon={session.hideEndpoints ? EyeOff : Lock}
@@ -398,7 +416,14 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
         )}
       </BottomPanel>
 
-      <RoutePrivacySheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} preview={privacyPreview} />
+      <RoutePrivacySheet
+        open={privacyOpen}
+        onClose={() => {
+          setPrivacyOpen(false);
+          saveRouteDefaults({ visibility: session.visibility, hideEndpoints: session.hideEndpoints });
+        }}
+        preview={privacyPreview}
+      />
       <Sheet
         open={otherOpen}
         onClose={() => setOtherOpen(false)}

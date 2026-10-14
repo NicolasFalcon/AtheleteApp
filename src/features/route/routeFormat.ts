@@ -44,3 +44,20 @@ export const SURFACE_LABEL = {
   asphalt: 'Asfalto',
   trail: 'Tierra',
 } as const;
+
+// "hace 12 min", "hace 3 h", "ayer", "hace 4 d" (a viewer's line under the name).
+export function agoLabel(ms: number, now: number): string {
+  const min = Math.max(0, Math.round((now - ms) / 60_000));
+  if (min < 1) {
+    return 'ahora';
+  }
+  if (min < 60) {
+    return `hace ${min} min`;
+  }
+  const hours = Math.floor(min / 60);
+  if (hours < 24) {
+    return `hace ${hours} h`;
+  }
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'ayer' : `hace ${days} d`;
+}

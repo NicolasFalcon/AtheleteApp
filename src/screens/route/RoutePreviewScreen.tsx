@@ -8,6 +8,8 @@ import { RouteMap } from '@app/features/route/RouteMap';
 import { KIND_LABEL, SURFACE_LABEL, formatElevation, formatKm } from '@app/features/route/routeFormat';
 import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import { BigFigure, BottomPanel, RoundButton, StatRow } from '@app/features/route/v2/RouteUi';
+import { ORS_ATTRIBUTION, isSavedRoute } from '@app/features/route/routeMappers';
+import { RouteServiceError } from '@app/services/route/routeService';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -22,7 +24,7 @@ export function RoutePreviewScreen({ navigation }: AppScreenProps<'RoutePreview'
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setSaved(Boolean(draft?.id.startsWith('saved-')));
+    setSaved(Boolean(draft && isSavedRoute(draft.id)));
   }, [draft]);
 
   if (!draft) {
@@ -60,6 +62,11 @@ export function RoutePreviewScreen({ navigation }: AppScreenProps<'RoutePreview'
               { value: SURFACE_LABEL[draft.surface], label: 'Superficie' },
             ]}
           />
+          {draft.origin === 'ellie' ? (
+            <TextV2 variant="caption" tone="secondary">
+              {ORS_ATTRIBUTION}
+            </TextV2>
+          ) : null}
           <Button
             label="Usar esta ruta"
             variant="primary"
@@ -98,7 +105,13 @@ export function RoutePreviewScreen({ navigation }: AppScreenProps<'RoutePreview'
                     setSaved(true);
                     toast.show('Ruta guardada en Tus rutas');
                   })
-                  .catch(() => toast.show('No pudimos guardar la ruta'));
+                  .catch(error =>
+                    toast.show(
+                      error instanceof RouteServiceError && error.code === 'limit_reached'
+                        ? 'Llegaste al límite de rutas guardadas. Elimina alguna para guardar otra.'
+                        : 'No pudimos guardar la ruta',
+                    ),
+                  );
               }}
             />
           </View>

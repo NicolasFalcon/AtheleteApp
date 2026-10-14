@@ -1,6 +1,6 @@
 // Types of Ruta (Running y Ciclismo). Pure data: nothing here talks to the
-// backend. TODO(route-wire): the server shapes of `route_activities` and
-// `planned_routes` replace these once they exist (see docs/migration/ROUTE_PLAN.md).
+// backend. The server shapes are in docs/backend/ROUTE_RPC_SHAPES.md and are
+// mapped in `routeMappers.ts`.
 
 export type RouteSport = 'running' | 'cycling';
 
@@ -48,7 +48,27 @@ export type RouteActivity = {
   ellieLine: string | null;
   visibility: RouteVisibility;
   hideEndpoints: boolean;
+  // ── 5c: what the client and the server add ──
+  // Idempotency key of the save (same id = same activity). Created when the
+  // outing ends; `id` is this value until the server gives the real one.
+  clientId?: string;
+  endedAt?: number;
+  pauses?: RoutePause[];
+  // The server's answer to the save.
+  countedAsWorkout?: boolean;
+  pointsAwarded?: number;
+  // Name of the planned route that was followed (viewer or later reads).
+  plannedName?: string | null;
+  // Who it belongs to; absent = mine.
+  owner?: RouteOwner | null;
+  isOwner?: boolean;
+  // Saved only on this device (no network): it goes up when it can.
+  pending?: boolean;
 };
+
+export type RoutePause = { from: number; to: number };
+
+export type RouteOwner = { id: string; name: string; avatarPath: string | null };
 
 export type RouteGenerationParams = {
   sport: RouteSport;

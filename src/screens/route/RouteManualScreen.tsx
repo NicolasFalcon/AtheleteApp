@@ -17,7 +17,7 @@ import type { AppScreenProps } from '@app/types/navigation';
 // (select one and tap the map to move it, or delete it). The distance is
 // computed here. MapLibre markers are not draggable, so "moving" is select +
 // tap (D in MIGRATION_PROGRESS).
-// TODO(route-wire): snap the segments to roads/paths and compute elevation on
+// TODO(route-snap): snap the segments to roads/paths and compute elevation on
 // the server; here they are straight lines and the gain is 0.
 export function manualToPlan(points: LatLng[], sport: PlannedRoute['sport']): PlannedRoute {
   return {

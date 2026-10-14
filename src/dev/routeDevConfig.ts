@@ -34,12 +34,22 @@ export const DEFAULT_DEV_CONFIG: RouteDevConfig = {
 
 let config: RouteDevConfig = DEFAULT_DEV_CONFIG;
 
+// The Ruta screens use the sample RouteService only after a dev deep link /
+// dev menu loaded a scenario (like the social fixtures). A release build, or a
+// debug build that never opened one, talks to the real backend.
+let sampleActive = false;
+
+export function isRouteSampleActive(): boolean {
+  return __DEV__ && sampleActive;
+}
+
 export function getRouteDevConfig(): RouteDevConfig {
   return __DEV__ ? config : DEFAULT_DEV_CONFIG;
 }
 
 export function setRouteDevConfig(next: Partial<RouteDevConfig>) {
   if (__DEV__) {
+    sampleActive = true;
     config = { ...DEFAULT_DEV_CONFIG, ...next };
   }
 }

@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Share2, Users, X } from 'lucide-react-native';
+import { Share2, Trash2, Users, X } from 'lucide-react-native';
 import {
   Button,
   LivingHalo,
   PressableScale,
+  Sheet,
   StatusBarV2,
   TextV2,
   useThemeV2,
   useToast,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
+import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { RouteMap } from '@app/features/route/RouteMap';
 import {
+  agoLabel,
   formatDuration,
   formatElevation,
   formatKm,
@@ -25,7 +28,15 @@ import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import { hiddenEnds } from '@app/features/route/routeSummary';
 import type { RouteActivity } from '@app/features/route/routeTypes';
 import { BigFigure, RoundButton, StatRow } from '@app/features/route/v2/RouteUi';
-import { RoutePrivacySheet, visibilityLabel } from '@app/features/route/v2/RoutePrivacySheet';
+import { useInvalidateRoute } from '@app/features/route/useRouteData';
+import {
+  RoutePrivacySheet,
+  visibilityLabel,
+  type RoutePrivacyValue,
+} from '@app/features/route/v2/RoutePrivacySheet';
+import { createPostErrorCopy } from '@app/features/social/postModel';
+import type { CreatePostError } from '@app/features/social/postTypes';
+import { RouteServiceError } from '@app/services/route/routeService';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -33,8 +44,8 @@ import type { AppScreenProps } from '@app/types/navigation';
 // new best if any, ELLIE's line, and share / post. The owner sees the whole
 // track (the 200 m hidden from others dotted grey); a viewer already receives
 // the trimmed one. A Route counts as a workout (ring, streak, km for
-// challenges) on the server. TODO(route-wire): `route` post in Comunidad
-// (Fase 3 composition) and the external share sheet.
+// challenges) on the server, which says so in `countedAsWorkout`. "Compartir en
+// Comunidad" is create_post('route'); privacy and delete go to the server.
 function hhmm(ms: number): string {
   const date = new Date(ms);
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
@@ -50,13 +61,21 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
   const toast = useToast();
   const service = useRouteService();
   const session = useRouteSession();
-  const viewer = Boolean(route?.params?.viewer);
+  const invalidate = useInvalidateRoute();
   const activityId = route?.params?.activityId;
   const [activity, setActivity] = useState<RouteActivity | null>(
     session.finished && (!activityId || session.finished.id === activityId) ? session.finished : null,
   );
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [pendingPrivacy, setPendingPrivacy] = useState<RoutePrivacyValue | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+  // Someone else's activity (the param says so before it loads; the server
+  // says so after).
+  const viewer = Boolean(route?.params?.viewer) || activity?.isOwner === false;
 
   useEffect(() => {
     if (activity || !activityId) {
@@ -64,30 +83,47 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
     }
     service
       .getActivity(activityId)
-      .then(setActivity)
-      .catch(() => {});
+      .then(found => (found ? setActivity(found) : setUnavailable(true)))
+      .catch(() => setUnavailable(true));
   }, [activity, activityId, service]);
 
   const shown = useMemo(() => {
     if (!activity) {
       return null;
     }
-    // The viewer only gets the trimmed track.
-    const visible =
-      viewer || activity.hideEndpoints ? trimEnds(activity.points, PRIVACY_TRIM_M) : activity.points;
+    // A viewer already gets the track trimmed by the server; only the sample
+    // data (dev) still carries a full one to trim here.
+    const line =
+      viewer && isRouteSampleActive() ? trimEnds(activity.points, PRIVACY_TRIM_M) : activity.points;
     return {
-      line: viewer ? visible : activity.points,
+      line,
       hidden: !viewer && activity.hideEndpoints ? hiddenEnds(activity.points, PRIVACY_TRIM_M) : [],
     };
   }, [activity, viewer]);
 
   if (!activity || !shown) {
-    return <View style={[styles.screen, { backgroundColor: colors.bg }]} />;
+    return (
+      <View style={[styles.screen, styles.unavailable, { backgroundColor: colors.bg }]}>
+        <StatusBarV2 />
+        {unavailable ? (
+          <>
+            <TextV2 variant="title22" align="center">
+              Esta ruta no está disponible
+            </TextV2>
+            <TextV2 variant="body" tone="secondary" align="center">
+              Puede que se haya borrado o que ya no la compartan contigo.
+            </TextV2>
+            <Button label="Volver" variant="secondary" onPress={() => navigation.goBack()} />
+          </>
+        ) : null}
+      </View>
+    );
   }
 
   const running = activity.sport === 'running';
   const planned = Boolean(activity.plannedRouteId);
-  const ofPlan = planned ? (session.plan ? `Ruta planeada · ${session.plan.name}` : 'Ruta planeada') : null;
+  const planName = activity.plannedName ?? (session.plan?.id === activity.plannedRouteId ? session.plan?.name : null);
+  const ofPlan = planned ? (planName ? `Ruta planeada · ${planName}` : 'Ruta planeada') : null;
 
   // The plan followed belongs to that outing, not to the next one.
   const done = () => {
@@ -99,12 +135,68 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
     setPosting(true);
     service
       .shareToCommunity(activity.id)
-      .then(() => {
+      .then(result => {
         routeStore.patch({ posted: true });
-        toast.show('Publicada en Comunidad');
+        // created:false = the same activity was already shared.
+        toast.show(result.created ? 'Publicada en Comunidad' : 'Ya la habías compartido');
       })
-      .catch(() => toast.show('No pudimos publicar. Inténtalo de nuevo.'))
+      .catch(error => {
+        const code = error instanceof RouteServiceError ? error.code : 'unknown';
+        if (code === 'route_private') {
+          // "Solo yo": open the privacy of this activity.
+          toast.show(createPostErrorCopy('route_private').message);
+          setPrivacyOpen(true);
+          return;
+        }
+        toast.show(createPostErrorCopy(code as CreatePostError).message);
+      })
       .finally(() => setPosting(false));
+  };
+
+  const applyPrivacy = (next: RoutePrivacyValue) => {
+    const previous = activity;
+    setSavingPrivacy(true);
+    setActivity({ ...activity, visibility: next.visibility, hideEndpoints: next.hideEndpoints });
+    service
+      .updatePrivacy(activity.id, next.visibility, next.hideEndpoints)
+      .then(() => {
+        if (next.visibility === 'me') {
+          // The server removes its post in Comunidad.
+          routeStore.patch({ posted: false });
+        }
+        invalidate();
+      })
+      .catch(() => {
+        setActivity(previous);
+        toast.show('No pudimos cambiar la privacidad. Inténtalo de nuevo.');
+      })
+      .finally(() => setSavingPrivacy(false));
+  };
+
+  // "Solo yo" takes the post down: it is confirmed first when it was shared.
+  const changePrivacy = (next: RoutePrivacyValue) => {
+    if (next.visibility === 'me' && activity.visibility !== 'me' && session.posted) {
+      setPendingPrivacy(next);
+      return;
+    }
+    applyPrivacy(next);
+  };
+
+  const remove = () => {
+    setDeleting(true);
+    service
+      .deleteActivity(activity.id)
+      .then(() => {
+        invalidate();
+        setDeleteOpen(false);
+        toast.show('Actividad eliminada');
+        routeStore.patch({ finished: null, posted: false, plan: null, generated: null, draft: null, mode: 'now' });
+        navigation.popToTop();
+      })
+      .catch(() => {
+        toast.show('No pudimos eliminarla. Inténtalo de nuevo.');
+      })
+      .finally(() => setDeleting(false));
   };
 
   return (
@@ -112,6 +204,16 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
       <StatusBarV2 />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + (viewer ? 40 : 200) }}>
         <View style={styles.map}>
+          {viewer && shown.line.length < 2 ? (
+            <View style={[StyleSheet.absoluteFill, styles.unavailable]}>
+              <TextV2 variant="bodyStrong" align="center">
+                Recorrido oculto
+              </TextV2>
+              <TextV2 variant="meta" tone="secondary" align="center">
+                Es corto y {activity.owner?.name ?? 'quien la compartió'} oculta el inicio y el final.
+              </TextV2>
+            </View>
+          ) : null}
           <RouteMap
             style={StyleSheet.absoluteFill}
             fit={shown.line}
@@ -126,9 +228,9 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
         <View style={styles.body}>
           {viewer ? (
             <TextV2 variant="bodyStrong">
-              Carlos{' '}
+              {activity.owner?.name ?? 'Un amigo'}{' '}
               <TextV2 variant="meta" tone="secondary">
-                {running ? 'Running' : 'Ciclismo'} · hace 3 h
+                {running ? 'Running' : 'Ciclismo'} · {agoLabel(activity.startedAt, Date.now())}
               </TextV2>
             </TextV2>
           ) : null}
@@ -161,6 +263,22 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
                 ...(activity.calories !== null ? [{ value: `${activity.calories}`, unit: 'kcal', label: 'Calorías' }] : []),
               ]}
             />
+          ) : null}
+
+          {activity.pending && !viewer ? (
+            <View style={[styles.notice, { backgroundColor: colors.surface.muted }]}>
+              <TextV2 variant="metaStrong">Guardada en este dispositivo</TextV2>
+              <TextV2 variant="meta" tone="secondary">
+                Sin conexión: se subirá sola cuando vuelva la red. Hasta entonces no suma a tu día.
+              </TextV2>
+            </View>
+          ) : activity.countedAsWorkout && !viewer ? (
+            <View style={[styles.notice, { backgroundColor: colors.surface.muted }]}>
+              <TextV2 variant="metaStrong">
+                Cuenta como entreno
+                {activity.pointsAwarded ? ` · +${activity.pointsAwarded} pts` : ''}
+              </TextV2>
+            </View>
           ) : null}
 
           {activity.newBest && !viewer ? (
@@ -233,6 +351,16 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
                   Cambiar
                 </TextV2>
               </PressableScale>
+              <PressableScale
+                accessibilityRole="button"
+                onPress={() => setDeleteOpen(true)}
+                style={styles.deleteRow}
+              >
+                <Trash2 size={16} strokeWidth={2} color={colors.text.secondary} />
+                <TextV2 variant="metaStrong" tone="secondary">
+                  Eliminar actividad
+                </TextV2>
+              </PressableScale>
             </>
           ) : null}
         </View>
@@ -245,7 +373,7 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
             iconPosition="start"
             variant="primary"
             fullWidth
-            disabled={session.posted || posting || activity.visibility === 'me'}
+            disabled={session.posted || posting || activity.visibility === 'me' || Boolean(activity.pending)}
             onPress={post}
           />
           <View style={styles.footerRow}>
@@ -271,7 +399,54 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
           />
         ) : null}
       </View>
-      <RoutePrivacySheet open={privacyOpen} onClose={() => setPrivacyOpen(false)} preview={activity.points} />
+      <RoutePrivacySheet
+        open={privacyOpen && !viewer}
+        onClose={() => setPrivacyOpen(false)}
+        preview={activity.points}
+        value={{ visibility: activity.visibility, hideEndpoints: activity.hideEndpoints }}
+        onChange={changePrivacy}
+        busy={savingPrivacy || Boolean(activity.pending)}
+      />
+      <Sheet
+        open={pendingPrivacy !== null}
+        onClose={() => setPendingPrivacy(null)}
+        title="¿Dejarla solo para ti?"
+        footer={
+          <View style={styles.footerRow}>
+            <Button label="Cancelar" variant="secondary" style={styles.flex} onPress={() => setPendingPrivacy(null)} />
+            <Button
+              label="Solo yo"
+              variant="primary"
+              style={styles.flex}
+              onPress={() => {
+                if (pendingPrivacy) {
+                  applyPrivacy(pendingPrivacy);
+                }
+                setPendingPrivacy(null);
+              }}
+            />
+          </View>
+        }
+      >
+        <TextV2 variant="body" tone="secondary">
+          Al pasar a "Solo yo" se borra tu publicación de esta ruta en Comunidad.
+        </TextV2>
+      </Sheet>
+      <Sheet
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        title="¿Eliminar esta actividad?"
+        footer={
+          <View style={styles.footerRow}>
+            <Button label="Cancelar" variant="secondary" style={styles.flex} onPress={() => setDeleteOpen(false)} />
+            <Button label="Eliminar" variant="primary" style={styles.flex} disabled={deleting} onPress={remove} />
+          </View>
+        }
+      >
+        <TextV2 variant="body" tone="secondary">
+          Se borra el recorrido, su publicación en Comunidad y lo que sumó a tu día, tu racha y tus retos. No se puede deshacer.
+        </TextV2>
+      </Sheet>
     </View>
   );
 }
@@ -295,4 +470,7 @@ const styles = StyleSheet.create({
   ellie: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   privacy: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 14 },
   flex: { flex: 1 },
+  unavailable: { alignItems: 'center', justifyContent: 'center', gap: 14, padding: 32 },
+  notice: { borderRadius: 16, padding: 14, gap: 2 },
+  deleteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8 },
 });
