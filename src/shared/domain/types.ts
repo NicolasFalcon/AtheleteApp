@@ -98,7 +98,26 @@ export type WorkoutSession = {
   completedExercises: string[];
   totalExercises: number;
   createdAt?: string;
+  // 'route' = a Ruta activity counted as a workout (no routine behind it).
+  source?: string | null;
+  routeActivityId?: string | null;
 };
+
+// Sessions created by saving a Ruta have no routine: lists show them as Ruta.
+export function isRouteSession(session: { source?: string | null }): boolean {
+  return session.source === 'route';
+}
+
+// Title to show: a Ruta session never reads as an empty routine.
+export function sessionDisplayTitle(session: {
+  source?: string | null;
+  workoutTitle: string;
+}): string {
+  if (isRouteSession(session)) {
+    return session.workoutTitle.trim() || 'Ruta';
+  }
+  return session.workoutTitle;
+}
 
 export type HabitCategory = 'training' | 'health' | 'mind';
 

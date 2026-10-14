@@ -160,6 +160,7 @@ export function useEllieData() {
         date: session.date,
         completed: session.completed,
         workoutId: session.workoutId,
+        source: session.source ?? null,
       })),
       workoutTitles: overviewQuery.data.workoutSessions.reduce<
         Record<string, string>

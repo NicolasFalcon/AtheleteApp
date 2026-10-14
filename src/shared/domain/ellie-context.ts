@@ -1,4 +1,5 @@
 import { getLocalDateKey } from '@app/lib/date';
+import { isRouteSession } from '@app/shared/domain/types';
 
 export interface EllieProfileContext {
   name: string;
@@ -198,6 +199,8 @@ export function buildEllieContext(params: {
     date: string;
     completed: boolean;
     workoutId: string;
+    // 'route' = a Ruta counted as a workout.
+    source?: string | null;
   }>;
   workoutTitles: Record<string, string>;
   workoutCount: number;
@@ -272,7 +275,11 @@ export function buildEllieContext(params: {
   );
   const recentWorkoutTitles = sortedSessions
     .slice(0, 5)
-    .map(session => params.workoutTitles[session.workoutId] || 'Entreno')
+    .map(session =>
+      isRouteSession(session)
+        ? 'Ruta'
+        : params.workoutTitles[session.workoutId] || 'Entreno',
+    )
     .filter((value, index, array) => array.indexOf(value) === index);
   const weeklyAdherence =
     params.user.trainingDaysPerWeek > 0

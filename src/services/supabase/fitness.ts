@@ -163,6 +163,8 @@ export function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
       : [],
     totalExercises: row.total_exercises || 0,
     createdAt: row.created_at,
+    source: row.source ?? null,
+    routeActivityId: row.route_activity_id ?? null,
   };
 }
 
@@ -536,6 +538,10 @@ export async function fetchEffectiveWorkoutSession(
 
   if (workoutId) {
     completedQuery = completedQuery.eq('workout_id', workoutId);
+  } else {
+    // A Ruta counted as a workout has no routine to show: it is not "the
+    // session of today" of a routine screen.
+    completedQuery = completedQuery.or('source.is.null,source.neq.route');
   }
 
   const { data, error } = await completedQuery

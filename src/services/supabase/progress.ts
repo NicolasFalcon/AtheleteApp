@@ -76,6 +76,8 @@ function mapWorkoutSession(row: WorkoutSessionRow): WorkoutSession {
       : [],
     totalExercises: row.total_exercises || 0,
     createdAt: row.created_at,
+    source: row.source ?? null,
+    routeActivityId: row.route_activity_id ?? null,
   };
 }
 

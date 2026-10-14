@@ -5,6 +5,7 @@ import type {
 import {
   ALL_BADGES,
   formatPRValue,
+  isRouteSession,
   type PersonalRecord,
   type WorkoutSession,
 } from '@app/shared';
@@ -204,7 +205,9 @@ export function buildActivity(params: {
       items.push({
         id: `session-${session.id}`,
         kind: 'workout',
-        text: `Completaste ${session.workoutTitle} · ${session.duration} min`,
+        text: isRouteSession(session)
+          ? `Completaste una ruta · ${session.duration} min`
+          : `Completaste ${session.workoutTitle} · ${session.duration} min`,
         when: relativeDay(session.date, now),
         order: daysAgo(session.date, now),
       });

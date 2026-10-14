@@ -5,6 +5,11 @@ import type { Database, Json } from '@app/types/supabase';
 // Event catalogue of the backend (docs/backend/BACKEND_SUMMARY.md §6). The
 // server decides points and badges from it; in `strict` mode it ignores the
 // points sent by the app.
+// `official_challenge_completed` and `social_challenge_completed` are NOT here
+// on purpose: the server raises them itself (server_only_event if the app
+// tried), and the points and badge of a finished official challenge are read
+// from the server. Nor does the app send `workout_completed` for a Ruta: the
+// server awards it when the activity is saved.
 export type GamificationEventType =
   | 'workout_completed'
   | 'custom_workout_created'
