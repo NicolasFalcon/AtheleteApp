@@ -456,3 +456,11 @@ Prioridad: **Alta** (bloquea una pantalla o un dato es incorrecto) · **Media** 
 - 2026-10-09: BT-55 (datos reales del reto oficial, Fase 4).
 - 2026-10-09: BT-54 (preferencia "Core 33 como prioridad" del hero de Inicio).
 - 2026-10-06: BT-41 ("Otro" en `profiles.gender`) y BT-42 (Scan, pendiente de TestFlight); BT-06 actualizado.
+
+
+## Ruta 5c · confirmaciones pedidas a backend (2026-10-13)
+
+- Forma exacta de `get_route_for_viewer`, `get_recent_activities`, `get_today_route_activity` (claves del track, `owner`, `new_best`, `is_owner`) y del payload de `save_planned_route` (la app envía `points` como `[[lat,lon],…]`); ver `docs/migration/ROUTE_5C_CHECKPOINT.md`.
+- `leave_challenge` y `join_official_challenge` para retos de `official_upcoming`; `status` de esos retos.
+- `routine_category` de las rutinas oficiales nuevas (reto de fuerza): `fuerza`, `tren_superior`, `tren_inferior` y `core` cuentan.
+- `workout_title` de las sesiones `source='route'` (la app muestra "Ruta" si viene vacío).

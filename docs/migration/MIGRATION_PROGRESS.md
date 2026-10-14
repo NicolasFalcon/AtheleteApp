@@ -2593,3 +2593,33 @@ Referencia: ROUTE_01 a ROUTE_25 y `Route.dc.html`. Sin backend y sin GPS real. C
 ### TODO(route-wire) por lo que necesitará el backend (base del lote de Lovable)
 
 Lista completa y agrupada en [`ROUTE_5A_CHECKPOINT.md`](ROUTE_5A_CHECKPOINT.md): (1) tablas `route_activities` y `planned_routes` y privacidad por defecto; (2) funciones `get_route_for_viewer` (recorte 200 m), `generate_route`, ajuste a calles y altitud, recálculo al subir; (3) efectos de entreno (anillo, racha, workouts, km de retos, sin Core 33, puntos); (4) post `route` de Comunidad (BT-56); (5) `getTodayActivity`, `getRecentActivities`, `getOutdoorMonth` e imagen estática del mapa; (6) fuera del backend: `ExpoLocationSource`, compartir fuera, proveedor de teselas.
+
+## v2.13 · Ruta · fase 5c (backend real) + Retos oficiales (app) · 2026-10-13
+
+Checkpoint: [`ROUTE_5C_CHECKPOINT.md`](ROUTE_5C_CHECKPOINT.md). Contratos: [`ROUTE_RPC_SHAPES.md`](../backend/ROUTE_RPC_SHAPES.md). Ubicación aún **simulada** (5d).
+
+- **D-162** · Cola de guardado escrita antes de la llamada, reintentos con el mismo `client_id` (30 s → 1 h), timeout 25 s.
+- **D-163** · `alignToNow`: la salida simulada termina "ahora" (el reloj simulado va más rápido que el real).
+- **D-164** · Calorías `null` hasta que las calcule el servidor.
+- **D-165** · "Avisarme" = `join_official_challenge` antes de empezar; tocar otra vez = `leave_challenge`.
+- **D-166** · Récords de ruta en Perfil (lista + registro manual); sin diseño propio.
+- **D-167** · Covers remotas con filtro gris.
+- **DA-202** · `useRouteService` → Supabase; ejemplo solo con deep link dev. `TODO(route-wire)` retirado; quedan `TODO(route-share)`, `TODO(route-snap)`, `TODO(route-tiles)`, `TODO(route-5d)`, `TODO(badges-oficiales)`.
+- **DA-203** · Dev: `athelete://dev/social?screen=officialList` y `officialListNotJoined` (SOCIAL_15 con datos de ejemplo).
+
+### Checklist de QA · Ruta 5c y Retos oficiales (simulador, dos cuentas A y B amigas)
+
+1. **Grabar** (cuenta A): Inicio → card de Ruta → Salir ahora → Comenzar. Con el motor simulado (×4) deja correr 10+ min virtuales y ≥ 1 km; Pausar y Continuar; Finalizar → Terminar.
+2. **Guardar**: aparece el resultado con las cifras del servidor; "Cuenta como entreno · +50 pts" si ≥ 10 min y ≥ 1 km (menos: sin la línea). Repite sin red (modo avión): "Guardada en este dispositivo"; al volver la red y reabrir/volver a la app sube sola y **no se duplica** (comprobar 1 sola fila en `route_activities`).
+3. **Perfil e Inicio**: Perfil → "Actividad reciente" con la actividad, "Al aire libre · Este mes" y "Récords de ruta"; Inicio muestra la card "tu ruta real" de hoy y el anillo/racha suman el entreno; en el historial la sesión se ve como Ruta (no como rutina vacía).
+4. **Privacidad**: en el resultado, "Cambiar" → Amigos/Público/Solo yo y "Ocultar inicio y final". Pasar a "Solo yo" tras publicar pide confirmación y borra el post.
+5. **Publicar** (A): "Compartir en Comunidad" → toast; repetir → "Ya la habías compartido". Con "Solo yo" el botón está desactivado (y `route_private` abre la privacidad).
+6. **Verlo desde B**: el feed muestra el post de ruta con la polilínea **recortada** (200 m en cada extremo) y el récord si lo hay; abrir el detalle y tocar el mapa → resultado de A sin tiempos ni pausas ni inicio/final. Una ruta ≤ 400 m: "Recorrido oculto".
+7. **Eliminar** la actividad (A, con confirmación): desaparece de Perfil, Inicio y del feed de B; el entreno y sus minutos se revierten.
+8. **Récords**: tras una salida ≥ 1 km aparecen automáticos; "Registrar una marca" (p. ej. 5K 24:41) → "Marca registrada"; un tiempo imposible (5K en 10:00) se rechaza en pantalla.
+9. **Generar ruta con ELLIE** (A): Planear → Generar ruta → "Opción 1" con la atribución "© openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors"; "Otra opción" cambia la ruta (otra seed); "Guardar" → "Tus rutas"; renombrar y eliminar (con confirmación). Errores: más de ~20 al día → mensaje de límite; sin red → "Sin conexión".
+10. **Retos de km**: Inicio → sección de reto (o "Retos oficiales" desde el CTA sin reto) → unirse al reto "50 km"; tras el paso 2 el progreso sube en km con 2 decimales y la barra avanza.
+11. **Retos de fuerza**: unirse al reto de 12 sesiones y completar una rutina de fuerza (categoría que cuenta); sube 1. Una rutina de movilidad o full body **no** suma (a confirmar con backend qué categoría tiene cada rutina oficial).
+12. **Retos oficiales (vista)**: destacado, "Más retos para este mes" y "Lo que viene"; "Unirme" → "Dentro"; en "Lo que viene", "Avisarme" ↔ "Te avisaremos". Covers firmadas (si el reto tiene `cover_path`), badge y "+N puntos · Badge X" del servidor.
+13. **Completar un reto oficial**: los puntos y la insignia llegan del servidor (Logros/Perfil); la app no registra `official_challenge_completed`.
+14. Light y Dark; cuenta sin retos oficiales: Inicio sin sección y la vista dice "Aún no hay un reto oficial en marcha".
