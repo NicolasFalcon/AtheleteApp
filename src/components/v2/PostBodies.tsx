@@ -20,6 +20,7 @@ import type {
   RouteAttachment,
   WorkoutAttachment,
 } from '@app/features/social/postTypes';
+import { fitPolyline } from '@app/features/social/routePostGeometry';
 import { ROUTE_SAMPLE_MAPS } from '@app/features/social/routeSampleMaps';
 import { usePostPhotoSource } from '@app/features/social/useSocial';
 
@@ -500,8 +501,8 @@ export function PhotoBody({
 
 // Route post (SOCIAL_16): the map with the route cut out as the protagonist
 // fading into the page, the distance at 72/800 over it and one line of
-// figures. The planned route is only a note. TODO(ruta): fixtures only until
-// the backend has the `route` type (Fase 5).
+// figures. The planned route is only a note. A real post draws its trimmed
+// polyline on the page; the dev fixtures still draw the sample map.
 export function RouteBody({
   attachment,
   onPress,
@@ -513,7 +514,20 @@ export function RouteBody({
   const bleed = useBleed();
   const sample = ROUTE_SAMPLE_MAPS[attachment.sport === 'cycling' ? 'bike' : 'run'];
   const layer = mode === 'dark' ? sample.dark : sample.light;
-  const crop = sample.crop;
+  // The real route, fitted into the map area (no tiles: the route is cut out).
+  const real = attachment.polyline
+    ? fitPolyline(attachment.polyline, {
+        width: 400,
+        height: sample.height,
+        padding: 48,
+        bottomPadding: 120,
+      })
+    : null;
+  const isReal = attachment.polyline !== undefined;
+  const crop = isReal ? { x: 0, y: 0, width: 400, height: sample.height } : sample.crop;
+  const routeD = real ? real.d : isReal ? '' : sample.route.d;
+  const routeStart = real ? real.start : sample.route.start;
+  const routeEnd = real ? real.end : sample.route.end;
   const hours = Math.floor(attachment.duration_sec / 3600);
   const minutes = Math.floor((attachment.duration_sec % 3600) / 60);
   const seconds = attachment.duration_sec % 60;
@@ -545,10 +559,10 @@ export function RouteBody({
           preserveAspectRatio="xMidYMid slice"
         >
           <Rect x={-300} y={-300} width={1000} height={1500} fill={layer.bg} />
-          {layer.blocks.map((d, i) => (
+          {(isReal ? [] : layer.blocks).map((d, i) => (
             <Path key={`b${i}`} d={d} fill={mode === 'dark' ? '#1B1E1A' : '#DCDED3'} />
           ))}
-          {layer.strokes.map((s, i) => (
+          {(isReal ? [] : layer.strokes).map((s, i) => (
             <Path
               key={`s${i}`}
               d={s.d}
@@ -558,8 +572,10 @@ export function RouteBody({
               fill="none"
             />
           ))}
+          {isReal && !real ? null : (
+            <>
           <Path
-            d={sample.route.d}
+            d={routeD}
             stroke={colors.ember.base}
             strokeOpacity={0.2}
             strokeWidth={sample.route.glowWidth}
@@ -568,7 +584,7 @@ export function RouteBody({
             fill="none"
           />
           <Path
-            d={sample.route.d}
+            d={routeD}
             stroke={colors.ember.base}
             strokeWidth={sample.route.width}
             strokeLinecap="round"
@@ -576,22 +592,31 @@ export function RouteBody({
             fill="none"
           />
           <Circle
-            cx={sample.route.start.x}
-            cy={sample.route.start.y}
+            cx={routeStart.x}
+            cy={routeStart.y}
             r={5.5}
             fill={colors.bg}
             stroke={colors.ember.base}
             strokeWidth={2.5}
           />
           <Circle
-            cx={sample.route.end.x}
-            cy={sample.route.end.y}
+            cx={routeEnd.x}
+            cy={routeEnd.y}
             r={6.5}
             fill={colors.ember.base}
             stroke={colors.bg}
             strokeWidth={2.5}
           />
+            </>
+          )}
         </Svg>
+        {isReal && !real ? (
+          <View style={[StyleSheet.absoluteFill, styles.routeHidden]}>
+            <TextV2 variant="meta" tone="secondary">
+              Recorrido oculto por privacidad
+            </TextV2>
+          </View>
+        ) : null}
         <LinearGradient
           pointerEvents="none"
           colors={[`${colors.bg}00`, `${colors.bg}00`, colors.bg]}
@@ -737,6 +762,7 @@ const styles = StyleSheet.create({
   photoOnly: { overflow: 'hidden' },
   // Route
   route: { overflow: 'hidden' },
+  routeHidden: { alignItems: 'center', justifyContent: 'center', paddingBottom: 80 },
   routeTexts: { marginTop: -64, paddingHorizontal: 20, gap: 8 },
   routeFigure: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   routeBig: { fontSize: 72, fontWeight: '800', letterSpacing: -4, lineHeight: 66, flexShrink: 1 },

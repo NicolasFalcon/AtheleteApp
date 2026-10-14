@@ -158,6 +158,12 @@ export function SocialPostScreen({ navigation, route }: Props) {
               })
             }
             onOpenRoutine={() => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}
+            onOpenRoute={activityId =>
+              navigation.navigate(APP_ROUTES.RouteResult, {
+                activityId,
+                viewer: post.data?.relationship !== 'self',
+              })
+            }
             routineSaved={saved}
             onSaveRoutine={async () => {
               try {

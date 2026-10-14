@@ -1,19 +1,20 @@
 import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
-import { ArrowRight, ChevronsUp } from 'lucide-react-native';
+import { ArrowRight } from 'lucide-react-native';
 import { HexMedal, PersonAvatar, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
+import { officialBadgeIcon } from '@app/features/social/officialBadge';
 import { formatThousands } from '@app/features/home/homePriority';
 import type { HomeChallengeCard } from '@app/features/home/homeChallengeSection';
 
-// Cover of the official challenge: an app photo (black and white baked in)
-// while the real `cover_path` is not wired. TODO(fase-4): `cover_path` and the
-// final artwork of the badges (placeholder hexagon with chevrons).
+// Cover of the official challenge: the signed `cover_path` photo, or an app
+// photo (black and white baked in) while the challenge has none. The badge is
+// drawn by `officialBadge.ts` (TODO(badges-oficiales)).
 const COVER = require('@app/assets/v2/photos/home/reto-overhead.jpg');
 const COVER_ASPECT = 900 / 601;
 const HEIGHT = 420;
 // Placeholder athletes of "N atletas dentro" (the official challenge only
-// exposes a total, no names). TODO(fase-4).
+// exposes a total, no names).
 const ATHLETES = [
   require('@app/assets/v2/photos/home/athlete-1.jpg'),
   require('@app/assets/v2/photos/home/athlete-2.jpg'),
@@ -60,23 +61,40 @@ export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSec
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={`Reto oficial. ${card.title}. ${
-        joined ? `${card.progress} de ${card.goal}` : 'Ver retos oficiales'
+        joined ? `${card.progressText} de ${card.goalText}` : 'Ver retos oficiales'
       }`}
       onPress={onPress}
       style={styles.section}
     >
-      <Image
-        source={COVER}
-        resizeMode="cover"
-        accessibilityIgnoresInvertColors
-        style={{
-          position: 'absolute',
-          top: 0,
-          height: HEIGHT,
-          width: photoWidth,
-          left: (width - photoWidth) / 2,
-        }}
-      />
+      {card.coverUrl ? (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { filter: [{ grayscale: 1 }, { contrast: 1.1 }, { brightness: 0.85 }] },
+          ]}
+        >
+          <Image
+            source={{ uri: card.coverUrl }}
+            resizeMode="cover"
+            accessibilityIgnoresInvertColors
+            style={StyleSheet.absoluteFill}
+          />
+        </View>
+      ) : (
+        <Image
+          source={COVER}
+          resizeMode="cover"
+          accessibilityIgnoresInvertColors
+          style={{
+            position: 'absolute',
+            top: 0,
+            height: HEIGHT,
+            width: photoWidth,
+            left: (width - photoWidth) / 2,
+          }}
+        />
+      )}
       <View style={[StyleSheet.absoluteFill, styles.dim]} />
       <LinearGradient
         pointerEvents="none"
@@ -111,7 +129,7 @@ export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSec
 
       {reward ? (
         <View style={styles.reward}>
-          <HexMedal icon={ChevronsUp} size={56} accessibilityLabel="Badge del reto" />
+          <HexMedal icon={officialBadgeIcon(reward.badgeIcon)} size={56} accessibilityLabel="Badge del reto" />
           {reward.points ? (
             <TextV2 style={styles.rewardPoints}>{`+${reward.points} pts`}</TextV2>
           ) : null}
@@ -128,9 +146,9 @@ export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSec
           <View style={styles.figureText}>
             <View style={styles.numberRow}>
               <TextV2 style={styles.number}>
-                {String(joined ? card.progress : card.goal)}
+                {joined ? card.progressText : card.goalText}
               </TextV2>
-              {joined ? <TextV2 style={styles.goal}>{`/ ${card.goal}`}</TextV2> : null}
+              {joined ? <TextV2 style={styles.goal}>{`/ ${card.goalText}`}</TextV2> : null}
             </View>
             <TextV2 style={styles.title} numberOfLines={2}>
               {card.label}
@@ -165,16 +183,28 @@ export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSec
                 )
               ) : null}
               <TextV2 variant="body" color="#E4E2DD" style={styles.lineText}>
-                {friend ? `${friend.name} acaba de llegar a ${friend.progress}.` : card.line}
+                {friend ? `${friend.name} acaba de llegar a ${friend.progressText ?? friend.progress}.` : card.line}
               </TextV2>
             </View>
           </>
         ) : athletes ? (
           <View style={styles.line}>
             <View style={styles.stack}>
-              {ATHLETES.map((source, index) => (
-                <Athlete key={index} source={source} first={index === 0} />
-              ))}
+              {card.people.length > 0
+                ? card.people.map((person, index) => (
+                    <View key={person.id} style={[styles.avatar, index > 0 && styles.avatarOverlap]}>
+                      <PersonAvatar
+                        name={person.name}
+                        avatarKey={person.avatar_key}
+                        profilePhotoUrl={person.profile_photo_url}
+                        relationship="friends"
+                        size={26}
+                      />
+                    </View>
+                  ))
+                : ATHLETES.map((source, index) => (
+                    <Athlete key={index} source={source} first={index === 0} />
+                  ))}
             </View>
             <TextV2 variant="body" color="#E4E2DD" style={styles.lineText}>
               {athletes}

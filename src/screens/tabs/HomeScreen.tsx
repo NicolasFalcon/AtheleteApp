@@ -29,14 +29,16 @@ import {
 } from '@app/features/home/homePriority';
 import { useHomeChallengeScenario } from '@app/dev/homeChallengeScenario';
 import { useHomeRouteScenario } from '@app/dev/homeRouteScenario';
+import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { ACTIVITY_RUN } from '@app/dev/routeFixtures';
 import { RouteDoneCard } from '@app/features/home/v2/RouteDoneCard';
+import { agoLabel } from '@app/features/route/routeFormat';
 import { routeStore } from '@app/features/route/routeStore';
+import type { RouteActivity } from '@app/features/route/routeTypes';
+import { useTodayRouteActivity } from '@app/features/route/useRouteData';
 import {
-  friendLeader,
   homeChallengeCard,
   sampleChallengeCard,
-  withFriend,
 } from '@app/features/home/homeChallengeSection';
 import { useSocialResource } from '@app/features/social/useSocial';
 import { EllieBand } from '@app/features/home/v2/EllieBand';
@@ -66,7 +68,7 @@ import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
 import { getGreeting, getLocalDateKey } from '@app/lib/date';
-import type { Workout } from '@app/shared';
+import { isRouteSession, type Workout } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Home'>;
@@ -116,30 +118,28 @@ export function HomeScreen({ navigation }: Props) {
     service.getMyChallenges(),
   );
   const challengeScenario = useHomeChallengeScenario();
-  // "Tu ruta real" only with the dev deep link; the real card stays an invitation
-  // until the Ruta backend exists. TODO(route-wire): today's activity from the service.
+  // "Tu ruta real": today's activity from the server (get_today_route_activity).
+  // The sample one appears only with the dev deep link (homeCardActive); a dev
+  // scenario without it (homeCardInvite) shows the invitation.
   const routeScenario = useHomeRouteScenario();
+  const todayRouteQuery = useTodayRouteActivity();
+  const todayRoute: RouteActivity | null = routeScenario
+    ? ACTIVITY_RUN
+    : isRouteSampleActive()
+      ? null
+      : (todayRouteQuery.data ?? null);
   const realCard = useMemo(
     () => homeChallengeCard(challenges.data),
     [challenges.data],
   );
-  // Joined: the friend furthest along, from the challenge board.
-  const boardId = realCard?.state === 'joined' ? realCard.id : null;
-  const board = useSocialResource(
-    'homeOfficialBoard',
-    service => (boardId ? service.getChallengeBoard(boardId) : Promise.resolve(null)),
-    [boardId],
-  );
+  // Joined: the friend furthest along comes with the list (`leader`).
   const challengeCard = useMemo(() => {
     if (challengeScenario) {
       return sampleChallengeCard(challengeScenario);
     }
-    if (realCard) {
-      return withFriend(realCard, friendLeader(board.data));
-    }
     // No real official challenge: the section does not appear (as in release).
-    return null;
-  }, [board.data, challengeScenario, realCard]);
+    return realCard;
+  }, [challengeScenario, realCard]);
 
   // Refresh everything when coming back to Inicio (not on the first mount).
   // Development only: open already scrolled (`-homeScroll N`), for captures.
@@ -413,7 +413,9 @@ export function HomeScreen({ navigation }: Props) {
             done: completedToday
               ? {
                   minutes: completedToday.duration,
-                  typeLabel: workoutTypeLabel(completedWorkout).toLowerCase(),
+                  typeLabel: isRouteSession(completedToday)
+                    ? 'ruta'
+                    : workoutTypeLabel(completedWorkout).toLowerCase(),
                 }
               : null,
             allDoneLine: allDoneLine({ coreActive, coreClosed, waterDone }),
@@ -463,26 +465,30 @@ export function HomeScreen({ navigation }: Props) {
                   />
                 );
               case 'route':
-                // TODO(route-wire): the real entry opens RoutePrep once the Ruta
-                // backend and the real LocationSource exist (5c/5d).
-                if (routeScenario) {
+                if (todayRoute) {
                   return (
                     <RouteDoneCard
                       key={key}
-                      activity={ACTIVITY_RUN}
-                      ago="hace 2 h"
+                      activity={todayRoute}
+                      ago={agoLabel(todayRoute.startedAt, Date.now())}
                       onOpen={() => {
-                        routeStore.reset({ finished: ACTIVITY_RUN });
-                        navigation.navigate(APP_ROUTES.RouteResult, { activityId: ACTIVITY_RUN.id });
+                        routeStore.reset({ finished: todayRoute });
+                        navigation.navigate(APP_ROUTES.RouteResult, { activityId: todayRoute.id });
                       }}
-                      onOther={() => navigation.navigate(APP_ROUTES.RoutePrep)}
+                      onOther={() => {
+                        routeStore.reset();
+                        navigation.navigate(APP_ROUTES.RoutePrep);
+                      }}
                     />
                   );
                 }
                 return (
                   <RouteInviteCard
                     key={key}
-                    onPress={() => navigation.navigate(APP_ROUTES.RouteSoon)}
+                    onPress={() => {
+                      routeStore.reset();
+                      navigation.navigate(APP_ROUTES.RoutePrep);
+                    }}
                   />
                 );
               case 'core33Invite':
@@ -517,9 +523,8 @@ export function HomeScreen({ navigation }: Props) {
                         ? navigation.navigate(APP_ROUTES.SocialChallenge, {
                             challengeId: challengeCard.id,
                           })
-                        : // TODO(retos-oficiales): the "Retos oficiales" view
-                          // arrives in Fase 4; until then, the Retos tab.
-                          navigation.navigate(TAB_ROUTES.Community, { segment: 'retos' })
+                        : // No challenge (or finished): the "Retos oficiales" view.
+                          navigation.navigate(APP_ROUTES.SocialOfficialList)
                     }
                   />
                 ) : null;

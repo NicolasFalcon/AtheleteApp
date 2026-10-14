@@ -64,6 +64,8 @@ const data = (official: ChallengeSummary | null): MyChallenges => ({
   invitations: [],
   recently_completed: [],
   official,
+  officialList: official ? [official] : [],
+  official_upcoming: [],
 });
 
 describe('homeChallengeCard · state of the section', () => {
@@ -133,6 +135,7 @@ describe('homeChallengeCard · reward line', () => {
       points: 150,
       badgeId: null,
       badgeName: null,
+      badgeIcon: null,
     });
     const withBadge = homeChallengeReward({ points: 0, badge_id: 'unknown-badge' });
     expect(withBadge?.points).toBeNull();

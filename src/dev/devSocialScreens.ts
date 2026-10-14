@@ -105,6 +105,8 @@ const SCREENS: Entry[] = [
   { key: 'retosWaiting', label: 'Retos · reto creado esperando', scenario: 'waitingChallenge', target: tab('retos', '', 'end') },
   { key: 'retosLoading', label: 'Retos · cargando', scenario: 'challengesLoading', target: tab('retos') },
   { key: 'retosError', label: 'Retos · error con reintento', scenario: 'challengesError', target: tab('retos') },
+  { key: 'officialList', label: 'Retos oficiales (SOCIAL_15)', scenario: 'default', target: route('SocialOfficialList') },
+  { key: 'officialListNotJoined', label: 'Retos oficiales · sin unirte', scenario: 'officialNotJoined', target: route('SocialOfficialList') },
   { key: 'challengeOfficial', label: 'Reto oficial (SOCIAL_08)', scenario: 'default', target: route('SocialChallenge', { challengeId: 'fx-ch-official' }) },
   { key: 'challengeOfficialNotJoined', label: 'Reto oficial · sin unirte', scenario: 'officialNotJoined', target: route('SocialChallenge', { challengeId: 'fx-ch-official' }) },
   { key: 'challengeFriends', label: 'Reto entre amigos (SOCIAL_09)', scenario: 'default', target: route('SocialChallenge', { challengeId: 'fx-ch-ent' }) },

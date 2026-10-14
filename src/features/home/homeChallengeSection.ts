@@ -1,7 +1,8 @@
 import { ALL_BADGES } from '@app/shared';
 import {
+  bigFigure,
   daysLeftLabel,
-  metricInfo,
+  formatChallengeValue,
   officialLeftLine,
   progressPct,
 } from '@app/features/social/challengeModel';
@@ -20,6 +21,8 @@ export type HomeChallengeReward = {
   points: number | null;
   badgeId: string | null;
   badgeName: string | null;
+  // Placeholder icon name from the server (see officialBadge.ts).
+  badgeIcon?: string | null;
 };
 
 // A friend of mine in the same challenge ("Carlos acaba de llegar a 81").
@@ -27,6 +30,7 @@ export type HomeChallengeReward = {
 export type HomeChallengeFriend = {
   name: string;
   progress: number;
+  progressText?: string;
   profile: SocialProfileRow | null;
 };
 
@@ -40,6 +44,11 @@ export type HomeChallengeCard = {
   unit: string;
   goal: number;
   progress: number;
+  // The figures as shown: km keep up to 2 decimals ("12,5"), the rest are whole.
+  goalText: string;
+  progressText: string;
+  // Signed URL of the cover (null: the app's own photo).
+  coverUrl: string | null;
   pct: number;
   daysLabel: string;
   // Joined: "Te faltan 26 para completar el reto." Invite: nothing here
@@ -48,6 +57,9 @@ export type HomeChallengeCard = {
   participants: number | null;
   // Joined only: the friend who is furthest along, if any has progress.
   friend: HomeChallengeFriend | null;
+  // Me and my friends in the challenge (up to 3, from `people.preview`): the
+  // stacked avatars. Empty: the placeholder photos.
+  people: SocialProfileRow[];
   // null when the challenge has neither points nor a badge: the reward line
   // is hidden.
   reward: HomeChallengeReward | null;
@@ -72,16 +84,21 @@ export function badgeName(badgeId: string | null): string | null {
   return ALL_BADGES.find(badge => badge.id === badgeId)?.title ?? null;
 }
 
-export function homeChallengeReward(challenge: {
-  points: number | null;
-  badge_id: string | null;
-}): HomeChallengeReward | null {
+export function homeChallengeReward(
+  challenge: { points: number | null; badge_id: string | null },
+  badge?: { id: string; title: string; icon: string | null } | null,
+): HomeChallengeReward | null {
   const points = challenge.points && challenge.points > 0 ? challenge.points : null;
-  const badgeId = challenge.badge_id ? challenge.badge_id : null;
+  const badgeId = badge?.id ?? (challenge.badge_id ? challenge.badge_id : null);
   if (points === null && badgeId === null) {
     return null;
   }
-  return { points, badgeId, badgeName: badgeName(badgeId) };
+  return {
+    points,
+    badgeId,
+    badgeName: badge?.title || badgeName(badgeId),
+    badgeIcon: badge?.icon ?? null,
+  };
 }
 
 // With a challenge (retoOn): I take part in the featured official challenge
@@ -98,6 +115,19 @@ export function homeChallengeCard(
     return null;
   }
   const { challenge, mine } = official;
+  const meta = official.meta;
+  // Who leads among me and my friends comes with the list (a friend only).
+  const leader = official.leader;
+  const friend =
+    leader && !leader.isMe && leader.progress > 0
+      ? {
+          name:
+            (leader.profile?.name?.trim() || leader.profile?.username || 'Un amigo').split(/\s+/)[0],
+          progress: leader.progress,
+          progressText: formatChallengeValue(challenge.metric, leader.progress),
+          profile: leader.profile,
+        }
+      : null;
   const joined =
     mine !== null && mine.status === 'active' && mine.progress < challenge.goal;
   const progress = joined ? mine.progress : 0;
@@ -107,15 +137,24 @@ export function homeChallengeCard(
     id: challenge.id,
     title: challenge.title,
     label: challengeLabel(challenge.title, challenge.goal),
-    unit: metricInfo(challenge.metric).unit,
+    unit: bigFigure({
+      metric: challenge.metric,
+      goal: challenge.goal,
+      title: challenge.title,
+      exerciseName: meta?.exerciseName ?? null,
+    }).unit,
     goal: challenge.goal,
     progress,
+    goalText: formatChallengeValue(challenge.metric, challenge.goal),
+    progressText: formatChallengeValue(challenge.metric, progress),
+    coverUrl: meta?.coverUrl ?? null,
     pct: progressPct(progress, challenge.goal),
     daysLabel: daysLeftLabel(challenge.ends_at, challenge.duration_days, now),
-    line: joined ? officialLeftLine(progress, challenge.goal) : '',
+    line: joined ? officialLeftLine(progress, challenge.goal, challenge.metric) : '',
     participants: official.participants_total,
-    friend: null,
-    reward: homeChallengeReward(challenge),
+    friend: joined ? friend : null,
+    people: official.people.flatMap(person => (person.profile ? [person.profile] : [])).slice(0, 3),
+    reward: homeChallengeReward(challenge, meta?.badge),
   };
 }
 
@@ -165,11 +204,15 @@ export function sampleChallengeCard(scenario: HomeChallengeScenario): HomeChalle
     unit: 'repeticiones',
     goal: 100,
     progress: 0,
+    goalText: '100',
+    progressText: '0',
+    coverUrl: null,
     pct: 0,
     daysLabel: '3 días restantes',
     line: '',
     participants: 18420,
     friend: null,
+    people: [],
     reward: { points: 150, badgeId: 'sample', badgeName: 'Semana de tracción' },
   };
   if (scenario === 'challengeJoined') {
@@ -177,6 +220,7 @@ export function sampleChallengeCard(scenario: HomeChallengeScenario): HomeChalle
       ...base,
       state: 'joined',
       progress: 74,
+      progressText: '74',
       pct: 74,
       line: officialLeftLine(74, 100),
       friend: { name: 'Carlos', progress: 81, profile: null },

@@ -1,3 +1,5 @@
+import { formatDuration } from '@app/features/route/routeFormat';
+import { parsePoint } from '@app/features/route/routeMappers';
 import { mergeFeedPages, nextFeedCursor } from '@app/features/social/postModel';
 import type {
   AchievementAttachment,
@@ -11,6 +13,7 @@ import type {
   PostAttachment,
   PostType,
   RecordAttachment,
+  RouteAttachment,
   RoutineAttachment,
   SocialCommentRow,
   WorkoutAttachment,
@@ -46,6 +49,7 @@ const POST_TYPES: readonly PostType[] = [
   'achievement',
   'challenge',
   'photo',
+  'route',
 ];
 
 // ── Attachments, by post type ─────────────────────────────────────────────
@@ -183,9 +187,48 @@ function parseChallenge(row: Json): ChallengeAttachment | null {
   };
 }
 
+// Route snapshot: pace_label for running, avg_speed_kmh for cycling; new_best
+// is {distance_key, best_sec}; the polyline arrives trimmed and simplified.
+function parseRoute(row: Json, rowActivityId?: string): RouteAttachment | null {
+  const sport = row.sport === 'cycling' ? 'cycling' : row.sport === 'running' ? 'running' : null;
+  const distance = asNumber(row.distance_km);
+  const duration = asNumber(row.duration_sec);
+  if (!sport || distance === undefined || duration === undefined) {
+    return null;
+  }
+  const speed = asNumber(row.avg_speed_kmh);
+  const bestSec = asNumber(asRecord(row.new_best)?.best_sec);
+  const bestKey = asString(asRecord(row.new_best)?.distance_key);
+  const polyline = Array.isArray(row.polyline)
+    ? row.polyline.flatMap(item => {
+        const p = parsePoint(item);
+        return p ? [{ lat: p.lat, lon: p.lon }] : [];
+      })
+    : [];
+  return {
+    sport,
+    distance_km: Math.round(distance * 100) / 100,
+    duration_sec: duration,
+    pace_label:
+      asString(row.pace_label) ??
+      (speed !== undefined ? `${speed.toFixed(1).replace('.', ',')} km/h` : ''),
+    elevation_m: orNull(asNumber(row.elevation_m)),
+    planned_name: orNull(asString(row.planned_name)),
+    new_best:
+      bestSec !== undefined && bestKey ? `${bestKey.toUpperCase()} · ${formatDuration(bestSec)}` : null,
+    // Always set for a real post (empty: the route is too short to show).
+    polyline,
+    activity_id: asString(row.activity_id) ?? rowActivityId ?? null,
+  };
+}
+
 // `photo` posts carry no attachment (null); an unreadable one is null too and
 // the card then shows only its text and photo.
-export function parseAttachment(type: PostType, value: unknown): PostAttachment | null {
+export function parseAttachment(
+  type: PostType,
+  value: unknown,
+  rowActivityId?: string,
+): PostAttachment | null {
   const row = asRecord(value);
   if (!row) {
     return null;
@@ -201,6 +244,8 @@ export function parseAttachment(type: PostType, value: unknown): PostAttachment 
       return parseAchievement(row);
     case 'challenge':
       return parseChallenge(row);
+    case 'route':
+      return parseRoute(row, rowActivityId);
     default:
       return null;
   }
@@ -248,7 +293,7 @@ export function parseFeedPost(value: unknown, me: string): FeedPost | null {
     photo_path: asString(row.photo_path) ?? null,
     photo_width: orNull(asNumber(row.photo_width)),
     photo_height: orNull(asNumber(row.photo_height)),
-    attachment: parseAttachment(type, row.attachment),
+    attachment: parseAttachment(type, row.attachment, asString(row.route_activity_id)),
     like_count: asNumber(row.like_count) ?? 0,
     comment_count: asNumber(row.comment_count) ?? 0,
     created_at: createdAt,
@@ -408,6 +453,7 @@ export function isDuplicate(error: PostgrestLike): boolean {
 // ("ya lo compartiste").
 const SERVER_ERRORS: readonly CreatePostError[] = [
   'invalid_type',
+  'route_private',
   'category_not_shared',
   'photo_not_allowed',
   'photos_not_shared',

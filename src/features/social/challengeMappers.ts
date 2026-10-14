@@ -1,5 +1,8 @@
 import type {
   BoardEntry,
+  ChallengeBadge,
+  ChallengeMeta,
+  ChallengeUnit,
   ChallengeBoard,
   ChallengeHead,
   ChallengeKind,
@@ -45,6 +48,7 @@ const METRICS: readonly ChallengeMetric[] = [
   'exercise_reps',
   'core33_habit_days',
   'mobility_minutes',
+  'distance_km',
 ];
 const CHALLENGE_STATUSES: readonly ChallengeStatus[] = [
   'pending',
@@ -69,11 +73,14 @@ function oneOf<T extends string>(list: readonly T[], value: unknown): T | undefi
 }
 
 // ── The challenge columns ─────────────────────────────────────────────────
-export function parseChallengeHead(value: unknown): ChallengeHead | null {
+export function parseChallengeHead(
+  value: unknown,
+  fallbackStatus?: ChallengeStatus,
+): ChallengeHead | null {
   const row = asRecord(value);
   const id = asString(row?.id);
   const metric = oneOf(METRICS, row?.metric);
-  const status = oneOf(CHALLENGE_STATUSES, row?.status);
+  const status = oneOf(CHALLENGE_STATUSES, row?.status) ?? fallbackStatus;
   const goal = asNumber(row?.goal);
   if (!row || !id || !metric || !status || goal === undefined) {
     return null;
@@ -98,19 +105,74 @@ export function parseChallengeHead(value: unknown): ChallengeHead | null {
 }
 
 // ── get_my_challenges ─────────────────────────────────────────────────────
+// Every row carries what the list needs (participants, people, leader, badge,
+// unit, cover_path…), so the list makes no get_challenge_board calls.
 export type ListedChallenge = {
   head: ChallengeHead;
   // The participant columns that come with the row (null: not a participant).
   mine: ChallengeMine | null;
+  people: { profile: SocialProfileRow | null; isMe: boolean }[];
+  participantsTotal: number | null;
+  leader: ChallengeSummary['leader'];
+  meta: ChallengeMeta;
 };
 
-function parseListed(value: unknown, fallbackStatus: ParticipantStatus | null): ListedChallenge | null {
+const UNITS: readonly ChallengeUnit[] = ['km', 'reps', 'min', 'sessions'];
+
+function parsePerson(value: unknown): { profile: SocialProfileRow | null; isMe: boolean } | null {
   const row = asRecord(value);
-  const head = parseChallengeHead(row);
+  const id = asString(row?.user_id);
+  if (!row || !id) {
+    return null;
+  }
+  return { profile: boardProfile(row, id), isMe: asBool(row.is_me) };
+}
+
+function parseLeader(value: unknown): ChallengeSummary['leader'] {
+  const row = asRecord(value);
+  const id = asString(row?.user_id);
+  const progress = asNumber(row?.progress);
+  if (!row || !id || progress === undefined) {
+    return null;
+  }
+  return { profile: boardProfile(row, id), progress, isMe: asBool(row.is_me) };
+}
+
+function parseBadge(value: unknown): ChallengeBadge | null {
+  const row = asRecord(value);
+  const id = asString(row?.id);
+  if (!row || !id) {
+    return null;
+  }
+  return { id, title: asString(row.title) ?? '', icon: orNull(asString(row.icon)) };
+}
+
+export function parseMeta(row: Json): ChallengeMeta {
+  return {
+    unit: oneOf(UNITS, row.unit) ?? null,
+    exerciseName: orNull(asString(row.exercise_name)),
+    badge: parseBadge(row.badge),
+    // The app signs `cover_path`; `cover_url` is never used directly.
+    coverPath: orNull(asString(row.cover_path)),
+    coverUrl: null,
+    description: orNull(asString(row.description)),
+    sport: orNull(asString(row.sport)),
+  };
+}
+
+function parseListed(
+  value: unknown,
+  fallbackStatus: ParticipantStatus | null,
+  fallbackChallengeStatus?: ChallengeStatus,
+): ListedChallenge | null {
+  const row = asRecord(value);
+  const head = parseChallengeHead(row, fallbackChallengeStatus);
   if (!row || !head) {
     return null;
   }
-  const status = oneOf(PARTICIPANT_STATUSES, row.my_status) ?? fallbackStatus;
+  // The server says 'joined' for an official challenge I signed up for.
+  const rawStatus = row.my_status === 'joined' ? 'active' : row.my_status;
+  const status = oneOf(PARTICIPANT_STATUSES, rawStatus) ?? fallbackStatus;
   const mine: ChallengeMine | null = status
     ? {
         status,
@@ -120,20 +182,38 @@ function parseListed(value: unknown, fallbackStatus: ParticipantStatus | null): 
         celebrated_at: orNull(asString(row.celebrated_at)),
       }
     : null;
-  return { head, mine };
+  const people = asRecord(row.people);
+  const total = asNumber(people?.total) ?? asNumber(row.participants_count);
+  return {
+    head,
+    mine,
+    people: asArray(people?.preview).flatMap(item => {
+      const person = parsePerson(item);
+      return person ? [person] : [];
+    }),
+    participantsTotal: orNull(total),
+    leader: parseLeader(row.leader),
+    meta: parseMeta(row),
+  };
 }
 
 export type ParsedMyChallenges = {
   active: ListedChallenge[];
   invitations: ListedChallenge[];
   recently_completed: ListedChallenge[];
-  // Every active official challenge, joined or not.
+  // Every active official challenge already started, joined or not.
   official: ListedChallenge[];
+  // Official challenges that have not started yet.
+  official_upcoming: ListedChallenge[];
 };
 
-function listOf(value: unknown, fallback: ParticipantStatus | null): ListedChallenge[] {
+function listOf(
+  value: unknown,
+  fallback: ParticipantStatus | null,
+  challengeStatus?: ChallengeStatus,
+): ListedChallenge[] {
   return asArray(value).flatMap(item => {
-    const parsed = parseListed(item, fallback);
+    const parsed = parseListed(item, fallback, challengeStatus);
     return parsed ? [parsed] : [];
   });
 }
@@ -147,83 +227,85 @@ export function parseMyChallenges(data: unknown): ParsedMyChallenges {
     active: active.filter(item => item.head.kind !== 'official'),
     invitations: listOf(body?.invitations, 'invited'),
     recently_completed: listOf(body?.recently_completed, 'completed'),
-    // The official list also holds challenges not joined yet: whether I take
-    // part is whether the id is in `active`.
+    // A row already says whether I joined (my_status); `active` also tells.
     official: official.map(item => {
       const mine = joined.get(item.head.id);
-      return mine ? { head: item.head, mine: mine.mine } : { head: item.head, mine: null };
+      return mine ? { ...item, mine: mine.mine } : item;
     }),
+    // They have not started: their status may not be one the app knows.
+    official_upcoming: listOf(body?.official_upcoming, null, 'pending').map(item => ({
+      ...item,
+      head: { ...item.head, kind: 'official' },
+    })),
   };
 }
-
-// Ids whose board adds the avatars and the leader to the list (the rows of
-// the list carry no people). The completed ones are plain rows without avatars,
-// so they are not looked up; the rest is capped.
-export const BOARD_LOOKUP_MAX = 12;
-
-export function listedIds(parsed: ParsedMyChallenges): string[] {
-  const ids = [
-    ...parsed.official.map(item => item.head.id),
-    ...parsed.invitations.map(item => item.head.id),
-    ...parsed.active.map(item => item.head.id),
-  ];
-  return Array.from(new Set(ids)).slice(0, BOARD_LOOKUP_MAX);
-}
-
-// Everything the list needs from one board (people, leader, total).
-export type BoardLookup = {
-  participants_total: number | null;
-  board: BoardEntry[];
-};
 
 export function summaryFrom(
   listed: ListedChallenge,
-  lookup: BoardLookup | null,
   profiles: Map<string, SocialProfileRow>,
 ): ChallengeSummary {
-  const board = lookup?.board ?? [];
   const inviterId = listed.mine?.invited_by ?? null;
-  const people = board.map(entry => ({ profile: entry.profile, isMe: entry.isMe }));
-  // The friend ahead of me: the best of the others, shown while they lead.
-  const others = board.filter(entry => !entry.isMe);
-  const best = others.reduce<BoardEntry | null>(
-    (top, entry) => (!top || entry.progress > top.progress ? entry : top),
-    null,
-  );
   return {
     challenge: listed.head,
     mine: listed.mine,
-    people,
+    people: listed.people,
     inviter: inviterId
       ? (profiles.get(inviterId) ??
-        board.find(entry => entry.user_id === inviterId)?.profile ??
+        listed.people.find(person => person.profile?.id === inviterId)?.profile ??
         null)
       : null,
-    participants_total: lookup?.participants_total ?? null,
-    leader: best ? { profile: best.profile, progress: best.progress } : null,
+    participants_total: listed.participantsTotal,
+    leader: listed.leader,
+    meta: listed.meta,
   };
+}
+
+// The covers of a list to sign in one call.
+export function coverPaths(parsed: ParsedMyChallenges): string[] {
+  return Array.from(
+    new Set(
+      [...parsed.official, ...parsed.official_upcoming, ...parsed.active].flatMap(item =>
+        item.meta.coverPath ? [item.meta.coverPath] : [],
+      ),
+    ),
+  );
 }
 
 export function buildMyChallenges(
   parsed: ParsedMyChallenges,
-  lookups: Map<string, BoardLookup>,
   profiles: Map<string, SocialProfileRow>,
+  covers: Map<string, string> = new Map(),
 ): MyChallenges {
-  const toSummary = (listed: ListedChallenge) =>
-    summaryFrom(listed, lookups.get(listed.head.id) ?? null, profiles);
+  const toSummary = (listed: ListedChallenge): ChallengeSummary => {
+    const summary = summaryFrom(listed, profiles);
+    const path = listed.meta.coverPath;
+    return path && covers.has(path)
+      ? { ...summary, meta: { ...listed.meta, coverUrl: covers.get(path) ?? null } }
+      : summary;
+  };
+  const officialList = parsed.official.map(toSummary);
   return {
     active: parsed.active.map(toSummary),
     invitations: parsed.invitations.map(toSummary),
     recently_completed: parsed.recently_completed.map(toSummary),
-    official: parsed.official.length > 0 ? toSummary(parsed.official[0]) : null,
+    official: officialList.length > 0 ? officialList[0] : null,
+    officialList,
+    official_upcoming: parsed.official_upcoming.map(toSummary),
   };
 }
 
 // Inviters of the invitations (to ask get_social_profiles for the missing ones).
 export function inviterIds(parsed: ParsedMyChallenges): string[] {
+  const known = new Set(
+    [...parsed.invitations].flatMap(item =>
+      item.people.flatMap(person => (person.profile ? [person.profile.id] : [])),
+    ),
+  );
   return Array.from(
     new Set(
-      parsed.invitations.flatMap(item => (item.mine?.invited_by ? [item.mine.invited_by] : [])),
+      parsed.invitations.flatMap(item =>
+        item.mine?.invited_by && !known.has(item.mine.invited_by) ? [item.mine.invited_by] : [],
+      ),
     ),
   );
 }
@@ -280,10 +362,6 @@ export function parseBoard(data: unknown): ParsedBoard | null {
     participants_total: orNull(asNumber(body.participants_total)),
     board,
   };
-}
-
-export function lookupFromBoard(board: ParsedBoard | null): BoardLookup | null {
-  return board ? { participants_total: board.participants_total, board: board.board } : null;
 }
 
 // My participant row (select on social_challenge_participants).

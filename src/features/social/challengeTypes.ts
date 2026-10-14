@@ -35,7 +35,42 @@ export type ChallengeMetric =
   | 'minutes_trained'
   | 'exercise_reps'
   | 'core33_habit_days'
-  | 'mobility_minutes';
+  | 'mobility_minutes'
+  // Official only: kilometres of Ruta (running and cycling), saved by the
+  // server with 2 decimals.
+  | 'distance_km';
+
+// What the server says the figures are ("km", "reps", "min", "sessions").
+export type ChallengeUnit = 'km' | 'reps' | 'min' | 'sessions';
+
+// The badge of an official challenge. TODO(badges-oficiales): final artwork;
+// `icon` is a name the app maps to a placeholder in `officialBadge.ts`.
+export type ChallengeBadge = { id: string; title: string; icon: string | null };
+
+// Official challenges: what get_my_challenges adds to each row.
+export type ChallengeMeta = {
+  unit: ChallengeUnit | null;
+  // Localised name of the exercise of a repetitions challenge ("dominadas").
+  exerciseName: string | null;
+  badge: ChallengeBadge | null;
+  coverPath: string | null;
+  // Signed URL of `coverPath` (bucket challenge-covers is private); null when
+  // there is no cover or it could not be signed.
+  coverUrl: string | null;
+  description: string | null;
+  // 'running' | 'cycling' | null (both).
+  sport: string | null;
+};
+
+export const NO_META: ChallengeMeta = {
+  unit: null,
+  exerciseName: null,
+  badge: null,
+  coverPath: null,
+  coverUrl: null,
+  description: null,
+  sport: null,
+};
 
 export type ChallengeHead = Pick<
   SocialChallengeRow,
@@ -73,15 +108,24 @@ export type ChallengeSummary = {
   inviter: SocialProfileRow | null;
   // Official challenge only: an aggregate with no names.
   participants_total: number | null;
-  // Best friend of mine in this challenge ("Carlos acaba de llegar a 81").
-  leader: { profile: SocialProfileRow | null; progress: number } | null;
+  // Who leads among me and my friends ("Carlos acaba de llegar a 81"). From
+  // the server (`leader`); `isMe` when it is me.
+  leader: { profile: SocialProfileRow | null; progress: number; isMe?: boolean } | null;
+  // Official challenges (absent in friend challenges and old fixtures).
+  meta?: ChallengeMeta;
 };
 
 export type MyChallenges = {
   active: ChallengeSummary[];
   invitations: ChallengeSummary[];
   recently_completed: ChallengeSummary[];
+  // The featured official challenge (the first of `officialList`).
   official: ChallengeSummary | null;
+  // Every official challenge already started (featured first).
+  officialList: ChallengeSummary[];
+  // Official challenges that have not started: I can join before they do
+  // (`mine` is active when I did).
+  official_upcoming: ChallengeSummary[];
 };
 
 export type BoardEntry = {

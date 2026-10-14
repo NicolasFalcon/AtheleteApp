@@ -23,7 +23,7 @@ import type {
   ManualContributionResult,
   MyChallenges,
 } from '@app/features/social/challengeTypes';
-import type { FixtureChallenge } from '@app/dev/socialChallengeFixtures';
+import { officialListSamples, type FixtureChallenge } from '@app/dev/socialChallengeFixtures';
 import type {
   ModerationAction,
   ModerationActionRow,
@@ -308,6 +308,9 @@ export const fixtureSocialService: SocialService = {
           share_photos: true,
           share_routines: true,
           share_body_weight: false,
+          route_default_visibility: 'friends',
+          route_hide_endpoints_default: true,
+          route_auto_pause: true,
           allow_friend_requests: true,
           created_at: now,
           updated_at: now,
@@ -766,11 +769,22 @@ export const fixtureSocialService: SocialService = {
   async getMyChallenges(): Promise<MyChallenges> {
     await sectionReady('challengesFailure');
     const now = new Date();
-    const result: MyChallenges = { active: [], invitations: [], recently_completed: [], official: null };
+    const result: MyChallenges = {
+      active: [],
+      invitations: [],
+      recently_completed: [],
+      official: null,
+      officialList: [],
+      official_upcoming: [],
+    };
     state.challenges.forEach(item => {
       const summary = summaryOf(item);
       if (item.head.kind === 'official') {
+        // The rest of the "Retos oficiales" view comes from dev samples.
+        const samples = officialListSamples(now);
         result.official = summary;
+        result.officialList = [summary, ...samples.more];
+        result.official_upcoming = samples.upcoming;
         return;
       }
       const view = challengeViewState(item.head, item.mine, now);

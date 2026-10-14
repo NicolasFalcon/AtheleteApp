@@ -139,7 +139,14 @@ export type SharingKey =
   | 'allow_friend_requests';
 
 export type SocialSettingsPatch = Partial<
-  Pick<SocialSettingsRow, 'audience' | SharingKey>
+  Pick<
+    SocialSettingsRow,
+    | 'audience'
+    | SharingKey
+    | 'route_default_visibility'
+    | 'route_hide_endpoints_default'
+    | 'route_auto_pause'
+  >
 >;
 
 export type InviteLink = {

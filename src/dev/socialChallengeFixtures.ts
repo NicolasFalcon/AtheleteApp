@@ -2,6 +2,7 @@ import type { FixturePerson } from '@app/dev/socialFixtures';
 import type {
   ChallengeHead,
   ChallengeMine,
+  ChallengeSummary,
 } from '@app/features/social/challengeTypes';
 import type { ModerationActionRow, ModerationQueueRow } from '@app/features/social/moderationModel';
 import type { SocialNotification } from '@app/features/social/notificationModel';
@@ -219,4 +220,38 @@ export function buildChallengeFixtures(
   ];
 
   return { challenges, notifications, queue, history };
+}
+
+// Development only: the rest of the "Retos oficiales" view (SOCIAL_15): two
+// more challenges in march and the two coming ones. The real app gets them
+// from get_my_challenges.
+export function officialListSamples(now: Date): {
+  more: ChallengeSummary[];
+  upcoming: ChallengeSummary[];
+} {
+  const t = now.getTime();
+  const day = 86_400_000;
+  const head = (id: string, title: string, metric: ChallengeHead['metric'], goal: number, points: number, startsIn: number, endsIn: number, status: ChallengeHead['status']): ChallengeHead => ({
+    id, kind: 'official', metric, status, title, goal, duration_days: 7,
+    starts_at: new Date(t + startsIn * day).toISOString(), ends_at: new Date(t + endsIn * day).toISOString(),
+    invite_expires_at: null, points, badge_id: id, allow_manual: false, creator_id: null,
+  });
+  const meta = (title: string, icon: string, description: string): ChallengeSummary['meta'] => ({
+    unit: null, exerciseName: null, badge: { id: title, title, icon }, coverPath: null, coverUrl: null, description, sport: null,
+  });
+  const summary = (challenge: ChallengeHead, m: ChallengeSummary['meta'], total: number, joined = false): ChallengeSummary => ({
+    challenge,
+    mine: joined ? { status: 'active', progress: 0, invited_by: null, final_rank_among_friends: null, celebrated_at: null } : null,
+    people: [], inviter: null, participants_total: total, leader: null, meta: m,
+  });
+  return {
+    more: [
+      summary(head('fx-km', '50 km en octubre', 'distance_km', 50, 300, -8, 23, 'active'), meta('Octubre en ruta', 'activity', 'Corre o pedalea con Ruta. Cada kilómetro suma, a tu ritmo.'), 9310),
+      summary(head('fx-str', '12 sesiones de fuerza', 'strength_sessions', 12, 250, -12, 18, 'active'), meta('Mes de fuerza', 'dumbbell', 'Tres por semana. Cuentan las rutinas completas.'), 6120, true),
+    ],
+    upcoming: [
+      summary(head('fx-mov', '7 días de movilidad', 'mobility_minutes', 70, 100, 12, 19, 'pending'), meta('Cuerpo libre', 'person-standing', '10 minutos al día, sin material.'), 0),
+      summary(head('fx-pasos', '10.000 pasos diarios', 'workouts', 7, 120, 19, 26, 'pending'), meta('Paso firme', 'footprints', 'Una semana con Apple Health.'), 0, true),
+    ],
+  };
 }

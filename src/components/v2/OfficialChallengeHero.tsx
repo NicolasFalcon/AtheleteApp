@@ -36,6 +36,9 @@ export type OfficialChallengeHeroProps = {
   joined: boolean;
   progress: number;
   goal: number;
+  // The figures as shown (kilometres keep decimals); default: the numbers.
+  progressText?: string;
+  goalText?: string;
   leftLine: string;
   participants: number | null;
   points: number;
@@ -50,6 +53,8 @@ export function OfficialChallengeHero({
   joined,
   progress,
   goal,
+  progressText,
+  goalText,
   leftLine,
   participants,
   points,
@@ -86,9 +91,9 @@ export function OfficialChallengeHero({
             <View style={styles.figures}>
               <View style={styles.figure}>
                 <TextV2 variant="title24" color={scene.onDark.primary}>
-                  {String(progress)}
+                  {progressText ?? String(progress)}
                 </TextV2>
-                <TextV2 variant="body" color={scene.onDark.meta}>{` / ${goal}`}</TextV2>
+                <TextV2 variant="body" color={scene.onDark.meta}>{` / ${goalText ?? goal}`}</TextV2>
               </View>
               <TextV2 variant="meta" color={scene.onDark.meta} style={styles.left}>
                 {leftLine}

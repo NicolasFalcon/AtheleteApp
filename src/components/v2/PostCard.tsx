@@ -53,6 +53,8 @@ export type PostCardProps = {
   onSaveRoutine?: () => void;
   // "Ver rutina" opens SOCIAL_04.
   onOpenRoutine?: () => void;
+  // A route post opens its activity (the trimmed one for others).
+  onOpenRoute?: (activityId: string) => void;
   // Tab bar visible under the toast (feed) or not (detail).
   withTabBar?: boolean;
 };
@@ -70,6 +72,7 @@ export function PostCard({
   routineSaved = false,
   onSaveRoutine,
   onOpenRoutine,
+  onOpenRoute,
   withTabBar = false,
 }: PostCardProps) {
   const { colors } = useThemeV2();
@@ -202,7 +205,14 @@ export function PostCard({
         <ChallengeBody attachment={attachment as ChallengeAttachment} onPress={open} />
       ) : null}
       {kind === 'route' && attachment ? (
-        <RouteBody attachment={attachment as RouteAttachment} onPress={open} />
+        <RouteBody
+          attachment={attachment as RouteAttachment}
+          onPress={
+            (attachment as RouteAttachment).activity_id && onOpenRoute
+              ? () => onOpenRoute((attachment as RouteAttachment).activity_id as string)
+              : open
+          }
+        />
       ) : null}
       {kind === 'photo' && post.photo_path ? (
         <PhotoBody

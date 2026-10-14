@@ -18,6 +18,7 @@ import { BlockError } from '@app/features/home/v2/BlockError';
 import {
   challengeViewState,
   daysLeftLabel,
+  formatChallengeValue,
   officialLeftLine,
   respondErrorMessage,
   rowLine,
@@ -118,7 +119,9 @@ export function ChallengesView({
           joined={officialState !== 'notJoined'}
           progress={official.mine?.progress ?? 0}
           goal={official.challenge.goal}
-          leftLine={officialLeftLine(official.mine?.progress ?? 0, official.challenge.goal)}
+          progressText={formatChallengeValue(official.challenge.metric, official.mine?.progress ?? 0)}
+          goalText={formatChallengeValue(official.challenge.metric, official.challenge.goal)}
+          leftLine={officialLeftLine(official.mine?.progress ?? 0, official.challenge.goal, official.challenge.metric)}
           participants={official.participants_total}
           points={official.challenge.points}
           onPress={() => onOpenChallenge(official.challenge.id)}

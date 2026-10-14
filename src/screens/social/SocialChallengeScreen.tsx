@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronsUp, MoreHorizontal } from 'lucide-react-native';
+import { MoreHorizontal } from 'lucide-react-native';
 import {
   BackButton,
   Button,
@@ -28,6 +28,9 @@ import { BlockError } from '@app/features/home/v2/BlockError';
 import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import {
   MANUAL_ADDS,
+  completionCondition,
+  formatChallengeValue,
+  rewardLine,
   challengeActions,
   challengeViewState,
   daysLeftLabel,
@@ -39,6 +42,7 @@ import {
   respondErrorMessage,
   weekBarHeight,
 } from '@app/features/social/challengeModel';
+import { officialBadgeIcon } from '@app/features/social/officialBadge';
 import { formatThousands, timeAgo } from '@app/features/social/postModel';
 import { firstName } from '@app/features/social/socialModel';
 import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
@@ -62,6 +66,12 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
   const service = useSocialService();
   const { challengeId, devSheet } = route.params;
   const board = useSocialResource('getChallengeBoard', s => s.getChallengeBoard(challengeId), [challengeId]);
+  // Badge, unit, cover and exercise name come with the list (get_my_challenges).
+  const listed = useSocialResource('getMyChallenges', s => s.getMyChallenges());
+  const meta = [
+    ...(listed.data?.officialList ?? []),
+    ...(listed.data?.official_upcoming ?? []),
+  ].find(item => item.challenge.id === challengeId)?.meta;
   const [sheet, setSheet] = useState<'leave' | 'cancel' | null>(devSheet ?? null);
   const [busy, setBusy] = useState(false);
   const data = board.data;
@@ -178,7 +188,24 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
           <StatusBarV2 style="light" />
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 190 }}>
             <View style={styles.officialHero}>
-              <CoverImage source={COVER} aspect={900 / 601} x={0.5} y={0.25} />
+              {meta?.coverUrl ? (
+                <View
+                  pointerEvents="none"
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { filter: [{ grayscale: 1 }, { contrast: 1.1 }, { brightness: 0.85 }] },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: meta.coverUrl }}
+                    resizeMode="cover"
+                    accessibilityIgnoresInvertColors
+                    style={StyleSheet.absoluteFill}
+                  />
+                </View>
+              ) : (
+                <CoverImage source={COVER} aspect={900 / 601} x={0.5} y={0.25} />
+              )}
               <LinearGradient
                 colors={['rgba(20,19,18,.45)', 'rgba(20,19,18,.05)', '#141312']}
                 locations={[0, 0.35, 1]}
@@ -209,8 +236,8 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
                 <>
                   <View style={styles.officialFigure}>
                     <View style={styles.bigRow}>
-                      <TextV2 style={styles.bigNumber}>{String(data.mine?.progress ?? 0)}</TextV2>
-                      <TextV2 variant="section" color="#8C8A85">{` / ${challenge.goal}`}</TextV2>
+                      <TextV2 style={styles.bigNumber}>{formatChallengeValue(challenge.metric, data.mine?.progress ?? 0)}</TextV2>
+                      <TextV2 variant="section" color="#8C8A85">{` / ${formatChallengeValue(challenge.metric, challenge.goal)}`}</TextV2>
                     </View>
                     <View style={[styles.bar8, { backgroundColor: 'rgba(255,255,255,.12)' }]}>
                       <View
@@ -221,7 +248,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
                       />
                     </View>
                     <TextV2 variant="bodyL" color="#D8D6D1">
-                      {officialLeftLine(data.mine?.progress ?? 0, challenge.goal)}
+                      {officialLeftLine(data.mine?.progress ?? 0, challenge.goal, challenge.metric)}
                     </TextV2>
                   </View>
                   {data.week ? (
@@ -278,13 +305,18 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
               </View>
 
               <View style={styles.reward}>
-                <HexMedal icon={ChevronsUp} size={58} />
+                <HexMedal icon={officialBadgeIcon(meta?.badge?.icon)} size={58} />
                 <View style={styles.flex}>
                   <TextV2 variant="bodyStrong" color="#FFFFFF">
-                    {`+${challenge.points} puntos · Badge Semana de tracción`}
+                    {rewardLine(challenge.points, meta?.badge?.title ?? null) ?? 'Sin recompensa'}
                   </TextV2>
                   <TextV2 variant="meta" color="#A8A6A1">
-                    Al completar las {challenge.goal}
+                    {completionCondition({
+                      metric: challenge.metric,
+                      goal: challenge.goal,
+                      exerciseName: meta?.exerciseName ?? null,
+                      sport: meta?.sport,
+                    })}
                   </TextV2>
                 </View>
               </View>

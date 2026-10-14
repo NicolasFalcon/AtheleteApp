@@ -20,8 +20,6 @@ export type PostType =
   | 'achievement'
   | 'challenge'
   | 'photo'
-  // TODO(ruta): the backend has no `route` type yet (Fase 5). It only exists
-  // in the dev fixtures; in the real app a post of this type is not shown.
   | 'route';
 
 // `attachment` is a snapshot the server writes (never editable by the app).
@@ -94,7 +92,8 @@ export type ChallengeAttachment = {
   badge_id?: string | null;
 };
 
-// Route post (v2.12 · SOCIAL_16). Fixtures only until Ruta exists (Fase 5).
+// Route post (v2.12 · SOCIAL_16): the snapshot create_post('route') takes on
+// the server. The polyline is already trimmed and simplified there.
 export type RouteAttachment = {
   sport: 'running' | 'cycling';
   distance_km: number;
@@ -104,8 +103,12 @@ export type RouteAttachment = {
   elevation_m: number | null;
   // Name of the planned route this activity followed ("Parque 5K").
   planned_name: string | null;
-  // "Nueva mejor marca" line, when the activity beat one.
+  // "Nueva mejor marca" line ("5K · 24:41"), when the activity beat one.
   new_best: string | null;
+  // The trimmed route (absent in the dev fixtures: they use a drawn sample).
+  polyline?: { lat: number; lon: number }[];
+  // The activity behind the post, to open it.
+  activity_id?: string | null;
 };
 
 export type PostAttachment =
@@ -238,6 +241,8 @@ export type CreatePostError =
   | 'invalid_source'
   | 'source_not_found'
   | 'routine_not_shareable'
+  // A route whose visibility is "Solo yo" cannot be posted (Ruta, 5c).
+  | 'route_private'
   | 'photo_required'
   // The app, before sending: type, size or an invalid post.
   | 'photo_type'

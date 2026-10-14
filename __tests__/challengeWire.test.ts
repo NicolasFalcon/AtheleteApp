@@ -12,7 +12,6 @@ import {
   validateStep,
 } from '../src/features/social/challengeModel';
 import {
-  listedIds,
   manualTodayFrom,
   parseBoard,
   parseCreateChallenge,
@@ -205,7 +204,6 @@ describe('get_my_challenges and get_challenge_board', () => {
     expect(parsed.official.find(item => item.head.id === 'o1')?.mine?.progress).toBe(40);
     expect(parsed.official.find(item => item.head.id === 'o2')?.mine).toBeNull();
     expect(parsed.invitations[0].mine).toMatchObject({ status: 'invited', invited_by: 'f1' });
-    expect(listedIds(parsed)).toEqual(['o1', 'o2', 'i1', 'a1']);
   });
 
   it('survives garbage and empty lists', () => {
@@ -284,6 +282,8 @@ describe('optimistic challenge actions', () => {
     invitations: [summary('i1', 'invited')],
     recently_completed: [],
     official: null,
+    officialList: [],
+    official_upcoming: [],
   };
 
   it('maps the service calls to actions', () => {

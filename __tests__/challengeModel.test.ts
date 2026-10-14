@@ -44,7 +44,8 @@ describe('create challenge · step validation', () => {
     expect(validateStep(0, selectMetric(draft, 'workouts'), FRIENDS)).toEqual({ ok: true });
     expect(validateStep(0, selectMetric(draft, 'exercise_reps'), FRIENDS)).toEqual({ ok: false, error: 'metric_not_allowed' });
     expect(friendMetrics().map(item => item.metric)).not.toContain('exercise_reps');
-    expect(friendMetrics()).toHaveLength(METRICS.length - 1);
+    expect(friendMetrics().map(item => item.metric)).not.toContain('distance_km');
+    expect(friendMetrics()).toHaveLength(METRICS.length - 2);
   });
 
   it('step 2 keeps the goal inside the range of the type', () => {

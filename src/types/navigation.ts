@@ -320,6 +320,7 @@ export type AppStackParamList = {
       }
     | undefined;
   SocialChallengeDone: { challengeId: string };
+  SocialOfficialList: undefined;
   SocialNotifications: undefined;
   SocialModeration: { devTab?: 'queue' | 'history' } | undefined;
   SocialModerationItem: { targetId: string };

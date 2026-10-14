@@ -91,6 +91,7 @@ export const APP_ROUTES = {
   SocialChallenge: 'SocialChallenge',
   SocialCreateChallenge: 'SocialCreateChallenge',
   SocialChallengeDone: 'SocialChallengeDone',
+  SocialOfficialList: 'SocialOfficialList',
   SocialNotifications: 'SocialNotifications',
   SocialModeration: 'SocialModeration',
   SocialModerationItem: 'SocialModerationItem',

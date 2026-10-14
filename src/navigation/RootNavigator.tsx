@@ -47,6 +47,7 @@ import { QuizChallengeScreen } from '@app/screens/quiz/QuizChallengeScreen';
 import { QuizQuestionScreen } from '@app/screens/quiz/QuizQuestionScreen';
 import { DevFixtureTabs } from '@app/dev/DevFixtureTabs';
 import { QuizResultScreen } from '@app/screens/quiz/QuizResultScreen';
+import { SocialOfficialListScreen } from '@app/screens/social/SocialOfficialListScreen';
 import { SocialChallengeDoneScreen } from '@app/screens/social/SocialChallengeDoneScreen';
 import { SocialChallengeScreen } from '@app/screens/social/SocialChallengeScreen';
 import { SocialCreateChallengeScreen } from '@app/screens/social/SocialCreateChallengeScreen';
@@ -176,6 +177,10 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.SocialCreateChallenge}
             component={SocialCreateChallengeScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialOfficialList}
+            component={SocialOfficialListScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.SocialChallengeDone}
@@ -379,6 +384,10 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.SocialCreateChallenge}
             component={SocialCreateChallengeScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.SocialOfficialList}
+            component={SocialOfficialListScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.SocialChallengeDone}

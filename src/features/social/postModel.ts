@@ -42,12 +42,11 @@ export type PostBodyKind =
   | 'achievement' // band with the medal
   | 'challenge' // band with the medal (finished challenge)
   | 'photo' // photo only
-  | 'route' // map with the route cut out (fixtures only for now)
+  | 'route' // the route cut out on the page
   | 'unknown'; // a type this app does not know: not shown
 
-// Route posts: the backend has no `route` type yet. They are drawn only in the
-// dev fixtures; flip this when Ruta exists. TODO(ruta): Fase 5.
-export const ROUTE_POSTS_ENABLED = false;
+// Route posts are real since Ruta 5c (create_post('route')).
+export const ROUTE_POSTS_ENABLED = true;
 
 export function postBodyKind(
   post: { type: string; photo_path: string | null },
@@ -144,6 +143,8 @@ export function createPostErrorCopy(error: CreatePostError): CreatePostErrorCopy
       return plain('Ya no encontramos lo que querías compartir. Elige otro adjunto.');
     case 'routine_not_shareable':
       return plain('Solo puedes compartir rutinas que hayas creado tú, no copias ni las de ELLIE.');
+    case 'route_private':
+      return plain('Esta ruta es solo tuya. Cambia su privacidad para compartirla.');
     case 'invalid_type':
     case 'validation':
       return plain('Revisa la publicación: falta algo o no es válido.');

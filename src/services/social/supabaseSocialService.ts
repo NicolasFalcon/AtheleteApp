@@ -7,8 +7,7 @@ import {
   buildBoard,
   buildMyChallenges,
   inviterIds,
-  listedIds,
-  lookupFromBoard,
+  coverPaths,
   parseBoard,
   parseContributions,
   parseCreateChallenge,
@@ -19,7 +18,6 @@ import {
   parseOkFlag,
   parseRespondInvite,
   weekStart,
-  type BoardLookup,
 } from '@app/features/social/challengeMappers';
 import type { ChallengeBoard, MyChallenges } from '@app/features/social/challengeTypes';
 import {
@@ -168,6 +166,29 @@ async function fetchProfiles(ids: string[]): Promise<Map<string, SocialProfileRo
     throw error;
   }
   return profileMap(data);
+}
+
+// Signed URLs of the challenge covers (bucket challenge-covers, private; any
+// signed-in user can read). One path that fails to sign only loses its cover.
+const COVER_URL_TTL_S = 60 * 60;
+
+async function signCovers(paths: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (paths.length === 0) {
+    return out;
+  }
+  const { data, error } = await client()
+    .storage.from('challenge-covers')
+    .createSignedUrls(paths, COVER_URL_TTL_S);
+  if (error || !data) {
+    return out;
+  }
+  data.forEach(item => {
+    if (item.path && item.signedUrl && !item.error) {
+      out.set(item.path, item.signedUrl);
+    }
+  });
+  return out;
 }
 
 async function findUser(username: string): Promise<FindUserResult | null> {
@@ -838,9 +859,9 @@ export const supabaseSocialService: SocialService = {
   },
 
   // ── Retos (W5) ──────────────────────────────────────────────────────────
-  // The list comes from get_my_challenges; the avatars and the leader of each
-  // row come from its board (one get_challenge_board per listed challenge,
-  // capped). A board that fails only leaves that row without them.
+  // The list comes whole from get_my_challenges (people, leader, badge, unit,
+  // cover_path…): no get_challenge_board per row. The covers live in the
+  // private bucket challenge-covers and are signed here in one call.
   async getMyChallenges(): Promise<MyChallenges> {
     const supabase = client();
     const { data, error } = await supabase.rpc('get_my_challenges');
@@ -848,32 +869,21 @@ export const supabaseSocialService: SocialService = {
       return failed(error);
     }
     const parsed = parseMyChallenges(data);
-    const settled = await Promise.allSettled(
-      listedIds(parsed).map(async id => {
-        const board = await supabase.rpc('get_challenge_board', { _challenge_id: id });
-        return [id, board.error ? null : lookupFromBoard(parseBoard(board.data))] as const;
-      }),
-    );
-    const lookups = new Map<string, BoardLookup>();
-    settled.forEach(result => {
-      if (result.status === 'fulfilled' && result.value[1]) {
-        lookups.set(result.value[0], result.value[1]);
-      }
-    });
-    const known = new Set(
-      Array.from(lookups.values()).flatMap(lookup => lookup.board.map(entry => entry.user_id)),
-    );
-    const missing = inviterIds(parsed).filter(id => !known.has(id));
-    const profiles = await fetchProfiles(missing).catch(() => new Map<string, SocialProfileRow>());
-    const result = buildMyChallenges(parsed, lookups, profiles);
+    const [profiles, covers] = await Promise.all([
+      fetchProfiles(inviterIds(parsed)).catch(() => new Map<string, SocialProfileRow>()),
+      signCovers(coverPaths(parsed)),
+    ]);
+    const result = buildMyChallenges(parsed, profiles, covers);
     await prefetchProfilePhotoUris(
-      [result.official, ...result.active, ...result.invitations].flatMap(summary =>
-        summary
-          ? [
-              summary.inviter?.profile_photo_url,
-              ...summary.people.map(person => person.profile?.profile_photo_url),
-            ]
-          : [],
+      [result.official, ...result.officialList, ...result.active, ...result.invitations].flatMap(
+        summary =>
+          summary
+            ? [
+                summary.inviter?.profile_photo_url,
+                ...summary.people.map(person => person.profile?.profile_photo_url),
+                summary.leader?.profile?.profile_photo_url,
+              ]
+            : [],
       ),
     ).catch(() => undefined);
     return result;

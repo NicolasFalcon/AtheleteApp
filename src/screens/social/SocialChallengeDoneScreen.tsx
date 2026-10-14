@@ -11,7 +11,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Polygon } from 'react-native-svg';
-import { ChevronsUp } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
+import { officialBadgeIcon } from '@app/features/social/officialBadge';
 import {
   Button,
   Skeleton,
@@ -21,7 +22,7 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { metricInfo } from '@app/features/social/challengeModel';
+import { formatChallengeValue, metricInfo } from '@app/features/social/challengeModel';
 import { firstName } from '@app/features/social/socialModel';
 import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
 import { SceneScope } from '@app/providers/ThemeProvider';
@@ -30,13 +31,13 @@ import type { AppScreenProps } from '@app/types/navigation';
 type Props = AppScreenProps<'SocialChallengeDone'>;
 
 // Ember hexagon with the icon in ink (SOCIAL_12), the same shape as HexMedal.
-function EmberMedal({ color }: { color: string }) {
+function EmberMedal({ color, icon: Icon }: { color: string; icon: LucideIcon }) {
   return (
     <View style={styles.hex}>
       <Svg width={100} height={110} viewBox="0 0 100 110" style={StyleSheet.absoluteFill}>
         <Polygon points="50,0 95,27.5 95,82.5 50,110 5,82.5 5,27.5" fill={color} />
       </Svg>
-      <ChevronsUp size={40} strokeWidth={2.4} color="#121212" />
+      <Icon size={40} strokeWidth={2.4} color="#121212" />
     </View>
   );
 }
@@ -63,6 +64,13 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
   const { challengeId } = route.params;
   const board = useSocialResource('getChallengeBoard', s => s.getChallengeBoard(challengeId), [challengeId]);
   const data = board.data;
+  // Badge, unit and exercise name of the challenge (they come with the list).
+  const listed = useSocialResource('getMyChallenges', s => s.getMyChallenges());
+  const meta = [
+    ...(listed.data?.recently_completed ?? []),
+    ...(listed.data?.officialList ?? []),
+    ...(listed.data?.active ?? []),
+  ].find(item => item.challenge.id === challengeId)?.meta;
 
   // Celebrate (haptics + mark) only the first time: celebrated_at null. Marking
   // is idempotent on the server, so a repeated call is harmless.
@@ -86,7 +94,12 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
     data?.mine?.final_rank_among_friends === 1 || others.length === 0
       ? 'Primero de tus amigos en terminar'
       : `Terminaste junto a ${firstName(others[0].profile?.name ?? 'un amigo')}`;
-  const unit = challenge ? (challenge.metric === 'exercise_reps' ? 'dominadas' : metricInfo(challenge.metric).unit) : '';
+  const unit = challenge
+    ? challenge.metric === 'exercise_reps'
+      ? (meta?.exerciseName?.toLowerCase() ?? 'repeticiones')
+      : metricInfo(challenge.metric).unit
+    : '';
+  const goalText = challenge ? formatChallengeValue(challenge.metric, challenge.goal) : '';
 
   return (
     <SceneScope>
@@ -97,7 +110,7 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
           <Burst delay={450} color="rgba(255,91,31,.6)" width={1} />
         </View>
         <Animated.View entering={ZoomIn.delay(100).duration(600)} style={styles.medalWrap}>
-          <EmberMedal color={colors.ember.base} />
+          <EmberMedal color={colors.ember.base} icon={officialBadgeIcon(meta?.badge?.icon)} />
         </Animated.View>
         <Animated.View entering={FadeInUp.delay(350).duration(400)}>
           <TextV2 variant="eyebrow" color="#A8A6A1" style={styles.over}>
@@ -107,7 +120,7 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
         {challenge ? (
           <>
             <Animated.View entering={FadeInUp.delay(450).duration(450)} style={styles.figure}>
-              <TextV2 style={styles.big}>{`${challenge.goal} / ${challenge.goal}`}</TextV2>
+              <TextV2 style={styles.big}>{`${goalText} / ${goalText}`}</TextV2>
               <TextV2 variant="bodyL" color="#A8A6A1">
                 {unit}
               </TextV2>
@@ -117,7 +130,7 @@ export function SocialChallengeDoneScreen({ navigation, route }: Props) {
                 <View style={styles.pill}>
                   <TextV2 variant="metaStrong" color="#FF8A5C">{`+${challenge.points} puntos`}</TextV2>
                   <TextV2 variant="metaStrong" color="#FFFFFF">
-                    {challenge.badge_id ? ' · Badge Semana de tracción' : ''}
+                    {challenge.badge_id ? ` · Badge ${meta?.badge?.title ?? ''}`.trimEnd() : ''}
                   </TextV2>
                 </View>
               ) : null}

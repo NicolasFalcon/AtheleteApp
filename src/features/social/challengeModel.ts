@@ -37,6 +37,8 @@ export const METRICS: readonly MetricInfo[] = [
   { metric: 'exercise_reps', title: 'Repeticiones de un ejercicio', subtitle: 'Acumuladas durante el reto', unit: 'repeticiones', short: 'repetición', initial: 100, step: 10, min: 20, max: 1000 },
   { metric: 'core33_habit_days', title: 'Core 33 · hábitos', subtitle: 'Días con los 3 hábitos cerrados', unit: 'días de hábitos', short: 'día', initial: 5, step: 1, min: 1, max: 14 },
   { metric: 'mobility_minutes', title: 'Movilidad', subtitle: 'Minutos de sesiones de movilidad', unit: 'min de movilidad', short: 'min', initial: 60, step: 15, min: 15, max: 300 },
+  // Official only (never offered between friends).
+  { metric: 'distance_km', title: 'Kilómetros', subtitle: 'Kilómetros de Ruta', unit: 'km', short: 'km', initial: 50, step: 5, min: 1, max: 1000 },
 ];
 
 export function metricInfo(metric: ChallengeMetric): MetricInfo {
@@ -46,11 +48,12 @@ export function metricInfo(metric: ChallengeMetric): MetricInfo {
 // Between friends the repetitions challenge is not offered (Q6: BT-45 is a
 // product decision); only the official challenge counts repetitions.
 export function friendMetrics(): readonly MetricInfo[] {
-  return METRICS.filter(item => item.metric !== 'exercise_reps');
+  return METRICS.filter(item => isFriendMetric(item.metric));
 }
 
+// Repetitions and kilometres are official-only metrics.
 export function isFriendMetric(metric: ChallengeMetric): boolean {
-  return metric !== 'exercise_reps';
+  return metric !== 'exercise_reps' && metric !== 'distance_km';
 }
 
 export const DURATIONS = [
@@ -427,10 +430,127 @@ export function weekBarHeight(value: number | null): number {
   return value === 0 ? 4 : Math.min(60, 8 + value * 1.6);
 }
 
-export function officialLeftLine(progress: number, goal: number): string {
-  return progress >= goal
-    ? 'Completado'
-    : `Te faltan ${goal - progress} para completar el reto.`;
+// Figures of a challenge: whole numbers, except kilometres (the server keeps
+// 2 decimals: "12,5", "50"). Decimal comma.
+export function formatChallengeValue(metric: ChallengeMetric, value: number): string {
+  if (metric !== 'distance_km') {
+    return String(Math.round(value));
+  }
+  const rounded = Math.round(value * 100) / 100;
+  return String(rounded).replace('.', ',');
+}
+
+export function officialLeftLine(
+  progress: number,
+  goal: number,
+  metric?: ChallengeMetric,
+): string {
+  if (progress >= goal) {
+    return 'Completado';
+  }
+  const left = metric ? formatChallengeValue(metric, goal - progress) : String(goal - progress);
+  return metric === 'distance_km'
+    ? `Te faltan ${left} km para completar el reto.`
+    : `Te faltan ${left} para completar el reto.`;
+}
+
+// "+150 puntos · Badge Semana de tracción" (the reward block of each official
+// challenge); what the server did not give is left out.
+export function rewardLine(points: number | null, badgeTitle: string | null): string | null {
+  const parts = [
+    points && points > 0 ? `+${points} puntos` : null,
+    badgeTitle ? `Badge ${badgeTitle}` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+// "Al completar las 100 dominadas", "Al sumar 50 km con Ruta".
+export function completionCondition(input: {
+  metric: ChallengeMetric;
+  goal: number;
+  exerciseName: string | null;
+  sport?: string | null;
+}): string {
+  const goal = formatChallengeValue(input.metric, input.goal);
+  switch (input.metric) {
+    case 'distance_km': {
+      const how =
+        input.sport === 'running' ? 'corriendo' : input.sport === 'cycling' ? 'en bici' : 'con Ruta';
+      return `Al sumar ${goal} km ${how}`;
+    }
+    case 'exercise_reps':
+      return input.exerciseName
+        ? `Al completar las ${goal} ${input.exerciseName.toLowerCase()}`
+        : `Al completar las ${goal} repeticiones`;
+    case 'strength_sessions':
+      return `Al completar las ${goal} sesiones de fuerza`;
+    case 'mobility_minutes':
+      return `Al sumar ${goal} min de movilidad`;
+    case 'minutes_trained':
+      return `Al sumar ${goal} min entrenados`;
+    case 'core33_habit_days':
+      return `Al completar los ${goal} días de hábitos`;
+    default:
+      return `Al completar los ${goal} entrenamientos`;
+  }
+}
+
+// The big figure and unit of a card ("100" "dominadas", "50" "km").
+export function bigFigure(input: {
+  metric: ChallengeMetric;
+  goal: number;
+  title: string;
+  exerciseName: string | null;
+}): { big: string; unit: string } {
+  const big = formatChallengeValue(input.metric, input.goal);
+  switch (input.metric) {
+    case 'distance_km':
+      return { big, unit: 'km' };
+    case 'exercise_reps':
+      return { big, unit: input.exerciseName?.toLowerCase() ?? 'repeticiones' };
+    case 'strength_sessions':
+      return { big, unit: 'sesiones' };
+    case 'mobility_minutes':
+    case 'minutes_trained':
+      return { big, unit: 'min' };
+    default:
+      return { big, unit: metricInfo(input.metric).unit };
+  }
+}
+
+// "OCT" and "12" of a start date (the cards of "Lo que viene").
+const MONTHS_SHORT = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC'];
+
+export function startDateParts(startsAt: string | null): { mon: string; day: string } | null {
+  if (!startsAt) {
+    return null;
+  }
+  const date = new Date(startsAt);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return { mon: MONTHS_SHORT[date.getMonth()], day: String(date.getDate()) };
+}
+
+// "Más retos para este mes": alternating compositions, a full-width photo and
+// then two columns, so the list reads as an editorial one (SOCIAL_15).
+export type OfficialBlock<T> =
+  | { kind: 'wide'; item: T }
+  | { kind: 'pair'; item: T; other: T | null };
+
+export function composeOfficialBlocks<T>(items: readonly T[]): OfficialBlock<T>[] {
+  const blocks: OfficialBlock<T>[] = [];
+  let index = 0;
+  while (index < items.length) {
+    if (blocks.length % 2 === 0) {
+      blocks.push({ kind: 'wide', item: items[index] });
+      index += 1;
+    } else {
+      blocks.push({ kind: 'pair', item: items[index], other: items[index + 1] ?? null });
+      index += 2;
+    }
+  }
+  return blocks;
 }
 
 // ── One line per challenge in the list (SOCIAL_07) ─────────────────────────

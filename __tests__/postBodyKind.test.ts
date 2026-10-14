@@ -18,9 +18,8 @@ describe('postBodyKind · composition by post type (v2.12)', () => {
     expect(postBodyKind(post('photo', 'u/p/photo.jpg'))).toBe('photo');
   });
 
-  it('draws route posts only when enabled (fixtures), never in the real app', () => {
-    expect(postBodyKind(post('route'))).toBe('unknown');
-    expect(postBodyKind(post('route'), { routeEnabled: false })).toBe('unknown');
+  it('draws route posts (real since Ruta 5c)', () => {
+    expect(postBodyKind(post('route'))).toBe('route');
     expect(postBodyKind(post('route'), { routeEnabled: true })).toBe('route');
   });
 
@@ -28,8 +27,7 @@ describe('postBodyKind · composition by post type (v2.12)', () => {
     expect(postBodyKind(post('story'))).toBe('unknown');
     expect(postBodyKind(post(''))).toBe('unknown');
     expect(isRenderablePost(post('story'))).toBe(false);
-    expect(isRenderablePost(post('route'))).toBe(false);
-    expect(isRenderablePost(post('route'), { routeEnabled: true })).toBe(true);
+    expect(isRenderablePost(post('route'))).toBe(true);
     expect(isRenderablePost(post('workout'))).toBe(true);
   });
 });
