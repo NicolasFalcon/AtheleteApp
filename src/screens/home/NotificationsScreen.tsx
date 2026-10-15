@@ -1,3 +1,4 @@
+import { usePushPromptOnFocus } from '@app/features/push/usePushPrompt';
 import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
 import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { useCallback, useMemo, useRef } from 'react';
@@ -78,6 +79,7 @@ export function NotificationsScreen({ navigation }: Props) {
   const overview = useNotificationsOverview();
   const ellieData = useEllieData();
   const openCore33 = useOpenCore33();
+  usePushPromptOnFocus('inbox');
 
   const firstFocus = useRef(true);
   useFocusEffect(

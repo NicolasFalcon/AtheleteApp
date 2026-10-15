@@ -192,6 +192,7 @@ export type AppStackParamList = {
   EditProfile: undefined;
   Settings: undefined;
   HealthSettings: undefined;
+  NotificationSettings: undefined;
   Achievements: undefined;
   Notifications: undefined;
   Core33: undefined;

@@ -1,3 +1,4 @@
+import { unregisterPushTokenBeforeSignOut } from '@app/features/push/pushRuntime';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -134,6 +135,8 @@ export function SettingsScreen({ navigation }: Props) {
     setDeleteOutcome(null);
     const userId = profile?.id;
     try {
+      // Before the account (and its session) disappears.
+      await unregisterPushTokenBeforeSignOut();
       const outcome = mapDeleteAccountResponse(await requestAccountDeletion());
       setDeleteOutcome(outcome);
       if (outcome.kind === 'deleted') {
@@ -278,6 +281,16 @@ export function SettingsScreen({ navigation }: Props) {
               }
             />
           ))}
+        </SettingsSection>
+
+        <SettingsSection title="Notificaciones">
+          <Row
+            leading={icon(Bell)}
+            title="Notificaciones push"
+            subtitle="Permiso, amigos, retos y horas de silencio"
+            trailing="chevron"
+            onPress={() => navigation.navigate(APP_ROUTES.NotificationSettings)}
+          />
         </SettingsSection>
 
         <SettingsSection title="Cuenta">

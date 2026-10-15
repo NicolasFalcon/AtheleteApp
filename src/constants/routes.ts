@@ -39,6 +39,7 @@ export const APP_ROUTES = {
   EditProfile: 'EditProfile',
   Settings: 'Settings',
   HealthSettings: 'HealthSettings',
+  NotificationSettings: 'NotificationSettings',
   Achievements: 'Achievements',
   Notifications: 'Notifications',
   Core33: 'Core33',

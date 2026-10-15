@@ -1,3 +1,4 @@
+import { parsePushPrefs } from '@app/services/push/pushService';
 import { getSupabaseClient } from '@app/services/supabase/client';
 import { normalizeAvatarKey } from '@app/assets/avatars';
 import { normalizeProfilePhotoReference } from '@app/services/supabase/profile-photo';
@@ -92,6 +93,7 @@ function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
     core33InviteDismissedAt: row.core33_invite_dismissed_at,
     core33InviteDismissCount: row.core33_invite_dismiss_count ?? 0,
     notificationPrefs: parseNotificationPrefs(row.notification_prefs),
+    pushPrefs: parsePushPrefs(row.notification_prefs),
     createdAt: (row as { created_at?: string | null }).created_at ?? null,
   };
 }
@@ -332,10 +334,44 @@ export const resetCore33InviteCounter = (userId: string) =>
   updateOwnProfile(userId, { core33_invite_dismiss_count: 0 });
 
 // BT-31: the three switches of Ajustes.
-export const saveNotificationPrefs = (
+// The three switches of Ajustes go in without touching the other keys of the
+// jsonb (`push` is written only by set_push_prefs): the stored object is read,
+// the three flags replaced, and everything else kept.
+export function mergeNotificationPrefs(
+  stored: unknown,
+  prefs: NotificationPrefs,
+): Record<string, unknown> {
+  const base =
+    stored && typeof stored === 'object' && !Array.isArray(stored)
+      ? (stored as Record<string, unknown>)
+      : {};
+  return {
+    ...base,
+    workouts: prefs.workouts,
+    hydration: prefs.hydration,
+    updates: prefs.updates,
+  };
+}
+
+export async function saveNotificationPrefs(
   userId: string,
   prefs: NotificationPrefs,
-) => updateOwnProfile(userId, { notification_prefs: prefs });
+): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) {
+    throw new Error('Supabase is not configured.');
+  }
+  const { data, error } = await (client.from('profiles') as any)
+    .select('notification_prefs')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    throw error;
+  }
+  await updateOwnProfile(userId, {
+    notification_prefs: mergeNotificationPrefs(data?.notification_prefs, prefs),
+  });
+}
 
 // For the Core 33 module (Intro seen / challenge completed).
 export const markCore33IntroSeen = (userId: string, at = new Date()) =>

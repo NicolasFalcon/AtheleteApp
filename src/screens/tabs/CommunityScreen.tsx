@@ -1,3 +1,4 @@
+import { usePushPromptOnFocus } from '@app/features/push/usePushPrompt';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -56,6 +57,7 @@ export function CommunityScreen({
     service.getUnreadNotifications(),
   );
   const unread = unreadResource.data ?? 0;
+  usePushPromptOnFocus('community');
   const redirected = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const meProfile = useMemo(

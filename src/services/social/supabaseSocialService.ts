@@ -104,7 +104,9 @@ import type {
   ToggleLikeResult,
 } from '@app/features/social/postTypes';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { applyBadge } from '@app/features/push/badge';
 import { createUuid } from '@app/lib/uuid';
+import { pushService } from '@app/services/push/pushService';
 import { loadAttachmentSources } from '@app/services/social/attachmentSources';
 import { getSupabaseClient } from '@app/services/supabase/client';
 import {
@@ -153,6 +155,12 @@ async function currentUserId(): Promise<string> {
     throw new Error('Sin sesión');
   }
   return id;
+}
+
+// mark_notifications_read: `null` marks all. Its `unread` is the icon badge.
+async function markRead(ids: string[] | null): Promise<void> {
+  const { unread } = await pushService.markRead(ids);
+  applyBadge(unread).catch(() => undefined);
 }
 
 async function fetchProfiles(ids: string[]): Promise<Map<string, SocialProfileRow>> {
@@ -1061,32 +1069,16 @@ export const supabaseSocialService: SocialService = {
     }
     return count ?? 0;
   },
-  // UPDATE read_at = now() for my unread rows (RLS only lets me write mine).
+  // mark_notifications_read (PUSH_SHAPES §3): the server answers the unread
+  // count left, which becomes the icon badge.
   async markNotificationsRead(ids) {
     if (ids.length === 0) {
       return;
     }
-    const me = await currentUserId();
-    const { error } = await client()
-      .from('social_notifications')
-      .update({ read_at: new Date().toISOString() })
-      .eq('recipient_id', me)
-      .is('read_at', null)
-      .in('id', ids);
-    if (error) {
-      return failed(error);
-    }
+    await markRead(ids);
   },
   async markAllNotificationsRead() {
-    const me = await currentUserId();
-    const { error } = await client()
-      .from('social_notifications')
-      .update({ read_at: new Date().toISOString() })
-      .eq('recipient_id', me)
-      .is('read_at', null);
-    if (error) {
-      return failed(error);
-    }
+    await markRead(null);
   },
   async deleteNotifications(ids) {
     if (ids.length === 0) {

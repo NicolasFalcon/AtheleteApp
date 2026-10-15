@@ -1,5 +1,6 @@
 import UIKit
 internal import Expo
+internal import ExpoModulesCore
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
@@ -41,6 +42,43 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     supportedInterfaceOrientationsFor window: UIWindow?
   ) -> UIInterfaceOrientationMask {
     Orientation.getOrientation()
+  }
+
+  // Remote notifications (APNs). This delegate does not inherit from
+  // ExpoAppDelegate, so the system callbacks are not forwarded to Expo's
+  // subscribers by themselves: hand them to the manager so that
+  // expo-notifications gets the device token, its failure and the pushes
+  // that arrive in the background.
+  func application(
+    _ application: UIApplication,
+    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+  ) {
+    ExpoAppDelegateSubscriberManager.application(
+      application,
+      didRegisterForRemoteNotificationsWithDeviceToken: deviceToken
+    )
+  }
+
+  func application(
+    _ application: UIApplication,
+    didFailToRegisterForRemoteNotificationsWithError error: Error
+  ) {
+    ExpoAppDelegateSubscriberManager.application(
+      application,
+      didFailToRegisterForRemoteNotificationsWithError: error
+    )
+  }
+
+  func application(
+    _ application: UIApplication,
+    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+  ) {
+    ExpoAppDelegateSubscriberManager.application(
+      application,
+      didReceiveRemoteNotification: userInfo,
+      fetchCompletionHandler: completionHandler
+    )
   }
 
   // Universal links. Inactive until an Associated Domains entitlement exists.

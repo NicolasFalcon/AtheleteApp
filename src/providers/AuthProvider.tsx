@@ -1,3 +1,5 @@
+import { signOutAfterUnregister } from '@app/features/push/pushRegistration';
+import { unregisterPushTokenBeforeSignOut } from '@app/features/push/pushRuntime';
 import {
   createContext,
   useCallback,
@@ -445,7 +447,9 @@ export function AuthProvider({ children }: PropsWithChildren) {
   );
 
   const signOut = useCallback(async () => {
-    const { error } = await signOutService();
+    // The push token goes back BEFORE the session closes (the RPC needs the
+    // JWT); it never blocks the sign-out.
+    const { error } = await signOutAfterUnregister(unregisterPushTokenBeforeSignOut, signOutService);
 
     if (error) {
       throw error;

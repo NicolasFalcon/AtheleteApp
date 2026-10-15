@@ -1,3 +1,4 @@
+import { usePushPromptOnFocus } from '@app/features/push/usePushPrompt';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,6 +45,7 @@ export function SocialNotificationsScreen({ navigation }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const list = useNotificationList();
+  usePushPromptOnFocus('inbox');
   const [removing, setRemoving] = useState<NotificationGroup | null>(null);
   const items = list.items;
   const groups = groupNotifications(items);

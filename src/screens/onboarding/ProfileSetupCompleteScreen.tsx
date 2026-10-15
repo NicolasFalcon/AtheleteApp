@@ -1,3 +1,4 @@
+import { requestPushPrompt } from '@app/features/push/pushPromptStore';
 import { useState } from 'react';
 import { ImageBackground, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -48,6 +49,8 @@ export function ProfileSetupCompleteScreen(_props: Props) {
     setError('');
     try {
       await completeOnboarding(payload);
+      // New users: the pre-permission screen comes up once the app opens.
+      requestPushPrompt('onboarding');
     } catch (nextError) {
       setError(
         nextError instanceof Error

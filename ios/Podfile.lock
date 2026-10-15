@@ -23,6 +23,8 @@ PODS:
     - Yoga
   - BVLinearGradient (2.8.3):
     - React-Core
+  - EXApplication (56.0.3):
+    - ExpoModulesCore
   - EXConstants (56.0.27):
     - ExpoModulesCore
   - Expo (56.0.23):
@@ -109,6 +111,8 @@ PODS:
     - ExpoModulesJSI
     - ExpoModulesWorklets
     - RNWorklets
+  - ExpoNotifications (56.0.26):
+    - ExpoModulesCore
   - ExpoSpeech (56.0.3):
     - ExpoModulesCore
   - ExpoSpeechRecognition (56.0.4):
@@ -2424,7 +2428,8 @@ PODS:
 DEPENDENCIES:
   - "AsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - BVLinearGradient (from `../node_modules/react-native-linear-gradient`)
-  - EXConstants (from `../node_modules/expo/node_modules/expo-constants/ios`)
+  - EXApplication (from `../node_modules/expo-application/ios`)
+  - EXConstants (from `../node_modules/expo-constants/ios`)
   - Expo (from `../node_modules/expo`)
   - ExpoAsset (from `../node_modules/expo/node_modules/expo-asset/ios`)
   - ExpoCamera (from `../node_modules/expo-camera/ios`)
@@ -2440,6 +2445,7 @@ DEPENDENCIES:
   - ExpoModulesJSI (from `../node_modules/expo-modules-jsi/apple`)
   - ExpoModulesWorklets (from `../node_modules/expo-modules-core`)
   - ExpoModulesWorkletsAdapter (from `../node_modules/expo-modules-core`)
+  - ExpoNotifications (from `../node_modules/expo-notifications/ios`)
   - ExpoSpeech (from `../node_modules/expo-speech/ios`)
   - ExpoSpeechRecognition (from `../node_modules/expo-speech-recognition/ios`)
   - ExpoTaskManager (from `../node_modules/expo-task-manager/ios`)
@@ -2544,8 +2550,10 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-async-storage/async-storage"
   BVLinearGradient:
     :path: "../node_modules/react-native-linear-gradient"
+  EXApplication:
+    :path: "../node_modules/expo-application/ios"
   EXConstants:
-    :path: "../node_modules/expo/node_modules/expo-constants/ios"
+    :path: "../node_modules/expo-constants/ios"
   Expo:
     :path: "../node_modules/expo"
   ExpoAsset:
@@ -2576,6 +2584,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-modules-core"
   ExpoModulesWorkletsAdapter:
     :path: "../node_modules/expo-modules-core"
+  ExpoNotifications:
+    :path: "../node_modules/expo-notifications/ios"
   ExpoSpeech:
     :path: "../node_modules/expo-speech/ios"
   ExpoSpeechRecognition:
@@ -2761,6 +2771,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AsyncStorage: 857a13f3c66a30d6b02efa09babba3d457e8e8ca
   BVLinearGradient: cb006ba232a1f3e4f341bb62c42d1098c284da70
+  EXApplication: e6040c92edc5522accd62852342e6b14742d42c0
   EXConstants: 9d3531b15141ea2e24f4b48d51050291f83ccce7
   Expo: 668a9b2aa9e6bfc2586f2a0e42d1705e4cfc6f1d
   ExpoAsset: 248b72382c8285f02fd6fb6d62ff6d2179071023
@@ -2777,6 +2788,7 @@ SPEC CHECKSUMS:
   ExpoModulesJSI: be5366379de5036c554db5f6478fc994da8f5ece
   ExpoModulesWorklets: 706d2511ac0e91743314d8f2e47683a924ae92f3
   ExpoModulesWorkletsAdapter: 72814d068279d4bfe282d1d5f0ff80df7901b946
+  ExpoNotifications: c26fd8557c759cec54abacfd54db48a4cffa70da
   ExpoSpeech: fe3706df8653ab8c16ff88251e33fab79b07a420
   ExpoSpeechRecognition: b167eed8044f79fad6189ee7ae9d668887d0c696
   ExpoTaskManager: b763626a0aacddfff42aeb6d7156edd2f6086973

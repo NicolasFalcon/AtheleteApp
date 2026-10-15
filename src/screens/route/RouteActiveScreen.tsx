@@ -11,6 +11,11 @@ import { clearRecording, createRecordingPersister } from '@app/features/route/ac
 import { MIN_SAVE_M, saveFinishedRecording } from '@app/features/route/finishRecording';
 import { getLocationSource } from '@app/features/route/locationSourceFactory';
 import { stopAllLocationUpdates } from '@app/features/route/RealLocationSource';
+import {
+  clearDeviationNotice,
+  deviationAction,
+  showDeviationNotice,
+} from '@app/features/push/routeDeviationNotice';
 import { RouteMap } from '@app/features/route/RouteMap';
 import {
   formatDuration,
@@ -36,6 +41,7 @@ import { useRouteTracker } from '@app/features/route/useRouteTracker';
 import { BigFigure, DARK } from '@app/features/route/v2/RouteUi';
 import { RouteServiceError } from '@app/services/route/routeService';
 import { useAuth } from '@app/hooks/useAuth';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { createUuid } from '@app/lib/uuid';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -51,6 +57,7 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
   const insets = useSafeAreaInsets();
   const service = useRouteService();
   const toast = useToast();
+  const language = useProfileLanguage();
   const queryClient = useQueryClient();
   const session = useRouteSession();
   const planPoints = session.plan?.points ?? null;
@@ -123,11 +130,11 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
   const off = state.deviation.off && !paused;
 
   // Deviation: a vibration when the app is in the foreground, on leaving the
-  // route and on getting back to it.
-  // TODO(push-local): the same warning as a local notification when the app is
-  // in the background (with the push notifications phase, expo-notifications).
+  // route and on getting back to it; a local notification when it is in the
+  // background (taken away once back on the route).
   const wasOff = useRef(false);
   useEffect(() => {
+    const action = deviationAction({ off, wasOff: wasOff.current, appState: AppState.currentState });
     if (off !== wasOff.current) {
       wasOff.current = off;
       if (AppState.currentState === 'active') {
@@ -138,7 +145,12 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
         }
       }
     }
-  }, [off]);
+    if (action === 'notify') {
+      showDeviationNotice(language).catch(() => undefined);
+    } else if (action === 'clear') {
+      clearDeviationNotice().catch(() => undefined);
+    }
+  }, [language, off]);
 
   // How much of the planned route is left.
   const planTotalM = useMemo(() => (planPoints ? polylineDistance(planPoints) : 0), [planPoints]);

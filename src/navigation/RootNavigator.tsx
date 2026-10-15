@@ -5,6 +5,7 @@ import { Core33DetailScreen } from '@app/screens/core33/Core33DetailScreen';
 import { Core33ReadyScreen } from '@app/screens/core33/Core33ReadyScreen';
 import { SettingsScreen } from '@app/screens/profile/SettingsScreen';
 import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen';
+import { NotificationSettingsScreen } from '@app/screens/profile/NotificationSettingsScreen';
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
 import { EllieVoiceScreen } from '@app/screens/ellie/EllieVoiceScreen';
 import { RouteSoonScreen } from '@app/screens/home/RouteSoonScreen';
@@ -194,6 +195,10 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.Settings}
             component={SettingsScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.NotificationSettings}
+            component={NotificationSettingsScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.HealthSettings}

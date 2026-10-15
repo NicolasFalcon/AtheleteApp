@@ -4,12 +4,13 @@ import type { Tables } from '@app/types/supabase';
 import type { SocialProfileRow } from '@app/features/social/socialTypes';
 
 // Pure model of the social notifications (tanda C). Table:
-// `social_notifications` (SOCIAL_SCHEMA_PROPOSAL §4.11); in-app only, no push
-// (Q10). The copy is built here from the type and the actor.
+// `social_notifications` (SOCIAL_SCHEMA_PROPOSAL §4.11); the same rows also go
+// out as push (docs/backend/PUSH_SHAPES.md). The copy is built here from the
+// type and the actor.
 
 export type SocialNotificationRow = Tables<'social_notifications'>;
 
-// The seven types the server writes (SOCIAL_RPC_SHAPES, W6). Any other value
+// The types the server writes (SOCIAL_RPC_SHAPES W6 + PUSH_SHAPES §2/§5). Any other value
 // is ignored, never an error: a newer server can add types.
 export const NOTIFICATION_TYPES = [
   'friend_request',
@@ -18,6 +19,10 @@ export const NOTIFICATION_TYPES = [
   'post_comment',
   'challenge_invite',
   'challenge_started',
+  'challenge_completed',
+  'challenge_ending',
+  'official_completed',
+  'official_new',
   'content_removed',
 ] as const;
 
@@ -119,6 +124,14 @@ function textFor(
       return `${who} te invita a un reto`;
     case 'challenge_started':
       return 'Tu reto entre amigos ha empezado';
+    case 'challenge_completed':
+      return 'Un reto entre amigos ha terminado';
+    case 'challenge_ending':
+      return 'Tu reto oficial termina en menos de 24 h';
+    case 'official_completed':
+      return 'Completaste un reto oficial';
+    case 'official_new':
+      return 'Hay un reto oficial nuevo';
     case 'content_removed':
       return 'Retiramos una publicación tuya por incumplir las normas';
   }
@@ -135,6 +148,10 @@ export function destinationOf(item: SocialNotification): NotificationDestination
       return item.post_id ? { kind: 'post', postId: item.post_id } : { kind: 'none' };
     case 'challenge_invite':
     case 'challenge_started':
+    case 'challenge_completed':
+    case 'challenge_ending':
+    case 'official_completed':
+    case 'official_new':
       return item.challenge_id
         ? { kind: 'challenge', challengeId: item.challenge_id }
         : { kind: 'none' };

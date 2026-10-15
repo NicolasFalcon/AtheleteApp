@@ -1,3 +1,4 @@
+import type { PushPrefs } from '@app/services/push/pushService';
 import type { AvatarKey } from '@app/types/profileIdentity';
 
 export type AppFlow = 'auth' | 'onboarding' | 'app';
@@ -72,4 +73,6 @@ export type ProfileRecord = {
   createdAt: string | null;
   // profiles.notification_prefs (BT-31).
   notificationPrefs: NotificationPrefs;
+  // profiles.notification_prefs.push (PUSH_SHAPES §2), with its defaults.
+  pushPrefs: PushPrefs;
 };
