@@ -8,7 +8,6 @@ import type {
   NativeStackScreenProps,
 } from '@react-navigation/native-stack';
 import type { Core33ChallengeId } from '@app/features/core33/core33Catalog';
-import type { DevSessionState } from '@app/features/session/useSessionRunner';
 import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
 import type {
   QuizChallengeRouteParams,
@@ -47,8 +46,6 @@ export type WorkoutSessionRouteParams = {
   workoutId: Workout['id'];
   // A specific session (e.g. one saved for later on another day).
   sessionId?: string;
-  // Development only (__DEV__): open in a state without writing anything.
-  devState?: DevSessionState;
 };
 
 // Resumen de cierre (SESSION_07).
@@ -56,8 +53,6 @@ export type WorkoutSummaryRouteParams = {
   sessionId: string;
   // Badges unlocked by workout_completed (from the completion response).
   newBadges?: string[];
-  // Development only (__DEV__): sample figures, nothing read or written.
-  devPreview?: boolean;
 };
 
 export type ExerciseDetailRouteParams = {
@@ -79,11 +74,9 @@ export type RoutineListRouteParams = {
   type?: WorkoutType;
   collection?: 'favorites' | 'mine' | 'all';
   focusSearch?: boolean;
-  // Development only (__DEV__): shows the empty state (STATE_06).
-  devEmpty?: boolean;
 };
 
-// Entrenos tab (WORKOUTS_01 / 03). Also set by the dev screen cycler.
+// Entrenos tab (WORKOUTS_01 / 03).
 export type WorkoutsTabParams = {
   segment?: 'routines' | 'exercises';
 };
@@ -92,9 +85,6 @@ export type RoutineBuilderRouteParams = {
   workoutId?: Workout['id'];
   initialExerciseId?: LibraryExercise['id'];
   initialExerciseName?: string;
-  // Development only (__DEV__): open on a step with sample answers so each
-  // step can be reviewed. Nothing is saved unless "Guardar" is pressed.
-  devStep?: 0 | 1 | 2;
 };
 
 export type EditRoutineRouteParams = {
@@ -109,10 +99,6 @@ export type AddExerciseToRoutineRouteParams = {
 export type PersonalRecordsRouteParams = {
   exerciseId?: LibraryExercise['id'];
   exerciseName?: string;
-  // Development only (__DEV__): sample / empty data and the open sheet.
-  devState?: 'data' | 'empty' | 'loading' | 'error';
-  devSheet?: boolean;
-  devCelebration?: boolean;
 };
 
 export type RegisterPrRouteParams = {
@@ -121,55 +107,32 @@ export type RegisterPrRouteParams = {
   showExercisePicker?: boolean;
 };
 
-// Perfil, Editar perfil y Ajustes. Development only: sample data / forced states.
-export type ProfileRouteParams = {
-  devState?: 'data' | 'new' | 'loading' | 'error';
-};
-export type ProfileFormRouteParams = {
-  devState?: 'data' | 'saving' | 'saved' | 'error' | 'invalid' | 'loading' | 'new';
+// Calorías (Nutrición): the day, with the meals and the photo flow.
+export type NutritionPlanRouteParams = undefined;
+
+// Camera of Calorías. From Inicio it says "Hoy llevas X kcal".
+export type CaloriesCameraRouteParams = {
+  source?: 'home' | 'nutrition';
+  todayKcal?: number;
 };
 
-// Core 33 (day screen). Development only: sample states, nothing is read or
-// written.
-export type Core33RouteParams = {
-  devState?:
-    | 'none'
-    | 'day1'
-    | 'day17'
-    | 'missed'
-    | 'day33'
-    | 'completed'
-    | 'celebration'
-    | 'loading'
-    | 'error';
+// Result / editor of a meal. `draft` is a MealDraft (plain data). With
+// `mealId` it edits that meal ("Guardar cambios"); otherwise it adds one with
+// `source` (photo of Calorías or the card of the chat).
+export type MealReviewRouteParams = {
+  draft: import('@app/features/nutrition/mealDraft').MealDraft;
+  photoUri?: string | null;
+  source: 'photo' | 'chat';
+  chatMessageId?: string;
+  mealId?: string;
 };
 
-// Achievements (Logros). Development only: sample data and the open sheet.
-export type AchievementsRouteParams = {
-  devState?: 'data' | 'loading' | 'error';
-  devSheet?: boolean | 'locked';
-};
+export type MealDetailRouteParams = { mealId: string; date?: string | null };
 
-export type NutritionPlanRouteParams = {
-  openLog?: boolean;
-  // Development only: sample data / forced states (nothing is read or written).
-  devState?: 'plan' | 'goalMet' | 'noPlan' | 'empty' | 'loading' | 'error';
-  devSheet?: 'log' | 'logSaving' | 'logError';
-};
-
-// Progreso tab. Also set by the dev screen cycler (__DEV__).
+// Progreso tab.
 export type ProgressTabParams = {
   segment?: 'summary' | 'challenges';
   period?: 'week' | 'month';
-  // Development only: force a state; 'data' uses sample data (no reads).
-  devState?: 'data' | 'empty' | 'loading' | 'error';
-  // Development only: scroll offset (to review the lower sections).
-  devScroll?: number;
-};
-
-// ELLIE tab (portada). Development only: a forced state.
-export type EllieTabParams = {
-  devState?: 'empty' | 'data' | 'loading' | 'error';
 };
 
 // ELLIE conversation (its own screen, no tab bar). `prompt` is sent once on
@@ -179,51 +142,25 @@ export type EllieChatRouteParams = {
   mode?: 'generate_workout' | 'generate_nutrition';
   // Open with the composer focused (no prompt).
   focusInput?: boolean;
-  // Development only (__DEV__): fixture conversation, no network, no writes.
-  devState?:
-    | 'first'
-    | 'chat'
-    | 'thinking'
-    | 'plan'
-    | 'planActivating'
-    | 'planError'
-    | 'planActive'
-    | 'routine'
-    | 'offline'
-    | 'server'
-    | 'limit'
-    | 'loading'
-    | 'historyError';
-};
-
-// ELLIE voice scene (UI only). `devState` (__DEV__) opens it in one of the
-// four visual states.
-export type EllieVoiceRouteParams = {
-  devState?: 'idle' | 'listening' | 'thinking' | 'speaking';
+  // 'new' starts a conversation; an id opens that one; without it the chat
+  // continues the latest.
+  conversationId?: string;
+  // Screen of origin, sent as client_context.
+  source?: string;
 };
 
 export type CommunitySegment = 'feed' | 'retos' | 'amigos';
 
 export type CommunityTabParams = {
   segment?: CommunitySegment;
-  // Dev only: prefilled search of Amigos.
-  devQuery?: string;
-  // Dev only: scroll the hub to the bottom (end of the feed, load more).
-  devScroll?: 'end' | number;
-  // Dev only: changes on every dev open, so the same params apply again.
-  devNonce?: number;
 };
 
 export type SocialProfileRouteParams = {
   userId: string;
-  // Dev only: opens the block confirmation.
-  devConfirmBlock?: boolean;
 };
 
 export type SocialPostRouteParams = {
   postId: string;
-  // Dev only: opens a content sheet (options, report, delete) or reports a comment.
-  devAction?: 'menu' | 'report' | 'delete' | 'reportComment';
 };
 
 export type SocialComposeRouteParams = {
@@ -232,23 +169,18 @@ export type SocialComposeRouteParams = {
   // The exact item to share (session, record, badge or `core33:<id>`,
   // routine, challenge); without it the latest of that kind is offered.
   sourceId?: string;
-  // Dev only: opens with the Terms sheet, an invalid photo, or an attached photo.
-  devState?: 'terms' | 'badPhoto' | 'photo';
 };
 
 export type SocialUsernameRouteParams = {
   // 'create' is the required first step before using Comunidad; 'edit'
   // comes from Privacidad social.
   mode: 'create' | 'edit';
-  // Dev only: starts with this text and a server error.
-  devText?: string;
-  devError?: 'username_taken';
 };
 
 export type MainTabParamList = {
   Home: undefined;
   Workouts: WorkoutsTabParams | undefined;
-  Ellie: EllieTabParams | undefined;
+  Ellie: undefined;
   Progress: ProgressTabParams | undefined;
   Community: CommunityTabParams | undefined;
 };
@@ -256,20 +188,18 @@ export type MainTabParamList = {
 // Shared screens above the tabs (handoff §6: detail, flows and immersive
 // screens hide the tab bar).
 export type AppStackParamList = {
-  Profile: ProfileRouteParams | undefined;
-  EditProfile: ProfileFormRouteParams | undefined;
-  Settings: ProfileFormRouteParams | undefined;
-  HealthSettings: { devConnected?: boolean } | undefined;
-  Achievements: AchievementsRouteParams | undefined;
+  Profile: undefined;
+  EditProfile: undefined;
+  Settings: undefined;
+  HealthSettings: undefined;
+  Achievements: undefined;
   Notifications: undefined;
-  Core33: Core33RouteParams | undefined;
-  Core33Intro: { devStep?: 0 | 1 | 2 } | undefined;
+  Core33: undefined;
+  Core33Intro: undefined;
   Core33Explore: undefined;
   Core33Detail: { challengeId: Core33ChallengeId };
   Core33Ready: {
     challengeId: Core33ChallengeId;
-    devStarting?: boolean;
-    devAlreadyActive?: boolean;
   };
   WorkoutDetail: WorkoutDetailRouteParams;
   WorkoutSession: WorkoutSessionRouteParams;
@@ -285,44 +215,44 @@ export type AppStackParamList = {
   QuizQuestion: QuizQuestionRouteParams;
   QuizResult: QuizResultRouteParams;
   EllieChat: EllieChatRouteParams | undefined;
-  EllieVoice: EllieVoiceRouteParams | undefined;
+  EllieVoice: undefined;
   RouteSoon: undefined;
-  // Ruta (phase 5a). `dev` (__DEV__): a scenario of the sample data.
-  RoutePrep: { dev?: string } | undefined;
-  RouteGen: { dev?: string } | undefined;
-  RouteManual: { dev?: string } | undefined;
-  RoutePreview: { dev?: string } | undefined;
-  RouteSaved: { dev?: string } | undefined;
-  RouteActive: { dev?: string } | undefined;
-  RouteResult: { dev?: string; activityId?: string; viewer?: boolean } | undefined;
+  RoutePrep: undefined;
+  RouteGen: undefined;
+  RouteManual: undefined;
+  RoutePreview: undefined;
+  RouteSaved: undefined;
+  RouteActive: undefined;
+  RouteResult: { activityId?: string; viewer?: boolean } | undefined;
   RouteShare: { activityId?: string } | undefined;
-  // `devScroll` (__DEV__): opens already scrolled, for captures.
-  Wear: { devScroll?: number } | undefined;
+  Wear: undefined;
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;
   NutritionPlan: NutritionPlanRouteParams | undefined;
+  CaloriesCamera: CaloriesCameraRouteParams | undefined;
+  MealReview: MealReviewRouteParams;
+  MealDetail: MealDetailRouteParams;
+  MachineScan: undefined;
   BodyScience: undefined;
   BodyScienceArticle: { articleId: string };
   SocialProfile: SocialProfileRouteParams;
   SocialPrivacy: undefined;
-  SocialInvite: { devState?: 'limit' } | undefined;
+  SocialInvite: undefined;
   SocialBlocked: undefined;
   SocialUsername: SocialUsernameRouteParams;
   SocialPost: SocialPostRouteParams;
   SocialCompose: SocialComposeRouteParams;
-  SocialChallenge: { challengeId: string; devSheet?: 'leave' | 'cancel' };
+  SocialChallenge: { challengeId: string };
   SocialCreateChallenge:
     | {
         // "Retar" from a friend's profile preselects them.
         inviteeId?: string;
-        // Dev only: opens at a step with a draft.
-        devStep?: 0 | 1 | 2 | 3 | 4;
       }
     | undefined;
   SocialChallengeDone: { challengeId: string };
   SocialOfficialList: undefined;
   SocialNotifications: undefined;
-  SocialModeration: { devTab?: 'queue' | 'history' } | undefined;
+  SocialModeration: undefined;
   SocialModerationItem: { targetId: string };
   SocialRoutine: { postId: string };
 };
@@ -331,7 +261,6 @@ export type RootStackParamList = {
   AuthFlow: NavigatorScreenParams<AuthStackParamList>;
   OnboardingFlow: NavigatorScreenParams<OnboardingStackParamList>;
   MainTabs: NavigatorScreenParams<MainTabParamList>;
-  DevFixtureTabs: NavigatorScreenParams<MainTabParamList>;
 } & AppStackParamList;
 
 export type AppRouteName = keyof AppStackParamList;

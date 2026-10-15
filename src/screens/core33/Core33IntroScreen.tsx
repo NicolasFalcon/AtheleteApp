@@ -34,10 +34,10 @@ const DEMO: CapsuleCellState[] = Array.from({ length: 33 }, (_, i) =>
 // Intro (CORE33_01_INTRO_1/2/3): three moments on a dark scene, always the
 // same in Light and Dark. Leaving it (Explorar retos or Saltar) marks the
 // intro as seen (profiles.core33_intro_seen_at).
-export function Core33IntroScreen({ navigation, route }: Props) {
+export function Core33IntroScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { markIntroSeen } = useCore33();
-  const [step, setStep] = useState<number>(__DEV__ ? route.params?.devStep ?? 0 : 0);
+  const [step, setStep] = useState<number>(0);
   const current = STEPS[step];
 
   const toExplore = () => {

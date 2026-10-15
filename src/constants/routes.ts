@@ -2,8 +2,6 @@ export const ROOT_ROUTES = {
   AuthFlow: 'AuthFlow',
   OnboardingFlow: 'OnboardingFlow',
   MainTabs: 'MainTabs',
-  // Development only: tabs without session for fixture-only screens.
-  DevFixtureTabs: 'DevFixtureTabs',
 } as const;
 
 export const AUTH_ROUTES = {
@@ -76,6 +74,10 @@ export const APP_ROUTES = {
   PersonalRecords: 'PersonalRecords',
   RegisterPr: 'RegisterPr',
   NutritionPlan: 'NutritionPlan',
+  CaloriesCamera: 'CaloriesCamera',
+  MealReview: 'MealReview',
+  MealDetail: 'MealDetail',
+  MachineScan: 'MachineScan',
   BodyScience: 'BodyScience',
   BodyScienceArticle: 'BodyScienceArticle',
   // Comunidad · tanda B (personas).

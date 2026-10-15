@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -71,7 +71,7 @@ const NOTIFICATIONS = [
 // Ajustes (PROFILE_03): flat rows by section. Community and Apple Health
 // depend on future modules: Comunidad rows open Amigos and Privacidad social and
 // Apple Health opens its placeholder screen.
-export function SettingsScreen({ navigation, route }: Props) {
+export function SettingsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   // The moderation row only exists for moderators (app_moderators); a normal
   // user never sees it and the screen checks the role again.
@@ -85,21 +85,13 @@ export function SettingsScreen({ navigation, route }: Props) {
   const preferences = useProfilePreferences();
   const openEllieChat = useOpenEllieChat();
   const openCore33 = useOpenCore33();
-  const dev = __DEV__ ? route.params?.devState : undefined;
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
   // Eliminar cuenta (BT-30): the result of the last attempt.
   const [deleting, setDeleting] = useState(false);
   const [deleteOutcome, setDeleteOutcome] = useState<DeleteAccountOutcome | null>(null);
 
-  const profile = useMemo(() => {
-    if (__DEV__ && dev) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fixtures = require('@app/dev/profileFixtures') as typeof import('@app/dev/profileFixtures');
-      return dev === 'new' ? fixtures.FIXTURE_NEW_PROFILE : fixtures.FIXTURE_PROFILE;
-    }
-    return realProfile;
-  }, [dev, realProfile]);
+  const profile = realProfile;
 
   const plan = overview.data?.nutritionPlan;
   const challenge = overview.data?.challenge;
@@ -135,7 +127,7 @@ export function SettingsScreen({ navigation, route }: Props) {
   };
 
   const deleteAccount = async () => {
-    if (deleting || dev) {
+    if (deleting) {
       return;
     }
     setDeleting(true);
@@ -280,7 +272,7 @@ export function SettingsScreen({ navigation, route }: Props) {
                   accessibilityLabel={item.title}
                   value={preferences.notifications[item.key]}
                   onValueChange={value =>
-                    !dev && preferences.updateNotifications({ [item.key]: value })
+                    preferences.updateNotifications({ [item.key]: value })
                   }
                 />
               }

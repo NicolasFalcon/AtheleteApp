@@ -50,7 +50,7 @@ export function openQueue(items: ModerationQueueRow[]): ModerationQueueRow[] {
   return items.filter(item => queueState(item) !== 'removed');
 }
 
-// The order of the view, for the sample data (never applied to real rows):
+// The order of the view (the server already sends rows in this order):
 // not hidden first, more open reports first, the one that waited longest.
 export function serverQueueOrder(items: ModerationQueueRow[]): ModerationQueueRow[] {
   return [...items].sort((a, b) => {

@@ -22,6 +22,14 @@
     "@supabase/supabase-js": "^2.104.0",
     "@tanstack/react-query": "^5.99.2",
     "base64-arraybuffer": "^1.0.2",
+    "expo": "56.0.23",
+    "expo-camera": "56.0.8",
+    "expo-image-manipulator": "56.0.26",
+    "expo-location": "56.0.26",
+    "expo-modules-core": "56.0.27",
+    "expo-speech": "56.0.3",
+    "expo-speech-recognition": "56.0.4",
+    "expo-task-manager": "56.0.27",
     "lucide-react-native": "^1.8.0",
     "react": "19.2.3",
     "react-native": "0.85.2",
@@ -64,5 +72,10 @@
   },
   "engines": {
     "node": ">= 22.11.0"
+  },
+  "overrides": {
+    "expo-modules-core": {
+      "react-native-worklets": "$react-native-worklets"
+    }
   }
 }

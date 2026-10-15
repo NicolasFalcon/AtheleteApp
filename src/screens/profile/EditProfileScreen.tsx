@@ -52,25 +52,13 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // Editar perfil (PROFILE_02): two groups on the background, the date written
 // out, the units visible. Guardar is active only with changes and valid
 // values; the writes respect the CHECKs of `profiles` (see profileModel).
-export function EditProfileScreen({ navigation, route }: Props) {
+export function EditProfileScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const queryClient = useQueryClient();
   const { profile: realProfile, refreshProfile } = useAuth();
-  const dev = __DEV__ ? route.params?.devState : undefined;
-
-  const profile = useMemo(() => {
-    if (__DEV__ && (dev === 'data' || dev === 'saving' || dev === 'saved' || dev === 'error' || dev === 'invalid')) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      return (require('@app/dev/profileFixtures') as typeof import('@app/dev/profileFixtures')).FIXTURE_PROFILE;
-    }
-    if (__DEV__ && dev === 'new') {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      return (require('@app/dev/profileFixtures') as typeof import('@app/dev/profileFixtures')).FIXTURE_NEW_PROFILE;
-    }
-    return realProfile;
-  }, [dev, realProfile]);
+  const profile = realProfile;
 
   const saved = useMemo(() => (profile ? draftFromProfile(profile) : null), [profile]);
   const [draft, setDraft] = useState<EditDraft | null>(saved);
@@ -83,26 +71,20 @@ export function EditProfileScreen({ navigation, route }: Props) {
 
   // The draft starts from the stored profile once (and when another loads).
   useEffect(() => {
-    if (saved && profile && loadedFor.current !== profile.id + (dev ?? '')) {
-      loadedFor.current = profile.id + (dev ?? '');
-      setDraft(
-        dev === 'invalid' ? { ...saved, minutes: 3, name: '' } : saved,
-      );
-      setTouched(dev === 'invalid');
-      setState(dev === 'saving' ? 'saving' : dev === 'saved' ? 'saved' : 'idle');
-      if (dev === 'error') {
-        setState('error');
-        setMessage('No pudimos guardar tus cambios. Revisa tu conexión e inténtalo de nuevo.');
-      }
+    if (saved && profile && loadedFor.current !== profile.id) {
+      loadedFor.current = profile.id;
+      setDraft(saved);
+      setTouched(false);
+      setState('idle');
     }
-  }, [dev, profile, saved]);
+  }, [profile, saved]);
 
   if (!draft || !saved || !profile) {
     return <View style={[styles.screen, { backgroundColor: colors.bg }]} />;
   }
 
   const errors = validateDraft(draft);
-  const dirty = isDirty(draft, saved) || dev === 'saved' || dev === 'saving' || dev === 'error';
+  const dirty = isDirty(draft, saved);
   const canSave = dirty && isValid(errors) && state !== 'saving' && state !== 'saved';
   const set = (patch: Partial<EditDraft>) => {
     setDraft({ ...draft, ...patch });
@@ -114,7 +96,7 @@ export function EditProfileScreen({ navigation, route }: Props) {
   };
 
   const save = async () => {
-    if (!canSave || dev) {
+    if (!canSave) {
       return;
     }
     setState('saving');
@@ -137,7 +119,7 @@ export function EditProfileScreen({ navigation, route }: Props) {
   };
 
   const changePhoto = async () => {
-    if (uploading || dev) {
+    if (uploading) {
       return;
     }
     try {

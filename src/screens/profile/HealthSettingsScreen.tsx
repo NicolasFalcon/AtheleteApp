@@ -30,11 +30,10 @@ const TYPES: { icon: LucideIcon; title: string; subtitle: string }[] = [
 // Apple Health (HEALTH_02 / 03): the integration is a future module (no
 // HealthKit yet), so this is the reference screen as a placeholder: always
 // "Sin conectar" and the connect action only explains it is coming.
-export function HealthSettingsScreen({ navigation, route }: Props) {
+export function HealthSettingsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const connected = __DEV__ ? Boolean(route.params?.devConnected) : false;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -54,7 +53,7 @@ export function HealthSettingsScreen({ navigation, route }: Props) {
           <View style={styles.identityText}>
             <TextV2 variant="title22">Apple Health</TextV2>
             <TextV2 variant="meta" tone="secondary">
-              {connected ? 'Configurado · sincronizado hace 5 min' : '○ Sin conectar'}
+              ○ Sin conectar
             </TextV2>
           </View>
         </View>
@@ -75,19 +74,13 @@ export function HealthSettingsScreen({ navigation, route }: Props) {
           ))}
         </View>
         <View style={styles.cta}>
-          {connected ? (
-            <Button label="Gestionar permisos en Salud" variant="outline" onPress={() => {}} fullWidth />
-          ) : (
-            <Button
-              label="Conectar con Apple Health"
-              onPress={() => toast.show('Apple Health llegará pronto')}
-              fullWidth
-            />
-          )}
+          <Button
+            label="Conectar con Apple Health"
+            onPress={() => toast.show('Apple Health llegará pronto')}
+            fullWidth
+          />
           <TextV2 variant="meta" tone="secondary" align="center">
-            {connected
-              ? 'Los permisos se cambian en la app Salud de tu iPhone.'
-              : 'Salud te preguntará qué compartir. Puedes cambiarlo cuando quieras.'}
+            Salud te preguntará qué compartir. Puedes cambiarlo cuando quieras.
           </TextV2>
         </View>
       </ScrollView>

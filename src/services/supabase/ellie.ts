@@ -57,13 +57,6 @@ export type EllieOverview = {
   workoutCount: number;
 };
 
-export type EllieChatMessageRow = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  createdAt: string;
-};
-
 function getClient() {
   const client = getSupabaseClient();
 
@@ -425,53 +418,4 @@ export async function fetchEllieOverview(params: {
     badges,
     workoutCount: workoutCountResult.count || 0,
   };
-}
-
-export async function fetchEllieChatHistory(
-  userId: string,
-): Promise<EllieChatMessageRow[]> {
-  const client = getClient();
-  const {data, error} = await (client.from('chat_messages') as any)
-    .select('id, role, content, created_at')
-    .eq('user_id', userId)
-    .order('created_at', {ascending: true});
-
-  if (error) {
-    throw error;
-  }
-
-  return ((data || []) as Array<Record<string, any>>).map(row => ({
-    id: String(row.id),
-    role: row.role === 'user' ? 'user' : 'assistant',
-    content: String(row.content || ''),
-    createdAt: String(row.created_at || ''),
-  }));
-}
-
-export async function insertEllieChatMessage(params: {
-  userId: string;
-  role: 'user' | 'assistant';
-  content: string;
-}): Promise<void> {
-  const client = getClient();
-  const {error} = await (client.from('chat_messages') as any).insert({
-    user_id: params.userId,
-    role: params.role,
-    content: params.content,
-  });
-
-  if (error) {
-    throw error;
-  }
-}
-
-export async function clearEllieChatHistory(userId: string): Promise<void> {
-  const client = getClient();
-  const {error} = await (client.from('chat_messages') as any)
-    .delete()
-    .eq('user_id', userId);
-
-  if (error) {
-    throw error;
-  }
 }

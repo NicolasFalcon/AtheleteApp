@@ -64,7 +64,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
-  const { challengeId, devSheet } = route.params;
+  const { challengeId } = route.params;
   const board = useSocialResource('getChallengeBoard', s => s.getChallengeBoard(challengeId), [challengeId]);
   // Badge, unit, cover and exercise name come with the list (get_my_challenges).
   const listed = useSocialResource('getMyChallenges', s => s.getMyChallenges());
@@ -72,7 +72,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
     ...(listed.data?.officialList ?? []),
     ...(listed.data?.official_upcoming ?? []),
   ].find(item => item.challenge.id === challengeId)?.meta;
-  const [sheet, setSheet] = useState<'leave' | 'cancel' | null>(devSheet ?? null);
+  const [sheet, setSheet] = useState<'leave' | 'cancel' | null>(null);
   const [busy, setBusy] = useState(false);
   const data = board.data;
 

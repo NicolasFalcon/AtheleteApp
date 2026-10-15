@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronRight, EyeOff, Lock, Minus, Pause, Play, Plus, X } from 'lucide-react-native';
@@ -10,15 +10,12 @@ import {
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
-import { getRouteDevConfig } from '@app/dev/routeDevConfig';
-import { SAMPLE_ORIGIN } from '@app/dev/routeFixtures';
 import { RouteThumb } from '@app/features/route/v2/RouteThumb';
-import { createLocationSource } from '@app/features/route/locationSourceFactory';
+import { useLocationAccess } from '@app/features/route/useLocationAccess';
 import { RouteMap } from '@app/features/route/RouteMap';
 import { KIND_LABEL, formatElevation, formatKm } from '@app/features/route/routeFormat';
 import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import type {
-  LatLng,
   PlannedRoute,
   RouteElevationPref,
   RouteKind,
@@ -33,8 +30,8 @@ import {
   SportSegment,
 } from '@app/features/route/v2/RouteUi';
 import { RoutePrivacySheet, visibilityLabel } from '@app/features/route/v2/RoutePrivacySheet';
-import { SAMPLE_TRACKS } from '@app/dev/routeFixtures';
 import { APP_ROUTES } from '@app/constants/routes';
+import { haversine } from '@app/features/route/routeGeo';
 import { ORS_ATTRIBUTION } from '@app/features/route/routeMappers';
 import { saveRouteDefaults, useRouteDefaults } from '@app/features/route/useRouteDefaults';
 import { useRouteService } from '@app/services/route/useRouteService';
@@ -65,23 +62,22 @@ function next<T extends { key: string }>(options: T[], key: string): T['key'] {
 
 // Salir ahora / Planear ruta (ROUTE_01–04, 13, 22): the map with the start
 // point, the sport, the target configuration and "Comenzar". The location comes
-// from the LocationSource (simulated in 5a).
+// from the LocationSource (expo-location): permission pre-screen, denied /
+// restricted / approximate-location states, then the live position.
 export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep'>) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
   const session = useRouteSession();
   const service = useRouteService();
   useRouteDefaults();
-  const dev = getRouteDevConfig();
   const { sport, mode, config, plan } = session;
-  const [privacyOpen, setPrivacyOpen] = useState(__DEV__ && route?.params?.dev === 'privacy');
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [otherOpen, setOtherOpen] = useState(false);
-  const [mapFailed, setMapFailed] = useState(dev.mapOffline);
+  const [mapFailed, setMapFailed] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   const [savedCount, setSavedCount] = useState(0);
-  const [permission, setPermission] = useState(dev.permission);
-  const [origin, setOrigin] = useState<LatLng | null>(dev.noSignal ? null : SAMPLE_ORIGIN);
-  const source = useMemo(() => createLocationSource(sport, plan?.points ?? null), [sport, plan]);
+  const { access, fix, usable, request } = useLocationAccess();
+  const origin = usable ? fix : null;
 
   useEffect(() => {
     let alive = true;
@@ -94,49 +90,12 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
     };
   }, [service, route?.params]);
 
-  useEffect(() => {
-    let alive = true;
-    source
-      .getPermission()
-      .then(value => alive && setPermission(value))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [source]);
-
-  useEffect(() => {
-    if (permission !== 'granted' || dev.noSignal) {
-      setOrigin(null);
-      return undefined;
-    }
-    let alive = true;
-    source
-      .getCurrent()
-      .then(fix => {
-        if (!alive) {
-          return;
-        }
-        const here = fix ? { lat: fix.lat, lon: fix.lon } : null;
-        setOrigin(here);
-        routeStore.patch({ origin: here });
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [source, permission, dev.noSignal]);
-
   const start = useCallback(async () => {
-    let value = permission;
-    if (value !== 'granted') {
-      value = await source.requestPermission();
-      setPermission(value);
+    if (!usable) {
+      return;
     }
-    if (value === 'granted') {
-      navigation.navigate(APP_ROUTES.RouteActive);
-    }
-  }, [navigation, permission, source]);
+    navigation.navigate(APP_ROUTES.RouteActive);
+  }, [navigation, usable]);
 
   const close = useCallback(() => {
     if (navigation.canGoBack()) {
@@ -144,16 +103,21 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
     }
   }, [navigation]);
 
-  const denied = permission === 'denied';
-  const searching = !denied && !origin;
+  const permission = access?.permission ?? null;
+  const rationale = permission === 'undetermined';
+  const blocked = permission === 'denied' || permission === 'restricted';
+  const approximate = permission === 'granted' && access?.precise === false;
+  const searching = access === null || (usable && !origin);
+  const accuracyM = fix?.accuracy !== undefined ? Math.round(fix.accuracy) : undefined;
+  // How far the start of the planned route is from where the person is.
+  const toStartM = origin && plan && plan.points.length > 0 ? haversine(origin, plan.points[0]) : null;
   const km = config.km;
   const ringRadius = (km * 1000) / (2 * Math.PI);
-  const privacyPreview = plan?.points ?? SAMPLE_TRACKS.parque5k;
+  const privacyPreview = plan?.points ?? [];
   const sportWord = sport === 'running' ? 'CORRER' : 'CICLISMO';
   const pills = KM_PILLS[sport];
   const isOther = !(pills as readonly number[]).includes(km);
 
-  const mapCenter = origin ?? SAMPLE_ORIGIN;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -161,7 +125,7 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
         key={mapKey}
         style={StyleSheet.absoluteFill}
         mode="auto"
-        center={mapCenter}
+        center={origin ?? undefined}
         zoom={mode === 'plan' && !plan ? zoomForKm(km) : 15}
         fit={plan ? plan.points : undefined}
         padding={{ top: insets.top + 90, bottom: 360, left: 40, right: 40 }}
@@ -171,7 +135,7 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
         here={origin}
         ring={mode === 'plan' && !plan && origin ? { center: origin, radiusM: ringRadius } : null}
         onLoadFailed={() => setMapFailed(true)}
-        onLoaded={() => setMapFailed(dev.mapOffline)}
+        onLoaded={() => setMapFailed(false)}
       />
 
       <View style={[styles.top, { top: insets.top + 8 }]}>
@@ -230,12 +194,48 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
 
         {mode === 'now' ? (
           <View style={styles.body}>
-            {denied ? (
+            {rationale ? (
               <View style={styles.state}>
-                <TextV2 variant="title22">Necesitamos tu ubicación</TextV2>
+                <TextV2 variant="title22">Tu ubicación, solo mientras entrenas</TextV2>
                 <TextV2 variant="body" tone="secondary">
-                  Para registrar tu ruta usamos tu ubicación solo mientras tienes la app abierta.
-                  Actívala en Ajustes.
+                  Athelete usa tu ubicación mientras la app está en uso para mostrar dónde estás y
+                  registrar tu recorrido de carrera o bici, también con la pantalla apagada. Nunca la
+                  usamos cuando no estás entrenando.
+                </TextV2>
+                <Button
+                  label="Continuar"
+                  variant="primary"
+                  fullWidth
+                  onPress={() => {
+                    request().catch(() => {});
+                  }}
+                />
+              </View>
+            ) : blocked ? (
+              <View style={styles.state}>
+                <TextV2 variant="title22">
+                  {permission === 'restricted' ? 'La ubicación no está disponible' : 'Necesitamos tu ubicación'}
+                </TextV2>
+                <TextV2 variant="body" tone="secondary">
+                  {permission === 'restricted'
+                    ? 'Los servicios de ubicación están desactivados o restringidos en este iPhone. Actívalos en Ajustes para registrar tu ruta.'
+                    : 'Para registrar tu ruta usamos tu ubicación solo mientras tienes la app abierta. Actívala en Ajustes.'}
+                </TextV2>
+                <Button
+                  label="Abrir Ajustes"
+                  variant="primary"
+                  fullWidth
+                  onPress={() => {
+                    Linking.openSettings().catch(() => {});
+                  }}
+                />
+              </View>
+            ) : approximate ? (
+              <View style={styles.state}>
+                <TextV2 variant="title22">Activa la ubicación precisa</TextV2>
+                <TextV2 variant="body" tone="secondary">
+                  Ahora Athelete solo ve tu ubicación aproximada y tu recorrido saldría a kilómetros de
+                  donde corres. En Ajustes → Athelete → Ubicación, activa «Ubicación precisa».
                 </TextV2>
                 <Button
                   label="Abrir Ajustes"
@@ -270,6 +270,11 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
                     />
                   </View>
                 ) : null}
+                {toStartM !== null && toStartM > 200 ? (
+                  <TextV2 variant="caption" tone="secondary">
+                    El inicio de la ruta está a {formatKm(toStartM)} km de ti.
+                  </TextV2>
+                ) : null}
                 {plan?.origin === 'ellie' ? (
                   <TextV2 variant="caption" tone="secondary">
                     {ORS_ATTRIBUTION}
@@ -279,7 +284,7 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
                   <TextV2 variant="eyebrow" tone="secondary">
                     {sportWord}
                   </TextV2>
-                  <GpsChip ready={!searching} accuracyM={searching ? undefined : 4} />
+                  <GpsChip ready={!searching} accuracyM={searching ? undefined : accuracyM} />
                 </View>
                 <BigFigure value="0,00" unit="km" size={plan ? 80 : 88} />
                 <View style={[styles.statLine, { borderTopColor: colors.divider }]}>

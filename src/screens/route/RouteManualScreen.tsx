@@ -1,10 +1,10 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, RotateCcw, Trash2 } from 'lucide-react-native';
 import { Button, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { SAMPLE_ORIGIN, SAMPLE_TRACKS } from '@app/dev/routeFixtures';
+import { useLocationAccess } from '@app/features/route/useLocationAccess';
 import { RouteMap, type RouteMapPoint } from '@app/features/route/RouteMap';
 import { formatKm } from '@app/features/route/routeFormat';
 import { polylineDistance } from '@app/features/route/routeGeo';
@@ -33,26 +33,12 @@ export function manualToPlan(points: LatLng[], sport: PlannedRoute['sport']): Pl
   };
 }
 
-export function RouteManualScreen({ navigation, route }: AppScreenProps<'RouteManual'>) {
+export function RouteManualScreen({ navigation }: AppScreenProps<'RouteManual'>) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
   const session = useRouteSession();
+  const { usable, fix } = useLocationAccess();
   const { manualPoints: points, manualSelected: selected, manualEditing: editing } = session;
-  const dev = __DEV__ ? route?.params?.dev : undefined;
-
-  useEffect(() => {
-    if (dev === 'drawing' || dev === 'editing') {
-      const track = SAMPLE_TRACKS.manual;
-      const step = Math.max(1, Math.floor(track.length / 6));
-      const picked = track.filter((_, index) => index % step === 0).slice(0, 7);
-      routeStore.patch({
-        manualPoints: picked,
-        manualEditing: dev === 'editing',
-        manualSelected: dev === 'editing' ? 2 : null,
-      });
-    }
-  }, [dev]);
-
   const distanceM = useMemo(() => polylineDistance(points), [points]);
   const markers: RouteMapPoint[] = points.map((point, index) => ({
     id: `p${index}`,
@@ -81,10 +67,9 @@ export function RouteManualScreen({ navigation, route }: AppScreenProps<'RouteMa
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <RouteMap
         style={StyleSheet.absoluteFill}
-        center={points[0] ?? SAMPLE_ORIGIN}
+        center={points[0] ?? (usable && fix ? fix : session.origin ?? undefined)}
         zoom={15}
-        fit={points.length > 1 && dev ? points : undefined}
-        padding={{ top: insets.top + 80, bottom: 300, left: 50, right: 50 }}
+                padding={{ top: insets.top + 80, bottom: 300, left: 50, right: 50 }}
         route={points.length > 1 ? points : undefined}
         points={markers}
         onPointPress={id => editing && routeStore.patch({ manualSelected: Number(id.slice(1)) })}

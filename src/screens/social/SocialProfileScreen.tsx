@@ -99,10 +99,10 @@ export function SocialProfileScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useSocialService();
-  const { userId, devConfirmBlock } = route.params;
+  const { userId } = route.params;
   const lookup = useSocialResource('getProfile', s => s.getProfile(userId), [userId]);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [confirmBlock, setConfirmBlock] = useState(Boolean(devConfirmBlock));
+  const [confirmBlock, setConfirmBlock] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [busy, setBusy] = useState(false);
 

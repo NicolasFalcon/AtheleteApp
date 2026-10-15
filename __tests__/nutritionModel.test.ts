@@ -1,13 +1,11 @@
 import {
-  adherenceScore,
-  applyIncrements,
   buildDayTotals,
+  dayTotalsFromDay,
+  daysNearGoal,
   ellieLine,
   formatLiters,
   gaugeDash,
   kcalLine,
-  parseKcal,
-  stepMacro,
   toGlasses,
   waterLine,
 } from '@app/features/nutrition/nutritionModel';
@@ -77,29 +75,44 @@ describe('day totals', () => {
   });
 });
 
-describe('registrar nutrición', () => {
-  it('adds the increments to what is already logged', () => {
-    expect(applyIncrements(log, { kcal: 500, protein: 25, carbs: 0, fats: 5 })).toEqual({
-      calories: 1740,
-      protein: 117,
-      carbs: 140,
-      fats: 43,
-    });
-    expect(applyIncrements(null, { kcal: 250, protein: 0, carbs: 0, fats: 0 }).calories).toBe(250);
+describe('the day of Calorías (get_nutrition_day)', () => {
+  const day = (source: 'plan' | 'profile' | 'none') => ({
+    totals: { kcal: 1240, protein: 92, carbs: 140, fats: 38 },
+    goal:
+      source === 'none'
+        ? { source, kcal: null, protein: null, carbs: null, fats: null }
+        : { source, kcal: 2850, protein: 168, carbs: 330, fats: 85 },
   });
 
-  it('parses and steps the inputs', () => {
-    expect(parseKcal('4a5,0')).toBe(450);
-    expect(parseKcal('')).toBe(0);
-    expect(parseKcal('99999')).toBe(5000);
-    expect(stepMacro(0, -1)).toBe(0);
-    expect(stepMacro(5, 1)).toBe(10);
+  it('with a plan: goal, what is left and the macros against the plan', () => {
+    const totals = dayTotalsFromDay(day('plan'), 1750, 14);
+    expect(totals).toMatchObject({ hasGoal: true, estimated: false, hasPlan: true });
+    expect(totals.kcal).toMatchObject({ consumed: 1240, target: 2850, left: 1610 });
+    expect(totals.macros[0]).toMatchObject({ key: 'protein', value: 92, goal: 168 });
   });
 
-  it('scores the day against the plan like v1 (null without plan)', () => {
-    expect(adherenceScore(null, { calories: 1, protein: 1, carbs: 1, fats: 1 })).toBeNull();
-    expect(adherenceScore(plan, { calories: 2850, protein: 168, carbs: 330, fats: 85 })).toBe(100);
-    expect(adherenceScore(plan, { calories: 0, protein: 0, carbs: 0, fats: 0 })).toBe(0);
+  it('without a plan the goal of the profile is an estimate (said on screen)', () => {
+    const totals = dayTotalsFromDay(day('profile'), 0, 14);
+    expect(totals).toMatchObject({ hasGoal: true, estimated: true });
+    expect(totals.kcal.target).toBe(2850);
+  });
+
+  it('with no goal at all: what was eaten, no target', () => {
+    const totals = dayTotalsFromDay(day('none'), 0, 14);
+    expect(totals).toMatchObject({ hasGoal: false, estimated: false });
+    expect(totals.kcal).toMatchObject({ consumed: 1240, target: null, left: 0 });
+  });
+
+  it('days near the goal count within ±10 %', () => {
+    expect(
+      daysNearGoal([
+        { kcal: 2800, goal: 2850 },
+        { kcal: 2000, goal: 2850 },
+        { kcal: 3100, goal: 2850 },
+        { kcal: 0, goal: 2850 },
+        { kcal: 2900, goal: null },
+      ]),
+    ).toEqual({ near: 2, counted: 3 });
   });
 });
 

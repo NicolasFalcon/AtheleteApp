@@ -395,11 +395,10 @@ export function localDateOf(ms: number): string {
   return `${date.getFullYear()}-${mm}-${dd}`;
 }
 
-// The simulated location source runs ahead of the clock (it replays faster
-// than real time), so a finished outing can end in the future. The server
-// would count that as a bad date, so the whole outing moves back until it ends
-// now: start, end, pauses and the time of every fix shift by the same amount.
-// With a real GPS the end is never ahead and nothing changes.
+// A finished outing must not end in the future (a phone clock that was
+// ahead): the server would count that as a bad date, so the whole outing moves
+// back until it ends now: start, end, pauses and the time of every fix shift by
+// the same amount. With a correct clock nothing changes.
 export function alignToNow(activity: RouteActivity, now: number): RouteActivity {
   const endedAt = activity.endedAt ?? activity.startedAt + activity.movingSec * 1000;
   const shift = endedAt - now;
@@ -452,9 +451,9 @@ export function buildSavePayload(activity: RouteActivity, clientId: string): Sav
 export const isUuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 
-// A planned route that lives in Tus rutas (a server id; the sample ones are
-// `saved-N`). Generated and hand-drawn drafts have local ids until saved.
-export const isSavedRoute = (id: string) => id.startsWith('saved-') || isUuid(id);
+// A planned route that lives in Tus rutas (a server id). Generated and
+// hand-drawn drafts have local ids until saved.
+export const isSavedRoute = (id: string) => isUuid(id);
 
 export type RouteSaveError =
   | 'invalid_sport'

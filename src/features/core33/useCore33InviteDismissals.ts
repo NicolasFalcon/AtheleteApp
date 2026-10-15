@@ -2,30 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useToast } from '@app/components/v2';
 import { useAuth } from '@app/hooks/useAuth';
-import {
-  dismissCore33Invite,
-  resetCore33InviteDismissals as resetProfileCore33Invite,
-} from '@app/services/supabase/profile';
+import { dismissCore33Invite } from '@app/services/supabase/profile';
 
 // "Ahora no" of the Core 33 discovery card: profiles.core33_invite_dismissed_at
 // and core33_invite_dismiss_count (they follow the user across devices; two
 // dismissals hide the card for good, BT-22). The old per-device AsyncStorage
 // copy is uploaded once and deleted.
 const legacyKey = (userId: string) => `@athelete/core33-invite-v1:${userId}`;
-
-// Lets the dev menu reset the card without restarting the app.
-type ResetListener = () => Promise<void>;
-const resetListeners = new Set<ResetListener>();
-
-// Development only ("Restablecer card de Core 33"): sets the column to null
-// for the signed-in user; Inicio shows the card again right away.
-export async function resetCore33InviteDismissals(): Promise<boolean> {
-  if (!__DEV__ || resetListeners.size === 0) {
-    return false;
-  }
-  await Promise.all([...resetListeners].map(listener => listener()));
-  return true;
-}
 
 type Dismissal = { at: string | null; count: number };
 
@@ -89,18 +72,6 @@ export function useCore33InviteDismissals() {
     // Runs once per user.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
-
-  useEffect(() => {
-    const reset: ResetListener = async () => {
-      if (userId) {
-        await run({ at: null, count: 0 }, () => resetProfileCore33Invite(userId));
-      }
-    };
-    resetListeners.add(reset);
-    return () => {
-      resetListeners.delete(reset);
-    };
-  }, [run, userId]);
 
   const dismiss = useCallback(() => {
     if (!userId) {

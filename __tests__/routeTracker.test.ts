@@ -10,8 +10,6 @@ import {
   type TrackerAction,
   type TrackerState,
 } from '../src/features/route/routeTracker';
-import { SimulatedLocationSource } from '../src/features/route/locationSource';
-import { haversine } from '../src/features/route/routeGeo';
 
 const north = (m: number) => ({ lat: m / 111_195, lon: 0 });
 const T0 = 1_000_000;
@@ -111,81 +109,21 @@ describe('tracker · signal and deviation', () => {
       lon: east / 111_195,
       t,
     });
+    // Plausible speeds (a fix that jumps 78 m in 1 s is now dropped).
     let s = run(
       [
         { type: 'start', t: T0 },
         { type: 'fix', fix: side(100, 0, T0 + 1000) },
-        { type: 'fix', fix: side(150, 60, T0 + 2000) },
-        { type: 'fix', fix: side(200, 62, T0 + 8000) },
+        { type: 'fix', fix: side(150, 60, T0 + 12_000) },
+        { type: 'fix', fix: side(200, 62, T0 + 18_000) },
       ],
       initialTracker('running', plan),
     );
     expect(s.planDistanceM).toBeGreaterThan(40);
     expect(s.deviation.off).toBe(false);
-    s = trackerReducer(s, { type: 'fix', fix: side(260, 65, T0 + 12_100) });
+    s = trackerReducer(s, { type: 'fix', fix: side(230, 65, T0 + 22_100) });
     expect(s.deviation.off).toBe(true);
-    s = trackerReducer(s, { type: 'fix', fix: side(300, 5, T0 + 14_000) });
+    s = trackerReducer(s, { type: 'fix', fix: side(280, 5, T0 + 30_000) });
     expect(s.deviation.off).toBe(false);
-  });
-});
-
-describe('SimulatedLocationSource', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
-
-  const track = Array.from({ length: 41 }, (_, i) => north(i * 25)); // 1000 m
-
-  it('replays the track at the given speed with a virtual clock', () => {
-    const source = new SimulatedLocationSource(
-      { polyline: track, sport: 'running', speedMs: 5, speedup: 10, tickMs: 1000 },
-      T0,
-    );
-    const fixes: { lat: number; lon: number; t?: number }[] = [];
-    const stop = source.watch(f => fixes.push(f));
-    jest.advanceTimersByTime(3000);
-    stop();
-    expect(fixes).toHaveLength(3);
-    // 3 ticks × 10 virtual s × 5 m/s = 150 m
-    expect(haversine(fixes[2], track[0])).toBeCloseTo(150, 0);
-    expect(source.now()).toBe(T0 + 30_000);
-  });
-
-  it('stands still while not moving, and leaves GPS gaps', () => {
-    const source = new SimulatedLocationSource(
-      { polyline: track, sport: 'running', speedMs: 5, gaps: [{ atSec: 2, forSec: 2 }] },
-      T0,
-    );
-    const fixes: { lat: number }[] = [];
-    source.watch(f => fixes.push(f));
-    jest.advanceTimersByTime(6000);
-    // Seconds of movement 1..6; the gap swallows those at 2 and 3.
-    expect(fixes.length).toBe(4);
-    source.setMoving(false);
-    const before = fixes.length;
-    jest.advanceTimersByTime(2000);
-    expect(fixes.length).toBe(before + 2);
-    expect(fixes[fixes.length - 1].lat).toBe(fixes[fixes.length - 2].lat);
-  });
-
-  it('applies a detour to the side of the track', () => {
-    const source = new SimulatedLocationSource(
-      { polyline: track, sport: 'running', detour: { startM: 300, lengthM: 300, offsetM: 100 } },
-      T0,
-    );
-    const straight = source.position(450);
-    expect(Math.abs(straight.lon * 111_195)).toBeGreaterThan(80);
-    expect(Math.abs(source.position(100).lon)).toBe(0);
-  });
-
-  it('denied permission stays denied until granted', async () => {
-    const source = new SimulatedLocationSource(
-      { polyline: track, sport: 'running', permission: 'denied' },
-      T0,
-    );
-    expect(await source.requestPermission()).toBe('denied');
-    expect(await source.getCurrent()).toBeNull();
-    source.grantPermission();
-    expect(await source.getPermission()).toBe('granted');
-    expect(await source.getCurrent()).not.toBeNull();
   });
 });

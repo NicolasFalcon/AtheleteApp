@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { APP_ROUTES } from '@app/constants/routes';
 import type { EllieMode } from '@app/features/ellie/chatModel';
@@ -11,12 +11,16 @@ import type { AppStackParamList } from '@app/types/navigation';
 export function useOpenEllieChat() {
   const navigation =
     useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  // The screen the question comes from travels as client_context ("progress",
+  // "nutrition_plan"…): never user data.
+  const source = useRoute().name.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
   return useCallback(
     (ask?: { text: string; mode?: EllieMode }) =>
       navigation.navigate(APP_ROUTES.EllieChat, {
         prompt: ask?.text,
         mode: ask?.mode,
+        source,
       }),
-    [navigation],
+    [navigation, source],
   );
 }

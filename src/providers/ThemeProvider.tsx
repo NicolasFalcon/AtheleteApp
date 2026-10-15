@@ -7,7 +7,7 @@ import {
   type PropsWithChildren,
 } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform, Settings, useColorScheme } from 'react-native';
+import { useColorScheme } from 'react-native';
 import {
   createTheme,
   type AppTheme,
@@ -30,29 +30,12 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 const THEME_STORAGE_KEY = '@athelete/theme-mode';
 
-// Development only (iOS launch argument, never persisted), for screenshots:
-// xcrun simctl launch booted <bundle> -themeMode dark
-function devThemeOverride(): ThemeMode | null {
-  if (!__DEV__ || Platform.OS !== 'ios') {
-    return null;
-  }
-  try {
-    const value = Settings.get('themeMode');
-    return value === 'light' || value === 'dark' ? value : null;
-  } catch {
-    // No native SettingsManager (tests).
-    return null;
-  }
-}
-
 export function ThemeProvider({children}: PropsWithChildren) {
   const systemMode = useColorScheme() === 'dark' ? 'dark' : 'light';
   const [preferredMode, setPreferredModeState] =
     useState<ThemePreference>('system');
   const [isReady, setIsReady] = useState(false);
-  const [devOverride] = useState(devThemeOverride);
-  const mode =
-    devOverride ?? (preferredMode === 'system' ? systemMode : preferredMode);
+  const mode = preferredMode === 'system' ? systemMode : preferredMode;
 
   useEffect(() => {
     AsyncStorage.getItem(THEME_STORAGE_KEY)
@@ -105,7 +88,7 @@ export function useIsInScene(): boolean {
 }
 
 // Forces theme.v2 to light or dark inside a subtree without touching the
-// user preference (previews such as the dev catalog). Legacy keys unaffected.
+// user preference. Legacy keys unaffected.
 const ThemeV2ModeContext = createContext<ThemeMode | null>(null);
 
 export function ThemeV2ModeScope({

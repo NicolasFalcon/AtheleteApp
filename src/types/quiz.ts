@@ -59,35 +59,18 @@ export type QuizAttemptAnswer = {
   pointsEarned: number;
 };
 
-export type QuizDevState = 'data' | 'new' | 'perfect' | 'empty' | 'loading' | 'error';
-
-export type QuizLandingRouteParams =
-  | {
-      // Development only: sample data / forced state (nothing is read).
-      devState?: QuizDevState;
-    }
-  | undefined;
+export type QuizLandingRouteParams = undefined;
 
 export type QuizChallengeRouteParams = {
   categoryId: string;
   categoryName: string;
   categoryIcon: string;
-  devState?: 'record' | 'new';
 };
 
 export type QuizQuestionRouteParams = {
   categoryId: string;
   categoryName: string;
   categoryIcon: string;
-  // Development only: freezes the round at a sample moment.
-  devState?:
-    | 'new'
-    | 'correct'
-    | 'incorrect'
-    | 'streak'
-    | 'loading'
-    | 'error'
-    | 'empty';
 };
 
 export type QuizResultRouteParams = {
@@ -105,21 +88,4 @@ export type QuizResultRouteParams = {
   bestStreak: number;
   // Texts of the questions that were missed ("Repasemos esto").
   missed: string[];
-  // Development only: sample best before this round (the real one comes from
-  // the server when the round is saved).
-  devPreviousBest?: {
-    score: number;
-    correctCount: number;
-    totalQuestions: number;
-  } | null;
-  // Development only: shows a saved / saving / failed result with sample data.
-  devState?:
-    | 'low'
-    | 'mid'
-    | 'perfect'
-    | 'record'
-    | 'saving'
-    | 'error'
-    | 'firstQuiz'
-    | 'master';
 };

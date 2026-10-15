@@ -6,10 +6,9 @@ import type {
 } from '@app/features/route/routeTypes';
 import type { DistanceKey } from '@app/features/route/routeMappers';
 import type { RoutePersonalBest } from '@app/features/route/routeRecords';
+import type { RejectedSave } from '@app/features/route/rejectedSaves';
 
-// What Ruta needs from the backend. Two implementations: the Supabase one
-// (`supabaseRouteService`, the real app) and the sample one
-// (`src/dev/routeFixtures.ts`, reachable only from the dev deep links).
+// What Ruta needs from the backend (`supabaseRouteService`).
 // Contracts: docs/backend/ROUTE_RPC_SHAPES.md.
 export interface RouteService {
   // Tus rutas (private planned routes).
@@ -54,6 +53,16 @@ export interface RouteService {
 
   // Activities waiting for network. Sends what is due; returns how many went up.
   flushPending(): Promise<number>;
+
+  // Activities the server refused. They are kept on the phone with the error
+  // (never discarded silently): the person retries or discards them.
+  getRejected(): Promise<RejectedSave[]>;
+  // Sends one again (after dropping impossible GPS stretches, when that was
+  // the reason). Resolves with the saved activity id; throws a
+  // `RouteServiceError` if the server refuses it again (it stays stored) or
+  // 'network' when there is no connection.
+  retryRejected(clientId: string): Promise<{ activityId: string }>;
+  discardRejected(clientId: string): Promise<void>;
 }
 
 export type OutdoorMonth = {

@@ -32,62 +32,11 @@ import {
   fetchSessionDetail,
   registerSessionPRs,
   type DetectedPR,
-  type SessionDetail,
 } from '@app/services/supabase/session';
 import { ALL_BADGES } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'WorkoutSummary'>;
-
-// __DEV__ preview (athelete://dev/session?screen=summary without a completed
-// session): the prototype's figures, no reads or writes.
-function devPreviewDetail(): SessionDetail {
-  const endedAt = Date.now();
-  const startedAt = endedAt - 42 * 60 * 1000;
-  return {
-    session: {
-      id: 'dev',
-      workoutId: '',
-      workoutTitle: 'Total Body Dumbbell',
-      userId: 'dev',
-      date: '',
-      completed: true,
-      duration: 42,
-      caloriesBurned: 280,
-      status: 'completed',
-      startedAt: new Date(startedAt).toISOString(),
-      endedAt: new Date(endedAt).toISOString(),
-      completedExercises: ['1', '2', '3', '4', '5', '6'],
-      totalExercises: 6,
-    },
-    clock: { startedAt, pausedTotalSec: 0, pausedAt: null },
-    volumeKg: 6240,
-    sets: Array.from({ length: 18 }, (_, index) => ({
-      position: Math.floor(index / 3),
-      setIndex: index % 3,
-      reps: 10,
-      weightKg: 16,
-      durationSec: null,
-      distanceM: null,
-    })),
-  };
-}
-
-const DEV_PRS: DetectedPR[] = [
-  {
-    sessionSetId: 'dev',
-    exerciseId: 'dev',
-    prType: 'max_weight',
-    valueWeight: 32,
-    valueReps: 8,
-    valueDurationSec: null,
-    valueDistanceM: null,
-    previousWeight: 28,
-    previousReps: 8,
-    previousDurationSec: null,
-    previousDistanceM: null,
-  },
-];
 
 const HERO_HEIGHT = 400;
 
@@ -152,7 +101,7 @@ function prPrevious(record: DetectedPR): string | null {
 // figures (duration without pauses, volume from the server, sets), the badge
 // unlocked by workout_completed, ELLIE and "Registrar récord" when
 // detect_session_prs finds new marks. Without Apple Health (SESSION_08) and
-// "Compartir" (opens the composer with the session; fixture until wired).
+// "Compartir" (opens the composer with the session).
 export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -160,8 +109,7 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const { profile } = useAuth();
   const userId = profile?.id;
   const { sessionId, newBadges: badgeIds = [] } = route.params;
-  const devPreview = __DEV__ && Boolean(route.params.devPreview);
-  const newBadges = devPreview ? ['week_consistency'] : badgeIds;
+  const newBadges = badgeIds;
   const ellie = useEllieData();
   // ELLIE's line must already count this session.
   useEffect(() => {
@@ -176,14 +124,12 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const [registerError, setRegisterError] = useState(false);
 
   const detailQuery = useQuery({
-    queryKey: ['session-summary', sessionId, devPreview],
-    queryFn: () =>
-      devPreview ? Promise.resolve(devPreviewDetail()) : fetchSessionDetail(sessionId),
+    queryKey: ['session-summary', sessionId],
+    queryFn: () => fetchSessionDetail(sessionId),
   });
   const prsQuery = useQuery({
-    queryKey: ['session-prs', sessionId, devPreview],
-    queryFn: () =>
-      devPreview ? Promise.resolve(DEV_PRS) : detectSessionPRs(sessionId),
+    queryKey: ['session-prs', sessionId],
+    queryFn: () => detectSessionPRs(sessionId),
   });
 
   const done = () =>
@@ -191,9 +137,8 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
 
   const exerciseName = useCallback(
     (exerciseId: string) =>
-      exercisesQuery.data?.find(item => item.id === exerciseId)?.name ??
-      (devPreview ? 'Press de banca con mancuernas' : 'Ejercicio'),
-    [devPreview, exercisesQuery.data],
+      exercisesQuery.data?.find(item => item.id === exerciseId)?.name ?? 'Ejercicio',
+    [exercisesQuery.data],
   );
 
   const records = useMemo(() => prsQuery.data ?? [], [prsQuery.data]);
@@ -205,11 +150,6 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   );
 
   const register = async () => {
-    if (devPreview) {
-      setRegisteredCount(records.length);
-      setPrSheetOpen(false);
-      return;
-    }
     if (!userId || records.length === 0) {
       return;
     }

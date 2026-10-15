@@ -23,7 +23,7 @@ export const NOTIFICATION_TYPES = [
 
 export type SocialNotificationType = (typeof NOTIFICATION_TYPES)[number];
 
-// The one spelling the sample payload of the docs uses for a like.
+// The one spelling the example payload of the docs uses for a like.
 const TYPE_ALIASES: Record<string, SocialNotificationType> = { post_liked: 'post_like' };
 
 export function parseNotificationType(value: unknown): SocialNotificationType | null {

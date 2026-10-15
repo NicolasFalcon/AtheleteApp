@@ -1,3 +1,5 @@
+import { failureEffect, type EllieFailure } from '@app/features/ellie/ellieCopy';
+import type { MealAnalysis } from '@app/services/vision/visionService';
 import type {
   EllieGeneratedNutritionPlan,
   EllieGeneratedWorkout,
@@ -10,43 +12,9 @@ import type {
 // function answers with text or a generated routine / nutrition plan.
 
 // ── Errors ──────────────────────────────────────────────────────────────────
-export type EllieErrorKind = 'offline' | 'limit' | 'server';
-
-// ELLIE explains the failure with her voice (STATE_08). Not persisted.
-export const ELLIE_ERROR_LINES: Record<EllieErrorKind, string> = {
-  offline:
-    'Ahora mismo no puedo conectarme. Tus datos están a salvo; te respondo en cuanto vuelva la red.',
-  server:
-    'Algo falló de mi lado y no pude responderte. Inténtalo de nuevo en unos segundos.',
-  limit:
-    'Hoy llegamos al límite de mensajes. Tus datos están a salvo; seguimos en cuanto se renueve.',
-};
-
-// The client does not know any quota: only the HTTP status and an error
-// text. 429 / 402 are read as a limit; a failed fetch as no connection.
-export function classifyEllieError(input: {
-  status?: number;
-  message?: string;
-}): EllieErrorKind {
-  if (input.status === 429 || input.status === 402) {
-    return 'limit';
-  }
-  if (input.status !== undefined && input.status > 0) {
-    return 'server';
-  }
-  const message = (input.message ?? '').toLowerCase();
-  if (
-    message.includes('network') ||
-    message.includes('internet') ||
-    message.includes('offline') ||
-    message.includes('failed to fetch') ||
-    message.includes('conectar') ||
-    message.includes('timed out')
-  ) {
-    return 'offline';
-  }
-  return 'server';
-}
+// What keeps the composer inactive: the day's quota, or no connection. The
+// wording of every failure lives in ellieCopy.ts (es / en).
+export type EllieBlock = 'offline' | 'limit';
 
 // ── Messages ────────────────────────────────────────────────────────────────
 export type SendStatus = 'sending' | 'sent' | 'failed';
@@ -57,8 +25,15 @@ export type UserMessage = {
   kind: 'text';
   text: string;
   status: SendStatus;
-  // Already stored in chat_messages (a retry must not store it twice).
-  persisted: boolean;
+  // The id sent as client_message_id: the SAME one on every retry, so the
+  // server never answers (or charges) the same message twice.
+  clientMessageId: string;
+  // Why it failed, when it did (retry is offered only if it can work).
+  failure?: EllieFailure;
+  // A photo sent with the message: the local file (just picked) and/or where
+  // it is in storage (stored messages, and the retry of a failed one).
+  imageUri?: string | null;
+  imagePath?: string | null;
 };
 
 export type EllieTextMessage = {
@@ -79,8 +54,6 @@ export type NutritionCardMessage = {
   kind: 'nutrition';
   plan: EllieGeneratedNutritionPlan;
   stage: NutritionStage;
-  // Messages that produced it (to ask for another version).
-  context?: { role: 'user' | 'assistant'; content: string }[];
 };
 
 export type WorkoutCardMessage = {
@@ -90,33 +63,41 @@ export type WorkoutCardMessage = {
   workout: EllieGeneratedWorkout;
   stage: WorkoutStage;
   workoutId?: string;
-  context?: { role: 'user' | 'assistant'; content: string }[];
 };
 
-export type CardMessage = NutritionCardMessage | WorkoutCardMessage;
+// The analysis of a photo of a meal (tool meal_analysis). Whether it was
+// already registered in Calorías is not part of the thread: it is read from
+// nutrition_meals by chat_message_id (useRegisteredMeal).
+export type MealCardMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'meal';
+  meal: MealAnalysis;
+};
+
+export type CardMessage = NutritionCardMessage | WorkoutCardMessage | MealCardMessage;
 export type ChatMessage =
   | UserMessage
   | EllieTextMessage
   | NutritionCardMessage
-  | WorkoutCardMessage;
+  | WorkoutCardMessage
+  | MealCardMessage;
 
 export type ChatState = {
   messages: ChatMessage[];
   thinking: boolean;
   // The composer is inactive: limit reached, or no connection.
-  blocked: EllieErrorKind | null;
+  blocked: EllieBlock | null;
 };
 
-export type HistoryRow = { id: string; role: 'user' | 'assistant'; content: string };
-
 export type ChatAction =
-  | { type: 'load'; history: HistoryRow[]; greeting: string }
-  | { type: 'send'; id: string; text: string }
+  // The stored conversation, already turned into messages (historyToMessages).
+  | { type: 'load'; messages: ChatMessage[]; greeting: string }
+  | { type: 'send'; id: string; text: string; image?: { uri: string; path: string } | null }
   | { type: 'delta'; id: string; delta: string }
   | { type: 'done' }
   | { type: 'tool'; id: string; intro?: string; card: CardMessage }
-  | { type: 'persisted'; id: string }
-  | { type: 'fail'; id: string; kind: EllieErrorKind }
+  | { type: 'fail'; id: string; failure: EllieFailure; text: string }
   | { type: 'retry'; id: string }
   | { type: 'stage'; id: string; stage: NutritionStage | WorkoutStage; workoutId?: string }
   | { type: 'replace'; id: string; card: CardMessage; intro?: string }
@@ -159,21 +140,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'load':
       return {
         ...state,
-        messages: [
-          greetingMessage(action.greeting),
-          ...action.history.map<ChatMessage>(row =>
-            row.role === 'user'
-              ? {
-                  id: row.id,
-                  role: 'user',
-                  kind: 'text',
-                  text: row.content,
-                  status: 'sent',
-                  persisted: true,
-                }
-              : { id: row.id, role: 'assistant', kind: 'text', text: row.content },
-          ),
-        ],
+        messages: [greetingMessage(action.greeting), ...action.messages],
       };
     case 'send':
       return {
@@ -187,18 +154,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
             kind: 'text',
             text: action.text,
             status: 'sending',
-            persisted: false,
+            clientMessageId: action.id,
+            imageUri: action.image?.uri ?? null,
+            imagePath: action.image?.path ?? null,
           },
         ],
-      };
-    case 'persisted':
-      return {
-        ...state,
-        messages: state.messages.map(message =>
-          message.id === action.id && message.role === 'user'
-            ? { ...message, persisted: true }
-            : message,
-        ),
       };
     case 'delta': {
       const exists = state.messages.some(message => message.id === action.id);
@@ -251,18 +211,19 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         id: `notice-${action.id}`,
         role: 'assistant',
         kind: 'text',
-        text: ELLIE_ERROR_LINES[action.kind],
+        text: action.text,
         notice: true,
       };
+      const effect = failureEffect(action.failure.code);
       return {
         thinking: false,
         // A limit or no connection leaves the composer inactive until the
         // user retries (STATE_08).
-        blocked: action.kind === 'server' ? state.blocked : action.kind,
+        blocked: effect === 'limit' ? 'limit' : effect === 'offline' ? 'offline' : state.blocked,
         messages: [
           ...withoutNotice(state.messages, action.id).map(message =>
             message.id === action.id && message.role === 'user'
-              ? { ...message, status: 'failed' as const }
+              ? { ...message, status: 'failed' as const, failure: action.failure }
               : message,
           ),
           notice,
@@ -276,7 +237,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         blocked: null,
         messages: withoutNotice(state.messages, action.id).map(message =>
           message.id === action.id && message.role === 'user'
-            ? { ...message, status: 'sending' as const }
+            ? { ...message, status: 'sending' as const, failure: undefined }
             : message,
         ),
       };

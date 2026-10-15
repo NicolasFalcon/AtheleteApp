@@ -157,93 +157,54 @@ export const GAUGE_LENGTH = 556;
 export const gaugeDash = (progress: number) =>
   Math.round(GAUGE_LENGTH * clamp01(progress) * 10) / 10;
 
-// ── Registrar nutrición (the sheet) ─────────────────────────────────────────
-export const KCAL_SHORTCUTS = [250, 500, 750] as const;
-export const MACRO_STEP = 5;
-export const MAX_KCAL_ENTRY = 5000;
-export const MAX_MACRO_ENTRY = 500;
-
-export type LogIncrements = {
-  kcal: number;
-  protein: number;
-  carbs: number;
-  fats: number;
+// ── The day of Calorías (get_nutrition_day) ─────────────────────────────────
+// The server adds the meals and picks the goal: the active plan, else the
+// profile's (an estimate, said on screen), else none.
+export type CounterTotals = DayTotals & {
+  // The goal comes from the profile, not from a plan of ELLIE.
+  estimated: boolean;
+  hasGoal: boolean;
 };
 
-export const emptyIncrements: LogIncrements = {
-  kcal: 0,
-  protein: 0,
-  carbs: 0,
-  fats: 0,
-};
-
-// "1.2a0" → 120: only digits, capped.
-export function parseKcal(text: string): number {
-  const digits = text.replace(/\D/g, '');
-  return Math.min(MAX_KCAL_ENTRY, digits ? parseInt(digits, 10) : 0);
+export function dayTotalsFromDay(
+  day: {
+    totals: { kcal: number; protein: number; carbs: number; fats: number };
+    goal: {
+      source: 'plan' | 'profile' | 'none';
+      kcal: number | null;
+      protein: number | null;
+      carbs: number | null;
+      fats: number | null;
+    };
+  },
+  waterMl: number,
+  goalGlasses?: number | null,
+): CounterTotals {
+  const { goal } = day;
+  const hasGoal = goal.source !== 'none' && goal.kcal !== null && goal.kcal > 0;
+  const totals = buildDayTotals({
+    plan: hasGoal
+      ? {
+          id: '',
+          userId: '',
+          targetCalories: goal.kcal as number,
+          targetProtein: goal.protein ?? 0,
+          targetCarbs: goal.carbs ?? undefined,
+          targetFats: goal.fats ?? undefined,
+        }
+      : null,
+    log: { calories: day.totals.kcal, protein: day.totals.protein, carbs: day.totals.carbs, fats: day.totals.fats },
+    waterMl,
+    goalGlasses,
+  });
+  return { ...totals, estimated: goal.source === 'profile', hasGoal };
 }
 
-export function stepMacro(current: number, direction: 1 | -1): number {
-  return Math.min(
-    MAX_MACRO_ENTRY,
-    Math.max(0, current + direction * MACRO_STEP),
-  );
+// Average of the days with a goal that landed within ±10 % of it.
+export function daysNearGoal(
+  days: readonly { kcal: number; goal: number | null }[],
+): { near: number; counted: number } {
+  const counted = days.filter(day => day.goal && day.goal > 0 && day.kcal > 0);
+  const near = counted.filter(day => Math.abs(day.kcal - (day.goal as number)) / (day.goal as number) <= 0.1);
+  return { near: near.length, counted: counted.length };
 }
-
-export const hasIncrements = (add: LogIncrements) =>
-  add.kcal > 0 || add.protein > 0 || add.carbs > 0 || add.fats > 0;
-
-export type LogTotals = {
-  calories: number;
-  protein: number;
-  carbs: number;
-  fats: number;
-};
-
-// New totals of the day: what was logged plus the increments.
-export function applyIncrements(
-  log: Pick<
-    DailyNutritionLog,
-    'calories' | 'protein' | 'carbs' | 'fats'
-  > | null,
-  add: LogIncrements,
-): LogTotals {
-  return {
-    calories: Math.max(0, (log?.calories ?? 0) + add.kcal),
-    protein: Math.max(0, (log?.protein ?? 0) + add.protein),
-    carbs: Math.max(0, (log?.carbs ?? 0) + add.carbs),
-    fats: Math.max(0, (log?.fats ?? 0) + add.fats),
-  };
-}
-
-function scoreAgainst(value: number, target?: number | null) {
-  if (!target || target <= 0) {
-    return null;
-  }
-  const delta = Math.abs(value - target) / target;
-  return Math.max(0, Math.round(100 - Math.min(delta, 1) * 100));
-}
-
-// Same score as the v1 sheet: how close the day is to the plan (0–100); null
-// without a plan.
-export function adherenceScore(
-  plan: NutritionPlan | null,
-  totals: LogTotals,
-): number | null {
-  if (!plan) {
-    return null;
-  }
-  const scores = [
-    scoreAgainst(totals.calories, plan.targetCalories),
-    scoreAgainst(totals.protein, plan.targetProtein),
-    scoreAgainst(totals.carbs, plan.targetCarbs),
-    scoreAgainst(totals.fats, plan.targetFats),
-  ].filter((score): score is number => score !== null);
-  return scores.length
-    ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
-    : 0;
-}
-
-// Percentage shown under "Adherencia de hoy" in the sheet's gauge.
-export const sheetPct = (consumed: number, target: number | null) =>
-  Math.min(100, Math.round(ratio(consumed, target) * 100));

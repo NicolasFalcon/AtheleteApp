@@ -326,13 +326,6 @@ export const dismissCore33Invite = (
     core33_invite_dismiss_count: Math.max(0, currentCount) + 1,
   });
 
-// Development only ("Restablecer card de Core 33"): count 0 and no date.
-export const resetCore33InviteDismissals = (userId: string) =>
-  updateOwnProfile(userId, {
-    core33_invite_dismissed_at: null,
-    core33_invite_dismiss_count: 0,
-  });
-
 // Called when a Core 33 is completed (toggleCore33Habit), so the discovery
 // card starts over with a clean counter.
 export const resetCore33InviteCounter = (userId: string) =>

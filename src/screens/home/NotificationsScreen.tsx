@@ -129,7 +129,7 @@ export function NotificationsScreen({ navigation }: Props) {
 
   const handleNotificationPress = (notification: ProductNotification) => {
     if (notification.sourceAction === 'log_nutrition') {
-      navigation.navigate(APP_ROUTES.NutritionPlan, { openLog: true });
+      navigation.navigate(APP_ROUTES.CaloriesCamera, { source: 'home' });
       return;
     }
 

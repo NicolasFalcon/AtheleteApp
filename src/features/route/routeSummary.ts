@@ -58,10 +58,16 @@ function titleFor(state: TrackerState): string {
 
 export function activityFromTracker(
   state: TrackerState,
-  options: { visibility: RouteVisibility; hideEndpoints: boolean; plannedRouteId: string | null },
+  options: {
+    visibility: RouteVisibility;
+    hideEndpoints: boolean;
+    plannedRouteId: string | null;
+    // The idempotency key chosen when the outing started (recovery keeps it).
+    clientId?: string;
+  },
 ): RouteActivity {
   const movingSec = Math.round(trackerActiveSec(state));
-  const clientId = createUuid();
+  const clientId = options.clientId ?? createUuid();
   const endedAt = state.endedAt ?? state.now ?? Date.now();
   return {
     id: clientId,

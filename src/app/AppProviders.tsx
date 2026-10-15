@@ -10,7 +10,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@app/app/queryClient';
 import { ToastProvider } from '@app/components/v2/Toast';
-import { DevCatalogHost } from '@app/dev/DevCatalogHost';
+import { useSessionOutboxSync } from '@app/features/session/useSessionOutboxSync';
 import { navigationRef } from '@app/navigation/navigationRef';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { AuthProvider } from '@app/providers/AuthProvider';
@@ -18,6 +18,7 @@ import { ThemeProvider } from '@app/providers/ThemeProvider';
 
 function AppNavigation({ children }: PropsWithChildren) {
   const { isDark, theme } = useAppTheme();
+  useSessionOutboxSync();
 
   const navigationTheme = {
     ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme),
@@ -36,7 +37,6 @@ function AppNavigation({ children }: PropsWithChildren) {
     <NavigationContainer ref={navigationRef} theme={navigationTheme}>
       <ToastProvider>
         {children}
-        {__DEV__ ? <DevCatalogHost /> : null}
       </ToastProvider>
     </NavigationContainer>
   );

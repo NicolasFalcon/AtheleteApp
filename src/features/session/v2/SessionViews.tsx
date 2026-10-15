@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Image,
@@ -7,6 +7,8 @@ import {
   TextInput,
   View,
   type ImageSourcePropType,
+  type ImageStyle,
+  type StyleProp,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
@@ -75,7 +77,34 @@ const NUMBER_WORDS = [
   'Diez',
 ];
 
-export type ThumbFor = (exercise: PlannedExercise) => ImageSourcePropType;
+// The picture of an exercise: its signed poster when it has one, else (or if
+// it fails to load) the generic muscle image.
+export type ExerciseImage = {
+  source: ImageSourcePropType;
+  fallback: ImageSourcePropType;
+};
+export type ThumbFor = (exercise: PlannedExercise) => ExerciseImage;
+
+function ExercisePicture({
+  image,
+  style,
+}: {
+  image: ExerciseImage;
+  style: StyleProp<ImageStyle>;
+}) {
+  const [failed, setFailed] = useState(false);
+  // A new source gets a new chance.
+  const uri = typeof image.source === 'object' && 'uri' in image.source ? image.source.uri : undefined;
+  useEffect(() => setFailed(false), [uri]);
+  return (
+    <Image
+      source={failed ? image.fallback : image.source}
+      resizeMode="cover"
+      style={style}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export function doneLabel(done: number, total: number): string {
   return `${done} de ${total} ejercicios`;
@@ -285,7 +314,7 @@ export function ActiveView({
   draft: SessionDraft;
   onDraft: (draft: SessionDraft) => void;
   thumbFor: ThumbFor;
-  cardImage: ImageSourcePropType | null;
+  cardImage: ExerciseImage | null;
   onPause: () => void;
   onLogSet: () => void;
   onTechnique?: () => void;
@@ -381,11 +410,7 @@ export function ActiveView({
           </TextV2>
           {next.map(exercise => (
             <View key={exercise.position} style={styles.nextRow}>
-              <Image
-                source={thumbFor(exercise)}
-                resizeMode="cover"
-                style={styles.nextThumb}
-              />
+              <ExercisePicture image={thumbFor(exercise)} style={styles.nextThumb} />
               <View style={styles.nextTexts}>
                 <TextV2
                   variant="body"
@@ -456,7 +481,7 @@ function CurrentCard({
   total: number;
   draft: SessionDraft;
   onDraft: (draft: SessionDraft) => void;
-  image: ImageSourcePropType | null;
+  image: ExerciseImage | null;
   onLogSet: () => void;
   onTechnique?: () => void;
 }) {
@@ -467,9 +492,7 @@ function CurrentCard({
   return (
     <View style={styles.card}>
       <View style={styles.cardPhoto}>
-        {image ? (
-          <Image source={image} resizeMode="cover" style={styles.fill} />
-        ) : null}
+        {image ? <ExercisePicture image={image} style={styles.fill} /> : null}
         <LinearGradient
           colors={['rgba(20,19,18,.35)', 'rgba(20,19,18,0)', 'rgba(31,29,27,.92)', C.card]}
           locations={[0, 0.35, 0.92, 1]}
@@ -669,7 +692,7 @@ export function PausedView({
         </View>
         {current ? (
           <View style={styles.compact}>
-            <Image source={thumbFor(current)} resizeMode="cover" style={styles.compactThumb} />
+            <ExercisePicture image={thumbFor(current)} style={styles.compactThumb} />
             <View style={styles.flexGap}>
               <TextV2 variant="eyebrow" color={C.tertiary}>
                 {`Ahora · ${current.position + 1} de ${total}`}
@@ -860,7 +883,7 @@ export function RestView({
               <>
                 <View style={styles.restDivider} />
                 <View style={styles.restNext}>
-                  <Image source={thumbFor(next)} resizeMode="cover" style={styles.restThumb} />
+                  <ExercisePicture image={thumbFor(next)} style={styles.restThumb} />
                   <View style={styles.flexGap}>
                     <TextV2 variant="eyebrow" color={C.tertiary}>
                       {kind === 'set' ? 'Siguiente serie' : 'Siguiente ejercicio'}

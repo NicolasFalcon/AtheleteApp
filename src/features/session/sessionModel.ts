@@ -43,7 +43,7 @@ export function selectPendingSession(
 
 // ── Plan ────────────────────────────────────────────────────────────────────
 export type PlannedExercise = {
-  position: number; // 0-based, = workout_session_exercises.position
+  position: number; // 0-based; the DB position is this + 1 (sessionDbMapping)
   templateExerciseId: string | null;
   exerciseId: string | null;
   name: string;
@@ -115,7 +115,7 @@ export function buildPlan(
 // ── Sets ────────────────────────────────────────────────────────────────────
 export type LoggedSet = {
   position: number;
-  setIndex: number; // 0-based, = workout_session_sets.set_index
+  setIndex: number; // 0-based; the DB set_index is this + 1 (sessionDbMapping)
   reps: number | null;
   weightKg: number | null;
   durationSec: number | null; // unit sec → workout_session_sets.duration_sec
@@ -258,6 +258,18 @@ export function resumeClock(clock: ClockState, now: number): ClockState {
       clock.pausedTotalSec +
       Math.max(0, Math.round((now - clock.pausedAt) / 1000)),
   };
+}
+
+// Closes the clock at `at` to finish the workout. A pause in progress is
+// folded into `pausedTotalSec`, so the final duration is the active time up
+// to the moment it was paused (the time spent paused is never added) and it
+// is the same value whenever it is read with `at` as the reference instant.
+export function finishClock(
+  clock: ClockState,
+  at: number,
+): { clock: ClockState; activeSec: number } {
+  const closed = resumeClock(clock, at);
+  return { clock: closed, activeSec: activeSeconds(closed, at) };
 }
 
 export function pausedForSeconds(clock: ClockState, now: number): number {

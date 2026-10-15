@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { routeStore } from '@app/features/route/routeStore';
 import type { RouteVisibility } from '@app/features/route/routeTypes';
 import { getSocialService } from '@app/services/social/socialSource';
@@ -18,7 +17,7 @@ export function parseVisibility(value: unknown): RouteVisibility | null {
 
 export function useRouteDefaults(): void {
   useEffect(() => {
-    if (loaded || isRouteSampleActive()) {
+    if (loaded) {
       return;
     }
     getSocialService()
@@ -45,9 +44,6 @@ export function saveRouteDefaults(next: {
   hideEndpoints?: boolean;
   autoPause?: boolean;
 }): void {
-  if (isRouteSampleActive()) {
-    return;
-  }
   getSocialService()
     .updateSettings({
       ...(next.visibility ? { route_default_visibility: next.visibility } : {}),

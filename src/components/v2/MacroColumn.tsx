@@ -13,12 +13,14 @@ export type MacroColumnProps = {
   value: number;
   goal: number;
   pct: number; // 0–100
+  // The protein of Calorías: wider, Ember fill, "· prioridad" (design §23.3).
+  priority?: boolean;
 };
 
 // Macro column (Nutrición): a 120 pt box that fills from the bottom with the
 // share of the goal, the percentage inside and the figure under it.
-export function MacroColumn({ label, value, goal, pct }: MacroColumnProps) {
-  const { colors } = useThemeV2();
+export function MacroColumn({ label, value, goal, pct, priority = false }: MacroColumnProps) {
+  const { colors, mode } = useThemeV2();
   const height = useSharedValue(0);
 
   useEffect(() => {
@@ -31,13 +33,18 @@ export function MacroColumn({ label, value, goal, pct }: MacroColumnProps) {
 
   return (
     <View
-      style={styles.column}
+      style={[styles.column, priority ? styles.priority : null]}
       accessible
       accessibilityLabel={`${label}: ${value} de ${goal} gramos, ${pct} por ciento`}
     >
       <View style={[styles.box, { backgroundColor: colors.surface.muted }]}>
         <Animated.View style={[styles.fill, fill]}>
-          <View style={[StyleSheet.absoluteFill, styles.ink]} />
+          <View
+            style={[
+              StyleSheet.absoluteFill,
+              priority ? { backgroundColor: colors.ember.base } : styles.ink,
+            ]}
+          />
         </Animated.View>
         <TextV2
           variant="metaStrong"
@@ -57,8 +64,12 @@ export function MacroColumn({ label, value, goal, pct }: MacroColumnProps) {
             color={colors.text.secondary}
           >{`/ ${goal} g`}</TextV2>
         </View>
-        <TextV2 variant="meta" color={colors.text.secondary} numberOfLines={1}>
-          {label}
+        <TextV2
+          variant={priority ? 'metaStrong' : 'meta'}
+          color={priority ? (mode === 'dark' ? colors.ember.textOnDark : colors.ember.deep) : colors.text.secondary}
+          numberOfLines={1}
+        >
+          {priority ? `${label} · prioridad` : label}
         </TextV2>
       </View>
     </View>
@@ -67,6 +78,7 @@ export function MacroColumn({ label, value, goal, pct }: MacroColumnProps) {
 
 const styles = StyleSheet.create({
   column: { flex: 1, gap: 10 },
+  priority: { flex: 1.3 },
   box: { height: 120, borderRadius: 20, overflow: 'hidden' },
   fill: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   ink: { backgroundColor: '#1C1A18' },

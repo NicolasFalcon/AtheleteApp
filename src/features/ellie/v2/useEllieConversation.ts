@@ -1,162 +1,203 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@app/hooks/useAuth';
-import { useEllieHistory } from '@app/hooks/useEllieHistory';
-import { invalidateNutritionPlanQueries } from '@app/lib/queryInvalidation';
-import {
-  callEllieChat,
-  generateWithEllie,
-} from '@app/services/ellie/chat';
-import {
-  clearEllieChatHistory,
-  insertEllieChatMessage,
-} from '@app/services/supabase/ellie';
-import {
-  saveEllieNutritionPlan,
-  saveEllieWorkout,
-} from '@app/services/supabase/ellie-actions';
 import {
   chatReducer,
-  classifyEllieError,
   composerState,
   initialChatState,
-  type ChatState,
-  type EllieMode,
+  type EllieMode as PlanMode,
 } from '@app/features/ellie/chatModel';
+import { ellieErrorLine, failureEffect, type EllieLanguage } from '@app/features/ellie/ellieCopy';
+import { historyToMessages, parseTool } from '@app/features/ellie/resultParsing';
+import { useAuth } from '@app/hooks/useAuth';
 import {
-  parseToolResult,
-  toClientMessages,
-} from '@app/features/ellie/resultParsing';
+  cacheEllieUsage,
+  invalidateEllieConversations,
+  useEllieLatest,
+  useEllieMessages,
+  useEllieUsage,
+} from '@app/hooks/useEllieConversations';
+import { createUuid } from '@app/lib/uuid';
+import { saveEllieNutritionPlan, saveEllieWorkout } from '@app/services/supabase/ellie-actions';
+import { invalidateNutritionPlanQueries } from '@app/lib/queryInvalidation';
+import {
+  EllieError,
+  sendEllieMessage,
+  type EllieMode,
+  type EllieReply,
+} from '@app/services/ellie/ellieService';
 
 export const defaultGreeting = (name?: string | null) =>
   `Hola${name ? `, ${name}` : ''}. ¿En qué te ayudo hoy?`;
 
+// What is sent with a photo and no words.
+const PHOTO_TEXT: Record<EllieLanguage, string> = {
+  es: 'Mira esta foto.',
+  en: 'Look at this photo.',
+};
+
+// "Another version" of a plan: a new turn of the same conversation.
+const ANOTHER_VERSION: Record<EllieLanguage, string> = {
+  es: 'Genérame otra versión diferente, con otra estructura y una propuesta distinta.',
+  en: 'Generate a different version for me, with another structure and a different proposal.',
+};
+
 type Options = {
-  userContext: string;
   greeting: string;
-  // Development: a ready conversation. Nothing is sent or stored; the
-  // actions are simulated locally.
-  fixture?: ChatState;
+  language: EllieLanguage;
+  // undefined: the most recent conversation; null: a new one; a uuid: that one.
+  conversationId?: string | null;
+  // Only the screen the question comes from ("home", "session_summary"…).
+  clientContext?: string | null;
+  // The session is gone: the screen goes back to the sign-in.
+  onUnauthorized?: () => void;
 };
 
 export type RegenerateBusy = Record<string, boolean>;
 
-// The state of the chat (chatReducer) wired to the ELLIE v1 backend: the
-// ellie-chat edge function and chat_messages, exactly as the v1 hook did.
-export function useEllieConversation({ userContext, greeting, fixture }: Options) {
+// The state of the chat (chatReducer) wired to ellie-chat: the server keeps the
+// conversation and reads the user's context; the app sends one message per
+// turn with an idempotency key and reads the history. Nothing is inserted from
+// here.
+export function useEllieConversation({
+  greeting,
+  language,
+  conversationId: requestedId,
+  clientContext = null,
+  onUnauthorized,
+}: Options) {
   const { profile } = useAuth();
   const userId = profile?.id;
   const queryClient = useQueryClient();
-  const history = useEllieHistory();
-  const [state, dispatch] = useReducer(
-    chatReducer,
-    fixture ?? initialChatState(greeting),
-  );
+  const [state, dispatch] = useReducer(chatReducer, initialChatState(greeting));
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState<RegenerateBusy>({});
   const stateRef = useRef(state);
   stateRef.current = state;
   const modes = useRef<Record<string, EllieMode | undefined>>({});
-  const loaded = useRef(Boolean(fixture));
+  // The photo each message carries (its path in storage): a retry sends it again.
+  const images = useRef<Record<string, string | undefined>>({});
 
-  // The stored thread is loaded once (the query keeps it for the session).
+  // Which conversation is open. Without a request it is the latest one, once
+  // known; a conversation created by the first message is adopted here.
+  const latest = useEllieLatest();
+  const [adopted, setAdopted] = useState<string | null | undefined>(requestedId);
+  const conversationId =
+    adopted !== undefined ? adopted : latest.isSuccess ? latest.data?.conversation.id ?? null : undefined;
+  const conversationRef = useRef<string | null>(null);
+  conversationRef.current = conversationId ?? null;
+  // A conversation born in this screen is not loaded from the server: its
+  // messages are already here.
+  const [localOnly, setLocalOnly] = useState(false);
+  const loadedFor = useRef<string | null>(null);
+  const messagesQuery = useEllieMessages(conversationId ?? null, !localOnly);
+  const usage = useEllieUsage();
+
   useEffect(() => {
-    if (fixture || loaded.current || !history.data) {
+    if (!conversationId || localOnly || loadedFor.current === conversationId) {
       return;
     }
-    loaded.current = true;
-    dispatch({ type: 'load', history: history.data, greeting });
-  }, [fixture, greeting, history.data]);
+    if (messagesQuery.data && !messagesQuery.isFetching) {
+      loadedFor.current = conversationId;
+      dispatch({ type: 'load', messages: historyToMessages(messagesQuery.data), greeting });
+    }
+  }, [conversationId, greeting, localOnly, messagesQuery.data, messagesQuery.isFetching]);
 
-  const ready = Boolean(fixture) || loaded.current || history.isError;
-  const loading = !fixture && history.isLoading;
-  const historyFailed = !fixture && history.isError;
+  const waitingForLatest = adopted === undefined && !latest.isSuccess && !latest.isError;
+  const emptyThread = conversationId === null || (adopted === undefined && latest.isError);
+  const ready = emptyThread
+    ? true
+    : !waitingForLatest && (localOnly || loadedFor.current === conversationId || messagesQuery.isError);
+  const loading = !ready;
+  const historyFailed = Boolean(conversationId) && !localOnly && messagesQuery.isError;
 
-  const persist = useCallback(
-    (role: 'user' | 'assistant', content: string, onStored?: () => void) => {
-      if (!userId || fixture) {
-        return;
+  const fail = useCallback(
+    (id: string, error: unknown) => {
+      const failure =
+        error instanceof EllieError
+          ? { code: error.code, used: error.used, limit: error.limit }
+          : { code: 'unknown' as const };
+      dispatch({ type: 'fail', id, failure, text: ellieErrorLine(failure, language) });
+      if (failureEffect(failure.code) === 'login') {
+        onUnauthorized?.();
       }
-      insertEllieChatMessage({ userId, role, content })
-        .then(() => onStored?.())
-        .catch(() => {});
     },
-    [fixture, userId],
+    [language, onUnauthorized],
+  );
+
+  // After a good reply: adopt the conversation, keep the usage, refresh lists.
+  const afterReply = useCallback(
+    (reply: EllieReply) => {
+      if (conversationRef.current !== reply.conversationId) {
+        conversationRef.current = reply.conversationId;
+        loadedFor.current = reply.conversationId;
+        setLocalOnly(true);
+        setAdopted(reply.conversationId);
+      }
+      cacheEllieUsage(queryClient, userId, reply.usage);
+      invalidateEllieConversations(queryClient, userId);
+    },
+    [queryClient, userId],
   );
 
   const run = useCallback(
-    async (id: string, text: string, mode: EllieMode | undefined, retry: boolean) => {
+    async (
+      id: string,
+      text: string,
+      mode: EllieMode | undefined,
+      retry: boolean,
+      image: { uri: string; path: string } | null = null,
+    ) => {
       modes.current[id] = mode;
-      const before = stateRef.current;
-      const messages = [
-        ...toClientMessages(before.messages, id),
-        { role: 'user' as const, content: text },
-      ];
-      dispatch(retry ? { type: 'retry', id } : { type: 'send', id, text });
-      const alreadyStored = before.messages.some(
-        message => message.id === id && message.role === 'user' && message.persisted,
-      );
-      if (!alreadyStored) {
-        persist('user', text, () => dispatch({ type: 'persisted', id }));
-      }
-
-      if (fixture) {
-        setTimeout(() => {
-          dispatch({ type: 'delta', id: `a-${id}`, delta: 'Respuesta de ejemplo (dev): no se envió nada.' });
+      dispatch(retry ? { type: 'retry', id } : { type: 'send', id, text, image });
+      try {
+        const reply = await sendEllieMessage({
+          conversationId: conversationRef.current,
+          // Same id on every retry: the server returns the stored answer
+          // (replayed) instead of answering and charging twice.
+          clientMessageId: id,
+          message: text,
+          mode,
+          imagePath: images.current[id] ?? null,
+          clientContext,
+        });
+        afterReply(reply);
+        const parsed = reply.message.tool
+          ? parseTool(reply.message.tool, reply.message.id, reply.message.content)
+          : null;
+        if (parsed) {
+          dispatch({ type: 'tool', id: `assistant-${id}`, intro: parsed.intro, card: parsed.card });
+        } else {
+          dispatch({ type: 'delta', id: reply.message.id || `assistant-${id}`, delta: reply.message.content });
           dispatch({ type: 'done' });
-        }, 900);
-        return;
+        }
+      } catch (error) {
+        fail(id, error);
       }
-
-      const streamId = `assistant-${id}`;
-      let answer = '';
-      await callEllieChat({
-        messages,
-        userContext,
-        mode,
-        onDelta: delta => {
-          answer += delta;
-          dispatch({ type: 'delta', id: streamId, delta });
-        },
-        onDone: () => {
-          dispatch({ type: 'done' });
-          if (answer.trim()) {
-            persist('assistant', answer);
-          }
-        },
-        onToolResult: result => {
-          const parsed = parseToolResult(result, `card-${id}`, messages);
-          if (!parsed) {
-            dispatch({ type: 'done' });
-            return;
-          }
-          dispatch({ type: 'tool', id: streamId, intro: parsed.intro, card: parsed.card });
-          persist('assistant', parsed.summary);
-        },
-        onError: (message, status) =>
-          dispatch({ type: 'fail', id, kind: classifyEllieError({ status, message }) }),
-      });
     },
-    [fixture, persist, userContext],
+    [afterReply, clientContext, fail],
   );
 
   const send = useCallback(
-    (text: string, mode?: EllieMode) => {
-      const trimmed = text.trim();
-      if (!trimmed || stateRef.current.thinking || (!userId && !fixture)) {
+    (text: string, mode?: PlanMode, image?: { uri: string; path: string } | null) => {
+      const trimmed = text.trim() || (image ? PHOTO_TEXT[language] : '');
+      if (!trimmed || stateRef.current.thinking || !userId) {
         return;
       }
       setDraft('');
-      run(`user-${Date.now()}`, trimmed, mode, false);
+      const id = createUuid();
+      if (image) {
+        images.current[id] = image.path;
+      }
+      run(id, trimmed, mode, false, image ?? null).catch(() => undefined);
     },
-    [fixture, run, userId],
+    [language, run, userId],
   );
 
   const retry = useCallback(
     (id: string) => {
       const message = stateRef.current.messages.find(item => item.id === id);
       if (message && message.role === 'user' && message.kind === 'text') {
-        run(id, message.text, modes.current[id], true);
+        run(message.clientMessageId, message.text, modes.current[id], true).catch(() => undefined);
       }
     },
     [run],
@@ -175,10 +216,6 @@ export function useEllieConversation({ userContext, greeting, fixture }: Options
         return;
       }
       dispatch({ type: 'stage', id, stage: 'activating' });
-      if (fixture) {
-        setTimeout(() => settle(id, 'active'), 900);
-        return;
-      }
       const result = await saveEllieNutritionPlan(userId, card.plan);
       if (!result.success) {
         settle(id, 'error');
@@ -187,7 +224,7 @@ export function useEllieConversation({ userContext, greeting, fixture }: Options
       settle(id, 'active');
       await invalidateNutritionPlanQueries(queryClient, userId);
     },
-    [fixture, queryClient, settle, userId],
+    [queryClient, settle, userId],
   );
 
   const saveRoutine = useCallback(
@@ -197,10 +234,6 @@ export function useEllieConversation({ userContext, greeting, fixture }: Options
         return;
       }
       dispatch({ type: 'stage', id, stage: 'saving' });
-      if (fixture) {
-        setTimeout(() => settle(id, 'saved', 'fixture'), 900);
-        return;
-      }
       const result = await saveEllieWorkout(userId, card.workout);
       if (!result.success) {
         settle(id, 'error');
@@ -213,59 +246,67 @@ export function useEllieConversation({ userContext, greeting, fixture }: Options
         queryClient.invalidateQueries({ queryKey: ['home', 'overview', userId] }),
       ]);
     },
-    [fixture, queryClient, settle, userId],
+    [queryClient, settle, userId],
   );
 
-  // "Otra versión": same request as v1 (regeneration messages + mode).
+  // "Otra versión": one more turn of the same conversation, in the mode of the
+  // card; the new plan replaces the card.
   const anotherVersion = useCallback(
     async (id: string) => {
       const card = stateRef.current.messages.find(item => item.id === id);
-      if (!card || (card.kind !== 'nutrition' && card.kind !== 'workout') || fixture) {
+      if (!card || (card.kind !== 'nutrition' && card.kind !== 'workout')) {
         return;
       }
-      const isWorkout = card.kind === 'workout';
       setBusy(current => ({ ...current, [id]: true }));
       try {
-        const result = await generateWithEllie({
-          messages: [
-            ...(card.context ?? []),
-            {
-              role: 'assistant',
-              content: `Ya generé una versión anterior llamada "${
-                card.kind === 'workout' ? card.workout.title : 'plan anterior'
-              }". El usuario quiere una variante diferente.`,
-            },
-            {
-              role: 'user',
-              content:
-                'Genérame otra versión diferente, con otra estructura y una propuesta distinta.',
-            },
-          ],
-          userContext,
-          mode: isWorkout ? 'generate_workout' : 'generate_nutrition',
+        const reply = await sendEllieMessage({
+          conversationId: conversationRef.current,
+          clientMessageId: createUuid(),
+          message: ANOTHER_VERSION[language],
+          mode: card.kind === 'workout' ? 'generate_workout' : 'generate_nutrition',
+          clientContext,
         });
-        const parsed = parseToolResult(result, id, card.context ?? []);
-        if (parsed) {
+        afterReply(reply);
+        const parsed = reply.message.tool ? parseTool(reply.message.tool, id, reply.message.content) : null;
+        if (parsed && parsed.card.kind !== 'meal') {
           dispatch({ type: 'replace', id, card: parsed.card, intro: parsed.intro });
+        } else {
+          settle(id, 'error');
         }
-      } catch {
+      } catch (error) {
         settle(id, 'error');
+        if (error instanceof EllieError && failureEffect(error.code) === 'login') {
+          onUnauthorized?.();
+        }
       } finally {
         setBusy(current => ({ ...current, [id]: false }));
       }
     },
-    [fixture, settle, userContext],
+    [afterReply, clientContext, language, onUnauthorized, settle],
   );
 
-  // Starts over: the one stored thread is cleared (as in v1).
-  const reset = useCallback(async () => {
-    if (userId && !fixture) {
-      await clearEllieChatHistory(userId);
-      await queryClient.invalidateQueries({ queryKey: ['ellie', 'chat', userId] });
-    }
+  // A new conversation: the server creates it with the first message.
+  const newConversation = useCallback(() => {
+    conversationRef.current = null;
+    loadedFor.current = null;
+    setLocalOnly(false);
+    setAdopted(null);
     dispatch({ type: 'reset', greeting });
     setDraft('');
-  }, [fixture, greeting, queryClient, userId]);
+  }, [greeting]);
+
+  // Opens another stored conversation.
+  const openConversation = useCallback(
+    (id: string) => {
+      conversationRef.current = id;
+      loadedFor.current = null;
+      setLocalOnly(false);
+      setAdopted(id);
+      dispatch({ type: 'reset', greeting });
+      setDraft('');
+    },
+    [greeting],
+  );
 
   const composer = useMemo(() => composerState(state, draft), [draft, state]);
 
@@ -274,16 +315,22 @@ export function useEllieConversation({ userContext, greeting, fixture }: Options
     draft,
     setDraft,
     composer,
+    busy,
+    conversationId: conversationId ?? null,
     ready,
     loading,
     historyFailed,
-    refetchHistory: history.refetch,
-    busy,
+    refetchHistory: () => {
+      loadedFor.current = null;
+      messagesQuery.refetch().catch(() => undefined);
+    },
+    usage: usage.data ?? null,
     send,
     retry,
     activatePlan,
     saveRoutine,
     anotherVersion,
-    reset,
+    newConversation,
+    openConversation,
   };
 }

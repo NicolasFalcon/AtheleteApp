@@ -46,11 +46,8 @@ import type {
 // Data layer of Comunidad. The screens only talk to this interface.
 // The real app uses `supabaseSocialService` (W1 to W7 connected: privacy and
 // people, feed and posts, publishing, challenges, notifications and
-// moderation); in `__DEV__` the dev screens use `fixtureSocialService` (see
-// `socialSource.ts`). Each method is one RPC or table; see
+// moderation). Each method is one RPC or table; see
 // docs/backend/SOCIAL_RPC_SHAPES.md.
-// TODO(social-wire): delete `fixtureSocialService` and the dev scenarios once
-// the QA checklist (W1 to W7) is signed off with two real accounts.
 export type ProfileLookup = {
   // null when get_social_profiles returned no row for that id.
   profile: SocialProfileRow | null;

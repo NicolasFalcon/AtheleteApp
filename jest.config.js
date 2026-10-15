@@ -2,8 +2,10 @@ module.exports = {
   preset: '@react-native/jest-preset',
   moduleNameMapper: {
     '^@app/(.*)$': '<rootDir>/src/$1',
-    '^@env$': '<rootDir>/src/types/__mocks__/env.ts',
+    '^@env$': '<rootDir>/__tests__/fixtures/env.ts',
+    '^expo-task-manager$': '<rootDir>/__tests__/fixtures/expoTaskManagerStub.ts',
   },
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/__tests__/fixtures/'],
   setupFiles: [
     '<rootDir>/node_modules/react-native-gesture-handler/jestSetup.js',
   ],

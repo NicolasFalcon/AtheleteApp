@@ -37,6 +37,10 @@ import { VisualOnboardingScreen } from '@app/screens/onboarding/VisualOnboarding
 import { NotificationsScreen } from '@app/screens/home/NotificationsScreen';
 import { PersonalRecordsScreen } from '@app/screens/home/PersonalRecordsScreen';
 import { QuizLandingScreen } from '@app/screens/home/QuizLandingScreen';
+import { CaloriesCameraScreen } from '@app/screens/calories/CaloriesCameraScreen';
+import { MealDetailScreen } from '@app/screens/calories/MealDetailScreen';
+import { MachineScanScreen } from '@app/screens/vision/MachineScanScreen';
+import { MealReviewScreen } from '@app/screens/calories/MealReviewScreen';
 import { NutritionPlanScreen } from '@app/screens/nutrition/NutritionPlanScreen';
 import { RegisterPrScreen } from '@app/screens/pr/RegisterPrScreen';
 import { AchievementsScreen } from '@app/screens/profile/AchievementsScreen';
@@ -45,7 +49,6 @@ import { BodyScienceArticleDetailScreen } from '@app/screens/progress/BodyScienc
 import { BodyScienceScreen } from '@app/screens/progress/BodyScienceScreen';
 import { QuizChallengeScreen } from '@app/screens/quiz/QuizChallengeScreen';
 import { QuizQuestionScreen } from '@app/screens/quiz/QuizQuestionScreen';
-import { DevFixtureTabs } from '@app/dev/DevFixtureTabs';
 import { QuizResultScreen } from '@app/screens/quiz/QuizResultScreen';
 import { SocialOfficialListScreen } from '@app/screens/social/SocialOfficialListScreen';
 import { SocialChallengeDoneScreen } from '@app/screens/social/SocialChallengeDoneScreen';
@@ -145,97 +148,6 @@ export function RootNavigator() {
           name={ROOT_ROUTES.AuthFlow}
           component={AuthStackNavigator}
         />
-      ) : null}
-      {/* Development only: screens that use sample data open without a
-          session (athelete://dev/social, athelete://dev/quiz). */}
-      {__DEV__ && flow === 'auth' ? (
-        <Stack.Group>
-          <Stack.Screen
-            name={ROOT_ROUTES.DevFixtureTabs}
-            component={DevFixtureTabs}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialProfile}
-            component={SocialProfileScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialPrivacy}
-            component={SocialPrivacyScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialInvite}
-            component={SocialInviteScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialBlocked}
-            component={SocialBlockedScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialChallenge}
-            component={SocialChallengeScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialCreateChallenge}
-            component={SocialCreateChallengeScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialOfficialList}
-            component={SocialOfficialListScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialChallengeDone}
-            component={SocialChallengeDoneScreen}
-            options={{ gestureEnabled: false }}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialNotifications}
-            component={SocialNotificationsScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialModeration}
-            component={SocialModerationScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialModerationItem}
-            component={SocialModerationItemScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialRoutine}
-            component={SocialRoutineScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialPost}
-            component={SocialPostScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialCompose}
-            component={SocialComposeScreen}
-            options={{ presentation: 'modal' }}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.SocialUsername}
-            component={SocialUsernameScreen}
-            options={{ gestureEnabled: false }}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.QuizLanding}
-            component={QuizLandingScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.QuizChallenge}
-            component={QuizChallengeScreen}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.QuizQuestion}
-            component={QuizQuestionScreen}
-            options={{ gestureEnabled: false }}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.QuizResult}
-            component={QuizResultScreen}
-            options={{ gestureEnabled: false }}
-          />
-        </Stack.Group>
       ) : null}
       {flow === 'onboarding' ? (
         <Stack.Screen
@@ -435,6 +347,24 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.NutritionPlan}
             component={NutritionPlanScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.CaloriesCamera}
+            component={CaloriesCameraScreen}
+            options={{ animation: 'fade', gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.MealReview}
+            component={MealReviewScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.MachineScan}
+            component={MachineScanScreen}
+            options={{ animation: 'fade', gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.MealDetail}
+            component={MealDetailScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.BodyScience}

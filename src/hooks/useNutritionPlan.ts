@@ -4,9 +4,6 @@ import {invalidateNutritionPlanQueries} from '@app/lib/queryInvalidation';
 import {
   deactivateNutritionPlan,
   fetchNutritionPlanScreenData,
-  upsertTodayNutritionLog,
-  type NutritionPlanScreenData,
-  type NutritionLogInput,
 } from '@app/services/supabase/nutrition';
 
 export function useNutritionPlan() {
@@ -41,43 +38,9 @@ export function useNutritionPlan() {
     },
   });
 
-  const logMutation = useMutation({
-    mutationFn: async (input: NutritionLogInput) => {
-      if (!profile?.id) {
-        throw new Error('No hay una sesión activa.');
-      }
-
-      return upsertTodayNutritionLog(profile.id, input);
-    },
-    onSuccess: log => {
-      if (!profile?.id) {
-        return;
-      }
-
-      queryClient.setQueryData<NutritionPlanScreenData>(
-        ['nutrition', 'plan', profile.id],
-        current => (current ? {...current, todayLog: log} : current),
-      );
-      queryClient.setQueryData(
-        ['home', 'overview', profile.id],
-        (current: any) =>
-          current ? {...current, todayNutritionLog: log} : current,
-      );
-
-      invalidateNutritionPlanQueries(queryClient, profile.id).catch(error => {
-        console.warn(
-          '[nutrition-log] No se pudieron refrescar todas las superficies.',
-          error,
-        );
-      });
-    },
-  });
-
   return {
     ...planQuery,
     deactivatePlan: deactivateMutation.mutateAsync,
     isDeactivating: deactivateMutation.isPending,
-    saveTodayLog: logMutation.mutateAsync,
-    isSavingTodayLog: logMutation.isPending,
   };
 }

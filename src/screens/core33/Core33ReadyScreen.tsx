@@ -34,14 +34,12 @@ export function Core33ReadyScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { startChallenge, stateQuery } = useCore33();
   const challenge = findChallenge(route.params.challengeId);
-  const [starting, setStarting] = useState(Boolean(__DEV__ && route.params.devStarting));
+  const [starting, setStarting] = useState(false);
   const [failed, setFailed] = useState(false);
   const cachedActive =
     startGuard(stateQuery.data?.challenge ? [stateQuery.data.challenge] : []) ===
     'alreadyActive';
-  const [alreadyActive, setAlreadyActive] = useState(
-    Boolean(__DEV__ && route.params.devAlreadyActive),
-  );
+  const [alreadyActive, setAlreadyActive] = useState(false);
 
   if (!challenge) {
     return <View style={styles.screen} />;

@@ -110,9 +110,13 @@ function project(origin: LatLng, p: LatLng) {
   return { x: (p.lon - origin.lon) * kx, y: (p.lat - origin.lat) * metersPerDegree };
 }
 
+// `window` limits the search to the stretch of the route between `fromM` and
+// `toM` metres from its start (following a route: where the person already is
+// and a bit ahead, so a loop that ends where it starts does not jump back).
 export function nearestOnRoute(
   point: LatLng,
   route: readonly LatLng[],
+  window?: { fromM: number; toM: number },
 ): NearestOnRoute | null {
   if (route.length === 0) {
     return null;
@@ -129,6 +133,9 @@ export function nearestOnRoute(
   let best: NearestOnRoute | null = null;
 
   for (let i = 0; i < route.length - 1; i += 1) {
+    if (window && (cumulative[i + 1] < window.fromM || cumulative[i] > window.toM)) {
+      continue;
+    }
     const a = project(point, route[i]);
     const b = project(point, route[i + 1]);
     const dx = b.x - a.x;

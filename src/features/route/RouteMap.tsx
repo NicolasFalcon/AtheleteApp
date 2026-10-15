@@ -10,7 +10,7 @@ import {
   type PressEvent,
 } from '@maplibre/maplibre-react-native';
 import type { NativeSyntheticEvent } from 'react-native';
-import { useThemeV2 } from '@app/components/v2';
+import { TextV2, useThemeV2 } from '@app/components/v2';
 import { routeMapStyle, ROUTE_EMBER, type RouteMapMode } from '@app/features/route/mapStyle';
 import { boundsOf } from '@app/features/route/routeGeo';
 import {
@@ -111,7 +111,7 @@ export function RouteMap({
     const c = center ?? fit?.[0];
     return c
       ? { center: [c.lon, c.lat] as [number, number], zoom: zoom ?? 15.5, padding, duration: 0 }
-      : { center: [-58.4208, -34.581] as [number, number], zoom: 14, padding, duration: 0 };
+      : null;
   }, [center, fit, padding, zoom]);
 
   const planOn = resolved === 'dark' ? 'rgba(255,255,255,.5)' : 'rgba(18,18,18,.35)';
@@ -119,6 +119,18 @@ export function RouteMap({
     const [lon, lat] = event.nativeEvent.lngLat;
     onPress?.({ lat, lon });
   };
+
+  // No position yet (nothing to centre on): a calm loading state instead of a
+  // map somewhere else.
+  if (!camera) {
+    return (
+      <View style={[styles.fill, styles.waiting, { backgroundColor: theme.colors.surface.muted }, style]}>
+        <TextV2 variant="meta" tone="secondary">
+          Buscando tu ubicación…
+        </TextV2>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.fill, { opacity: dim }, style]}>
@@ -278,6 +290,7 @@ export function RouteMap({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  waiting: { alignItems: 'center', justifyContent: 'center' },
   endHollow: {
     width: 14,
     height: 14,

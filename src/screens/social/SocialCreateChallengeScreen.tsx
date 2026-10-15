@@ -66,20 +66,6 @@ const ICONS: Partial<Record<ChallengeMetric, LucideIcon>> = {
   mobility_minutes: Activity,
 };
 
-// Dev only: a draft already filled in for each step.
-function devDraft(step: number | undefined, inviteeId: string | undefined): CreateDraft {
-  const base = initialDraft(inviteeId);
-  if (step === undefined || step === 0) {
-    return base;
-  }
-  const withMetric = selectMetric(base, 'workouts');
-  return {
-    ...withMetric,
-    durationDays: step >= 2 ? 7 : null,
-    inviteeIds: step >= 3 ? ['fx-carlos', 'fx-andrea'] : withMetric.inviteeIds,
-  };
-}
-
 // Crear reto (SOCIAL_11): five short steps — tipo, objetivo, duración, amigos y
 // revisión con la vista previa. Between friends there is no repetitions type
 // (BT-45); points only exist in the official challenge.
@@ -90,9 +76,8 @@ export function SocialCreateChallengeScreen({ navigation, route }: Props) {
   const service = useSocialService();
   const overview = useSocialResource('getFriendsOverview', s => s.getFriendsOverview());
   const inviteeId = route.params?.inviteeId;
-  const devStep = __DEV__ ? route.params?.devStep : undefined;
-  const [step, setStep] = useState<number>(devStep ?? 0);
-  const [draft, setDraft] = useState<CreateDraft>(() => devDraft(devStep, inviteeId));
+  const [step, setStep] = useState<number>(0);
+  const [draft, setDraft] = useState<CreateDraft>(() => initialDraft(inviteeId));
   const [creating, setCreating] = useState(false);
 
   const friends = overview.data?.friends ?? [];

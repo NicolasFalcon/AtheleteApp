@@ -17,8 +17,18 @@ import {
   parseTodayActivity,
   parseWriteResult,
   saveErrorCopy,
+  type RouteSaveError,
   type SavePayload,
 } from '@app/features/route/routeMappers';
+import {
+  REJECTED_KEY,
+  addRejected,
+  cleanTrack,
+  parseRejected,
+  removeRejected,
+  serializeRejected,
+  type RejectedSave,
+} from '@app/features/route/rejectedSaves';
 import {
   QUEUE_KEY,
   enqueue,
@@ -81,6 +91,38 @@ async function writeQueue(queue: readonly QueuedSave[]): Promise<void> {
   } catch {
     // Without storage the activity stays in memory only; nothing else to do.
   }
+}
+
+// ── Rejected saves (kept for the person to retry or discard) ───────────────
+async function readRejected(): Promise<RejectedSave[]> {
+  try {
+    return parseRejected(await AsyncStorage.getItem(REJECTED_KEY));
+  } catch {
+    return [];
+  }
+}
+
+async function writeRejected(list: readonly RejectedSave[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(REJECTED_KEY, serializeRejected(list));
+  } catch {
+    // Without storage there is nothing else to do.
+  }
+}
+
+async function keepRejected(payload: SavePayload, error: RouteSaveError, distanceM: number) {
+  await withQueue(async () =>
+    writeRejected(
+      addRejected(await readRejected(), {
+        clientId: payload.client_id,
+        payload,
+        error,
+        message: saveErrorCopy(error),
+        rejectedAt: Date.now(),
+        distanceM,
+      }),
+    ),
+  );
 }
 
 // One save_route_activity call, sorted into saved / rejected / retry.
@@ -272,6 +314,8 @@ export const supabaseRouteService: RouteService = {
       return readBack({ ...activity, clientId }, outcome.result);
     }
     if (outcome.kind === 'rejected') {
+      // Never discarded: it moves from the retry queue to the rejected list.
+      await keepRejected(payload, outcome.error, activity.distanceM);
       await withQueue(async () => {
         const queue = await readQueue();
         await writeQueue(queue.filter(item => item.clientId !== clientId));
@@ -429,9 +473,51 @@ export const supabaseRouteService: RouteService = {
         return 0;
       }
       const report = await flush(queue, sendSave, Date.now());
+      for (const item of report.rejected) {
+        const entry = queue.find(queued => queued.clientId === item.clientId);
+        if (entry) {
+          await writeRejected(
+            addRejected(await readRejected(), {
+              clientId: item.clientId,
+              payload: entry.payload,
+              error: item.error,
+              message: saveErrorCopy(item.error),
+              rejectedAt: Date.now(),
+              distanceM: 0,
+            }),
+          );
+        }
+      }
       await writeQueue(report.queue);
       return report.saved.length;
     });
+  },
+
+  getRejected() {
+    return withQueue(readRejected);
+  },
+
+  async retryRejected(clientId) {
+    const entry = (await withQueue(readRejected)).find(item => item.clientId === clientId);
+    if (!entry) {
+      throw new RouteServiceError('not_found', 'Esa actividad ya no está en el teléfono.');
+    }
+    // An impossible stretch is cut out first: that is what the server refused.
+    const payload = entry.error === 'impossible_speed' ? cleanTrack(entry.payload) : entry.payload;
+    const outcome = await sendSave(payload);
+    if (outcome.kind === 'saved') {
+      await withQueue(async () => writeRejected(removeRejected(await readRejected(), clientId)));
+      return { activityId: outcome.result.activityId };
+    }
+    if (outcome.kind === 'rejected') {
+      await keepRejected(payload, outcome.error, entry.distanceM);
+      throw new RouteServiceError(outcome.error, saveErrorCopy(outcome.error));
+    }
+    throw new RouteServiceError('network', 'Sin conexión. Inténtalo de nuevo cuando tengas red.');
+  },
+
+  async discardRejected(clientId) {
+    await withQueue(async () => writeRejected(removeRejected(await readRejected(), clientId)));
   },
 };
 

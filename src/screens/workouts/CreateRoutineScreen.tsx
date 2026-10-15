@@ -133,8 +133,6 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [zoneFilter, setZoneFilter] = useState<ZoneKey | null>(null);
   const [adjustIndex, setAdjustIndex] = useState<number | null>(null);
-  const devStep =
-    __DEV__ && params && 'devStep' in params ? params.devStep : undefined;
   const [replaceExerciseIndex, setReplaceExerciseIndex] = useState<
     number | null
   >(null);
@@ -188,30 +186,6 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
       return;
     }
 
-    // Development only: open a step with sample answers (devStep).
-    if (devStep !== undefined && exercisesQuery.data) {
-      const seen = new Set<string>();
-      const sample = exercisesQuery.data
-        .filter(item => {
-          if (seen.has(item.bodyPart)) {
-            return false;
-          }
-          seen.add(item.bodyPart);
-          return true;
-        })
-        .slice(0, 4);
-      setTitle('Full body del viernes');
-      setSelectedExercises(sample.map(createBuilderExercise));
-      setStep(
-        devStep === 0 ? 'details' : devStep === 1 ? 'exercises' : 'configure',
-      );
-      if (devStep === 0) {
-        setTitle('');
-      }
-      hasInitialized.current = true;
-      return;
-    }
-
     const initialExercises: BuilderExercise[] = [];
     if (initialExerciseId && exercisesQuery.data) {
       const libraryExercise = exercisesQuery.data.find(
@@ -241,7 +215,6 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     initialWorkoutId,
     mode,
     workout,
-    devStep,
   ]);
 
   useEffect(() => {

@@ -105,7 +105,7 @@ export type RouteAttachment = {
   planned_name: string | null;
   // "Nueva mejor marca" line ("5K · 24:41"), when the activity beat one.
   new_best: string | null;
-  // The trimmed route (absent in the dev fixtures: they use a drawn sample).
+  // The trimmed route (absent when the activity has no recorded polyline).
   polyline?: { lat: number; lon: number }[];
   // The activity behind the post, to open it.
   activity_id?: string | null;
@@ -189,10 +189,9 @@ export type ReportReason =
 export type ReportTarget = 'post' | 'comment' | 'user';
 
 export type PostPhotoDraft = {
-  // Fixture key of the picked photo (dev screens only).
   key: string;
   // Local file the picker returned (already resized and re-encoded without
-  // EXIF); absent for fixtures.
+  // EXIF).
   uri?: string;
   mime: string;
   sizeBytes: number;

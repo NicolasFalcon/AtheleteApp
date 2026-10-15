@@ -65,11 +65,7 @@ export function RoutineListScreen({ navigation, route }: Props) {
     }, []),
   );
 
-  const devEmpty = __DEV__ && Boolean(route.params?.devEmpty);
-  const all = useMemo(
-    () => (devEmpty ? [] : workoutsQuery.data ?? []),
-    [devEmpty, workoutsQuery.data],
-  );
+  const all = useMemo(() => workoutsQuery.data ?? [], [workoutsQuery.data]);
   const visible = useMemo(
     () =>
       filterRoutines(all, {

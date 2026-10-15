@@ -9,7 +9,6 @@ import {
   StatusBarV2,
   TextV2,
   useThemeV2,
-  useToast,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
 import { lastLine } from '@app/features/ellie/chatModel';
@@ -23,7 +22,7 @@ import {
 import { useEllieEntry } from '@app/features/ellie/v2/useEllieEntry';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
-import { useEllieHistory } from '@app/hooks/useEllieHistory';
+import { useEllieLatest } from '@app/hooks/useEllieConversations';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { ScanCard } from '@app/features/ellie/v2/EllieHome';
@@ -31,25 +30,18 @@ import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Ellie'>;
 
-const FIXTURE_RESUME = {
-  text: 'Ajusta mi rutina de hoy para que dure 40 minutos.',
-  when: 'Ayer',
-};
-
 // ELLIE (ELLIE_01_HOME): the orb and her voice, two quick asks, what else she
 // can do, the machine scanner and the readings. Every ask opens the chat
 // (EllieChat) and sends the prompt there; the floating field opens it with
-// the keyboard up. Single conversation per user: "Retomar" continues it.
-export function EllieScreen({ navigation, route }: Props) {
+// the keyboard up. "Retomar" continues the latest conversation.
+export function EllieScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const toast = useToast();
   const tabBarMotion = useTabBarMotion();
   const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const ellieData = useEllieData();
-  const history = useEllieHistory();
-  const dev = __DEV__ ? route.params?.devState : undefined;
+  const history = useEllieLatest();
   const scrollRef = useRef<ScrollView>(null);
   const contentPaddingTop = insets.top;
   const entry = useEllieEntry(navigation, () =>
@@ -62,24 +54,20 @@ export function EllieScreen({ navigation, route }: Props) {
     ellieData.heroInsight?.text ??
     `Hola${firstName ? `, ${firstName}` : ''}. ¿En qué te ayudo hoy?`;
 
-  const resume = useMemo(() => {
-    if (dev === 'data') {
-      return FIXTURE_RESUME;
-    }
-    if (dev === 'empty' || dev === 'loading' || dev === 'error') {
-      return null;
-    }
-    return lastLine(history.data ?? [], new Date());
-  }, [dev, history.data]);
+  const resume = useMemo(
+    () => lastLine(history.data?.last ? [history.data.last] : [], new Date()),
+    [history.data],
+  );
 
-  const loading = dev === 'loading' || (!dev && history.isLoading);
-  const failed = dev === 'error' || (!dev && history.isError);
+  const loading = history.isLoading;
+  const failed = history.isError;
 
   const open = useCallback(
     (ask: EllieAsk) =>
       navigation.navigate(APP_ROUTES.EllieChat, {
         prompt: ask.text,
         mode: ask.mode,
+        source: 'ellie',
       }),
     [navigation],
   );
@@ -113,12 +101,7 @@ export function EllieScreen({ navigation, route }: Props) {
         />
 
         <AlsoCanList onAsk={open} />
-        {/* Scan placeholder: the same notice as in Entrenos. */}
-        <ScanCard
-          onPress={() =>
-            toast.show('Pronto podrás escanear máquinas', { withTabBar: true })
-          }
-        />
+        <ScanCard onPress={() => navigation.navigate(APP_ROUTES.MachineScan)} />
         <ReadWithEllie onAsk={open} />
 
         {loading ? (

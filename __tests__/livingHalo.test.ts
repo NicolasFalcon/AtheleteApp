@@ -8,11 +8,6 @@ import {
   resolveHaloSize,
   resolveHaloTargets,
 } from '../src/components/v2/livingHaloModel';
-import {
-  VOICE_ORDER,
-  isVoiceBusy,
-  nextVoiceState,
-} from '../src/features/ellie/v2/voiceSceneModel';
 
 describe('Living Halo · states', () => {
   it('resolves named sizes and passes numbers through', () => {
@@ -65,21 +60,5 @@ describe('Living Halo · states', () => {
     expect(haloMayAnimate({ state: 'idle', tab: false, reduceMotion: true })).toBe(false);
     expect(haloMayAnimate({ state: 'idle', tab: true, reduceMotion: false })).toBe(false);
     expect(haloMayAnimate({ state: 'offline', tab: false, reduceMotion: false })).toBe(false);
-  });
-});
-
-describe('Voice scene · state walk', () => {
-  it('goes idle → listening → thinking → speaking → idle', () => {
-    expect(VOICE_ORDER.map(s => s)).toEqual(['idle', 'listening', 'thinking', 'speaking']);
-    expect(nextVoiceState('idle')).toBe('listening');
-    expect(nextVoiceState('listening')).toBe('thinking');
-    expect(nextVoiceState('thinking')).toBe('speaking');
-    expect(nextVoiceState('speaking')).toBe('idle');
-  });
-
-  it('shows the stop button in every state but idle', () => {
-    expect(isVoiceBusy('idle')).toBe(false);
-    expect(isVoiceBusy('listening')).toBe(true);
-    expect(isVoiceBusy('speaking')).toBe(true);
   });
 });

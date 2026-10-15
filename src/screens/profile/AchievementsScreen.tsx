@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -11,7 +11,7 @@ import {
 } from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { buildShelves, type ShelfItem } from '@app/features/progress/badgesModel';
+import { type ShelfItem } from '@app/features/progress/badgesModel';
 import {
   BadgeSheet,
   CollectionHeader,
@@ -29,52 +29,17 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // category with the medals (locked ones with a progress ring) and the detail
 // sheet. Category, progress and earned come from get_badge_progress (BT-24);
 // the dates of earning from user_badges.
-export function AchievementsScreen({ navigation, route }: Props) {
+export function AchievementsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const dev = __DEV__ ? route.params?.devState : undefined;
   const badges = useBadgeShelves();
-  const now = useMemo(() => new Date(), []);
 
-  // Development: sample rows like those of get_badge_progress.
-  const sample = useMemo(() => {
-    if (!__DEV__ || dev !== 'data') {
-      return null;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fixtures =
-      require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
-    return buildShelves(fixtures.badgeRowsFixture(now));
-  }, [dev, now]);
-
-  const result = sample ?? badges;
+  const result = badges;
 
   const [selected, setSelected] = useState<ShelfItem | null>(null);
 
-  // Development only: open a medal's sheet once (first earned / first locked).
-  const devSheet = __DEV__ ? route.params?.devSheet : undefined;
-  const devOpened = useRef(false);
-  useEffect(() => {
-    if (!devSheet || devOpened.current) {
-      return;
-    }
-    const all = result.shelves.flatMap(shelf => shelf.items);
-    const target =
-      devSheet === 'locked'
-        ? all.find(item => !item.earned && item.progress)
-        : all.find(item => item.earned);
-    if (target) {
-      // iOS does not present a modal during the screen's push animation.
-      const timer = setTimeout(() => {
-        devOpened.current = true;
-        setSelected(target);
-      }, 900);
-      return () => clearTimeout(timer);
-    }
-  }, [devSheet, result.shelves]);
-
-  const loading = dev === 'loading' || (!dev && badges.isLoading);
-  const failed = dev === 'error' || (!dev && Boolean(badges.error));
+  const loading = badges.isLoading;
+  const failed = Boolean(badges.error);
   const retry = () => {
     badges.refetchAll().catch(() => {});
   };

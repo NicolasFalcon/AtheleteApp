@@ -11,6 +11,12 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { Check, ChevronDown } from 'lucide-react-native';
+import { MealThumb } from '@app/features/nutrition/v2/MealRow';
+import { mealTypeForTime, mealTypeLabel, draftFromAnalysis, draftTotals } from '@app/features/nutrition/mealDraft';
+import { formatThousands } from '@app/features/nutrition/nutritionModel';
+import { useSignedImage } from '@app/hooks/useSignedImage';
+import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
+import type { RegisteredMeal } from '@app/hooks/useRegisteredMeal';
 import {
   Button,
   EllieActionButton,
@@ -24,6 +30,7 @@ import {
   DONUT_LENGTH,
   DONUT_RADIUS,
   macroDonut,
+  type MealCardMessage,
   type NutritionCardMessage,
   type WorkoutCardMessage,
 } from '@app/features/ellie/chatModel';
@@ -64,15 +71,28 @@ export function UserPill({
   text,
   status,
   onRetry,
+  imageUri,
+  imagePath,
 }: {
   text: string;
   status: 'sending' | 'sent' | 'failed';
-  onRetry: () => void;
+  // The photo of the message: 200 × 200 over the pill (design §23.3).
+  imageUri?: string | null;
+  imagePath?: string | null;
+  // Missing when no retry can work (limit reached, session gone…).
+  onRetry?: () => void;
 }) {
   const { colors } = useThemeV2();
   const failed = status === 'failed';
+  const stored = useSignedImage(imageUri ? null : imagePath);
+  const photo = imageUri ?? stored;
   return (
     <View style={styles.userRow}>
+      {imageUri || imagePath ? (
+        <View style={[styles.userPhoto, { backgroundColor: colors.surface.muted, opacity: status === 'sending' ? 0.7 : 1 }]}>
+          {photo ? <Image source={{ uri: photo }} style={styles.fill} resizeMode="cover" /> : null}
+        </View>
+      ) : null}
       <View
         style={[
           styles.pill,
@@ -88,7 +108,12 @@ export function UserPill({
           {text}
         </TextV2>
       </View>
-      {failed ? (
+      {failed && !onRetry ? (
+        <TextV2 variant="caption" color={colors.ember.deep} style={styles.failed}>
+          No enviado
+        </TextV2>
+      ) : null}
+      {failed && onRetry ? (
         <PressableScale
           accessibilityRole="button"
           onPress={onRetry}
@@ -440,7 +465,117 @@ export function RoutineCard({
   );
 }
 
+// The card of a photo of a meal (design §23.3, "Tarjeta de resultado en el
+// chat"): a summary with the total and "Registrar en Calorías"; once registered
+// it says so and cannot be registered again.
+export function MealAnalysisCard({
+  card,
+  registered,
+  registering,
+  error,
+  language,
+  onRegister,
+  onEdit,
+  onOpenDay,
+}: {
+  card: MealCardMessage;
+  registered: RegisteredMeal;
+  registering: boolean;
+  error: boolean;
+  language: EllieLanguage;
+  onRegister: () => void;
+  onEdit: () => void;
+  onOpenDay: () => void;
+}) {
+  const { colors, shadow } = useThemeV2();
+  const es = language === 'es';
+  const draft = draftFromAnalysis(card.meal, new Date());
+  const totals = draftTotals(draft);
+  const type = card.meal.mealTypeSuggestion ?? mealTypeForTime(new Date());
+  const shown = card.meal.items.slice(0, 3);
+  const more = card.meal.items.length - shown.length;
+  return (
+    <View style={[styles.card, styles.mealCard, { backgroundColor: colors.surface.raised, boxShadow: shadow.subtle }]}>
+      <View style={styles.mealHead}>
+        <MealThumb path={card.meal.imagePath || null} />
+        <View style={styles.flex}>
+          <TextV2 variant="eyebrow" tone="secondary">
+            {`${es ? 'ESTIMACIÓN' : 'ESTIMATE'} · ${mealTypeLabel(type, language).toUpperCase()}`}
+          </TextV2>
+          <TextV2 variant="bodyStrong" numberOfLines={2}>
+            {card.meal.title}
+          </TextV2>
+        </View>
+      </View>
+      <View style={styles.mealItems}>
+        {shown.map((item, index) => (
+          <View key={`${item.name}-${index}`} style={styles.mealItem}>
+            <TextV2 variant="body" numberOfLines={1} style={styles.flex}>
+              {item.name}
+            </TextV2>
+            <TextV2 variant="meta" tone="secondary">{`${item.grams} g · ${formatThousands(item.kcal)} kcal`}</TextV2>
+          </View>
+        ))}
+        {more > 0 ? (
+          <TextV2 variant="meta" tone="secondary">
+            {es ? `+${more} más` : `+${more} more`}
+          </TextV2>
+        ) : null}
+      </View>
+      <View style={styles.mealTotal}>
+        <TextV2 style={styles.mealKcal}>{formatThousands(totals.kcal)}</TextV2>
+        <TextV2 variant="body" tone="secondary">
+          kcal
+        </TextV2>
+      </View>
+      <TextV2 variant="meta" tone="secondary">
+        {es
+          ? `Proteína ${card.meal.totals.protein} g · Carbohidratos ${card.meal.totals.carbs} g · Grasas ${card.meal.totals.fats} g`
+          : `Protein ${card.meal.totals.protein} g · Carbs ${card.meal.totals.carbs} g · Fats ${card.meal.totals.fats} g`}
+      </TextV2>
+      {registered ? (
+        <PressableScale accessibilityRole="button" onPress={onOpenDay} style={styles.mealDone}>
+          <Check size={28} color={colors.ember.base} strokeWidth={2.6} />
+          <View style={styles.flex}>
+            <TextV2 variant="bodyStrong">
+              {es ? `Añadido a ${mealTypeLabel(registered.mealType, language)}` : `Added to ${mealTypeLabel(registered.mealType, language)}`}
+            </TextV2>
+            <TextV2 variant="meta" color={colors.ember.deep}>
+              {es ? 'Ver día →' : 'See day →'}
+            </TextV2>
+          </View>
+        </PressableScale>
+      ) : (
+        <View style={styles.pair}>
+          <Button
+            label={es ? 'Registrar en Calorías' : 'Log in Calorías'}
+            size="md"
+            loading={registering}
+            disabled={registering}
+            onPress={onRegister}
+            style={styles.flex}
+          />
+          <Button label={es ? 'Editar' : 'Edit'} variant="secondary" size="md" disabled={registering} onPress={onEdit} />
+        </View>
+      )}
+      {error && !registered ? (
+        <TextV2 variant="meta" color={colors.ember.deep}>
+          {es ? 'No pudimos registrarla. Inténtalo de nuevo.' : "We couldn't log it. Please try again."}
+        </TextV2>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  userPhoto: { width: 200, height: 200, borderRadius: 22, overflow: 'hidden' },
+  mealCard: { gap: 12, padding: 16, borderRadius: 24 },
+  mealHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  mealItems: { gap: 6 },
+  mealItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  mealTotal: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  mealKcal: { fontSize: 32, lineHeight: 36, fontWeight: '600', letterSpacing: -1 },
+  mealDone: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
   flex: { flex: 1 },
   fill: { width: '100%', height: '100%' },
   flip: { transform: [{ rotate: '180deg' }] },

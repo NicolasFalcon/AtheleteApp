@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
 import { Button, LivingHalo, TextV2, useThemeV2 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { getRouteDevConfig } from '@app/dev/routeDevConfig';
-import { PLAN_A, PLAN_B, SAMPLE_ORIGIN } from '@app/dev/routeFixtures';
+import { useLocationAccess } from '@app/features/route/useLocationAccess';
 import { RouteMap } from '@app/features/route/RouteMap';
 import { KIND_LABEL, SURFACE_LABEL, formatElevation, formatKm } from '@app/features/route/routeFormat';
 import {
@@ -22,27 +21,33 @@ import type { AppScreenProps } from '@app/types/navigation';
 
 // Generar ruta con ELLIE (ROUTE_15–17): "Generando…" (~1,5 s), then "Opción N"
 // with "Otra opción" (another seed) / "Usar esta ruta". The routes come from
-// the generate-route Edge Function through the RouteService (samples only with
-// the dev deep links). Its errors have their own message, and the routing
+// the generate-route Edge Function through the RouteService, starting from
+// where the person is. Its errors have their own message, and the routing
 // provider's attribution is shown with every generated route.
 const ELEVATION_WORD = { low: 'bajo', balanced: 'medio', any: 'libre' } as const;
 
-export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>) {
+export function RouteGenScreen({ navigation }: AppScreenProps<'RouteGen'>) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
   const service = useRouteService();
   const session = useRouteSession();
-  const dev = __DEV__ ? route?.params?.dev : undefined;
-  const [seed, setSeed] = useState(dev === 'alt' ? 1 : 0);
-  const [loading, setLoading] = useState(dev !== 'result' && dev !== 'alt');
+  const { access, fix, usable } = useLocationAccess();
+  const [seed, setSeed] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState<GenerateRouteError | null>(null);
-  const [mapFailed, setMapFailed] = useState(getRouteDevConfig().mapOffline);
+  const [mapFailed, setMapFailed] = useState(false);
   const plan = session.generated;
   // generate-route needs where the person is (the LocationSource's fix).
-  const origin = session.origin ?? SAMPLE_ORIGIN;
+  const here = fix ? { lat: fix.lat, lon: fix.lon } : null;
+  const origin = usable ? (here ?? session.origin) : null;
+  const noLocation = access !== null && !usable;
+  const started = useRef(false);
 
   const generate = useCallback(
     async (nextSeed: number) => {
+      if (!origin) {
+        return;
+      }
       setLoading(true);
       setFailed(null);
       try {
@@ -67,17 +72,13 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
     [service, session.sport, session.config, origin],
   );
 
+  // The first route is requested as soon as there is a position.
   useEffect(() => {
-    if (dev === 'result' || dev === 'alt') {
-      routeStore.patch({ generated: dev === 'alt' ? PLAN_B : PLAN_A, generationSeed: dev === 'alt' ? 1 : 0 });
-      return;
+    if (origin && !started.current) {
+      started.current = true;
+      generate(0).catch(() => {});
     }
-    if (dev === 'generating') {
-      return; // stays on the loading state for the capture
-    }
-    generate(0).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [generate, origin]);
 
   const use = () => {
     if (!plan) {
@@ -91,7 +92,7 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <RouteMap
         style={StyleSheet.absoluteFill}
-        center={origin}
+        center={origin ?? undefined}
         zoom={14}
         fit={plan && !loading ? plan.points : undefined}
         padding={{ top: insets.top + 80, bottom: 380, left: 40, right: 40 }}
@@ -113,7 +114,29 @@ export function RouteGenScreen({ navigation, route }: AppScreenProps<'RouteGen'>
       ) : null}
 
       <BottomPanel style={{ paddingBottom: Math.max(insets.bottom, 16) + 4 }}>
-        {loading ? (
+        {noLocation ? (
+          <View style={styles.loading}>
+            <TextV2 variant="title22" style={styles.center}>
+              Ubicación no disponible
+            </TextV2>
+            <TextV2 variant="body" tone="secondary" style={styles.center}>
+              Para generar una ruta cerca de ti necesitamos tu ubicación precisa. Actívala en Ajustes.
+            </TextV2>
+            <Button
+              label="Abrir Ajustes"
+              variant="primary"
+              fullWidth
+              onPress={() => {
+                Linking.openSettings().catch(() => {});
+              }}
+            />
+          </View>
+        ) : loading && !origin ? (
+          <View style={styles.loading}>
+            <LivingHalo size={64} />
+            <TextV2 variant="title22">Buscando tu ubicación…</TextV2>
+          </View>
+        ) : loading ? (
           <View style={styles.loading}>
             <LivingHalo size={64} />
             <TextV2 variant="title22">Generando tu ruta…</TextV2>

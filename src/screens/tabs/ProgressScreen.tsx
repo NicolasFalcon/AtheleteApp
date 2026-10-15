@@ -85,7 +85,6 @@ export function ProgressScreen({ navigation, route }: Props) {
   const openCore33 = useOpenCore33();
   const openCore33Discovery = useOpenCore33Discovery();
   const summary = useProgressSummary();
-  const dev = __DEV__ ? route.params?.devState : undefined;
 
   const [section, setSection] = useState<Section>(
     route.params?.segment ?? 'summary',
@@ -95,18 +94,7 @@ export function ProgressScreen({ navigation, route }: Props) {
   );
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
-  const devScroll = __DEV__ ? route.params?.devScroll : undefined;
-  useEffect(() => {
-    if (devScroll) {
-      const timer = setTimeout(
-        () => scrollRef.current?.scrollTo({ y: devScroll, animated: false }),
-        1200,
-      );
-      return () => clearTimeout(timer);
-    }
-  }, [devScroll, section, period]);
-
-  // Tab params (dev screen cycler, deep links).
+  // Tab params (deep links).
   useEffect(() => {
     if (route.params?.segment) {
       setSection(route.params.segment);
@@ -138,46 +126,21 @@ export function ProgressScreen({ navigation, route }: Props) {
   );
 
   const now = useMemo(() => new Date(), []);
-  const fixture = useMemo(() => {
-    if (!__DEV__ || dev !== 'data') {
-      return null;
-    }
-     
-    return require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
-  }, [dev]);
-  const sample = useMemo(
-    () => fixture?.progressFixture(now) ?? null,
-    [fixture, now],
-  );
-
   const overview = summary.overviewQuery.data;
-  const forced = Boolean(sample) || dev === 'empty';
   const sessionsData = summary.sessions;
   const recordsData = summary.recordsQuery.records;
   const data = useMemo(
     () => ({
-      sessions: sample ? sample.sessions : forced ? [] : sessionsData,
-      hydrationLogs: sample
-        ? sample.hydration
-        : forced
-        ? []
-        : overview?.hydrationLogs ?? [],
-      nutritionLogs: sample
-        ? sample.nutrition
-        : forced
-        ? []
-        : overview?.dailyNutritionLogs ?? [],
-      challenge: sample
-        ? sample.challenge
-        : forced
-        ? null
-        : overview?.challenge ?? null,
-      records: sample ? sample.records : forced ? [] : recordsData,
-      hasPlan: sample ? true : Boolean(overview?.nutritionPlan),
-      goalProtein: sample ? 168 : overview?.nutritionPlan?.targetProtein,
-      goalGlasses: sample ? DEFAULT_WATER_GOAL_GLASSES : overview?.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES,
+      sessions: sessionsData,
+      hydrationLogs: overview?.hydrationLogs ?? [],
+      nutritionLogs: overview?.dailyNutritionLogs ?? [],
+      challenge: overview?.challenge ?? null,
+      records: recordsData,
+      hasPlan: Boolean(overview?.nutritionPlan),
+      goalProtein: overview?.nutritionPlan?.targetProtein,
+      goalGlasses: overview?.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES,
     }),
-    [forced, overview, recordsData, sample, sessionsData],
+    [overview, recordsData, sessionsData],
   );
   const {
     sessions,
@@ -190,17 +153,15 @@ export function ProgressScreen({ navigation, route }: Props) {
     goalGlasses,
   } = data;
 
-  const loading = dev === 'loading' || (!dev && summary.isLoading);
-  const failed = dev === 'error' || (!dev && Boolean(summary.error));
+  const loading = summary.isLoading;
+  const failed = Boolean(summary.error);
 
   const model = useMemo(() => {
     const todayKey = getLocalDateKey(now);
     const keys = weekKeys(now);
     const names = (id: string) =>
-      sample
-        ? fixture?.FIXTURE_EXERCISE_NAMES[id] ?? 'Ejercicio'
-        : summary.exercisesQuery.data?.find(item => item.id === id)?.name ??
-          'Ejercicio';
+      summary.exercisesQuery.data?.find(item => item.id === id)?.name ??
+      'Ejercicio';
     return {
       hero: buildHero(sessions, now),
       week: buildWeek(sessions, now, {
@@ -215,7 +176,6 @@ export function ProgressScreen({ navigation, route }: Props) {
       groups: groupRecords(records, names, now),
     };
   }, [
-    fixture,
     goalGlasses,
     goalProtein,
     hydrationLogs,
@@ -224,7 +184,6 @@ export function ProgressScreen({ navigation, route }: Props) {
     profile?.preferredSessionMinutes,
     profile?.trainingDaysPerWeek,
     records,
-    sample,
     sessions,
     summary.exercisesQuery.data,
   ]);

@@ -44,11 +44,8 @@ export function ContentActions({
   onClose,
   onDone,
   withTabBar = false,
-  initialStep = 'menu',
 }: {
   target: ContentTarget | null;
-  // Dev only: opens straight on a step.
-  initialStep?: Step;
   onClose: () => void;
   // The content left the list: because the user reported or deleted it.
   onDone: (target: ContentTarget, action: 'reported' | 'deleted' | 'edited') => void;
@@ -57,7 +54,7 @@ export function ContentActions({
   const { colors } = useThemeV2();
   const toast = useToast();
   const service = useSocialService();
-  const [step, setStep] = useState<Step>(initialStep);
+  const [step, setStep] = useState<Step>('menu');
   // The sheet keeps its content while it slides away.
   const lastTarget = useRef<ContentTarget | null>(liveTarget);
   if (liveTarget) {
@@ -72,13 +69,13 @@ export function ContentActions({
   // Every time it opens it starts from the menu with an empty report.
   useEffect(() => {
     if (liveTarget) {
-      setStep(initialStep);
+      setStep('menu');
       setReason(null);
       setDetails('');
       setDraft(liveTarget.body ?? '');
       setBusy(false);
     }
-  }, [liveTarget, initialStep]);
+  }, [liveTarget]);
 
   if (!target) {
     return null;

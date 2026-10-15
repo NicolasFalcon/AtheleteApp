@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import type { ActiveRecording } from '@app/features/route/activeRecording';
 import type {
   LatLng,
   PlannedRoute,
@@ -46,6 +47,8 @@ export type RouteSession = {
   // The activity just finished and whether it was posted to Comunidad.
   finished: RouteActivity | null;
   posted: boolean;
+  // A recording found on the phone that the person chose to continue.
+  resume: ActiveRecording | null;
 };
 
 export const DEFAULT_CONFIG: Record<RouteSport, RouteConfig> = {
@@ -70,6 +73,7 @@ export const INITIAL_SESSION: RouteSession = {
   autoPause: true,
   finished: null,
   posted: false,
+  resume: null,
 };
 
 let session: RouteSession = INITIAL_SESSION;

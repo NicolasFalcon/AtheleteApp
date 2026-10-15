@@ -11,7 +11,6 @@ import {
   generateProactiveNudges,
   generateSmartInsights,
   generateWeeklySummary,
-  serializeEllieContext,
   type EllieActionType,
   type EllieFullContext,
   type EllieNudge,
@@ -254,11 +253,6 @@ export function useEllieData() {
     )}`;
   }, [exerciseNameMap, personalRecordsQuery.latestRecord]);
 
-  const serializedContext = useMemo(
-    () => (context ? serializeEllieContext(context) : ''),
-    [context],
-  );
-
   const suggestedModes = useMemo(
     () =>
       promptCards.reduce<
@@ -284,7 +278,6 @@ export function useEllieData() {
     personalRecordsQuery,
     exercisesQuery,
     context,
-    serializedContext,
     insights,
     heroInsight: insights[0] || null,
     secondaryInsights: insights.slice(1, 4),

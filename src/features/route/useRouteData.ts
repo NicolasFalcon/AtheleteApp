@@ -1,17 +1,15 @@
 import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@app/hooks/useAuth';
-import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { getRouteService } from '@app/services/route/useRouteService';
 
-// Reads of Ruta through React Query. The key holds the user (or "sample" after
-// a dev deep link) so accounts and sources never share a cache. Every write
+// Reads of Ruta through React Query. The key holds the user so accounts never share a cache. Every write
 // (save, delete, privacy, record) calls `useInvalidateRoute()`.
 const ROUTE_KEY = 'route';
 
 function useScope(): string {
   const { session } = useAuth();
-  return isRouteSampleActive() ? 'sample' : (session?.user.id ?? 'anon');
+  return session?.user.id ?? 'anon';
 }
 
 export function useInvalidateRoute(): () => void {

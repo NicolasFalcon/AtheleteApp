@@ -4,13 +4,11 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from 'react';
 import { AppState, type ImageSourcePropType } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   focusManager,
-  keepPreviousData,
   useInfiniteQuery,
   useQuery,
   useQueryClient,
@@ -31,18 +29,13 @@ import {
 } from '@app/features/social/notificationModel';
 import type { FeedPost } from '@app/features/social/postTypes';
 import type { SocialLoadState } from '@app/features/social/socialTypes';
-import { socialFixtureStore } from '@app/services/social/fixtureSocialService';
 import type { SocialService } from '@app/services/social/socialService';
-import {
-  getSocialService,
-  usesFixtures,
-} from '@app/services/social/socialSource';
+import { getSocialService } from '@app/services/social/socialSource';
 
 // Hooks of Comunidad. Reads go through React Query (`useSocialResource`);
 // every write made through `useSocialService()` invalidates the social cache,
 // and a screen reloads when it regains focus or the app returns to the
-// foreground. In `__DEV__` the fixture scenarios keep their own store (the
-// version of the store is part of the query key).
+// foreground.
 // TODO(social-wire): `useFeed` is still a local loader (W3: `useInfiniteQuery`
 // over get_feed, cursor = `_before`).
 
@@ -100,12 +93,7 @@ function withInvalidation(
 
 export function useSocialService(): SocialService {
   const client = useQueryClient();
-  const fixtures = usesFixtures();
-  return useMemo(
-    () => withInvalidation(getSocialService(), client),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [client, fixtures],
-  );
+  return useMemo(() => withInvalidation(getSocialService(), client), [client]);
 }
 
 export type SocialResource<T> = {
@@ -124,30 +112,17 @@ export function useSocialResource<T>(
 ): SocialResource<T> {
   ensureFocusManager();
   const { session } = useAuth();
-  const userId = session?.user.id ?? 'dev';
-  // Fixture scenarios reload whenever a fixture action changes the state.
-  const version = useSyncExternalStore(
-    socialFixtureStore.subscribe,
-    socialFixtureStore.getVersion,
-  );
-  const fixtures = usesFixtures();
+  const userId = session?.user.id ?? 'anon';
   const loadRef = useRef(load);
   loadRef.current = load;
 
   const query = useQuery({
-    queryKey: [
-      SOCIAL_KEY,
-      fixtures ? `fixtures-${version}` : userId,
-      name,
-      ...keys,
-    ],
+    queryKey: [SOCIAL_KEY, userId, name, ...keys],
     queryFn: () => loadRef.current(getSocialService()),
     // Refresh in the background when the screen is seen again.
     staleTime: 30_000,
     refetchOnWindowFocus: true,
-    retry: fixtures ? false : 1,
-    // Fixture actions change the key: keep what is on screen meanwhile.
-    placeholderData: fixtures ? keepPreviousData : undefined,
+    retry: 1,
   });
   const { refetch, data } = query;
 
@@ -167,10 +142,6 @@ export function useSocialResource<T>(
     data !== undefined ? 'ready' : query.isError ? 'error' : 'loading';
 
   const reload = useCallback(() => {
-    if (usesFixtures()) {
-      // Fixture scenarios: the next load succeeds.
-      socialFixtureStore.clearFailure();
-    }
     refetch();
   }, [refetch]);
 
@@ -191,22 +162,16 @@ export function useUnreadNotifications(): number {
 export function useNotificationList() {
   ensureFocusManager();
   const { session } = useAuth();
-  const userId = session?.user.id ?? 'dev';
-  const version = useSyncExternalStore(
-    socialFixtureStore.subscribe,
-    socialFixtureStore.getVersion,
-  );
-  const fixtures = usesFixtures();
+  const userId = session?.user.id ?? 'anon';
   const query = useInfiniteQuery({
-    queryKey: [SOCIAL_KEY, fixtures ? `fixtures-${version}` : userId, 'getNotifications'],
+    queryKey: [SOCIAL_KEY, userId, 'getNotifications'],
     queryFn: ({ pageParam }) =>
       getSocialService().getNotifications(pageParam, NOTIFICATIONS_PAGE_SIZE),
     initialPageParam: null as string | null,
     getNextPageParam: last => last.nextCursor,
     staleTime: 30_000,
     refetchOnWindowFocus: true,
-    retry: fixtures ? false : 1,
-    placeholderData: fixtures ? keepPreviousData : undefined,
+    retry: 1,
   });
   const { refetch } = query;
 
@@ -239,16 +204,12 @@ export function useNotificationList() {
       }
     },
     reload: () => {
-      if (usesFixtures()) {
-        socialFixtureStore.clearFailure();
-      }
       refetch().catch(() => undefined);
     },
   };
 }
 
-// Source of a post photo. The real one is a signed URL of `social-photos`;
-// the fixtures map `fx://` keys to app assets.
+// Source of a post photo: a signed URL of `social-photos`.
 // TODO(social-wire): cache signed URLs for the session, like profile-photo.ts.
 export function usePostPhotoSource(path: string | null): ImageSourcePropType | null {
   const [source, setSource] = useState<ImageSourcePropType | null>(null);
@@ -300,11 +261,6 @@ export function useFeed() {
   });
   const cursor = useRef<string | null>(null);
   const busy = useRef(false);
-  // TODO(social-wire): fixture-only; a new dev scenario reloads the feed.
-  const scenarioVersion = useSyncExternalStore(
-    socialFixtureStore.subscribe,
-    socialFixtureStore.getResetVersion,
-  );
 
   // First page + activity lines. `silent` keeps what is on screen meanwhile.
   const refresh = useCallback(async (silent = false) => {
@@ -360,21 +316,11 @@ export function useFeed() {
     }
   }, []);
 
-  useEffect(() => {
-    if (scenarioVersion > 0) {
-      refresh();
-    }
-  }, [refresh, scenarioVersion]);
-
   const retry = useCallback(() => {
-    // TODO(social-wire): only refetch; clearing the failure is fixture-only.
-    socialFixtureStore.clearFailure();
-    socialFixtureStore.clearFeedFailure();
     refresh();
   }, [refresh]);
 
   const retryMore = useCallback(() => {
-    socialFixtureStore.clearFeedFailure();
     loadMore();
   }, [loadMore]);
 

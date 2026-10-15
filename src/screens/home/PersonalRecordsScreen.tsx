@@ -59,64 +59,35 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const toast = useToast();
   const exerciseId = route.params?.exerciseId;
-  const dev = __DEV__ ? route.params?.devState : undefined;
   const recordsQuery = usePersonalRecords();
   const exercisesQuery = useExerciseLibrary();
 
-  const [sheetOpen, setSheetOpen] = useState(
-    __DEV__ ? Boolean(route.params?.devSheet) : false,
-  );
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{
     value: string;
     unit: string;
     subtitle: string;
-  } | null>(
-    __DEV__ && route.params?.devCelebration
-      ? { value: '205', unit: 'kg × 1', subtitle: 'Peso muerto rumano' }
-      : null,
-  );
+  } | null>(null);
 
   const now = useMemo(() => new Date(), []);
-  const fixture = useMemo(() => {
-    if (!__DEV__ || dev !== 'data') {
-      return null;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    return require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
-  }, [dev]);
-
-  const records = useMemo(
-    () =>
-      fixture
-        ? fixture.progressFixture(now).records
-        : dev === 'empty'
-        ? []
-        : recordsQuery.records,
-    [dev, fixture, now, recordsQuery.records],
-  );
+  const records = recordsQuery.records;
   const library = exercisesQuery.data;
   const groups = useMemo(
     () =>
       groupRecords(
         records,
         id =>
-          fixture
-            ? fixture.FIXTURE_EXERCISE_NAMES[id] ?? 'Ejercicio'
-            : library?.find(item => item.id === id)?.name ??
-              route.params?.exerciseName ??
-              'Ejercicio',
+          library?.find(item => item.id === id)?.name ??
+          route.params?.exerciseName ??
+          'Ejercicio',
         now,
       ),
-    [fixture, library, now, records, route.params?.exerciseName],
+    [library, now, records, route.params?.exerciseName],
   );
 
-  const loading =
-    dev === 'loading' ||
-    (!dev && (recordsQuery.isLoading || exercisesQuery.isLoading));
-  const failed =
-    dev === 'error' ||
-    (!dev && Boolean(recordsQuery.error || exercisesQuery.error));
+  const loading = recordsQuery.isLoading || exercisesQuery.isLoading;
+  const failed = Boolean(recordsQuery.error || exercisesQuery.error);
   const group = exerciseId
     ? groups.find(item => item.exerciseId === exerciseId) ?? null
     : null;
@@ -144,11 +115,9 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
   ) => {
     setSaveError(null);
     try {
-      if (!dev) {
-        // personal_records (source 'manual') and `personal_record_created`,
-        // idempotent by the record id.
-        await recordsQuery.addRecord(insert);
-      }
+      // personal_records (source 'manual') and `personal_record_created`,
+      // idempotent by the record id.
+      await recordsQuery.addRecord(insert);
       setSheetOpen(false);
       const shown = formatRecord({
         prType: insert.prType,
@@ -173,7 +142,7 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
   };
 
   const confirmDelete = (row: RecordHistoryRow) => {
-    if (row.source === 'session' || dev) {
+    if (row.source === 'session') {
       return;
     }
     Alert.alert(
@@ -403,7 +372,6 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
               navigation.navigate(APP_ROUTES.PersonalRecords, {
                 exerciseId: item.exerciseId,
                 exerciseName: item.exerciseName,
-                devState: dev,
               })
             }
           />

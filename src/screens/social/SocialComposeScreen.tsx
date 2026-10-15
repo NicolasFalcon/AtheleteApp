@@ -43,9 +43,7 @@ import type {
   AttachmentSource,
   PostPhotoDraft,
 } from '@app/features/social/postTypes';
-import { usesFixtures } from '@app/services/social/socialSource';
 import {
-  usePostPhotoSource,
   useSocialResource,
   useSocialService,
 } from '@app/features/social/useSocial';
@@ -63,21 +61,6 @@ const CHIP_LABEL: Record<AttachmentKind, string> = {
   record: 'Récord',
   achievement: 'Logro',
   challenge: 'Reto',
-};
-
-// Photos the dev screens cycle through (sample data only). The real app uses
-// the image picker: resized to 1440 px, JPEG 0.8, without EXIF (pickPostPhoto).
-const FIXTURE_PHOTOS: PostPhotoDraft[] = [
-  { key: 'barra-mujer', mime: 'image/jpeg', sizeBytes: 640_000, width: 1200, height: 1500 },
-  { key: 'hero-entreno', mime: 'image/jpeg', sizeBytes: 720_000, width: 1200, height: 1500 },
-  { key: 'overhead', mime: 'image/jpeg', sizeBytes: 580_000, width: 1200, height: 1500 },
-];
-const BAD_PHOTO: PostPhotoDraft = {
-  key: 'overhead',
-  mime: 'image/heic',
-  sizeBytes: 6_400_000,
-  width: 1200,
-  height: 1500,
 };
 
 const SHARE_TITLE: Record<AttachmentKind, string> = {
@@ -102,7 +85,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { profile } = useAuth();
-  const { attach, sourceId, devState } = route.params ?? {};
+  const { attach, sourceId } = route.params ?? {};
   const sources = useSocialResource(
     'getAttachmentSources',
     s => s.getAttachmentSources(attach && sourceId ? { kind: attach, sourceId } : undefined),
@@ -113,21 +96,15 @@ export function SocialComposeScreen({ navigation, route }: Props) {
 
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState<AttachmentKind | null>(attach ?? null);
-  const [photo, setPhoto] = useState<PostPhotoDraft | null>(
-    devState === 'badPhoto' ? BAD_PHOTO : devState === 'photo' ? FIXTURE_PHOTOS[0] : null,
-  );
-  const [issues, setIssues] = useState<PostIssue[]>(
-    devState === 'badPhoto' ? ['photo_type', 'photo_size', 'photo_not_allowed'] : [],
-  );
-  const [termsOpen, setTermsOpen] = useState(devState === 'terms');
+  const [photo, setPhoto] = useState<PostPhotoDraft | null>(null);
+  const [issues, setIssues] = useState<PostIssue[]>([]);
+  const [termsOpen, setTermsOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   // Where a publication with a photo is: the upload comes first.
   const [step, setStep] = useState<'uploading' | 'publishing'>('publishing');
   // What create_post refused, with its message (and a way to Privacidad social).
   const [failure, setFailure] = useState<CreatePostErrorCopy | null>(null);
-  const [photoIndex, setPhotoIndex] = useState(0);
-  const fixturePhoto = usePostPhotoSource(photo && !photo.uri ? `fx://${photo.key}` : null);
-  const photoSource = photo?.uri ? { uri: photo.uri } : fixturePhoto;
+  const photoSource = photo?.uri ? { uri: photo.uri } : null;
 
   // Opens with the first available attachment when none came preselected.
   useEffect(() => {
@@ -150,13 +127,6 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   const pickPhoto = async () => {
     haptics.selection();
     setFailure(null);
-    if (usesFixtures()) {
-      // Dev screens: sample photos, nothing is read from the library.
-      setPhoto(FIXTURE_PHOTOS[photoIndex % FIXTURE_PHOTOS.length]);
-      setPhotoIndex(value => value + 1);
-      setIssues(current => current.filter(item => !item.startsWith('photo')));
-      return;
-    }
     const picked = await pickPostPhoto();
     if (picked.status === 'cancelled') {
       return;
@@ -309,7 +279,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
               placeholder={shared ? 'Añade una frase, si quieres' : '¿Qué quieres contar?'}
               placeholderTextColor={colors.text.tertiary}
               multiline
-              autoFocus={devState === undefined && !shared}
+              autoFocus={!shared}
               accessibilityLabel="Texto de la publicación"
               selectionColor={colors.text.primary}
               style={[styles.input, { color: colors.text.primary }]}

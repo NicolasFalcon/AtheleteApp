@@ -5,6 +5,17 @@ import {
   type LoggedSet,
   type PlannedExercise,
 } from '@app/features/session/sessionModel';
+import {
+  buildExerciseRows,
+  buildSetRow,
+  mapSetRows,
+  toDbPosition,
+} from '@app/features/session/sessionDbMapping';
+import {
+  runOutbox,
+  type Queued,
+  type RunOptions,
+} from '@app/features/session/sessionOutbox';
 import { getSupabaseClient } from '@app/services/supabase/client';
 import { mapWorkoutSession } from '@app/services/supabase/fitness';
 import {
@@ -50,18 +61,6 @@ function clockFromRow(row: SessionRow): SessionClockFields {
   };
 }
 
-function mapSet(row: SetRow): LoggedSet {
-  return {
-    id: row.id,
-    position: row.exercise_position,
-    setIndex: row.set_index,
-    reps: row.reps,
-    weightKg: row.weight_kg,
-    durationSec: row.duration_sec,
-    distanceM: row.distance_m,
-  };
-}
-
 export async function fetchSessionDetail(
   sessionId: string,
 ): Promise<SessionDetail> {
@@ -86,7 +85,7 @@ export async function fetchSessionDetail(
     session: mapWorkoutSession(row),
     clock: clockFromRow(row),
     volumeKg: row.volume_kg,
-    sets: ((setsResult.data ?? []) as SetRow[]).map(mapSet),
+    sets: mapSetRows((setsResult.data ?? []) as SetRow[]),
   };
 }
 
@@ -119,7 +118,7 @@ export async function fetchLastWeights(
   return result;
 }
 
-// Readable message of a Supabase / unknown error (for logs and dev screens).
+// Readable message of a Supabase / unknown error (for logs).
 export function describeError(error: unknown): string {
   if (error && typeof error === 'object') {
     const e = error as { message?: string; code?: string; details?: string };
@@ -146,25 +145,16 @@ export async function ensureSessionExercises(
   if (existing.error) {
     throw existing.error;
   }
-  const have = new Set((existing.data ?? []).map(row => row.position));
-  const missing = plan.filter(exercise => !have.has(exercise.position));
-  if (missing.length === 0) {
+  // DB positions start at 1; the plan keeps the app's base 0.
+  const rows = buildExerciseRows(
+    sessionId,
+    plan,
+    (existing.data ?? []).map(row => row.position),
+  );
+  if (rows.length === 0) {
     return;
   }
-  const { error } = await (client.from('workout_session_exercises') as any).insert(
-    missing.map(exercise => ({
-      session_id: sessionId,
-      position: exercise.position,
-      exercise_id: exercise.exerciseId,
-      template_exercise_id: exercise.templateExerciseId,
-      name: exercise.name,
-      planned_sets: exercise.sets,
-      planned_reps: exercise.reps,
-      planned_duration_sec: exercise.durationSec,
-      planned_rest_sec: exercise.restSec,
-      planned_weight_kg: exercise.plannedWeightKg,
-    })),
-  );
+  const { error } = await (client.from('workout_session_exercises') as any).insert(rows);
   if (error) {
     throw error;
   }
@@ -185,19 +175,7 @@ export async function upsertSessionSet(write: SetWrite): Promise<string> {
   const client = getClient();
   const { data, error } = await (client.from('workout_session_sets') as any)
     .upsert(
-      {
-        session_id: write.sessionId,
-        user_id: write.userId,
-        exercise_id: write.exerciseId,
-        exercise_position: write.set.position,
-        set_index: write.set.setIndex,
-        reps: write.set.reps,
-        weight_kg: write.set.weightKg,
-        duration_sec: write.set.durationSec,
-        distance_m: write.set.distanceM,
-        rest_actual_sec: write.restActualSec ?? null,
-        completed_at: write.completedAt,
-      },
+      buildSetRow(write),
       { onConflict: 'session_id,exercise_position,set_index' },
     )
     .select('id')
@@ -220,7 +198,7 @@ export async function markSessionExercise(
       completed_at: done ? new Date().toISOString() : null,
     })
     .eq('session_id', sessionId)
-    .eq('position', position);
+    .eq('position', toDbPosition(position));
   if (error) {
     throw error;
   }
@@ -530,10 +508,19 @@ export async function registerSessionPRs(params: {
 // ── Outbox: writes that failed stay on the phone and sync later ─────────────
 // STATE_09 "Está a salvo en este teléfono". Sets and the completion are kept
 // in AsyncStorage per user and replayed in order (both are idempotent).
-type OutboxItem =
+type OutboxItem = (
   | { kind: 'set'; write: SetWrite }
   | { kind: 'save'; params: SaveForLaterParams }
-  | { kind: 'complete'; payload: CompletionPayload };
+  | { kind: 'complete'; payload: CompletionPayload }
+) &
+  Queued;
+
+const outboxKeyOf = (entry: OutboxItem) =>
+  entry.kind === 'set'
+    ? `set:${entry.write.sessionId}:${entry.write.set.position}:${entry.write.set.setIndex}`
+    : entry.kind === 'save'
+    ? `save:${entry.params.sessionId}`
+    : `complete:${entry.payload.sessionId}`;
 
 const outboxKey = (userId: string) => `@athelete/session-outbox-v1:${userId}`;
 
@@ -559,15 +546,10 @@ export async function enqueueSessionWrite(
   item: OutboxItem,
 ): Promise<void> {
   const items = await readOutbox(userId);
-  const key = (entry: OutboxItem) =>
-    entry.kind === 'set'
-      ? `set:${entry.write.sessionId}:${entry.write.set.position}:${entry.write.set.setIndex}`
-      : entry.kind === 'save'
-      ? `save:${entry.params.sessionId}`
-      : `complete:${entry.payload.sessionId}`;
+  // Queuing again (a new attempt by the person) clears an old failure mark.
   await writeOutbox(userId, [
-    ...items.filter(entry => key(entry) !== key(item)),
-    item,
+    ...items.filter(entry => outboxKeyOf(entry) !== outboxKeyOf(item)),
+    { ...item, failure: undefined },
   ]);
 }
 
@@ -586,28 +568,64 @@ export async function hasPendingSetsForSession(
   );
 }
 
-// Replays the queue; stops at the first failure (still offline). Returns the
-// completions that went through.
-export async function flushSessionOutbox(
-  userId: string,
-): Promise<CompletionResult[]> {
-  const items = await readOutbox(userId);
-  const completed: CompletionResult[] = [];
-  let index = 0;
-  for (; index < items.length; index += 1) {
-    const item = items[index];
-    try {
-      if (item.kind === 'set') {
-        await upsertSessionSet(item.write);
-      } else if (item.kind === 'save') {
-        await saveSessionForLater(item.params);
-      } else {
-        completed.push(await completeSession(item.payload));
-      }
-    } catch {
-      break;
-    }
+// Replays the queue (rules in sessionOutbox.ts). Only one replay runs at a
+// time per user: a second caller gets the one in progress. Every operation is
+// idempotent, so a replay interrupted halfway is safe to repeat.
+const inflight = new Map<string, Promise<OutboxRun>>();
+
+export type OutboxRun = {
+  completed: CompletionResult[];
+  done: number;
+  // Still waiting for the network (worth another attempt later).
+  retryable: number;
+  // Parked with an error that is not the network's.
+  failed: number;
+  stoppedByNetwork: boolean;
+};
+
+async function execute(item: OutboxItem): Promise<CompletionResult | undefined> {
+  if (item.kind === 'set') {
+    await upsertSessionSet(item.write);
+    return undefined;
   }
-  await writeOutbox(userId, items.slice(index));
-  return completed;
+  if (item.kind === 'save') {
+    await saveSessionForLater(item.params);
+    return undefined;
+  }
+  return completeSession(item.payload);
+}
+
+export function flushSessionOutbox(
+  userId: string,
+  options: RunOptions = {},
+): Promise<OutboxRun> {
+  const running = inflight.get(userId);
+  if (running) {
+    // A manual retry of parked items waits for the replay in progress and
+    // then runs its own; anything else just shares it.
+    return options.retryFailed
+      ? running.then(() => flushSessionOutbox(userId, options))
+      : running;
+  }
+  const run = (async () => {
+    const items = await readOutbox(userId);
+    const outcome = await runOutbox(items, execute, () => new Date(), options);
+    // Items queued while the replay ran are kept (re-read and merge).
+    const current = await readOutbox(userId);
+    const keyOf = (entry: OutboxItem) => outboxKeyOf(entry);
+    const handled = new Set(items.map(keyOf));
+    const added = current.filter(entry => !handled.has(keyOf(entry)));
+    await writeOutbox(userId, [...outcome.remaining, ...added]);
+    return {
+      completed: outcome.results,
+      done: outcome.done,
+      retryable: [...outcome.remaining, ...added].filter(entry => !entry.failure).length,
+      failed: outcome.remaining.filter(entry => entry.failure).length,
+      stoppedByNetwork: outcome.stoppedByNetwork,
+    };
+  })().finally(() => {
+    inflight.delete(userId);
+  });
+  inflight.set(userId, run);
+  return run;
 }

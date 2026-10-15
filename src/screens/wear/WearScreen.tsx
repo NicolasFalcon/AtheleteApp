@@ -83,7 +83,7 @@ function Tile({ photo, label, height }: { photo: TilePhoto; label: string; heigh
 // launch: no products, prices or sizes, and nothing to tap but "Avísame".
 // Entry: the hero photo settles (8 s, 1.08 → 1) and the title block rises
 // (0.7 s, after 0.2 s). "Reducir movimiento" shows everything at rest.
-export function WearScreen({ navigation, route }: AppScreenProps<'Wear'>) {
+export function WearScreen({ navigation }: AppScreenProps<'Wear'>) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const toast = useToast();
@@ -126,20 +126,10 @@ export function WearScreen({ navigation, route }: AppScreenProps<'Wear'>) {
     }
   };
 
-  // Development only: open already scrolled, for captures.
-  const [scroller, setScroller] = useState<ScrollView | null>(null);
-  const devScroll = __DEV__ ? route.params?.devScroll ?? 0 : 0;
-  useEffect(() => {
-    if (devScroll > 0 && scroller) {
-      const id = setTimeout(() => scroller.scrollTo({ y: devScroll, animated: false }), 600);
-      return () => clearTimeout(id);
-    }
-  }, [devScroll, scroller]);
-
   return (
     <View style={styles.fill}>
       <StatusBarV2 style="light" />
-      <ScrollView ref={setScroller} showsVerticalScrollIndicator={false} bounces={false}>
+      <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
         <View style={styles.hero}>
           <Animated.View style={[StyleSheet.absoluteFill, heroPhoto]}>
             {/* object-position 50 % 25 %: sized by height and centred. */}

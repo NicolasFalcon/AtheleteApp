@@ -62,7 +62,6 @@ type SaveView = {
 export function QuizResultScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const params = route.params;
-  const dev = __DEV__ ? params.devState : undefined;
   const overviewQuery = useQuizOverview();
   const profileQuery = useProfileOverview();
   const submit = useQuizSubmit();
@@ -88,24 +87,14 @@ export function QuizResultScreen({ navigation, route }: Props) {
 
   // The round is saved once on arrival; "Reintentar" repeats the same attempt.
   useEffect(() => {
-    if (dev || startedRef.current) {
+    if (startedRef.current) {
       return;
     }
     startedRef.current = true;
     save();
-  }, [dev, save]);
+  }, [save]);
 
   const view: SaveView = useMemo(() => {
-    if (dev) {
-      return {
-        status: dev === 'saving' ? 'saving' : dev === 'error' ? 'error' : 'saved',
-        points: params.pointsEarned,
-        total: 4860,
-        previousBest: params.devPreviousBest ?? null,
-        badges: dev === 'firstQuiz' ? ['first_quiz'] : dev === 'master' ? ['first_quiz', 'quiz_master'] : [],
-        rewardPending: false,
-      };
-    }
     if (submit.isError) {
       return { status: 'error', previousBest: null, points: null, total: null, badges: [], rewardPending: false };
     }
@@ -121,7 +110,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
       };
     }
     return { status: 'saving', previousBest: null, points: null, total: null, badges: [], rewardPending: false };
-  }, [dev, params.devPreviousBest, params.pointsEarned, submit.data, submit.isError]);
+  }, [submit.data, submit.isError]);
 
   const saved = view.status === 'saved';
   const totalPoints = view.total ?? (saved ? profileQuery.data?.points ?? null : null);
@@ -134,7 +123,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
 
   // Leaving with the round unsaved asks first (it would be lost).
   const leave = (go: () => void) => {
-    if (saved || dev) {
+    if (saved) {
       leavingRef.current = true;
       go();
       return;
@@ -148,7 +137,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
   useEffect(
     () =>
       navigation.addListener('beforeRemove', event => {
-        if (leavingRef.current || saved || dev) {
+        if (leavingRef.current || saved) {
           return;
         }
         event.preventDefault();
@@ -157,7 +146,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
           navigation.dispatch(event.data.action);
         });
       }),
-    [dev, navigation, saved],
+    [navigation, saved],
   );
 
   const again = () =>

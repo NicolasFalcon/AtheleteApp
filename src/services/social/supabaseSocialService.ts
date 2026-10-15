@@ -116,7 +116,7 @@ import { prefetchProfilePhotoUris } from '@app/services/supabase/profile-photo';
 // Supabase implementation of `SocialService`: W1 (personas: lectura, nombre de
 // usuario y privacidad), W2 (escrituras de personas), W3 (feed y publicaciones),
 // W4 (publicar), W5 (retos), W6 (notificaciones) and W7 (moderación). Every
-// method talks to the backend; the sample data only exists in the dev fixtures.
+// method talks to the backend.
 
 // BT-43 (placeholder): local acceptance of the Terms before the first post.
 const TERMS_KEY = '@athelete/social-terms-accepted';

@@ -10,7 +10,6 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
-import { devHomeSlide } from '@app/dev/homeModeOverride';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, Bell, Check, Play } from 'lucide-react-native';
@@ -128,19 +127,6 @@ export function HomeHero(props: HomeHeroProps) {
     setIndex(0);
     scrollRef.current?.scrollTo({ x: 0, animated: false });
   }, [key]);
-
-  // Development only: open on a slide (`-homeSlide N`), for captures.
-  useEffect(() => {
-    const target = devHomeSlide();
-    if (multi && target > 0) {
-      peekShown = true; // no nudge while a capture asks for a slide
-      const id = setTimeout(() => {
-        scrollRef.current?.scrollTo({ x: target * width, animated: false });
-        setIndex(target);
-      }, 600);
-      return () => clearTimeout(id);
-    }
-  }, [multi, width]);
 
   // A single small nudge per app session, never with reduced motion.
   useEffect(() => {

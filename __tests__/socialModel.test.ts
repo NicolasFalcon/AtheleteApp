@@ -25,7 +25,7 @@ import {
 import {
   buildFixtureState,
   buildPeople,
-} from '../src/dev/socialFixtures';
+} from './fixtures/socialFixtures';
 import type {
   FriendInviteRow,
   RelationshipState,

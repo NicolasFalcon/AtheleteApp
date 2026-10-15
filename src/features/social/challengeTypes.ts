@@ -111,7 +111,7 @@ export type ChallengeSummary = {
   // Who leads among me and my friends ("Carlos acaba de llegar a 81"). From
   // the server (`leader`); `isMe` when it is me.
   leader: { profile: SocialProfileRow | null; progress: number; isMe?: boolean } | null;
-  // Official challenges (absent in friend challenges and old fixtures).
+  // Official challenges (absent in friend challenges).
   meta?: ChallengeMeta;
 };
 

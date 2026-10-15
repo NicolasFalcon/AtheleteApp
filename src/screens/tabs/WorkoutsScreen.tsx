@@ -59,7 +59,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
     [scrollY, tabBarMotion],
   );
 
-  // Tab params (dev screen cycler, deep links).
+  // Tab params (deep links).
   useEffect(() => {
     if (route.params?.segment) {
       setSegment(route.params.segment);
@@ -183,6 +183,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
             onOpenEquipment={equipment =>
               navigation.navigate(APP_ROUTES.ExerciseList, { equipment })
             }
+            onScan={() => navigation.navigate(APP_ROUTES.MachineScan)}
             onOpenAll={() => navigation.navigate(APP_ROUTES.ExerciseList)}
           />
         )}

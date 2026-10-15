@@ -66,14 +66,7 @@ export function SocialPostScreen({ navigation, route }: Props) {
   const comments = useSocialResource('getComments', s => s.getComments(postId), [postId]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const { devAction } = route.params;
-  const [target, setTarget] = useState<ContentTarget | null>(
-    devAction === 'reportComment'
-      ? { kind: 'comment', id: 'fx-c1', mine: false }
-      : devAction
-      ? { kind: 'post', id: postId, mine: devAction === 'delete' }
-      : null,
-  );
+  const [target, setTarget] = useState<ContentTarget | null>(null);
   const [saved, setSaved] = useState(false);
 
   const check = validateComment(draft);
@@ -275,13 +268,6 @@ export function SocialPostScreen({ navigation, route }: Props) {
 
       <ContentActions
         target={target}
-        initialStep={
-          devAction === 'report' || devAction === 'reportComment'
-            ? 'report'
-            : devAction === 'delete'
-            ? 'delete'
-            : 'menu'
-        }
         onClose={() => setTarget(null)}
         onDone={(done, action) => {
           if (done.kind === 'post' && action !== 'edited') {

@@ -50,13 +50,11 @@ export function SocialUsernameScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const settings = useSocialResource('getSettings', s => s.getSettings());
-  const { mode, devText, devError } = route.params;
+  const { mode } = route.params;
   const creating = mode === 'create';
-  const [text, setText] = useState(devText ?? '');
-  const [submitted, setSubmitted] = useState(Boolean(devError));
-  const [serverError, setServerError] = useState<'username_taken' | null>(
-    devError ?? null,
-  );
+  const [text, setText] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [serverError, setServerError] = useState<'username_taken' | null>(null);
   const [saving, setSaving] = useState(false);
 
   const current = settings.data?.username ?? null;

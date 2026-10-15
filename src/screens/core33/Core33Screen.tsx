@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,12 +44,11 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // cells, the streaks and "Hoy" with the three habits (tap to mark, tap again
 // to undo). Completing day 33 shows the celebration; the challenge can be
 // left from the menu (with confirmation) to choose another.
-export function Core33Screen({ navigation, route }: Props) {
+export function Core33Screen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const dev = __DEV__ ? route.params?.devState : undefined;
-  const [celebrate, setCelebrate] = useState(dev === 'celebration');
+  const [celebrate, setCelebrate] = useState(false);
   const [menu, setMenu] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -57,37 +56,25 @@ export function Core33Screen({ navigation, route }: Props) {
   const day = useCore33Day({ onChallengeCompleted: () => setCelebrate(true) });
   const { state } = day;
 
-  // Development: a sample participation (nothing is read or written).
-  const sample = useMemo(() => {
-    if (!__DEV__ || !dev || dev === 'none' || dev === 'loading' || dev === 'error') {
-      return null;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fx = require('@app/dev/core33Fixtures') as typeof import('@app/dev/core33Fixtures');
-    return fx.core33Fixture(dev === 'celebration' ? 'completed' : dev);
-  }, [dev]);
-
-  const challenge = sample ? sample.challenge : state?.challenge ?? null;
-  const logs = sample ? sample.habitLogs : state?.habitLogs ?? {};
+  const challenge = state?.challenge ?? null;
+  const logs = state?.habitLogs ?? {};
   const view = challenge
     ? buildCore33DayView({
         challenge,
         habitLogs: logs,
-        overrides: sample ? undefined : day.overrides,
+        overrides: day.overrides,
       })
     : null;
   const art = challenge ? challengeOfHabits(challenge.habits) : null;
 
-  const loading = dev === 'loading' || (!dev && day.stateQuery.isLoading);
-  const failed = dev === 'error' || (!dev && Boolean(day.stateQuery.error));
-  const none = dev === 'none' || (!dev && !loading && !failed && !challenge);
+  const loading = day.stateQuery.isLoading;
+  const failed = Boolean(day.stateQuery.error);
+  const none = !loading && !failed && !challenge;
 
   const leave = async () => {
     setLeaving(true);
     try {
-      if (!dev) {
-        await abandonChallenge();
-      }
+      await abandonChallenge();
       navigation.reset({
         index: 1,
         routes: [{ name: ROOT_ROUTES.MainTabs }, { name: APP_ROUTES.Core33Explore }],
@@ -207,7 +194,7 @@ export function Core33Screen({ navigation, route }: Props) {
                 pillar={habit.pillar}
                 text={habit.text}
                 done={habit.done}
-                disabled={view.completed || Boolean(sample)}
+                disabled={view.completed}
                 onPress={() => day.toggle(habit.index)}
               />
             ))}
@@ -218,7 +205,7 @@ export function Core33Screen({ navigation, route }: Props) {
                 Terminaste este compromiso. Puedes descansar unos días o elegir el siguiente cuando quieras.
               </TextV2>
               {/* achievement with the participation as source: `core33:<id>` (create_post). */}
-              {challenge && 'id' in challenge && typeof challenge.id === 'string' && !sample ? (
+              {challenge && 'id' in challenge && typeof challenge.id === 'string' ? (
                 <Button
                   label="Compartir logro"
                   variant="secondary"

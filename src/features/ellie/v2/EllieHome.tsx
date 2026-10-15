@@ -176,8 +176,7 @@ export function AlsoCanList({ onAsk }: { onAsk: (ask: EllieAsk) => void }) {
   );
 }
 
-// "¿No sabes cómo usar una máquina? Escanéala con ELLIE." (Scan: sin acción
-// todavía, como en Entrenos).
+// "¿No sabes cómo usar una máquina? Escanéala con ELLIE." Opens the machine scan.
 export function ScanCard({ onPress }: { onPress: () => void }) {
   const { colors } = useThemeV2();
 

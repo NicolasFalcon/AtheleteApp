@@ -70,9 +70,7 @@ export function SocialNotificationsScreen({ navigation }: Props) {
       service.markNotificationsRead(ids).catch(() => {});
     }
     const target = group.destination;
-    const hub = navigation.getState().routeNames.includes(ROOT_ROUTES.MainTabs)
-      ? ROOT_ROUTES.MainTabs
-      : ROOT_ROUTES.DevFixtureTabs;
+    const hub = ROOT_ROUTES.MainTabs;
     switch (target.kind) {
       case 'friends':
         navigation.navigate(hub, { screen: TAB_ROUTES.Community, params: { segment: 'amigos' } });

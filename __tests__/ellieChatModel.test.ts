@@ -1,9 +1,7 @@
 import {
   chatReducer,
-  classifyEllieError,
   composerState,
   DONUT_LENGTH,
-  ELLIE_ERROR_LINES,
   GREETING_ID,
   initialChatState,
   isFirstContact,
@@ -14,6 +12,7 @@ import {
   type CardMessage,
   type ChatState,
 } from '../src/features/ellie/chatModel';
+import { ellieErrorLine, type EllieFailure } from '../src/features/ellie/ellieCopy';
 
 const plan: CardMessage = {
   id: 'p1',
@@ -25,33 +24,19 @@ const plan: CardMessage = {
 
 const start = () => initialChatState('Hola, Nicolas.');
 
-describe('error classification', () => {
-  it('reads limit, server and no connection', () => {
-    expect(classifyEllieError({ status: 429 })).toBe('limit');
-    expect(classifyEllieError({ status: 402 })).toBe('limit');
-    expect(classifyEllieError({ status: 500 })).toBe('server');
-    expect(classifyEllieError({ status: 400, message: 'bad' })).toBe('server');
-    expect(classifyEllieError({ message: 'Network request failed' })).toBe('offline');
-    expect(classifyEllieError({ message: 'No pudimos conectar con ELLIE.' })).toBe('offline');
-    expect(classifyEllieError({ message: 'boom' })).toBe('server');
-    expect(classifyEllieError({})).toBe('server');
-  });
-});
-
 describe('sending', () => {
   it('goes sending → sent when ELLIE answers, with the thinking state', () => {
     let state = chatReducer(start(), { type: 'send', id: 'u1', text: 'Hola' });
     expect(state.thinking).toBe(true);
-    expect(state.messages[1]).toMatchObject({ role: 'user', status: 'sending', persisted: false });
+    expect(state.messages[1]).toMatchObject({ role: 'user', status: 'sending', clientMessageId: 'u1' });
     expect(showSuggestions(state)).toBe(false);
 
-    state = chatReducer(state, { type: 'persisted', id: 'u1' });
     state = chatReducer(state, { type: 'delta', id: 'a1', delta: 'Hola, ' });
     state = chatReducer(state, { type: 'delta', id: 'a1', delta: 'Nicolas.' });
     expect(state.messages[2]).toMatchObject({ kind: 'text', text: 'Hola, Nicolas.' });
     state = chatReducer(state, { type: 'done' });
     expect(state.thinking).toBe(false);
-    expect(state.messages[1]).toMatchObject({ status: 'sent', persisted: true });
+    expect(state.messages[1]).toMatchObject({ status: 'sent' });
     expect(composerState(state, 'otra').canSend).toBe(true);
     expect(composerState(state, '   ').canSend).toBe(false);
   });
@@ -69,11 +54,17 @@ describe('sending', () => {
 });
 
 describe('failures and retry', () => {
+  const failures: Record<'offline' | 'server' | 'limit', EllieFailure> = {
+    offline: { code: 'offline' },
+    server: { code: 'ai_unavailable' },
+    limit: { code: 'daily_limit', used: 40, limit: 40 },
+  };
   const failed = (kind: 'offline' | 'server' | 'limit'): ChatState =>
     chatReducer(chatReducer(start(), { type: 'send', id: 'u1', text: 'Ajusta mi rutina' }), {
       type: 'fail',
       id: 'u1',
-      kind,
+      failure: failures[kind],
+      text: ellieErrorLine(failures[kind], 'es'),
     });
 
   it('marks the message as not sent and ELLIE explains it with her voice', () => {
@@ -82,7 +73,7 @@ describe('failures and retry', () => {
     expect(state.messages[1]).toMatchObject({ status: 'failed' });
     expect(state.messages[2]).toMatchObject({
       notice: true,
-      text: ELLIE_ERROR_LINES.offline,
+      text: ellieErrorLine({ code: 'offline' }, 'es'),
     });
     // No connection: the composer is inactive (STATE_08).
     expect(composerState(state, 'hola')).toEqual({
@@ -100,15 +91,26 @@ describe('failures and retry', () => {
     });
   });
 
-  it('retry clears the explanation and sends again without storing twice', () => {
-    let state = chatReducer(failed('offline'), { type: 'persisted', id: 'u1' });
-    state = chatReducer(state, { type: 'retry', id: 'u1' });
+  it('keeps why it failed on the message, and clears it on retry (same client id)', () => {
+    let state = failed('limit');
+    expect(state.messages[1]).toMatchObject({ status: 'failed', failure: { code: 'daily_limit' } });
+    state = chatReducer(failed('offline'), { type: 'retry', id: 'u1' });
+    expect(state.messages[1]).toMatchObject({ status: 'sending', clientMessageId: 'u1', failure: undefined });
+  });
+
+  it('retry clears the explanation and sends again', () => {
+    let state = chatReducer(failed('offline'), { type: 'retry', id: 'u1' });
     expect(state.thinking).toBe(true);
     expect(state.blocked).toBeNull();
     expect(state.messages.some(message => message.id === 'notice-u1')).toBe(false);
-    expect(state.messages[1]).toMatchObject({ status: 'sending', persisted: true });
+    expect(state.messages[1]).toMatchObject({ status: 'sending' });
     // A second failure replaces the notice instead of stacking another.
-    state = chatReducer(state, { type: 'fail', id: 'u1', kind: 'server' });
+    state = chatReducer(state, {
+      type: 'fail',
+      id: 'u1',
+      failure: failures.server,
+      text: ellieErrorLine(failures.server, 'es'),
+    });
     expect(state.messages.filter(message => 'notice' in message && message.notice)).toHaveLength(1);
   });
 });
@@ -187,13 +189,13 @@ describe('history and the plan donut', () => {
     const state = chatReducer(start(), {
       type: 'load',
       greeting: 'Hola',
-      history: [
-        { id: '1', role: 'user', content: 'Hola' },
-        { id: '2', role: 'assistant', content: 'Hola,   ¿en qué te ayudo?' },
+      messages: [
+        { id: '1', role: 'user', kind: 'text', text: 'Hola', status: 'sent', clientMessageId: '1' },
+        { id: '2', role: 'assistant', kind: 'text', text: 'Hola,   ¿en qué te ayudo?' },
       ],
     });
     expect(state.messages).toHaveLength(3);
-    expect(state.messages[1]).toMatchObject({ status: 'sent', persisted: true });
+    expect(state.messages[1]).toMatchObject({ status: 'sent' });
     const now = new Date(2026, 9, 4, 12);
     expect(
       lastLine([{ content: 'Hola,   ¿en qué te ayudo?', createdAt: new Date(2026, 9, 4, 11, 30).toISOString() }], now),

@@ -21,7 +21,6 @@ import type {
   WorkoutAttachment,
 } from '@app/features/social/postTypes';
 import { fitPolyline } from '@app/features/social/routePostGeometry';
-import { ROUTE_SAMPLE_MAPS } from '@app/features/social/routeSampleMaps';
 import { usePostPhotoSource } from '@app/features/social/useSocial';
 
 // The compositions of a post, one per type (v2.12 §22.5): photo, record,
@@ -502,7 +501,14 @@ export function PhotoBody({
 // Route post (SOCIAL_16): the map with the route cut out as the protagonist
 // fading into the page, the distance at 72/800 over it and one line of
 // figures. The planned route is only a note. A real post draws its trimmed
-// polyline on the page; the dev fixtures still draw the sample map.
+// polyline on the page; without one the map area stays empty.
+// Layout of the map area of a route post, by sport.
+const ROUTE_MAP = {
+  bike: { height: 520, glowWidth: 12, width: 4 },
+  run: { height: 340, glowWidth: 13.5, width: 4.5 },
+} as const;
+const ROUTE_MAP_BG = { light: '#E8E6E1', dark: '#181715' } as const;
+
 export function RouteBody({
   attachment,
   onPress,
@@ -512,22 +518,18 @@ export function RouteBody({
 }) {
   const { colors, mode } = useThemeV2();
   const bleed = useBleed();
-  const sample = ROUTE_SAMPLE_MAPS[attachment.sport === 'cycling' ? 'bike' : 'run'];
-  const layer = mode === 'dark' ? sample.dark : sample.light;
+  const map = ROUTE_MAP[attachment.sport === 'cycling' ? 'bike' : 'run'];
   // The real route, fitted into the map area (no tiles: the route is cut out).
   const real = attachment.polyline
     ? fitPolyline(attachment.polyline, {
         width: 400,
-        height: sample.height,
+        height: map.height,
         padding: 48,
         bottomPadding: 120,
       })
     : null;
-  const isReal = attachment.polyline !== undefined;
-  const crop = isReal ? { x: 0, y: 0, width: 400, height: sample.height } : sample.crop;
-  const routeD = real ? real.d : isReal ? '' : sample.route.d;
-  const routeStart = real ? real.start : sample.route.start;
-  const routeEnd = real ? real.end : sample.route.end;
+  const unavailable = attachment.polyline === undefined;
+
   const hours = Math.floor(attachment.duration_sec / 3600);
   const minutes = Math.floor((attachment.duration_sec % 3600) / 60);
   const seconds = attachment.duration_sec % 60;
@@ -551,69 +553,56 @@ export function RouteBody({
       onPress={onPress}
       style={[styles.route, bleed]}
     >
-      <View style={{ height: sample.height }}>
+      <View style={{ height: map.height }}>
         <Svg
           pointerEvents="none"
           style={StyleSheet.absoluteFill}
-          viewBox={`${crop.x} ${crop.y} ${crop.width} ${crop.height}`}
+          viewBox={`0 0 400 ${map.height}`}
           preserveAspectRatio="xMidYMid slice"
         >
-          <Rect x={-300} y={-300} width={1000} height={1500} fill={layer.bg} />
-          {(isReal ? [] : layer.blocks).map((d, i) => (
-            <Path key={`b${i}`} d={d} fill={mode === 'dark' ? '#1B1E1A' : '#DCDED3'} />
-          ))}
-          {(isReal ? [] : layer.strokes).map((s, i) => (
-            <Path
-              key={`s${i}`}
-              d={s.d}
-              stroke={s.stroke}
-              strokeWidth={s.width}
-              strokeLinecap={s.round ? 'round' : undefined}
-              fill="none"
-            />
-          ))}
-          {isReal && !real ? null : (
+          <Rect x={-300} y={-300} width={1000} height={1500} fill={ROUTE_MAP_BG[mode === 'dark' ? 'dark' : 'light']} />
+          {real ? (
             <>
           <Path
-            d={routeD}
+            d={real.d}
             stroke={colors.ember.base}
             strokeOpacity={0.2}
-            strokeWidth={sample.route.glowWidth}
+            strokeWidth={map.glowWidth}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
           />
           <Path
-            d={routeD}
+            d={real.d}
             stroke={colors.ember.base}
-            strokeWidth={sample.route.width}
+            strokeWidth={map.width}
             strokeLinecap="round"
             strokeLinejoin="round"
             fill="none"
           />
           <Circle
-            cx={routeStart.x}
-            cy={routeStart.y}
+            cx={real.start.x}
+            cy={real.start.y}
             r={5.5}
             fill={colors.bg}
             stroke={colors.ember.base}
             strokeWidth={2.5}
           />
           <Circle
-            cx={routeEnd.x}
-            cy={routeEnd.y}
+            cx={real.end.x}
+            cy={real.end.y}
             r={6.5}
             fill={colors.ember.base}
             stroke={colors.bg}
             strokeWidth={2.5}
           />
             </>
-          )}
+          ) : null}
         </Svg>
-        {isReal && !real ? (
+        {real === null ? (
           <View style={[StyleSheet.absoluteFill, styles.routeHidden]}>
             <TextV2 variant="meta" tone="secondary">
-              Recorrido oculto por privacidad
+              {unavailable ? 'Recorrido no disponible' : 'Recorrido oculto por privacidad'}
             </TextV2>
           </View>
         ) : null}

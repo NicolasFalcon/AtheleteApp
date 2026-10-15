@@ -33,7 +33,7 @@ import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useQuizOverview } from '@app/hooks/useQuiz';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
-import type { QuizCategoryPreview, QuizOverview } from '@app/types/quiz';
+import type { QuizCategoryPreview } from '@app/types/quiz';
 
 type Props = AppScreenProps<'QuizLanding'>;
 
@@ -42,30 +42,17 @@ type Props = AppScreenProps<'QuizLanding'>;
 // the progress towards Quiz Master and the last rounds. Tapping a challenge
 // opens its start screen. Data: categories, questions and attempts from
 // Supabase (read only); points from the profile.
-export function QuizLandingScreen({ navigation, route }: Props) {
+export function QuizLandingScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const dev = __DEV__ ? route.params?.devState : undefined;
   const overviewQuery = useQuizOverview();
   const profileQuery = useProfileOverview();
   const now = useMemo(() => new Date(), []);
 
-  // Development: sample data, nothing is read.
-  const sample = useMemo<{ overview: QuizOverview; points: number } | null>(() => {
-    if (!__DEV__ || (dev !== 'data' && dev !== 'new' && dev !== 'perfect')) {
-      return null;
-    }
-    const fixtures = require('@app/dev/quizFixtures') as typeof import('@app/dev/quizFixtures');
-    return {
-      overview: fixtures.quizOverviewFixture(dev, now),
-      points: dev === 'new' ? 0 : fixtures.QUIZ_FIXTURE_POINTS,
-    };
-  }, [dev, now]);
-
-  const overview = dev === 'empty' ? { categories: [], attempts: [] } : sample?.overview ?? overviewQuery.data;
-  const points = sample ? sample.points : profileQuery.data?.points ?? null;
-  const loading = dev === 'loading' || (!dev && overviewQuery.isLoading);
-  const failed = dev === 'error' || (!dev && overviewQuery.isError && !overviewQuery.data);
+  const overview = overviewQuery.data;
+  const points = profileQuery.data?.points ?? null;
+  const loading = overviewQuery.isLoading;
+  const failed = overviewQuery.isError && !overviewQuery.data;
 
   const views = useMemo<QuizCategoryView[]>(
     () =>

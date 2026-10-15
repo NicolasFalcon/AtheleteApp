@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,18 +29,9 @@ type Props = AppScreenProps<'QuizChallenge'>;
 export function QuizChallengeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { categoryId, categoryName, categoryIcon } = route.params;
-  const dev = __DEV__ ? route.params.devState : undefined;
   const overviewQuery = useQuizOverview();
 
-  const sample = useMemo(() => {
-    if (!__DEV__ || !dev) {
-      return null;
-    }
-    const fixtures = require('@app/dev/quizFixtures') as typeof import('@app/dev/quizFixtures');
-    return fixtures.quizOverviewFixture(dev === 'record' ? 'data' : 'new');
-  }, [dev]);
-
-  const categories = (sample ?? overviewQuery.data)?.categories;
+  const categories = overviewQuery.data?.categories;
   const index = categories?.findIndex(item => item.id === categoryId) ?? -1;
   const category: QuizCategoryPreview | undefined =
     index >= 0 ? categories?.[index] : undefined;

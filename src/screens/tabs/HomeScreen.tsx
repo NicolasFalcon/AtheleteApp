@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { StatusBarV2, useThemeV2 } from '@app/components/v2';
@@ -20,17 +20,12 @@ import {
   quizMastery,
   resolveHomeMode,
   resolveHomeSlides,
-  slideFor,
   sessionActiveSeconds,
   trainedMinutesToday,
   toGlasses,
   type DayRingKind,
   type HomeChallengeState,
 } from '@app/features/home/homePriority';
-import { useHomeChallengeScenario } from '@app/dev/homeChallengeScenario';
-import { useHomeRouteScenario } from '@app/dev/homeRouteScenario';
-import { isRouteSampleActive } from '@app/dev/routeDevConfig';
-import { ACTIVITY_RUN } from '@app/dev/routeFixtures';
 import { RouteDoneCard } from '@app/features/home/v2/RouteDoneCard';
 import { agoLabel } from '@app/features/route/routeFormat';
 import { routeStore } from '@app/features/route/routeStore';
@@ -38,7 +33,6 @@ import type { RouteActivity } from '@app/features/route/routeTypes';
 import { useTodayRouteActivity } from '@app/features/route/useRouteData';
 import {
   homeChallengeCard,
-  sampleChallengeCard,
 } from '@app/features/home/homeChallengeSection';
 import { useSocialResource } from '@app/features/social/useSocial';
 import { EllieBand } from '@app/features/home/v2/EllieBand';
@@ -56,7 +50,6 @@ import { QuizBanner } from '@app/features/home/v2/QuizBanner';
 import { WearCard } from '@app/features/wear/WearCard';
 import { WeekCarousel } from '@app/features/home/v2/WeekCarousel';
 import { recommendRoutines } from '@app/features/workouts/workoutsModel';
-import { devHomeScroll, useHomeModeOverride } from '@app/dev/homeModeOverride';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
@@ -108,49 +101,19 @@ export function HomeScreen({ navigation }: Props) {
   const { addGlass } = useHydration();
   const openCore33 = useOpenCore33();
   const openCore33Discovery = useOpenCore33Discovery();
-  const homeOverride = useHomeModeOverride();
-  const modeOverride = homeOverride?.mode ?? null;
   const inviteDismissals = useCore33InviteDismissals();
-  // Official challenge section (cache shared with Comunidad). Real data only;
-  // the sample of the reference appears only when forced with a dev deep link
-  // (athelete://dev/home?scenario=challengeInvite|challengeJoined|challengeCompleted).
+  // Official challenge section (cache shared with Comunidad). Real data only.
   const challenges = useSocialResource('getMyChallenges', service =>
     service.getMyChallenges(),
   );
-  const challengeScenario = useHomeChallengeScenario();
   // "Tu ruta real": today's activity from the server (get_today_route_activity).
-  // The sample one appears only with the dev deep link (homeCardActive); a dev
-  // scenario without it (homeCardInvite) shows the invitation.
-  const routeScenario = useHomeRouteScenario();
   const todayRouteQuery = useTodayRouteActivity();
-  const todayRoute: RouteActivity | null = routeScenario
-    ? ACTIVITY_RUN
-    : isRouteSampleActive()
-      ? null
-      : (todayRouteQuery.data ?? null);
-  const realCard = useMemo(
+  const todayRoute: RouteActivity | null = todayRouteQuery.data ?? null;
+  const challengeCard = useMemo(
     () => homeChallengeCard(challenges.data),
     [challenges.data],
   );
-  // Joined: the friend furthest along comes with the list (`leader`).
-  const challengeCard = useMemo(() => {
-    if (challengeScenario) {
-      return sampleChallengeCard(challengeScenario);
-    }
-    // No real official challenge: the section does not appear (as in release).
-    return realCard;
-  }, [challengeScenario, realCard]);
-
   // Refresh everything when coming back to Inicio (not on the first mount).
-  // Development only: open already scrolled (`-homeScroll N`), for captures.
-  const scrollRef = useRef<ScrollView>(null);
-  useEffect(() => {
-    const y = devHomeScroll();
-    if (y > 0) {
-      const id = setTimeout(() => scrollRef.current?.scrollTo({ y, animated: false }), 900);
-      return () => clearTimeout(id);
-    }
-  }, []);
 
   const firstFocus = useRef(true);
   useFocusEffect(
@@ -201,7 +164,7 @@ export function HomeScreen({ navigation }: Props) {
     id ? (workouts || []).find(workout => workout.id === id) ?? null : null;
 
   // ── Mode ────────────────────────────────────────────────────────────────
-  const realMode = overview
+  const mode = overview
     ? resolveHomeMode({
         hasCompletedEver: overview.hasCompletedEver,
         workoutDoneToday: Boolean(overview.completedToday),
@@ -209,10 +172,8 @@ export function HomeScreen({ navigation }: Props) {
         challenge: challengeState,
       })
     : null;
-  // Development-only visual override ("Ver modos de Inicio"); null in prod.
-  const mode = modeOverride ?? realMode;
   // Hero carousel: one slide per state of the day.
-  const realSlides = overview
+  const slides = overview
     ? resolveHomeSlides({
         hasCompletedEver: overview.hasCompletedEver,
         workoutDoneToday: Boolean(overview.completedToday),
@@ -221,7 +182,6 @@ export function HomeScreen({ navigation }: Props) {
         core33FirstPriority: CORE33_FIRST_PRIORITY,
       })
     : null;
-  const slides = homeOverride ? homeOverride.slides.map(slideFor) : realSlides;
   const isNewUser = mode === 'new';
 
   // Core 33 discovery card (HOME_10 / HOME_11): only without a current
@@ -240,7 +200,7 @@ export function HomeScreen({ navigation }: Props) {
     completedKey && (!approxDay33 || completedKey > approxDay33)
       ? completedKey
       : approxDay33;
-  const realInvite =
+  const core33Invite =
     overview && inviteDismissals.loaded
       ? resolveCore33Invite({
           hasCurrentChallenge: challenge?.status === 'active',
@@ -252,7 +212,6 @@ export function HomeScreen({ navigation }: Props) {
           now: new Date(),
         })
       : null;
-  const core33Invite = homeOverride ? homeOverride.core33Card : realInvite;
 
   const heroWorkoutSource = mode === 'new' ? firstSession : recommended[0];
   const resumable = overview?.resumable ?? null;
@@ -340,9 +299,11 @@ export function HomeScreen({ navigation }: Props) {
         }
         return;
       case 'nutrition':
-        // Registrar nutrición opens over the Nutrición screen (with or
-        // without a plan: the sheet adds to the day's totals).
-        navigation.navigate(APP_ROUTES.NutritionPlan, { openLog: true });
+        // The Nutrición ring opens the camera of Calorías (design §23.7).
+        navigation.navigate(APP_ROUTES.CaloriesCamera, {
+          source: 'home',
+          todayKcal: overview?.todayNutritionLog?.calories ?? 0,
+        });
         return;
       case 'hydration':
         navigation.navigate(APP_ROUTES.NutritionPlan);
@@ -365,15 +326,14 @@ export function HomeScreen({ navigation }: Props) {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 style="light" />
       <ScrollView
-        ref={scrollRef}
         onScroll={tabBarMotion.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomClearance }}
       >
         <HomeHero
-          slides={homeQuery.error && !homeOverride ? null : slides}
-          error={Boolean(homeQuery.error) && !modeOverride}
+          slides={homeQuery.error ? null : slides}
+          error={Boolean(homeQuery.error)}
           onRetry={() => {
             homeQuery.refetch().catch(() => {});
           }}

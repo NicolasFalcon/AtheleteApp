@@ -59,38 +59,17 @@ function roundReducer(state: RoundState, action: RoundAction): RoundState {
 export function QuizQuestionScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { categoryId, categoryName, categoryIcon } = route.params;
-  const dev = __DEV__ ? route.params.devState : undefined;
   const attemptIdRef = useRef(createQuizAttemptId());
   const questionsQuery = useQuizQuestions(categoryId, attemptIdRef.current);
   const [confirmExit, setConfirmExit] = useState(false);
   const leavingRef = useRef(false);
 
-  // Development: a round frozen at a sample moment (nothing is read).
-  const fixtures = useMemo(() => {
-    if (!__DEV__ || !dev || dev === 'loading' || dev === 'error' || dev === 'empty') {
-      return null;
-    }
-    return require('@app/dev/quizFixtures') as typeof import('@app/dev/quizFixtures');
-  }, [dev]);
-
   const questions = useMemo(
-    () =>
-      fixtures
-        ? fixtures.QUIZ_FIXTURE_QUESTIONS
-        : questionsQuery.data
-        ? randomizeQuizOptions(questionsQuery.data)
-        : null,
-    [fixtures, questionsQuery.data],
+    () => (questionsQuery.data ? randomizeQuizOptions(questionsQuery.data) : null),
+    [questionsQuery.data],
   );
 
-  const [round, dispatch] = useReducer(
-    roundReducer,
-    undefined,
-    () =>
-      fixtures && dev && dev !== 'loading' && dev !== 'error' && dev !== 'empty'
-        ? fixtures.quizRoundFixture(dev)
-        : INITIAL_ROUND,
-  );
+  const [round, dispatch] = useReducer(roundReducer, INITIAL_ROUND);
 
   const total = questions?.length ?? 0;
   const question = questions?.[round.index];
@@ -101,7 +80,7 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
   // Haptics once per answer.
   const hapticIndex = useRef(-1);
   useEffect(() => {
-    if (!answered || hapticIndex.current === round.index || dev) {
+    if (!answered || hapticIndex.current === round.index) {
       return;
     }
     hapticIndex.current = round.index;
@@ -110,7 +89,7 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
     } else {
       haptics.error();
     }
-  }, [answer?.isCorrect, answered, dev, round.index]);
+  }, [answer?.isCorrect, answered, round.index]);
 
   const exit = () => {
     leavingRef.current = true;
@@ -130,10 +109,9 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
     [navigation, round.answers.length],
   );
 
-  const forcedState = dev === 'loading' || dev === 'error' || dev === 'empty' ? dev : null;
-  const loading = forcedState === 'loading' || (!dev && questionsQuery.isLoading);
-  const failed = forcedState === 'error' || (!dev && questionsQuery.isError);
-  const empty = forcedState === 'empty' || (!dev && !loading && !failed && total === 0);
+  const loading = questionsQuery.isLoading;
+  const failed = questionsQuery.isError;
+  const empty = !loading && !failed && total === 0;
 
   const handleNext = () => {
     if (!questions) {

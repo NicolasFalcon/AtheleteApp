@@ -36,12 +36,12 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // Moderación (D-97, sin diseño): solo para moderadores (`app_moderators`).
 // La app pregunta `is_moderator()` antes de mostrar nada y las lecturas pasan
 // por RLS: sin rol, ni siquiera se piden la cola ni el historial.
-export function SocialModerationScreen({ navigation, route }: Props) {
+export function SocialModerationScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const role = useSocialResource('getModeratorRole', s => s.getModeratorRole());
   const permissions = moderatorPermissions(role.data ?? null);
-  const [tab, setTab] = useState<'queue' | 'history'>(route.params?.devTab ?? 'queue');
+  const [tab, setTab] = useState<'queue' | 'history'>('queue');
   const queue = useSocialResource(
     'getModerationQueue',
     s => (permissions.canSeePanel ? s.getModerationQueue() : Promise.resolve([])),

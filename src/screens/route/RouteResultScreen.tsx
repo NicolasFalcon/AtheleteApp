@@ -13,7 +13,6 @@ import {
   useToast,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { RouteMap } from '@app/features/route/RouteMap';
 import {
   agoLabel,
@@ -23,7 +22,7 @@ import {
   formatPace,
   formatSpeed,
 } from '@app/features/route/routeFormat';
-import { PRIVACY_TRIM_M, paceSecPerKm, speedKmh, trimEnds } from '@app/features/route/routeGeo';
+import { PRIVACY_TRIM_M, paceSecPerKm, speedKmh } from '@app/features/route/routeGeo';
 import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import { hiddenEnds } from '@app/features/route/routeSummary';
 import type { RouteActivity } from '@app/features/route/routeTypes';
@@ -91,10 +90,8 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
     if (!activity) {
       return null;
     }
-    // A viewer already gets the track trimmed by the server; only the sample
-    // data (dev) still carries a full one to trim here.
-    const line =
-      viewer && isRouteSampleActive() ? trimEnds(activity.points, PRIVACY_TRIM_M) : activity.points;
+    // A viewer already gets the track trimmed by the server.
+    const line = activity.points;
     return {
       line,
       hidden: !viewer && activity.hideEndpoints ? hiddenEnds(activity.points, PRIVACY_TRIM_M) : [],

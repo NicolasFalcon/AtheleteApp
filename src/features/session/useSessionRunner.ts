@@ -10,6 +10,7 @@ import {
   freezeRest,
   isExerciseDone,
   pauseClock,
+  finishClock,
   pausedForSeconds,
   restAfter,
   restPhase,
@@ -51,20 +52,6 @@ import {
 } from '@app/services/supabase/session';
 import type { Workout } from '@app/shared';
 
-// Development only (__DEV__): opens the session in a given state with the
-// routine's real plan and nothing written (athelete://dev/session).
-export type DevSessionState =
-  | 'active'
-  | 'paused'
-  | 'pausedExit'
-  | 'restExercise'
-  | 'restSet'
-  | 'restEnd'
-  | 'menu'
-  | 'exit'
-  | 'error'
-  | 'allDone';
-
 export type SessionDraft = { reps: number | null; weightKg: number | null };
 
 type Params = {
@@ -73,67 +60,20 @@ type Params = {
   userId?: string;
   // recommended_sets_reps of a library exercise (fills rows without reps).
   recommendedFor?: (exerciseId: string) => unknown;
-  dev?: DevSessionState | null;
   onCompleted: (result: CompletionResult) => void;
   onLeave: () => void;
 };
 
 type LoadState = 'loading' | 'ready' | 'error';
 
-function devSetup(
-  dev: DevSessionState,
-  plan: PlannedExercise[],
-  now: number,
-): { sets: LoggedSet[]; clock: ClockState; rest: RestState | null } {
-  const full = (exercise: PlannedExercise | undefined) =>
-    exercise
-      ? Array.from({ length: exercise.sets }, (_, setIndex) => ({
-          position: exercise.position,
-          setIndex,
-          reps: exercise.reps,
-          weightKg: 16,
-          durationSec: exercise.durationSec,
-          distanceM: exercise.distanceM,
-        }))
-      : [];
-  const clock: ClockState = { startedAt: now - 1000, pausedTotalSec: 0, pausedAt: null };
-  switch (dev) {
-    case 'paused':
-    case 'pausedExit':
-      return {
-        sets: [...full(plan[0]), ...full(plan[1])],
-        clock: { startedAt: now - (12 * 60 + 34 + 73) * 1000, pausedTotalSec: 0, pausedAt: now - 73_000 },
-        rest: null,
-      };
-    case 'restExercise':
-      return {
-        sets: full(plan[0]),
-        clock,
-        rest: startRest('exercise', plan[0]?.restSec ?? 45, now),
-      };
-    case 'restSet':
-      return {
-        sets: [...full(plan[0]), ...full(plan[1]).slice(0, 1)],
-        clock,
-        rest: startRest('set', plan[1]?.restSec ?? 60, now),
-      };
-    case 'allDone':
-      return { sets: plan.flatMap(exercise => full(exercise)), clock, rest: null };
-    default:
-      return { sets: [], clock, rest: null };
-  }
-}
-
 export function useSessionRunner({
   workout,
   sessionId,
   userId,
   recommendedFor,
-  dev = null,
   onCompleted,
   onLeave,
 }: Params) {
-  const dryRun = Boolean(dev);
   const plan = useMemo(
     () => buildPlan(workout?.exercises ?? [], recommendedFor),
     [recommendedFor, workout],
@@ -160,30 +100,9 @@ export function useSessionRunner({
   // Real rest taken before the next set that gets logged (null: none yet).
   const lastRestSec = useRef<number | null>(null);
 
-  // ── Load (or the dev state) ───────────────────────────────────────────────
+  // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!workout) {
-      return;
-    }
-    if (dev) {
-      const setup = devSetup(dev, plan, Date.now());
-      setSets(setup.sets);
-      setClock(setup.clock);
-      setRest(setup.rest);
-      setYourTurnUntil(dev === 'restEnd' ? Date.now() + 60 * 60 * 1000 : null);
-      if (dev === 'error') {
-        setSaveError({
-          sessionId: 'dev',
-          workoutId: workout.id,
-          workoutTitle: workout.title,
-          activeSec: workout.duration * 60,
-          pausedTotalSec: 0,
-          caloriesBurned: workout.calories,
-          completedExercises: plan.map(exercise => String(exercise.position)),
-          endedAt: new Date().toISOString(),
-        });
-      }
-      setLoadState('ready');
       return;
     }
     if (!sessionId) {
@@ -202,7 +121,7 @@ export function useSessionRunner({
           ),
         );
         if (userId) {
-          await flushSessionOutbox(userId).catch(() => []);
+          await flushSessionOutbox(userId, { retryFailed: true }).catch(() => undefined);
         }
         let detail = await fetchSessionDetail(sessionId);
         if (detail.session.status === 'completed') {
@@ -240,7 +159,7 @@ export function useSessionRunner({
     };
     // onCompleted is a navigation callback; the load runs once per session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dev, loadAttempt, plan, sessionId, userId, workout]);
+  }, [loadAttempt, plan, sessionId, userId, workout]);
 
   // ── Ticker: 4 Hz while a countdown is on screen, 1 Hz otherwise ───────────
   const fast = Boolean(rest || yourTurnUntil);
@@ -254,13 +173,13 @@ export function useSessionRunner({
 
   // Rest reached zero → "Tu turno" for 1.5 s, then the active card.
   useEffect(() => {
-    if (rest && !paused && remainingMs <= 0 && !dryRun) {
+    if (rest && !paused && remainingMs <= 0) {
       lastRestSec.current = restElapsedSec(rest, Date.now());
       haptics.success();
       setRest(null);
       setYourTurnUntil(Date.now() + YOUR_TURN_MS);
     }
-  }, [dryRun, paused, remainingMs, rest]);
+  }, [paused, remainingMs, rest]);
 
   useEffect(() => {
     if (yourTurnUntil && now >= yourTurnUntil) {
@@ -288,7 +207,10 @@ export function useSessionRunner({
     );
   }, [current, cursor, lastWeights, sets]);
 
-  const elapsedSec = clock ? activeSeconds(clock, now) : 0;
+  // Set when the workout is finished: from then on the clock never moves
+  // again (summary, saving, error and retry all show this figure).
+  const [finishedAt, setFinishedAt] = useState<number | null>(null);
+  const elapsedSec = clock ? activeSeconds(clock, finishedAt ?? now) : 0;
 
   // ── Writes ────────────────────────────────────────────────────────────────
   const track = (promise: Promise<unknown>) => {
@@ -299,7 +221,7 @@ export function useSessionRunner({
   };
 
   const writeSet = (next: LoggedSet, exercise: PlannedExercise, setsAfter: LoggedSet[]) => {
-    if (dryRun || !sessionId || !userId) {
+    if (!sessionId || !userId) {
       return;
     }
     const write: SetWrite = {
@@ -382,12 +304,12 @@ export function useSessionRunner({
     const next = pauseClock(clock, at);
     setClock(next);
     setRest(currentRest => (currentRest ? freezeRest(currentRest, at) : null));
-    if (!dryRun && sessionId) {
+    if (sessionId) {
       setSessionPaused(sessionId, next, activeSeconds(next, at)).catch(error =>
         console.warn('[session] La pausa no se pudo guardar.', error),
       );
     }
-  }, [clock, dryRun, sessionId]);
+  }, [clock, sessionId]);
 
   const resume = useCallback(() => {
     if (!clock || !clock.pausedAt) {
@@ -397,13 +319,13 @@ export function useSessionRunner({
     const next = resumeClock(clock, at);
     setClock(next);
     setRest(currentRest => (currentRest ? thawRest(currentRest, at) : null));
-    if (!dryRun && sessionId) {
+    if (sessionId) {
       // Resuming is activity: the row's minutes are refreshed here.
       setSessionPaused(sessionId, next, activeSeconds(next, at)).catch(error =>
         console.warn('[session] La reanudación no se pudo guardar.', error),
       );
     }
-  }, [clock, dryRun, sessionId]);
+  }, [clock, sessionId]);
 
   const addRest = useCallback(() => {
     haptics.selection();
@@ -425,7 +347,7 @@ export function useSessionRunner({
   // The planned exercises must exist before the session is saved or
   // completed; a failure here is a visible save error (STATE_09), not silent.
   const ensurePlanned = async () => {
-    if (!dryRun && sessionId) {
+    if (sessionId) {
       await ensureSessionExercises(sessionId, plan);
     }
   };
@@ -434,8 +356,8 @@ export function useSessionRunner({
   // still not on the server the workout is not reported as saved (STATE_09).
   const syncBeforeClosing = async () => {
     await ensurePlanned();
-    if (userId && sessionId && !dryRun) {
-      await flushSessionOutbox(userId);
+    if (userId && sessionId) {
+      await flushSessionOutbox(userId, { retryFailed: true });
       if (await hasPendingSetsForSession(userId, sessionId)) {
         throw new Error('Hay series sin sincronizar.');
       }
@@ -446,7 +368,7 @@ export function useSessionRunner({
   const buildPayload = (closed: ClockState, at: number): CompletionPayload => {
     const done = completedExerciseCount(plan, sets);
     return {
-      sessionId: sessionId ?? 'dev',
+      sessionId: sessionId ?? '',
       workoutId: workout?.id ?? null,
       workoutTitle: workout?.title ?? '',
       activeSec: activeSeconds(closed, at),
@@ -477,7 +399,7 @@ export function useSessionRunner({
     if (!clock) {
       return;
     }
-    if (dryRun || !sessionId) {
+    if (!sessionId) {
       onLeave();
       return;
     }
@@ -507,10 +429,10 @@ export function useSessionRunner({
       setBusy(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clock, dryRun, plan, sessionId, sets, workout]);
+  }, [clock, plan, sessionId, sets, workout]);
 
   const discard = useCallback(async () => {
-    if (dryRun || !sessionId) {
+    if (!sessionId) {
       onLeave();
       return;
     }
@@ -523,7 +445,7 @@ export function useSessionRunner({
       setBusy(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dryRun, sessionId]);
+  }, [sessionId]);
 
   const runCompletion = async (payload: CompletionPayload) => {
     setBusy('finish');
@@ -547,22 +469,23 @@ export function useSessionRunner({
       return;
     }
     const at = Date.now();
-    const closed = resumeClock(clock, at);
+    const { clock: closed } = finishClock(clock, at);
     const payload = buildPayload(closed, at);
     setClock(closed);
+    setFinishedAt(at);
     setRest(null);
     setSaveErrorKind('finish');
-    if (dryRun || !sessionId) {
+    if (!sessionId) {
       setSaveError(payload);
       return;
     }
     await waitForWrites();
     await runCompletion(payload);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clock, dryRun, plan, sessionId, sets, workout]);
+  }, [clock, plan, sessionId, sets, workout]);
 
   const retrySave = useCallback(async () => {
-    if (!saveError || dryRun) {
+    if (!saveError) {
       return;
     }
     if (saveErrorKind === 'save') {
@@ -571,11 +494,11 @@ export function useSessionRunner({
     }
     await runCompletion(saveError);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dryRun, saveError, saveErrorKind, saveForLater]);
+  }, [saveError, saveErrorKind, saveForLater]);
 
   // "Continuar sin sincronizar": the completion waits in the outbox.
   const continueOffline = useCallback(async () => {
-    if (saveError && userId && !dryRun) {
+    if (saveError && userId) {
       const params = saveErrorKind === 'save' ? saveParams() : null;
       await enqueueSessionWrite(
         userId,
@@ -586,7 +509,7 @@ export function useSessionRunner({
     }
     onLeave();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dryRun, saveError, saveErrorKind, userId]);
+  }, [saveError, saveErrorKind, userId]);
 
   return {
     loadState,
@@ -598,7 +521,7 @@ export function useSessionRunner({
     doneCount: completedExerciseCount(plan, sets),
     elapsedSec,
     paused,
-    pausedForSec: clock ? pausedForSeconds(clock, now) : 0,
+    pausedForSec: clock && finishedAt === null ? pausedForSeconds(clock, now) : 0,
     rest: rest
       ? {
           kind: rest.kind,

@@ -2,12 +2,11 @@ import {
   badgeName,
   challengeLabel,
   friendLeader,
-  isHomeChallengeScenario,
-  sampleChallengeCard,
   withFriend,
   homeChallengeCard,
   homeChallengeReward,
 } from '../src/features/home/homeChallengeSection';
+import { sampleChallengeCard } from './fixtures/homeChallengeSample';
 import type {
   BoardEntry,
   ChallengeBoard,
@@ -211,15 +210,7 @@ describe('friendLeader · "acaba de llegar a N"', () => {
   });
 });
 
-describe('dev samples (same as the reference)', () => {
-  it('has the three scenarios', () => {
-    expect(isHomeChallengeScenario('challengeInvite')).toBe(true);
-    expect(isHomeChallengeScenario('challengeJoined')).toBe(true);
-    expect(isHomeChallengeScenario('challengeCompleted')).toBe(true);
-    expect(isHomeChallengeScenario('other')).toBe(false);
-    expect(isHomeChallengeScenario(null)).toBe(false);
-  });
-
+describe('sample challenge card (test fixture)', () => {
   it('joined = 74 / 100 with Carlos at 81; invite and completed = the goal without progress', () => {
     const joined = sampleChallengeCard('challengeJoined');
     expect(joined).toMatchObject({ state: 'joined', progress: 74, label: 'dominadas' });

@@ -16,17 +16,10 @@ export type OnboardingFinishTarget = 'home' | 'ellie';
 export type OnboardingFlowProps = {
   initialName?: string;
   // Runs in the background as soon as the ELLIE welcome appears.
-  // Real flow: writes the profile. Dev walkthrough: resolves without saving.
+  // Writes the profile.
   onSave: (answers: OnboardingAnswers) => Promise<void>;
   // Leaving the welcome only navigates (the profile is already saved).
   onFinish: (target: OnboardingFinishTarget) => Promise<void> | void;
-  // Back from the first question (dev walkthrough → back to the intro).
-  onExit?: () => void;
-  // Prefilled answers for the dev walkthrough.
-  seed?: Partial<OnboardingAnswers>;
-  // Dev walkthrough deep links: start on a given question or on the welcome.
-  initialStep?: number;
-  startOnWelcome?: boolean;
 };
 
 const SAVE_ERROR =
@@ -40,22 +33,13 @@ export function OnboardingFlow({
   initialName = '',
   onSave,
   onFinish,
-  onExit,
-  seed,
-  initialStep = 0,
-  startOnWelcome = false,
 }: OnboardingFlowProps) {
-  const [answers, setAnswers] = useState<OnboardingAnswers>(() => ({
-    ...initialAnswers(initialName),
-    ...seed,
-  }));
-  const [step, setStep] = useState(() =>
-    Math.min(Math.max(initialStep, 0), STEPS.length - 1),
+  const [answers, setAnswers] = useState<OnboardingAnswers>(() =>
+    initialAnswers(initialName),
   );
+  const [step, setStep] = useState(0);
   const [direction, setDirection] = useState<'forward' | 'back'>('forward');
-  const [phase, setPhase] = useState<'wizard' | 'welcome'>(
-    startOnWelcome ? 'welcome' : 'wizard',
-  );
+  const [phase, setPhase] = useState<'wizard' | 'welcome'>('wizard');
   const [saveStatus, setSaveStatus] = useState<WelcomeSaveStatus>('saving');
   const [continuing, setContinuing] = useState(false);
   const [error, setError] = useState('');
@@ -112,10 +96,8 @@ export function OnboardingFlow({
     setDirection('back');
     if (step > 0) {
       setStep(step - 1);
-    } else {
-      onExit?.();
     }
-  }, [onExit, step]);
+  }, [step]);
 
   const finish = async (target: OnboardingFinishTarget) => {
     if (saveStatus !== 'saved' || continuing) {
@@ -158,7 +140,6 @@ export function OnboardingFlow({
       update={update}
       onNext={next}
       onBack={back}
-      canExit={Boolean(onExit)}
     />
   );
 }

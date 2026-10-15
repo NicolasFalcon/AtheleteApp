@@ -43,7 +43,7 @@ export function CommunityScreen({
   const [segment, setSegment] = useState<CommunitySegment>(
     route.params?.segment ?? 'feed',
   );
-  const [query, setQuery] = useState(route.params?.devQuery ?? '');
+  const [query, setQuery] = useState('');
   const [nearEnd, setNearEnd] = useState(false);
   // Pull to refresh: the feed reloads itself (`refreshSignal`) and tells when
   // it is done; the rest of the hub reloads from here.
@@ -58,7 +58,6 @@ export function CommunityScreen({
   const unread = unreadResource.data ?? 0;
   const redirected = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
-  const devEndUntil = useRef(0);
   const meProfile = useMemo(
     () => ({
       id: profile?.id ?? 'me',
@@ -76,30 +75,7 @@ export function CommunityScreen({
     if (route.params?.segment) {
       setSegment(route.params.segment);
     }
-    if (route.params?.devQuery !== undefined) {
-      setQuery(route.params.devQuery);
-    }
-  }, [route.params?.segment, route.params?.devQuery]);
-
-  // Dev only: jump to the bottom so the feed loads its next pages.
-  useEffect(() => {
-    if (!__DEV__ || route.params?.devNonce === undefined) {
-      return undefined;
-    }
-    if (typeof route.params.devScroll === 'number') {
-      const y = route.params.devScroll;
-      const id = setTimeout(() => scrollRef.current?.scrollTo({ y, animated: false }), 900);
-      return () => clearTimeout(id);
-    }
-    if (route.params.devScroll !== 'end') {
-      scrollRef.current?.scrollTo({ y: 0, animated: false });
-      return undefined;
-    }
-    // Keep following the bottom while the pages arrive (content grows).
-    devEndUntil.current = Date.now() + 9000;
-    scrollRef.current?.scrollToEnd({ animated: false });
-    return undefined;
-  }, [route.params?.devNonce, route.params?.devScroll]);
+  }, [route.params?.segment]);
 
   // No username yet: the backend needs it before anything social (D-79).
   useFocusEffect(
@@ -210,11 +186,6 @@ export function CommunityScreen({
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={64}
-        onContentSizeChange={() => {
-          if (__DEV__ && devEndUntil.current > Date.now()) {
-            scrollRef.current?.scrollToEnd({ animated: false });
-          }
-        }}
         onScroll={event => {
           // Close to the bottom: the feed asks for its next page.
           const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;

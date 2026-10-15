@@ -39,6 +39,7 @@ export type ExercisesViewProps = {
   onOpenZone: (zone: ZoneKey) => void;
   onOpenEquipment: (equipment: EquipmentKey) => void;
   onOpenAll: () => void;
+  onScan: () => void;
 };
 
 const ZONE_KEYS = ZONES.map(zone => zone.key);
@@ -56,6 +57,7 @@ export function ExercisesView({
   onOpenZone,
   onOpenEquipment,
   onOpenAll,
+  onScan,
 }: ExercisesViewProps) {
   const { colors, layout } = useThemeV2();
   const zoneCounts = countBy(exercises, 'bodyPart', ZONE_KEYS);
@@ -88,7 +90,7 @@ export function ExercisesView({
         </PressableScale>
       </View>
 
-      <ScanCard />
+      <ScanCard onPress={onScan} />
 
       {error ? (
         <BlockError
@@ -192,15 +194,15 @@ export function ExercisesView({
   );
 }
 
-// "Escanear máquina · Con ELLIE". Shown without action: the Scan feature is
-// pending (TODO(scan): open the camera flow, handoff §10).
-function ScanCard() {
+// "Escanear máquina · Con ELLIE" (handoff §10): opens the machine scan.
+function ScanCard({ onPress }: { onPress: () => void }) {
   const { scene } = useThemeV2();
 
   return (
-    <View
-      accessibilityRole="text"
-      accessibilityLabel="Escanear máquina con ELLIE. Próximamente."
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel="Escanear máquina con ELLIE"
+      onPress={onPress}
       style={[styles.scan, { backgroundColor: scene.plate }]}
     >
       <View style={styles.scanPhoto}>
@@ -242,7 +244,7 @@ function ScanCard() {
           </TextV2>
         </View>
       </View>
-    </View>
+    </PressableScale>
   );
 }
 

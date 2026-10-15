@@ -21,6 +21,9 @@ export type EllieGeneratedWorkout = {
   targetMuscles: string[];
   exercises: EllieGeneratedExercise[];
   imageUrl?: string | null;
+  // Exercises the model proposed that are not in the catalog (the server
+  // already left them out).
+  droppedExercises?: number;
 };
 
 export type EllieGeneratedNutritionPlan = {

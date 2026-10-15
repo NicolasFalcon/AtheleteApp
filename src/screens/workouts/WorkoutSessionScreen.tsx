@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBarV2, TextV2 } from '@app/components/v2';
@@ -8,7 +8,6 @@ import { BlockError } from '@app/features/home/v2/BlockError';
 import { planScheme } from '@app/features/session/sessionModel';
 import {
   useSessionRunner,
-  type DevSessionState,
 } from '@app/features/session/useSessionRunner';
 import { ExitDialog } from '@app/features/session/v2/ExitDialog';
 import {
@@ -21,6 +20,7 @@ import {
   SESSION_COLORS,
   SessionHeader,
   SessionMenu,
+  type ExerciseImage,
   type ThumbFor,
 } from '@app/features/session/v2/SessionViews';
 import {
@@ -52,9 +52,6 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const userId = profile?.id;
-  const dev: DevSessionState | null = __DEV__
-    ? route.params.devState ?? null
-    : null;
   const workoutsQuery = useWorkoutLibrary();
   const exercisesQuery = useExerciseLibrary();
   const workout = useMemo(
@@ -73,8 +70,8 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     route.params.sessionId ?? null,
   );
   const [startFailed, setStartFailed] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(dev === 'menu');
-  const [exitOpen, setExitOpen] = useState(dev === 'exit' || dev === 'pausedExit');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [exitOpen, setExitOpen] = useState(false);
   const starting = useRef(false);
   // Set right before an intentional exit (saved, discarded, summary).
   const allowLeave = useRef(false);
@@ -85,7 +82,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
 
   // Session to run: the one in the route, today's for this routine, or new.
   useEffect(() => {
-    if (dev || sessionId || !workout || sessionLoading || starting.current) {
+    if (sessionId || !workout || sessionLoading || starting.current) {
       return;
     }
     if (workoutSession) {
@@ -102,7 +99,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
       .finally(() => {
         starting.current = false;
       });
-  }, [dev, sessionId, sessionLoading, startSession, workout, workoutSession]);
+  }, [sessionId, sessionLoading, startSession, workout, workoutSession]);
 
   const refreshSurfaces = useCallback(() => {
     if (userId) {
@@ -143,7 +140,6 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     sessionId,
     userId,
     recommendedFor,
-    dev,
     onCompleted,
     onLeave: goHome,
   });
@@ -156,26 +152,48 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
         : null,
     [library],
   );
-  const thumbFor: ThumbFor = useCallback(
-    exercise => exerciseThumbnail(bodyPartOf(exercise.exerciseId)),
-    [bodyPartOf],
+  // The posters come with the exercise library (one batched signing through
+  // exercise-media-url, cached by React Query); the muscle image stays as the
+  // fallback for an exercise without poster or one that fails to load.
+  const posterOf = useCallback(
+    (exerciseId: string | null) =>
+      exerciseId
+        ? library?.find(item => item.id === exerciseId)?.thumbnailUrl || null
+        : null,
+    [library],
   );
-  const cardImage = useMemo(() => {
+  const imageFor = useCallback(
+    (exerciseId: string | null, fallback: ImageSourcePropType): ExerciseImage => {
+      const poster = posterOf(exerciseId);
+      return { source: poster ? { uri: poster } : fallback, fallback };
+    },
+    [posterOf],
+  );
+  const thumbFor: ThumbFor = useCallback(
+    exercise =>
+      imageFor(exercise.exerciseId, exerciseThumbnail(bodyPartOf(exercise.exerciseId))),
+    [bodyPartOf, imageFor],
+  );
+  const cardImage = useMemo((): ExerciseImage | null => {
     const zone = runner.current
       ? (bodyPartOf(runner.current.exerciseId) as ZoneKey | null)
       : null;
-    if (zone && ZONE_IMAGES[zone]) {
-      return ZONE_IMAGES[zone];
+    const generic =
+      zone && ZONE_IMAGES[zone]
+        ? ZONE_IMAGES[zone]
+        : workout
+          ? resolveWorkoutThumbnailSource({
+              imageUrl: workout.imageUrl,
+              type: workout.type,
+              targetMuscles: workout.targetMuscles,
+              title: workout.title,
+            })
+          : null;
+    if (!generic) {
+      return null;
     }
-    return workout
-      ? resolveWorkoutThumbnailSource({
-          imageUrl: workout.imageUrl,
-          type: workout.type,
-          targetMuscles: workout.targetMuscles,
-          title: workout.title,
-        })
-      : null;
-  }, [bodyPartOf, runner, workout]);
+    return imageFor(runner.current?.exerciseId ?? null, generic);
+  }, [bodyPartOf, imageFor, runner, workout]);
 
   if (runner.rest) {
     lastRestKind.current = runner.rest.kind;
@@ -266,7 +284,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   }
 
   const notReady =
-    !workout || runner.loadState !== 'ready' || (!dev && !sessionId);
+    !workout || runner.loadState !== 'ready' || !sessionId;
   readyRef.current = !notReady;
   const failed =
     workoutsQuery.error || startFailed || runner.loadState === 'error';

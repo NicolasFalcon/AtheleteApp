@@ -19,7 +19,6 @@ import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
 import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import {
-  buildShelves,
   type ShelfItem,
 } from '@app/features/progress/badgesModel';
 import { BadgeSheet } from '@app/features/progress/v2/AchievementViews';
@@ -40,12 +39,10 @@ import {
   StatsTrio,
   Timeline,
 } from '@app/features/profile/v2/ProfileViews';
-import { useHomeRouteScenario } from '@app/dev/homeRouteScenario';
 import { routeStore } from '@app/features/route/routeStore';
 import { useOutdoorMonth, usePersonalBests, useRecentActivities } from '@app/features/route/useRouteData';
 import { RecentActivity } from '@app/features/route/v2/RecentActivity';
 import { RouteBests } from '@app/features/route/v2/RouteBests';
-import { isRouteSampleActive } from '@app/dev/routeDevConfig';
 import { useAuth } from '@app/hooks/useAuth';
 import { useBadgeShelves } from '@app/hooks/useBadgeShelves';
 import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
@@ -63,22 +60,17 @@ const HERO_HEIGHT = 460;
 // Perfil propio (PROFILE_01): the portrait with Editar and Ajustes, the
 // figures, the medal showcase (→ Logros), the trajectory and the plan. Opened
 // from the avatar; it has a back button and no tab bar.
-export function ProfileScreen({ navigation, route }: Props) {
+export function ProfileScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { profile: realProfile } = useAuth();
   const openEllieChat = useOpenEllieChat();
   const openCore33 = useOpenCore33();
-  const dev = __DEV__ ? route.params?.devState : undefined;
-  // Outdoor activity, month and records from the server. The sample ones show
-  // only with the dev deep link (athelete://dev/route?screen=profile).
-  const routeSamples = useHomeRouteScenario();
-  const hideRouteSamples = isRouteSampleActive() && !routeSamples;
   const recentQuery = useRecentActivities(5);
   const monthQuery = useOutdoorMonth();
   const bestsQuery = usePersonalBests();
-  const recentRoutes = hideRouteSamples ? [] : (recentQuery.data ?? []);
-  const routeBests = hideRouteSamples ? [] : (bestsQuery.data ?? []);
+  const recentRoutes = recentQuery.data ?? [];
+  const routeBests = bestsQuery.data ?? [];
   const now = useMemo(() => new Date(), []);
 
   const badges = useBadgeShelves();
@@ -87,30 +79,10 @@ export function ProfileScreen({ navigation, route }: Props) {
   const library = useExerciseLibrary();
   const [selected, setSelected] = useState<ShelfItem | null>(null);
 
-  const sample = useMemo(() => {
-    if (!__DEV__ || (dev !== 'data' && dev !== 'new')) {
-      return null;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fixtures = require('@app/dev/profileFixtures') as typeof import('@app/dev/profileFixtures');
-    return {
-      profile: dev === 'new' ? fixtures.FIXTURE_NEW_PROFILE : fixtures.FIXTURE_PROFILE,
-      data: dev === 'new' ? null : fixtures.profileDevData(now),
-    };
-  }, [dev, now]);
-
-  const profile = sample ? sample.profile : realProfile;
+  const profile = realProfile;
   const photo = useProfilePhotoUri(profile?.profilePhotoUrl);
 
-  // Medals: from the real data or the dev sample.
-  const shelves = useMemo(() => {
-    if (sample) {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const fixtures = require('@app/dev/progressFixtures') as typeof import('@app/dev/progressFixtures');
-      return buildShelves(sample.data ? fixtures.badgeRowsFixture(now) : []);
-    }
-    return badges;
-  }, [badges, now, sample]);
+  const shelves = badges;
 
   const items = shelves.shelves.flatMap(shelf => shelf.items);
   const earned = items
@@ -122,14 +94,14 @@ export function ProfileScreen({ navigation, route }: Props) {
       .sort((a, b) => (b.progress?.ratio ?? 0) - (a.progress?.ratio ?? 0))[0] ?? null;
 
   const names = useMemo(() => {
-    const byId: Record<string, string> = sample?.data?.exerciseNames ?? {};
+    const byId: Record<string, string> = {};
     (library.data ?? []).forEach(exercise => {
       byId[exercise.id] = exercise.name;
     });
     return byId;
-  }, [library.data, sample]);
-  const records = sample ? sample.data?.records ?? [] : recordsQuery.data ?? [];
-  const firstSession = sample ? sample.data?.firstSession ?? null : stats.data?.firstSession ?? null;
+  }, [library.data]);
+  const records = recordsQuery.data ?? [];
+  const firstSession = stats.data?.firstSession ?? null;
 
   const timeline = buildTimeline({
     badges: earned.map(item => ({
@@ -151,20 +123,16 @@ export function ProfileScreen({ navigation, route }: Props) {
     now,
   });
 
-  const loading =
-    dev === 'loading' ||
-    (!dev && (!realProfile || badges.isLoading || stats.isLoading));
-  const failed =
-    dev === 'error' ||
-    (!dev && Boolean(badges.error || stats.error));
+  const loading = !realProfile || badges.isLoading || stats.isLoading;
+  const failed = Boolean(badges.error || stats.error);
   const retry = () => {
     badges.refetchAll().catch(() => {});
     stats.refetch().catch(() => {});
   };
 
-  const sessions = sample ? sample.data?.sessionsCount ?? 0 : stats.data?.sessions ?? 0;
-  const points = sample ? sample.data?.points ?? 0 : badges.overview?.points ?? 0;
-  const streak = sample ? sample.data?.streak ?? 0 : badges.overview?.currentStreak ?? 0;
+  const sessions = stats.data?.sessions ?? 0;
+  const points = badges.overview?.points ?? 0;
+  const streak = badges.overview?.currentStreak ?? 0;
   const complete = profile ? hasOnboardingData(profile) : false;
 
   const planItems = profile
