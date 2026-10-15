@@ -56,6 +56,10 @@
 	<string>Athelete usa tu ubicación para mostrar tu posición y grabar tus rutas de carrera o bici mientras usas la app.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Athelete usa el micrófono para que puedas hablar con ELLIE.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Athelete usa los sensores de movimiento para medir mejor tu actividad durante rutas y entrenos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Athelete guarda en tu biblioteca de fotos solo lo que tú decidas conservar.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Athelete accede a tus fotos para que elijas imágenes de tus comidas o de tu perfil.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
