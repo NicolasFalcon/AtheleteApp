@@ -12,6 +12,7 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import { Button, EmptyState } from '@app/components/ui';
+import { StatusBarV2 } from '@app/components/v2';
 import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import { getBodyScienceArticleImage } from '@app/features/body-science/articleImages';
 import { BodyScienceCategoryBadge } from '@app/features/body-science/components/BodyScienceCategoryBadge';
@@ -40,7 +41,7 @@ export function BodyScienceArticleDetailScreen({navigation, route}: Props) {
       backgroundColor: theme.colors.background,
     },
     hero: {
-      height: 260,
+      height: 260 + insets.top,
       backgroundColor: theme.colors.surfaceMuted,
     },
     heroImage: {
@@ -134,8 +135,12 @@ export function BodyScienceArticleDetailScreen({navigation, route}: Props) {
     );
   }
 
+  // B-01: the photo reaches the top edge (under the status bar and the
+  // Dynamic Island); only the bottom keeps the safe area. White status bar
+  // text over the darkened photo.
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+      <StatusBarV2 style="light" />
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.hero}>
           <Image

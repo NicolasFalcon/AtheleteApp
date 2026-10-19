@@ -11,8 +11,8 @@ import {
   type WorkoutSession,
 } from '@app/shared';
 import {
-  DEFAULT_WATER_GOAL_GLASSES,
-  GLASS_ML,
+  waterGoalGlasses,
+  waterGoalMl,
 } from '@app/features/nutrition/nutritionModel';
 import {getSupabaseClient} from '@app/services/supabase/client';
 import type {Database, Json} from '@app/types/supabase';
@@ -329,8 +329,9 @@ export async function fetchEllieOverview(params: {
     currentStreak = getCurrentChallengeStreak(challengeRecord, habitLogs);
   }
 
-  const goalGlasses = params.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES;
-  const goalMl = goalGlasses * GLASS_ML;
+  // profiles.daily_water_goal only (B-25); without it there is no goal.
+  const goalGlasses = waterGoalGlasses(params.dailyWaterGoal);
+  const goalMl = waterGoalMl(goalGlasses);
   const hydrationRows = (hydrationLogsResult.data || []) as DailyHydrationLogRow[];
   const hydrationLogs: HydrationLog[] = hydrationRows.map(row => ({
     date: row.date,

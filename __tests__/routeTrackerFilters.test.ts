@@ -1,5 +1,4 @@
 import {
-  AUTO_PAUSE_HOLD_MS,
   REANCHOR_AFTER_JUMPS,
   initialTracker,
   restoreTracker,
@@ -14,8 +13,8 @@ const T0 = 1_000_000;
 const M = 1 / 111_195; // degrees of latitude per metre
 const at = (m: number, t: number, accuracy = 5) => ({ lat: m * M, lon: 0, t: T0 + t * 1000, accuracy });
 
-function run(actions: TrackerAction[], from?: TrackerState, sport: RouteSport = 'running', autoPause = false) {
-  return actions.reduce(trackerReducer, from ?? initialTracker(sport, null, autoPause));
+function run(actions: TrackerAction[], from?: TrackerState, sport: RouteSport = 'running') {
+  return actions.reduce(trackerReducer, from ?? initialTracker(sport, null));
 }
 const start: TrackerAction = { type: 'start', t: T0 };
 const fix = (m: number, t: number, accuracy = 5): TrackerAction => ({ type: 'fix', fix: at(m, t, accuracy) });
@@ -58,7 +57,9 @@ describe('filters · impossible jumps', () => {
       const step = Math.abs(s.points[i].lat - s.points[i - 1].lat) / M;
       expect(step / dt).toBeLessThanOrEqual(12);
     }
-    expect(s.points.length).toBeGreaterThan(40);
+    // The good track survives the jumps: its 180 m are all there.
+    expect(s.distanceM).toBeGreaterThan(170);
+    expect(s.distanceM).toBeLessThanOrEqual(181);
   });
 
   it('ignores a fix with the same or an older time', () => {
@@ -83,16 +84,20 @@ describe('filters · impossible jumps', () => {
 });
 
 describe('filters · drift while standing still', () => {
-  it('a step smaller than max(accuracy, 5 m) is not distance when the pace is almost zero', () => {
+  it('a step smaller than max(2.5 × accuracy, 12 m) is not distance when the pace is almost zero', () => {
     const s = run([start, fix(0, 0, 12), fix(8, 30, 12), fix(-6, 60, 12), fix(9, 90, 12)]);
     expect(s.points).toHaveLength(1);
     expect(s.distanceM).toBe(0);
   });
 
-  it('a real step counts even with the same displacement when it is moving', () => {
-    const s = run([start, fix(0, 0, 12), fix(8, 3, 12)]);
+  it('a real step counts when it is moving (max(1.5 × accuracy, 8 m))', () => {
+    const s = run([start, fix(0, 0, 12), fix(19, 6, 12)]);
     expect(s.points).toHaveLength(2);
-    expect(s.distanceM).toBeCloseTo(8, 0);
+    expect(s.distanceM).toBeCloseTo(19, 0);
+    // Shorter than the threshold: the anchor waits and nothing is lost.
+    const short = run([start, fix(0, 0, 12), fix(10, 4, 12), fix(20, 8, 12)]);
+    expect(short.points).toHaveLength(2);
+    expect(short.distanceM).toBeCloseTo(20, 0);
   });
 
   it('walking slowly still adds up (the displacement accumulates until it passes the threshold)', () => {
@@ -105,76 +110,41 @@ describe('filters · drift while standing still', () => {
   });
 });
 
-describe('auto-pause', () => {
-  const hold = AUTO_PAUSE_HOLD_MS.running / 1000;
+describe('the pause is always manual (B-07)', () => {
   const alive = (t: number): TrackerAction => ({ type: 'alive', t: T0 + t * 1000 });
   const tick = (t: number): TrackerAction => ({ type: 'tick', t: T0 + t * 1000 });
-
   const moving = (): TrackerAction[] => [start, fix(0, 0), fix(10, 3), fix(20, 6)];
 
-  it('pauses by itself after the hold time without movement, starting at the last movement', () => {
-    const s = run([...moving(), alive(8), alive(12), tick(15)], undefined, 'running', true);
-    expect(s.status).toBe('paused');
-    expect(s.autoPaused).toBe(true);
-    expect(s.pauses[0].from).toBe(T0 + 6000);
-    // the stopped seconds are not part of the active time
-    expect(trackerActiveSec(s)).toBe(6);
-  });
-
-  it('does not pause before the hold time, or when the preference is off', () => {
-    const early = run([...moving(), alive(6 + hold - 1), tick(6 + hold - 1)], undefined, 'running', true);
-    expect(early.status).toBe('recording');
-    const off = run([...moving(), alive(20), tick(30)], undefined, 'running', false);
-    expect(off.status).toBe('recording');
-  });
-
-  it('does not pause when the signal was lost (that is not standing still)', () => {
-    const s = run([...moving(), tick(40)], undefined, 'running', true);
+  it('standing still never pauses by itself: the time keeps running', () => {
+    const s = run([...moving(), alive(8), alive(20), tick(60)]);
     expect(s.status).toBe('recording');
+    expect(s.pauses).toEqual([]);
+    expect(trackerActiveSec(s)).toBe(60);
   });
 
-  it('cycling reacts faster', () => {
-    expect(AUTO_PAUSE_HOLD_MS.cycling).toBeLessThan(AUTO_PAUSE_HOLD_MS.running);
-    const s = run(
-      [start, fix(0, 0), fix(20, 3), fix(40, 6), alive(8), alive(12)],
-      undefined,
-      'cycling',
-      true,
-    );
-    expect(s.status).toBe('paused');
-  });
-
-  it('GPS drift while paused does not resume it', () => {
-    let s = run([...moving(), alive(8), alive(15)], undefined, 'running', true);
-    expect(s.status).toBe('paused');
-    s = run([fix(23, 20, 12), fix(17, 25, 12), fix(25, 30, 12)], s);
-    expect(s.status).toBe('paused');
-  });
-
-  it('resumes when the person moves again, counting the movement and not the stop', () => {
-    let s = run([...moving(), alive(8), alive(15)], undefined, 'running', true);
-    s = run([fix(30, 40), fix(38, 43)], s);
-    expect(s.status).toBe('recording');
-    expect(s.autoPaused).toBe(false);
-    expect(s.pauses[0]).toEqual({ from: T0 + 6000, to: T0 + 40_000 });
-    expect(s.distanceM).toBeGreaterThan(30);
-    // the stop (34 s) is excluded from the time
-    s = trackerReducer(s, { type: 'tick', t: T0 + 43_000 });
-    expect(trackerActiveSec(s)).toBeCloseTo(9, 0);
-  });
-
-  it('a manual pause never resumes by itself', () => {
-    let s = run([...moving(), { type: 'pause', t: T0 + 7000 }], undefined, 'running', true);
+  it('a manual pause never resumes by itself, and its time is not counted', () => {
+    let s = run([...moving(), { type: 'pause', t: T0 + 7000 }]);
     s = run([fix(40, 12), fix(60, 16)], s);
     expect(s.status).toBe('paused');
-    expect(s.autoPaused).toBe(false);
+    expect(s.distanceM).toBeCloseTo(20, 0);
+    s = trackerReducer(s, { type: 'resume', t: T0 + 20_000 });
+    s = trackerReducer(s, { type: 'tick', t: T0 + 25_000 });
+    expect(s.status).toBe('recording');
+    expect(trackerActiveSec(s)).toBe(12);
   });
 
-  it('the person can resume manually from an automatic pause', () => {
-    let s = run([...moving(), alive(8), alive(15)], undefined, 'running', true);
-    s = trackerReducer(s, { type: 'resume', t: T0 + 20_000 });
-    expect(s.status).toBe('recording');
-    expect(s.autoPaused).toBe(false);
+  it('a recording saved by an older version with auto-pause fields comes back without them', () => {
+    const old = {
+      ...run([...moving(), { type: 'tick', t: T0 + 7000 }]),
+      autoPause: true,
+      autoPaused: false,
+      lastMoveAt: T0 + 6000,
+      resumeCandidate: null,
+    };
+    const back = restoreTracker(JSON.parse(JSON.stringify(old)));
+    expect(back.status).toBe('paused');
+    expect(back).not.toHaveProperty('autoPause');
+    expect(back).not.toHaveProperty('autoPaused');
   });
 });
 

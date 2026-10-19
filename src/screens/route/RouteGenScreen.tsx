@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
@@ -15,8 +15,9 @@ import {
 } from '@app/features/route/routeMappers';
 import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import { BigFigure, BottomPanel, RoundButton, StatRow, TopPill } from '@app/features/route/v2/RouteUi';
+import { useGeneratedRoute } from '@app/features/route/useRouteData';
+import type { LatLng, RouteGenerationParams } from '@app/features/route/routeTypes';
 import { RouteServiceError } from '@app/services/route/routeService';
-import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
 // Generar ruta con ELLIE (ROUTE_15–17): "Generando…" (~1,5 s), then "Opción N"
@@ -29,56 +30,60 @@ const ELEVATION_WORD = { low: 'bajo', balanced: 'medio', any: 'libre' } as const
 export function RouteGenScreen({ navigation }: AppScreenProps<'RouteGen'>) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const service = useRouteService();
   const session = useRouteSession();
   const { access, fix, usable } = useLocationAccess();
-  const [seed, setSeed] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState<GenerateRouteError | null>(null);
+  const [seed, setSeed] = useState(session.generationSeed);
   const [mapFailed, setMapFailed] = useState(false);
-  const plan = session.generated;
-  // generate-route needs where the person is (the LocationSource's fix).
+  // generate-route needs where the person is (the shared location: the
+  // last known one is enough). The first origin is kept: the person moving a
+  // few metres does not ask for another route.
   const here = fix ? { lat: fix.lat, lon: fix.lon } : null;
-  const origin = usable ? (here ?? session.origin) : null;
-  const noLocation = access !== null && !usable;
-  const started = useRef(false);
-
-  const generate = useCallback(
-    async (nextSeed: number) => {
-      if (!origin) {
-        return;
-      }
-      setLoading(true);
-      setFailed(null);
-      try {
-        const result = await service.generateRoute({
-          sport: session.sport,
-          origin,
-          targetKm: session.config.km,
-          kind: session.config.kind,
-          elevation: session.config.elevation,
-          surface: session.config.surface,
-          seed: nextSeed,
-        });
-        routeStore.patch({ generated: result, generationSeed: nextSeed });
-      } catch (error) {
-        setFailed(
-          error instanceof RouteServiceError ? (error.code as GenerateRouteError) : 'unknown',
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [service, session.sport, session.config, origin],
-  );
-
-  // The first route is requested as soon as there is a position.
+  const live = usable ? (here ?? session.origin) : null;
+  const [origin, setOrigin] = useState<LatLng | null>(live);
   useEffect(() => {
-    if (origin && !started.current) {
-      started.current = true;
-      generate(0).catch(() => {});
+    if (!origin && live) {
+      setOrigin(live);
     }
-  }, [generate, origin]);
+  }, [live, origin]);
+  const noLocation = access !== null && !usable;
+
+  // React Query by rounded origin + parameters (B-13): coming back, or
+  // going back to an earlier option, does not call generate-route again.
+  const params: RouteGenerationParams | null = useMemo(
+    () =>
+      origin
+        ? {
+            sport: session.sport,
+            origin,
+            targetKm: session.config.km,
+            kind: session.config.kind,
+            elevation: session.config.elevation,
+            surface: session.config.surface,
+            seed,
+          }
+        : null,
+    [origin, seed, session.config, session.sport],
+  );
+  const generated = useGeneratedRoute(params);
+  const plan = generated.data ?? null;
+  const loading = !origin || generated.isFetching;
+  const failed: GenerateRouteError | null = generated.error
+    ? generated.error instanceof RouteServiceError
+      ? (generated.error.code as GenerateRouteError)
+      : 'unknown'
+    : null;
+  const generate = (nextSeed: number) => {
+    if (nextSeed === seed) {
+      generated.refetch().catch(() => undefined);
+    } else {
+      setSeed(nextSeed);
+    }
+  };
+  useEffect(() => {
+    if (plan) {
+      routeStore.patch({ generated: plan, generationSeed: seed });
+    }
+  }, [plan, seed]);
 
   const use = () => {
     if (!plan) {
@@ -153,7 +158,7 @@ export function RouteGenScreen({ navigation }: AppScreenProps<'RouteGen'>) {
               {generateErrorCopy(failed ?? 'unknown')}
             </TextV2>
             {!failed || canRetryGenerate(failed) ? (
-              <Button label="Reintentar" variant="primary" fullWidth onPress={() => generate(seed).catch(() => {})} />
+              <Button label="Reintentar" variant="primary" fullWidth onPress={() => generate(seed)} />
             ) : (
               <Button label="Cambiar configuración" variant="primary" fullWidth onPress={() => navigation.goBack()} />
             )}
@@ -187,11 +192,7 @@ export function RouteGenScreen({ navigation }: AppScreenProps<'RouteGen'>) {
                 iconPosition="start"
                 variant="outline"
                 style={styles.half}
-                onPress={() => {
-                  const nextSeed = seed + 1;
-                  setSeed(nextSeed);
-                  generate(nextSeed).catch(() => {});
-                }}
+                onPress={() => generate(seed + 1)}
               />
               <Button label="Usar esta ruta" variant="primary" style={styles.half} onPress={use} />
             </View>

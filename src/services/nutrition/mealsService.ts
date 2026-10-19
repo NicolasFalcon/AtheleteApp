@@ -185,13 +185,26 @@ const supabaseRpc: MealsRpc = async (name, args) => {
   return data;
 };
 
-const itemPayload = (item: MealItem) => ({
+// A countable food also sends its units and values per unit (stored when
+// unit_count > 0; kcal_adjusted is never sent).
+export const itemPayload = (item: MealItem) => ({
   name: item.name,
   grams: Math.round(item.grams),
   kcal: Math.round(item.kcal),
   protein: Math.round(item.protein),
   carbs: Math.round(item.carbs),
   fats: Math.round(item.fats),
+  ...(item.unit && item.unit.count > 0
+    ? {
+        unit_count: item.unit.count,
+        unit_label: item.unit.label,
+        grams_per_unit: item.unit.gramsPer,
+        kcal_per_unit: item.unit.kcalPer,
+        protein_per_unit: item.unit.proteinPer,
+        carbs_per_unit: item.unit.carbsPer,
+        fats_per_unit: item.unit.fatsPer,
+      }
+    : {}),
 });
 
 export function savePayload(input: SaveMealInput) {

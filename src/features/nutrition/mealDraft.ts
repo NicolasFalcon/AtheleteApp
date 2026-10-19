@@ -1,6 +1,12 @@
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
 import type { Meal, SaveMealInput, UpdateMealInput } from '@app/services/nutrition/mealsService';
-import type { MealAnalysis, MealItem, MealTotals, MealType } from '@app/services/vision/visionService';
+import type {
+  MealAnalysis,
+  MealItem,
+  MealTotals,
+  MealType,
+  MealUnit,
+} from '@app/services/vision/visionService';
 
 // The editable draft of a meal (pure): what ELLIE estimated from the photo,
 // corrected by the person (portion − / +, remove a food, moment of the day)
@@ -9,6 +15,9 @@ import type { MealAnalysis, MealItem, MealTotals, MealType } from '@app/services
 export type DraftItem = {
   id: string;
   name: string;
+  // A countable food ("2 huevos") is edited by units with its values per
+  // unit; `unit.count` is the current number. null: edited by grams.
+  unit: MealUnit | null;
   grams: number;
   // What the estimate said for `baseGrams`: other portions scale from it.
   baseGrams: number;
@@ -68,10 +77,12 @@ let counter = 0;
 const nextId = () => `item-${(counter += 1)}`;
 
 export function draftItem(item: MealItem): DraftItem {
-  const grams = Math.max(0, item.grams);
+  const unit = item.unit && item.unit.count > 0 ? { ...item.unit } : null;
+  const grams = Math.max(0, unit ? unit.count * unit.gramsPer || item.grams : item.grams);
   return {
     id: nextId(),
     name: item.name,
+    unit,
     grams,
     baseGrams: grams,
     baseKcal: item.kcal,
@@ -110,8 +121,21 @@ export function draftFromMeal(meal: Meal): MealDraft {
   };
 }
 
-// Values of one item at its current grams (proportional to the estimate).
+// Values of one item now: units × the values per unit for a countable food;
+// otherwise proportional to the grams of the estimate.
 export function itemValues(item: DraftItem): MealItem {
+  if (item.unit) {
+    const { count } = item.unit;
+    return {
+      name: item.name,
+      grams: Math.round(count * item.unit.gramsPer),
+      kcal: Math.round(count * item.unit.kcalPer),
+      protein: Math.round(count * item.unit.proteinPer),
+      carbs: Math.round(count * item.unit.carbsPer),
+      fats: Math.round(count * item.unit.fatsPer),
+      unit: { ...item.unit },
+    };
+  }
   const factor = item.baseGrams > 0 ? item.grams / item.baseGrams : 1;
   return {
     name: item.name,
@@ -120,6 +144,7 @@ export function itemValues(item: DraftItem): MealItem {
     protein: Math.round(item.baseProtein * factor),
     carbs: Math.round(item.baseCarbs * factor),
     fats: Math.round(item.baseFats * factor),
+    unit: null,
   };
 }
 
@@ -142,15 +167,54 @@ export function draftTotals(draft: MealDraft): MealTotals {
   );
 }
 
+// − / +: one unit for a countable food (never below 1), else its gram step.
 export function stepItem(draft: MealDraft, id: string, direction: 1 | -1): MealDraft {
   return {
     ...draft,
-    items: draft.items.map(item =>
-      item.id === id
-        ? { ...item, grams: Math.max(item.step, item.grams + direction * item.step) }
-        : item,
-    ),
+    items: draft.items.map(item => {
+      if (item.id !== id) {
+        return item;
+      }
+      if (item.unit) {
+        const count = Math.max(1, item.unit.count + direction);
+        return { ...item, unit: { ...item.unit, count }, grams: Math.round(count * item.unit.gramsPer) };
+      }
+      return { ...item, grams: Math.max(item.step, item.grams + direction * item.step) };
+    }),
   };
+}
+
+// "huevo" → "huevos", "pan" → "panes" (es) / "slice" → "slices" (en).
+export function unitLabel(label: string, count: number, language: EllieLanguage = 'es'): string {
+  const word = label.trim();
+  if (count === 1 || !word || /s$/i.test(word)) {
+    return word;
+  }
+  if (language === 'en') {
+    return `${word}s`;
+  }
+  return /[aeiouáéó]$/i.test(word) ? `${word}s` : `${word}es`;
+}
+
+// "4 huevos · 200 g · total"
+export function unitLine(item: MealItem, language: EllieLanguage = 'es'): string {
+  if (!item.unit) {
+    return `${item.grams} g`;
+  }
+  return `${formatCount(item.unit.count)} ${unitLabel(item.unit.label, item.unit.count, language)} · ${item.grams} g · total`;
+}
+
+// "por unidad: 50 g · 70 kcal · P 6 g"
+export function perUnitLine(unit: MealUnit, language: EllieLanguage = 'es'): string {
+  return `${language === 'es' ? 'por unidad' : 'per unit'}: ${formatCount(unit.gramsPer)} g · ${formatCount(
+    unit.kcalPer,
+  )} kcal · P ${formatCount(unit.proteinPer)} g`;
+}
+
+// 2 → "2", 0.5 → "0,5" (es) / "0.5" (en is shown the same way in the app).
+function formatCount(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded).replace('.', ',');
 }
 
 export function removeItem(draft: MealDraft, id: string): MealDraft {

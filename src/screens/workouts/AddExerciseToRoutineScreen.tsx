@@ -15,8 +15,14 @@ import { ChevronRight, Plus } from 'lucide-react-native';
 import { AppHeader } from '@app/components';
 import { Button, Card, EmptyState, Loader } from '@app/components/ui';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
+import { routineErrorCopy } from '@app/features/workouts/routineErrors';
 import { useAppTheme } from '@app/hooks/useAppTheme';
-import { useRoutineBuilder } from '@app/hooks/useRoutineBuilder';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
+import { useRoutineList, useRoutineMutations } from '@app/hooks/useRoutines';
+import {
+  routineInputFrom,
+  routinesService,
+} from '@app/services/routines/routinesService';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'AddExerciseToRoutine'>;
@@ -24,11 +30,14 @@ type Props = AppScreenProps<'AddExerciseToRoutine'>;
 export function AddExerciseToRoutineScreen({navigation, route}: Props) {
   const {theme} = useAppTheme();
   const insets = useSafeAreaInsets();
-  const routineBuilder = useRoutineBuilder();
+  const language = useProfileLanguage();
+  // The user's own routines (list_routines · mine), every page.
+  const mineQuery = useRoutineList('mine', { exhaust: true });
+  const mutations = useRoutineMutations();
 
   const editableRoutines = useMemo(
-    () => routineBuilder.editableWorkouts,
-    [routineBuilder.editableWorkouts],
+    () => mineQuery.items.filter(workout => workout.canEdit !== false),
+    [mineQuery.items],
   );
 
   const styles = StyleSheet.create({
@@ -80,24 +89,38 @@ export function AddExerciseToRoutineScreen({navigation, route}: Props) {
     });
   };
 
+  // get_routine (fresh) + the exercise at the end → update_user_routine.
   const handleAppendToRoutine = async (workoutId: string) => {
     try {
-      await routineBuilder.appendExerciseToRoutine({
-        workoutId,
-        exerciseId: route.params.exerciseId,
-        exerciseName: route.params.exerciseName,
+      const routine = await routinesService.getRoutine(workoutId);
+      const input = routineInputFrom(routine);
+      await mutations.updateRoutine({
+        id: workoutId,
+        input: {
+          ...input,
+          exercises: [
+            ...input.exercises,
+            {
+              exerciseId: route.params.exerciseId,
+              block: 'main',
+              sets: 3,
+              reps: 10,
+              restTime: 60,
+            },
+          ],
+        },
       });
 
       navigation.replace(APP_ROUTES.EditRoutine, { workoutId });
     } catch (error) {
       Alert.alert(
         'No pudimos agregar el ejercicio',
-        error instanceof Error ? error.message : 'Inténtalo otra vez.',
+        routineErrorCopy(error, language).message,
       );
     }
   };
 
-  if (routineBuilder.isLoadingEditableWorkouts) {
+  if (mineQuery.isLoading) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Loader label="Cargando tus rutinas..." />
@@ -146,8 +169,8 @@ export function AddExerciseToRoutineScreen({navigation, route}: Props) {
                 <View style={styles.rowContent}>
                   <Text style={styles.rowTitle}>{workout.title}</Text>
                   <Text style={styles.rowMeta}>
-                    {workout.exercises.length} ejercicio
-                    {workout.exercises.length === 1 ? '' : 's'} · {workout.duration}{' '}
+                    {workout.exerciseCount ?? 0} ejercicio
+                    {workout.exerciseCount === 1 ? '' : 's'} · {workout.duration}{' '}
                     min
                   </Text>
                 </View>

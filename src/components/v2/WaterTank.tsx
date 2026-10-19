@@ -12,7 +12,8 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
 export type WaterTankProps = {
   glasses: number;
-  goal: number;
+  // profiles.daily_water_goal (glasses); null: the profile has none.
+  goal: number | null;
   progress: number; // 0–1
   onAdd: () => void;
   disabled?: boolean;
@@ -56,7 +57,7 @@ export function WaterTank({
         />
       </Animated.View>
       <View style={styles.ticks} pointerEvents="none">
-        {Array.from({ length: Math.min(goal, 20) }, (_, index) => (
+        {Array.from({ length: goal ? Math.min(goal, 20) : 0 }, (_, index) => (
           <View
             key={index}
             style={[
@@ -79,7 +80,7 @@ export function WaterTank({
         <TextV2
           variant="bodyL"
           color={dark ? '#D8E4F2' : '#1E2E42'}
-        >{`de ${goal} vasos`}</TextV2>
+        >{goal ? `de ${goal} vasos` : glasses === 1 ? 'vaso' : 'vasos'}</TextV2>
       </Animated.View>
       <PressableScale
         accessibilityRole="button"

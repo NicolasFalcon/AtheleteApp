@@ -20,7 +20,8 @@ import { TextV2 } from '@app/components/v2/TextV2';
 export type ZoneTileItem = {
   key: string;
   label: string;
-  count: number;
+  // null: unknown (the catalog has no per-zone count): the line is hidden.
+  count?: number | null;
   column: 1 | 2;
   span: 1 | 2;
   // Ember hotspot over the muscle (percent of the tile) and its start delay.
@@ -69,7 +70,11 @@ function ZoneTile({ item }: { item: ZoneTileItem }) {
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel={`${item.label}, ${item.count} ejercicios`}
+      accessibilityLabel={
+        typeof item.count === 'number'
+          ? `${item.label}, ${item.count} ejercicios`
+          : item.label
+      }
       onPress={item.onPress}
       style={[styles.tile, { height }]}
     >
@@ -134,9 +139,11 @@ function ZoneTile({ item }: { item: ZoneTileItem }) {
         >
           {item.label}
         </TextV2>
-        <TextV2 variant="caption" color="#A8A6A1">
-          {`${item.count} ejercicios`}
-        </TextV2>
+        {typeof item.count === 'number' ? (
+          <TextV2 variant="caption" color="#A8A6A1">
+            {`${item.count} ejercicios`}
+          </TextV2>
+        ) : null}
       </View>
     </PressableScale>
   );

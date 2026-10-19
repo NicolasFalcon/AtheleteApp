@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -12,10 +12,22 @@ import Animated, {
 import Svg, { Circle } from 'react-native-svg';
 import { Check, ChevronDown } from 'lucide-react-native';
 import { MealThumb } from '@app/features/nutrition/v2/MealRow';
-import { mealTypeForTime, mealTypeLabel, draftFromAnalysis, draftTotals } from '@app/features/nutrition/mealDraft';
+import {
+  draftFromAnalysis,
+  draftTotals,
+  mealTypeForTime,
+  mealTypeLabel,
+  perUnitLine,
+  unitLine,
+} from '@app/features/nutrition/mealDraft';
 import { formatThousands } from '@app/features/nutrition/nutritionModel';
 import { useSignedImage } from '@app/hooks/useSignedImage';
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
+import {
+  parseMarkdown,
+  plainMarkdown,
+  type MarkdownSpan,
+} from '@app/features/ellie/markdown';
 import type { RegisteredMeal } from '@app/hooks/useRegisteredMeal';
 import {
   Button,
@@ -54,13 +66,88 @@ export function EllieVoice({
           <LivingHalo size={24} state={muted ? 'offline' : 'idle'} />
         ) : null}
       </View>
-      <TextV2
-        variant="bodyL"
-        color={muted ? colors.ellie.textSecondary : colors.text.primary}
-        style={styles.voiceText}
-      >
-        {text}
-      </TextV2>
+      {muted ? (
+        <TextV2
+          variant="bodyL"
+          color={colors.ellie.textSecondary}
+          style={styles.voiceText}
+        >
+          {text}
+        </TextV2>
+      ) : (
+        <EllieMarkdown text={text} />
+      )}
+    </View>
+  );
+}
+
+function Spans({ spans }: { spans: MarkdownSpan[] }) {
+  return (
+    <>
+      {spans.map((span, index) =>
+        span.bold || span.italic ? (
+          <Text
+            key={index}
+            style={[span.bold ? styles.mdBold : null, span.italic ? styles.mdItalic : null]}
+          >
+            {span.text}
+          </Text>
+        ) : (
+          span.text
+        ),
+      )}
+    </>
+  );
+}
+
+// ELLIE's answer with its markdown painted (B-24): bold, italics and short
+// lists in the v2 type; no mark (###, **, *) is ever shown. Old messages of
+// the history go through here too.
+export function EllieMarkdown({ text }: { text: string }) {
+  const { colors } = useThemeV2();
+  const blocks = useMemo(() => parseMarkdown(text), [text]);
+  const color = colors.text.primary;
+  return (
+    <View style={styles.mdBody} accessible accessibilityLabel={plainMarkdown(text)}>
+      {blocks.map((block, index) => {
+        if (block.kind === 'bullets' || block.kind === 'numbered') {
+          return (
+            <View key={index} style={styles.mdList}>
+              {block.kind === 'bullets'
+                ? block.items.map((spans, item) => (
+                    <View key={item} style={styles.mdItem}>
+                      <TextV2 variant="bodyL" color={color} style={styles.mdMarker}>
+                        •
+                      </TextV2>
+                      <TextV2 variant="bodyL" color={color} style={styles.mdItemText}>
+                        <Spans spans={spans} />
+                      </TextV2>
+                    </View>
+                  ))
+                : block.items.map((entry, item) => (
+                    <View key={item} style={styles.mdItem}>
+                      <TextV2 variant="bodyL" color={color} style={styles.mdMarker}>
+                        {`${entry.number}.`}
+                      </TextV2>
+                      <TextV2 variant="bodyL" color={color} style={styles.mdItemText}>
+                        <Spans spans={entry.spans} />
+                      </TextV2>
+                    </View>
+                  ))}
+            </View>
+          );
+        }
+        return (
+          <TextV2
+            key={index}
+            variant="bodyL"
+            color={color}
+            style={[styles.voiceLine, block.kind === 'heading' ? styles.mdBold : null]}
+          >
+            <Spans spans={block.spans} />
+          </TextV2>
+        );
+      })}
     </View>
   );
 }
@@ -508,14 +595,32 @@ export function MealAnalysisCard({
         </View>
       </View>
       <View style={styles.mealItems}>
-        {shown.map((item, index) => (
-          <View key={`${item.name}-${index}`} style={styles.mealItem}>
-            <TextV2 variant="body" numberOfLines={1} style={styles.flex}>
-              {item.name}
-            </TextV2>
-            <TextV2 variant="meta" tone="secondary">{`${item.grams} g · ${formatThousands(item.kcal)} kcal`}</TextV2>
-          </View>
-        ))}
+        {shown.map((item, index) =>
+          item.unit ? (
+            // Countable: "4 huevos · 200 g · total" and the values per unit.
+            <View key={`${item.name}-${index}`} style={styles.mealUnitItem}>
+              <View style={styles.mealItem}>
+                <TextV2 variant="body" numberOfLines={1} style={styles.flex}>
+                  {item.name}
+                </TextV2>
+                <TextV2 variant="meta" tone="secondary">{`${formatThousands(item.kcal)} kcal`}</TextV2>
+              </View>
+              <TextV2 variant="meta" tone="secondary">
+                {unitLine(item, language)}
+              </TextV2>
+              <TextV2 variant="meta" tone="tertiary">
+                {perUnitLine(item.unit, language)}
+              </TextV2>
+            </View>
+          ) : (
+            <View key={`${item.name}-${index}`} style={styles.mealItem}>
+              <TextV2 variant="body" numberOfLines={1} style={styles.flex}>
+                {item.name}
+              </TextV2>
+              <TextV2 variant="meta" tone="secondary">{`${item.grams} g · ${formatThousands(item.kcal)} kcal`}</TextV2>
+            </View>
+          ),
+        )}
         {more > 0 ? (
           <TextV2 variant="meta" tone="secondary">
             {es ? `+${more} más` : `+${more} more`}
@@ -573,6 +678,7 @@ const styles = StyleSheet.create({
   mealHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   mealItems: { gap: 6 },
   mealItem: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  mealUnitItem: { gap: 2 },
   mealTotal: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   mealKcal: { fontSize: 32, lineHeight: 36, fontWeight: '600', letterSpacing: -1 },
   mealDone: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 4 },
@@ -587,6 +693,14 @@ const styles = StyleSheet.create({
   },
   voiceOrb: { width: 24, height: 24, marginTop: 3 },
   voiceText: { flex: 1, lineHeight: 26, fontWeight: '400' },
+  voiceLine: { lineHeight: 26, fontWeight: '400' },
+  mdBody: { flex: 1, gap: 10 },
+  mdBold: { fontWeight: '600' },
+  mdItalic: { fontStyle: 'italic' },
+  mdList: { gap: 4 },
+  mdItem: { flexDirection: 'row', gap: 8 },
+  mdMarker: { lineHeight: 26, minWidth: 14 },
+  mdItemText: { flex: 1, lineHeight: 26, fontWeight: '400' },
   userRow: { alignItems: 'flex-end', gap: 6 },
   pill: {
     maxWidth: '78%',

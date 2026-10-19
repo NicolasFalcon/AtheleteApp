@@ -1,9 +1,10 @@
 import { StyleSheet, View } from 'react-native';
-import { Check, Globe, Lock, Users, type LucideIcon } from 'lucide-react-native';
+import { Check, Lock, Users, type LucideIcon } from 'lucide-react-native';
 import { Button, PressableScale, Sheet, TextV2, useThemeV2 } from '@app/components/v2';
 import { PRIVACY_TRIM_M, trimEnds } from '@app/features/route/routeGeo';
 import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import type { LatLng, RouteVisibility } from '@app/features/route/routeTypes';
+import { shownVisibility, visibilityTitle } from '@app/features/route/routeVisibility';
 import { RouteThumb } from '@app/features/route/v2/RouteThumb';
 
 // Privacy of a route (ROUTE_04): who sees it and "Ocultar inicio y final".
@@ -11,15 +12,13 @@ import { RouteThumb } from '@app/features/route/v2/RouteThumb';
 // only previews it. Without `value` it edits the defaults of this and the next
 // outings (the session store, saved to social_settings by the caller); with
 // `value` + `onChange` it edits one saved activity (update_route_activity_privacy).
+// Solo yo / Amigos: no "Público" for now (see routeVisibility).
 const OPTIONS: { key: RouteVisibility; title: string; sub: string; icon: LucideIcon }[] = [
-  { key: 'me', title: 'Solo yo', sub: 'Nadie más ve tus rutas', icon: Lock },
-  { key: 'friends', title: 'Amigos', sub: 'Tus amigos en Comunidad', icon: Users },
-  { key: 'public', title: 'Público', sub: 'Cualquiera en ATHELETE', icon: Globe },
+  { key: 'me', title: visibilityTitle('me'), sub: 'Nadie más ve tus rutas', icon: Lock },
+  { key: 'friends', title: visibilityTitle('friends'), sub: 'Tus amigos en Comunidad', icon: Users },
 ];
 
-export function visibilityLabel(visibility: RouteVisibility): string {
-  return OPTIONS.find(option => option.key === visibility)?.title ?? 'Amigos';
-}
+export const visibilityLabel = visibilityTitle;
 
 export type RoutePrivacyValue = { visibility: RouteVisibility; hideEndpoints: boolean };
 
@@ -70,7 +69,7 @@ export function RoutePrivacySheet({
       </TextV2>
       <View style={styles.options}>
         {OPTIONS.map(option => {
-          const on = option.key === current.visibility;
+          const on = option.key === shownVisibility(current.visibility);
           return (
             <PressableScale
               key={option.key}

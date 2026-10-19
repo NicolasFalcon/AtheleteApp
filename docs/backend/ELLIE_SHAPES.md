@@ -106,3 +106,14 @@ Columna `text` nullable. La app la envía y actualiza con la zona IANA del dispo
   - **La app no inserta mensajes**: los escribe solo `ellie-chat`. La app puede leerlos y borrarlos.
 - Los mensajes anteriores a este cambio están en una conversación por usuario titulada **"Historial anterior"**.
 - `chat_messages.tool_type`: `generate_workout_plan | generate_nutrition_plan | meal_analysis`.
+
+## Cambios Lote 2 (IA)
+- **Foto en el chat**: la imagen se envía al modelo reducida a ~1024 px e incrustada en base64, con razonamiento mínimo, un límite de salida y 20 s de límite en el servidor. Si se pasa → **504 `ai_timeout`** (en SSE, `event: error` con `error: "ai_timeout"`); se devuelve el cupo y el mensaje no se guarda. El chat solo de texto no cambia.
+- La idempotencia del chat con foto sigue siendo `client_message_id`: un reintento devuelve la respuesta ya guardada sin cobrar.
+- **`meal_analysis`**: los items traen los campos por unidad y la validación de kcal descritos en `VISION_SHAPES.md` §6.
+- **Contexto (B-25)**: el agua siempre en vasos de 250 ml y en ml (`daily_hydration_logs` + `profiles.daily_water_goal` en vasos), con el consumo y la meta de hoy según `profiles.timezone`. Las kcal registradas salen de `daily_nutrition_logs`; los días entrenados, sesiones, minutos y volumen de 14 días, solo de `workout_sessions` con `status='completed'`.
+- **Tono (B-24)**: 2–5 frases, sin títulos, como mucho una lista breve, negrita solo para una cifra clave, emojis con moderación y siempre termina con una pregunta o sugerencia concreta.
+
+| HTTP | error | notas |
+|---|---|---|
+| 504 | ai_timeout | solo con imagen; cupo devuelto; reintentable con el mismo `client_message_id` |

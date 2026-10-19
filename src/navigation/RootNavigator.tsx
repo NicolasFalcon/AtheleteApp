@@ -20,6 +20,7 @@ import { RouteShareScreen } from '@app/screens/route/RouteShareScreen';
 import { WearScreen } from '@app/screens/wear/WearScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { STACK_SCREEN_OPTIONS } from '@app/navigation/stackScreenOptions';
 import { StyleSheet } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
@@ -143,7 +144,7 @@ export function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator key={flow} screenOptions={{ headerShown: false }}>
+    <Stack.Navigator key={flow} screenOptions={STACK_SCREEN_OPTIONS}>
       {flow === 'auth' ? (
         <Stack.Screen
           name={ROOT_ROUTES.AuthFlow}

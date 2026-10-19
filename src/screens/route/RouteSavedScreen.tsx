@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Lock, MoreHorizontal, Plus } from 'lucide-react-native';
@@ -18,6 +18,7 @@ import { routeStore } from '@app/features/route/routeStore';
 import type { PlannedRoute } from '@app/features/route/routeTypes';
 import { RoundButton } from '@app/features/route/v2/RouteUi';
 import { RouteThumb } from '@app/features/route/v2/RouteThumb';
+import { useInvalidateRoute, usePlannedRoutes } from '@app/features/route/useRouteData';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -29,26 +30,19 @@ export function RouteSavedScreen({ navigation }: AppScreenProps<'RouteSaved'>) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useRouteService();
-  const [items, setItems] = useState<PlannedRoute[] | null>(null);
+  // React Query (B-13): read once, refreshed after a rename / delete.
+  const planned = usePlannedRoutes();
+  const invalidate = useInvalidateRoute();
+  const items: PlannedRoute[] | null = planned.data ?? (planned.isError ? [] : null);
   const [menu, setMenu] = useState<PlannedRoute | null>(null);
   const [renaming, setRenaming] = useState<PlannedRoute | null>(null);
   const [name, setName] = useState('');
-  const [failed, setFailed] = useState(false);
+  const failed = planned.isError;
   const [removing, setRemoving] = useState<PlannedRoute | null>(null);
 
-  const load = useCallback(() => {
-    setFailed(false);
-    service
-      .getSavedRoutes()
-      .then(setItems)
-      .catch(() => {
-        // A failed read is not an empty list.
-        setFailed(true);
-        setItems(current => current ?? []);
-      });
-  }, [service]);
-
-  useEffect(load, [load]);
+  const load = () => {
+    planned.refetch().catch(() => undefined);
+  };
 
   const use = (item: PlannedRoute) => {
     routeStore.patch({ plan: item, draft: item, mode: 'now', sport: item.sport });
@@ -200,7 +194,7 @@ export function RouteSavedScreen({ navigation }: AppScreenProps<'RouteSaved'>) {
                   service
                     .deleteRoute(item.id)
                     .then(() => {
-                      load();
+                      invalidate();
                       toast.show('Ruta eliminada');
                     })
                     .catch(() => toast.show('No pudimos eliminar la ruta'));
@@ -230,7 +224,7 @@ export function RouteSavedScreen({ navigation }: AppScreenProps<'RouteSaved'>) {
               if (item) {
                 service
                   .renameRoute(item.id, name.trim())
-                  .then(load)
+                  .then(invalidate)
                   .catch(() => toast.show('No pudimos cambiar el nombre'));
               }
             }}

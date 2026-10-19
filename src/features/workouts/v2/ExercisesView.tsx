@@ -20,17 +20,17 @@ import {
   MUSCLE_IMAGES,
 } from '@app/features/workouts/workoutAssets';
 import {
-  countBy,
   EQUIPMENT,
   ZONES,
   type EquipmentKey,
   type ZoneKey,
 } from '@app/features/workouts/workoutsModel';
 import { EQUIPMENT_ICONS } from '@app/features/workouts/v2/workoutIcons';
-import type { LibraryExercise } from '@app/shared';
 
 export type ExercisesViewProps = {
-  exercises: LibraryExercise[];
+  // catalog_version().exercises; null until known. The catalog is never
+  // loaded whole here: zones and equipment open their server list.
+  total: number | null;
   loading: boolean;
   error: boolean;
   onRetry: () => void;
@@ -42,13 +42,10 @@ export type ExercisesViewProps = {
   onScan: () => void;
 };
 
-const ZONE_KEYS = ZONES.map(zone => zone.key);
-const EQUIPMENT_KEYS = EQUIPMENT.map(item => item.key);
-
 // Entrenos · Ejercicios (WORKOUTS_03): search + filters, Escanear máquina,
 // Por zona (handoff §16) and Por equipamiento.
 export function ExercisesView({
-  exercises,
+  total,
   loading,
   error,
   onRetry,
@@ -60,8 +57,6 @@ export function ExercisesView({
   onScan,
 }: ExercisesViewProps) {
   const { colors, layout } = useThemeV2();
-  const zoneCounts = countBy(exercises, 'bodyPart', ZONE_KEYS);
-  const equipmentCounts = countBy(exercises, 'equipment', EQUIPMENT_KEYS);
 
   return (
     <>
@@ -69,9 +64,9 @@ export function ExercisesView({
         <SearchField
           radius={14}
           placeholder={
-            loading
+            loading || total === null
               ? 'Buscar ejercicios'
-              : `Buscar entre ${exercises.length} ejercicios`
+              : `Buscar entre ${total} ejercicios`
           }
           onPress={onSearch}
           style={styles.flex}
@@ -124,7 +119,6 @@ export function ExercisesView({
               <ZoneMosaic
                 items={ZONES.map((zone, index) => ({
                   ...zone,
-                  count: zoneCounts[zone.key],
                   image: MUSCLE_IMAGES[zone.key],
                   hotspot: MUSCLE_HOTSPOTS[zone.key],
                   hotspotDelay: index * 250,
@@ -149,7 +143,6 @@ export function ExercisesView({
                 <EquipmentBubble
                   key={item.key}
                   label={item.label}
-                  count={equipmentCounts[item.key]}
                   icon={EQUIPMENT_ICONS[item.key]}
                   image={EQUIPMENT_IMAGES[item.key]}
                   onPress={() => onOpenEquipment(item.key)}
@@ -160,7 +153,11 @@ export function ExercisesView({
 
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={`Ver todos los ejercicios, ${exercises.length}`}
+            accessibilityLabel={
+              total === null
+                ? 'Ver todos los ejercicios'
+                : `Ver todos los ejercicios, ${total}`
+            }
             onPress={onOpenAll}
             style={[
               styles.allRow,
@@ -179,7 +176,7 @@ export function ExercisesView({
                 tone="secondary"
                 style={styles.allCountText}
               >
-                {loading ? '' : String(exercises.length)}
+                {loading || total === null ? '' : String(total)}
               </TextV2>
               <ChevronRight
                 size={16}

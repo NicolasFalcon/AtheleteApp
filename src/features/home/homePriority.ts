@@ -244,9 +244,9 @@ export function hasCompletedEver(
 
 // ── Water and totals: one model (features/nutrition/nutritionModel) ───────
 export {
-  DEFAULT_WATER_GOAL_GLASSES,
   GLASS_ML,
   toGlasses,
+  waterGoalGlasses,
 } from '@app/features/nutrition/nutritionModel';
 
 // ── Tu día ─────────────────────────────────────────────────────────────────
@@ -270,7 +270,8 @@ export type DayRingsInput = {
     targetMinutes: number;
   };
   nutrition: { hasPlan: boolean; calories: number; targetCalories: number };
-  hydration: { todayMl: number; goalGlasses: number };
+  // profiles.daily_water_goal; null: no goal (the ring only counts).
+  hydration: { todayMl: number; goalGlasses: number | null };
 };
 
 const clamp01 = (value: number) =>
@@ -314,8 +315,8 @@ export function buildDayRings({
       };
 
   const glasses = toGlasses(hydration.todayMl);
-  const goal = Math.max(1, hydration.goalGlasses);
-  const hydrationDone = glasses >= goal;
+  const goal = hydration.goalGlasses && hydration.goalGlasses > 0 ? hydration.goalGlasses : null;
+  const hydrationDone = goal !== null && glasses >= goal;
 
   const rings: DayRing[] = [
     first,
@@ -335,8 +336,8 @@ export function buildDayRings({
       kind: 'hydration',
       label: hydrationDone ? 'Hidratación · cumplida' : 'Hidratación',
       value: String(glasses),
-      unit: `de ${goal} vasos`,
-      progress: clamp01(glasses / goal),
+      unit: goal ? `de ${goal} vasos` : glasses === 1 ? 'vaso' : 'vasos',
+      progress: goal ? clamp01(glasses / goal) : 0,
       done: hydrationDone,
     },
   ];

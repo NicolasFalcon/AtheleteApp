@@ -10,7 +10,6 @@ import {
   useOpenCore33Discovery,
 } from '@app/features/core33/useOpenCore33';
 import {
-  DEFAULT_WATER_GOAL_GLASSES,
   allDoneLine,
   buildDayRings,
   homeDateLine,
@@ -23,6 +22,7 @@ import {
   sessionActiveSeconds,
   trainedMinutesToday,
   toGlasses,
+  waterGoalGlasses,
   type DayRingKind,
   type HomeChallengeState,
 } from '@app/features/home/homePriority';
@@ -50,6 +50,7 @@ import { QuizBanner } from '@app/features/home/v2/QuizBanner';
 import { WearCard } from '@app/features/wear/WearCard';
 import { WeekCarousel } from '@app/features/home/v2/WeekCarousel';
 import { recommendRoutines } from '@app/features/workouts/workoutsModel';
+import type { RoutineSuggestion } from '@app/services/routines/routinesService';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
@@ -59,9 +60,13 @@ import { useHydration } from '@app/hooks/useHydration';
 import { useQuizCategories } from '@app/hooks/useQuizCategories';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
-import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
+import {
+  useRoutine,
+  useRoutineList,
+  useTodaySuggestion,
+} from '@app/hooks/useRoutines';
 import { getGreeting, getLocalDateKey } from '@app/lib/date';
-import { isRouteSession, type Workout } from '@app/shared';
+import { isRouteSession } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Home'>;
@@ -71,14 +76,18 @@ type Props = TabScreenProps<'Home'>;
 // such preference in the profile, BT-54). When it exists, read it here.
 const CORE33_FIRST_PRIORITY = false;
 
-function toHeroWorkout(workout: Workout | null): HeroWorkout | null {
-  return workout
+// get_today_suggestion → the hero routine (null: no candidate today, the
+// empty "Elige tu entreno de hoy").
+function toHeroWorkout(suggestion: RoutineSuggestion | null): HeroWorkout | null {
+  return suggestion
     ? {
-        title: workout.title,
-        typeLabel: workoutTypeLabel(workout),
-        minutes: workout.duration,
-        exercises: workout.exercises.length,
-        calories: workout.calories,
+        title: suggestion.title,
+        typeLabel: workoutTypeLabel({
+          routineCategory: suggestion.routineCategory,
+          type: 'strength',
+        }),
+        minutes: suggestion.duration,
+        reason: suggestion.reason,
       }
     : null;
 }
@@ -91,7 +100,11 @@ export function HomeScreen({ navigation }: Props) {
   const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const homeQuery = useHomeFeed();
-  const workoutsQuery = useWorkoutLibrary();
+  // Hero: today's suggestion (get_today_suggestion, one per local day).
+  const suggestionQuery = useTodaySuggestion();
+  const suggestion = suggestionQuery.data?.suggestion ?? null;
+  // "Para entrenar esta semana": the first page of list_routines.
+  const workoutsQuery = useRoutineList('all');
   const ellieData = useEllieData();
   const notifications = useNotificationsOverview();
   // Social notifications only add to the dot of the bell: no new screen. When
@@ -126,6 +139,8 @@ export function HomeScreen({ navigation }: Props) {
       ellieData.overviewQuery.refetch().catch(() => {});
       quizQuery.refetch().catch(() => {});
       workoutsQuery.refetch().catch(() => {});
+      // Today's suggestion is not asked again: one per local day (a new day
+      // is a new key; a saved session drops it).
       challenges.reload();
       // refetch functions are stable; listing the query objects would
       // re-run this effect on every render.
@@ -146,22 +161,11 @@ export function HomeScreen({ navigation }: Props) {
   const coreClosed = isCoreClosedToday(challengeState);
 
   // ── Routines: current recommendation score by goal ──────────────────────
-  const workouts = workoutsQuery.data;
+  const workouts = workoutsQuery.items;
   const recommended = useMemo(
-    () => recommendRoutines(workouts || [], profile?.goal),
+    () => recommendRoutines(workouts, profile?.goal),
     [profile?.goal, workouts],
   );
-
-  // First session for a new user: shortest beginner routine (DA-42).
-  const firstSession = useMemo(() => {
-    const all = workouts || [];
-    const beginners = all.filter(workout => workout.difficulty === 'beginner');
-    const pool = beginners.length > 0 ? beginners : all;
-    return [...pool].sort((a, b) => a.duration - b.duration)[0] ?? null;
-  }, [workouts]);
-
-  const findWorkout = (id?: string | null) =>
-    id ? (workouts || []).find(workout => workout.id === id) ?? null : null;
 
   // ── Mode ────────────────────────────────────────────────────────────────
   const mode = overview
@@ -213,12 +217,21 @@ export function HomeScreen({ navigation }: Props) {
         })
       : null;
 
-  const heroWorkoutSource = mode === 'new' ? firstSession : recommended[0];
+  // The same suggestion for a new user (reason_code "first") and the rest.
+  const heroWorkoutSource = suggestion;
   const resumable = overview?.resumable ?? null;
   const completedToday = overview?.completedToday ?? null;
-  const goalGlasses = profile?.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES;
+  // Type of today's finished routine ("45 min de fuerza").
+  const completedRoutineQuery = useRoutine(
+    completedToday && !isRouteSession(completedToday)
+      ? completedToday.workoutId
+      : null,
+    { refetchOnMount: true },
+  );
+  // profiles.daily_water_goal, the same goal ELLIE reads (null: none).
+  const goalGlasses = waterGoalGlasses(profile?.dailyWaterGoal);
   const todayMl = overview?.hydration.todayMl ?? 0;
-  const waterDone = toGlasses(todayMl) >= goalGlasses;
+  const waterDone = goalGlasses !== null && toGlasses(todayMl) >= goalGlasses;
 
   const firstName = profile?.name?.trim().split(/\s+/)[0] || 'Athelete';
   const greeting =
@@ -231,7 +244,7 @@ export function HomeScreen({ navigation }: Props) {
 
   // ── Tu día ──────────────────────────────────────────────────────────────
   const targetMinutes =
-    profile?.preferredSessionMinutes || heroWorkoutSource?.duration || 30;
+    profile?.preferredSessionMinutes || suggestion?.duration || 30;
   const { rings, dayPct } = buildDayRings({
     mode: mode ?? 'workout',
     challenge: challengeState,
@@ -254,9 +267,9 @@ export function HomeScreen({ navigation }: Props) {
   const openWorkouts = () => navigation.navigate(TAB_ROUTES.Workouts);
 
   const startHeroWorkout = () => {
-    if (heroWorkoutSource) {
+    if (suggestion) {
       navigation.navigate(APP_ROUTES.WorkoutDetail, {
-        workoutId: heroWorkoutSource.id,
+        workoutId: suggestion.routineId,
       });
       return;
     }
@@ -265,7 +278,9 @@ export function HomeScreen({ navigation }: Props) {
 
   const resumeSession = () => {
     const workoutId = resumable?.workoutId;
-    if (workoutId && findWorkout(workoutId)) {
+    // The session screen reads the routine with get_routine (any routine,
+    // also the user's own).
+    if (workoutId) {
       // The exact session: a 'saved' one may be from another day.
       navigation.navigate(APP_ROUTES.WorkoutSession, {
         workoutId,
@@ -316,7 +331,7 @@ export function HomeScreen({ navigation }: Props) {
     challenge: challengeCard !== null,
   });
 
-  const completedWorkout = findWorkout(completedToday?.workoutId);
+  const completedWorkout = completedRoutineQuery.data ?? null;
   const points =
     ellieData.context?.achievements.totalPoints ??
     ellieData.overviewQuery.data?.profileExtras.points ??
@@ -358,7 +373,7 @@ export function HomeScreen({ navigation }: Props) {
                   ),
                 }
               : null,
-            workout: toHeroWorkout(heroWorkoutSource ?? null),
+            workout: toHeroWorkout(heroWorkoutSource),
             resume: resumable
               ? {
                   title: resumable.workoutTitle,

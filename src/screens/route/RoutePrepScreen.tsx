@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronRight, EyeOff, Lock, Minus, Pause, Play, Plus, X } from 'lucide-react-native';
+import { ChevronRight, EyeOff, Lock, Minus, Play, Plus, X } from 'lucide-react-native';
 import {
   Button,
   EllieActionButton,
@@ -34,7 +34,7 @@ import { APP_ROUTES } from '@app/constants/routes';
 import { haversine } from '@app/features/route/routeGeo';
 import { ORS_ATTRIBUTION } from '@app/features/route/routeMappers';
 import { saveRouteDefaults, useRouteDefaults } from '@app/features/route/useRouteDefaults';
-import { useRouteService } from '@app/services/route/useRouteService';
+import { usePlannedRoutes } from '@app/features/route/useRouteData';
 import type { AppScreenProps } from '@app/types/navigation';
 
 const KM_PILLS = { running: [3, 5, 10, 21], cycling: [20, 40, 60, 100] } as const;
@@ -64,38 +64,30 @@ function next<T extends { key: string }>(options: T[], key: string): T['key'] {
 // point, the sport, the target configuration and "Comenzar". The location comes
 // from the LocationSource (expo-location): permission pre-screen, denied /
 // restricted / approximate-location states, then the live position.
-export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep'>) {
+export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
   const session = useRouteSession();
-  const service = useRouteService();
   useRouteDefaults();
   const { sport, mode, config, plan } = session;
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [otherOpen, setOtherOpen] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
   const [mapKey, setMapKey] = useState(0);
-  const [savedCount, setSavedCount] = useState(0);
-  const { access, fix, usable, request } = useLocationAccess();
+  // Tus rutas: React Query, not asked again on every visit (B-13).
+  const savedRoutes = usePlannedRoutes();
+  const savedCount = savedRoutes.data?.length ?? 0;
+  // The last known position at once, the search from the moment Ruta opens;
+  // "Comenzar" once the accuracy is ≤ 30 m (B-11).
+  const { access, fix, usable, ready, approximate: lastKnownOnly, request } = useLocationAccess();
   const origin = usable ? fix : null;
 
-  useEffect(() => {
-    let alive = true;
-    service
-      .getSavedRoutes()
-      .then(list => alive && setSavedCount(list.length))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [service, route?.params]);
-
   const start = useCallback(async () => {
-    if (!usable) {
+    if (!usable || !ready) {
       return;
     }
     navigation.navigate(APP_ROUTES.RouteActive);
-  }, [navigation, usable]);
+  }, [navigation, ready, usable]);
 
   const close = useCallback(() => {
     if (navigation.canGoBack()) {
@@ -107,7 +99,7 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
   const rationale = permission === 'undetermined';
   const blocked = permission === 'denied' || permission === 'restricted';
   const approximate = permission === 'granted' && access?.precise === false;
-  const searching = access === null || (usable && !origin);
+  const searching = access === null || (usable && !ready);
   const accuracyM = fix?.accuracy !== undefined ? Math.round(fix.accuracy) : undefined;
   // How far the start of the planned route is from where the person is.
   const toStartM = origin && plan && plan.points.length > 0 ? haversine(origin, plan.points[0]) : null;
@@ -284,7 +276,12 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
                   <TextV2 variant="eyebrow" tone="secondary">
                     {sportWord}
                   </TextV2>
-                  <GpsChip ready={!searching} accuracyM={searching ? undefined : accuracyM} />
+                  <GpsChip
+                    ready={ready}
+                    located={Boolean(origin)}
+                    approximate={lastKnownOnly}
+                    accuracyM={accuracyM}
+                  />
                 </View>
                 <BigFigure value="0,00" unit="km" size={plan ? 80 : 88} />
                 <View style={[styles.statLine, { borderTopColor: colors.divider }]}>
@@ -303,21 +300,19 @@ export function RoutePrepScreen({ navigation, route }: AppScreenProps<'RoutePrep
                 </View>
                 <View style={styles.chips}>
                   <Chip
-                    icon={Pause}
-                    label={session.autoPause ? 'Pausa automática' : 'Pausa manual'}
-                    onPress={() => {
-                      routeStore.patch({ autoPause: !session.autoPause });
-                      saveRouteDefaults({ autoPause: !session.autoPause });
-                    }}
-                  />
-                  <Chip
                     icon={session.hideEndpoints ? EyeOff : Lock}
                     label={`${visibilityLabel(session.visibility)}${session.hideEndpoints ? ' · extremos ocultos' : ''}`}
                     onPress={() => setPrivacyOpen(true)}
                   />
                 </View>
                 <Button
-                  label={searching ? 'Buscando GPS…' : 'Comenzar'}
+                  label={
+                    !searching
+                      ? 'Comenzar'
+                      : origin && !lastKnownOnly && accuracyM !== undefined
+                        ? `Mejorando precisión · ±${accuracyM} m`
+                        : 'Buscando GPS…'
+                  }
                   icon={Play}
                   iconPosition="start"
                   variant="commit"

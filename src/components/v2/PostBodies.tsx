@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Award, Bookmark, Check, Dumbbell, Trophy } from 'lucide-react-native';
 import { CoverImage } from '@app/components/v2/CoverImage';
 import { HexMedal } from '@app/components/v2/HexMedal';
@@ -20,7 +20,7 @@ import type {
   RouteAttachment,
   WorkoutAttachment,
 } from '@app/features/social/postTypes';
-import { fitPolyline } from '@app/features/social/routePostGeometry';
+import { RouteStaticMap } from '@app/features/route/v2/RouteStaticMap';
 import { usePostPhotoSource } from '@app/features/social/useSocial';
 
 // The compositions of a post, one per type (v2.12 §22.5): photo, record,
@@ -519,15 +519,9 @@ export function RouteBody({
   const { colors, mode } = useThemeV2();
   const bleed = useBleed();
   const map = ROUTE_MAP[attachment.sport === 'cycling' ? 'bike' : 'run'];
-  // The real route, fitted into the map area (no tiles: the route is cut out).
-  const real = attachment.polyline
-    ? fitPolyline(attachment.polyline, {
-        width: 400,
-        height: map.height,
-        padding: 48,
-        bottomPadding: 120,
-      })
-    : null;
+  // A drawable saved route (≥ 2 points): the static map; otherwise it was
+  // trimmed away (privacy) or the activity has none.
+  const real = (attachment.polyline?.length ?? 0) > 1;
   const unavailable = attachment.polyline === undefined;
 
   const hours = Math.floor(attachment.duration_sec / 3600);
@@ -554,52 +548,18 @@ export function RouteBody({
       style={[styles.route, bleed]}
     >
       <View style={{ height: map.height }}>
-        <Svg
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-          viewBox={`0 0 400 ${map.height}`}
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <Rect x={-300} y={-300} width={1000} height={1500} fill={ROUTE_MAP_BG[mode === 'dark' ? 'dark' : 'light']} />
-          {real ? (
-            <>
-          <Path
-            d={real.d}
-            stroke={colors.ember.base}
-            strokeOpacity={0.2}
-            strokeWidth={map.glowWidth}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
+        {/* The saved (trimmed) polyline on the static map of Ruta (B-06). */}
+        {real ? (
+          <RouteStaticMap
+            style={StyleSheet.absoluteFill}
+            mode="auto"
+            points={attachment.polyline ?? []}
+            padding={{ top: 48, right: 48, bottom: 120, left: 48 }}
           />
-          <Path
-            d={real.d}
-            stroke={colors.ember.base}
-            strokeWidth={map.width}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            fill="none"
-          />
-          <Circle
-            cx={real.start.x}
-            cy={real.start.y}
-            r={5.5}
-            fill={colors.bg}
-            stroke={colors.ember.base}
-            strokeWidth={2.5}
-          />
-          <Circle
-            cx={real.end.x}
-            cy={real.end.y}
-            r={6.5}
-            fill={colors.ember.base}
-            stroke={colors.bg}
-            strokeWidth={2.5}
-          />
-            </>
-          ) : null}
-        </Svg>
-        {real === null ? (
+        ) : (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: ROUTE_MAP_BG[mode === 'dark' ? 'dark' : 'light'] }]} />
+        )}
+        {!real ? (
           <View style={[StyleSheet.absoluteFill, styles.routeHidden]}>
             <TextV2 variant="meta" tone="secondary">
               {unavailable ? 'Recorrido no disponible' : 'Recorrido oculto por privacidad'}

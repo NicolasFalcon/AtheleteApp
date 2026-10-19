@@ -79,6 +79,10 @@ export function ellieErrorLine(failure: EllieFailure, language: EllieLanguage): 
       return es
         ? 'No pude entender ese mensaje. Escríbelo de nuevo (hasta 4000 caracteres).'
         : "I couldn't make sense of that message. Please write it again (up to 4000 characters).";
+    case 'ai_timeout':
+      return es
+        ? 'Está tardando más de lo normal. Tu mensaje sigue aquí: toca Reintentar.'
+        : 'This is taking longer than usual. Your message is still here: tap Retry.';
     case 'offline':
       return es
         ? 'Ahora mismo no puedo conectarme. Tus datos están a salvo; te respondo en cuanto vuelva la red.'

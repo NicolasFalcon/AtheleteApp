@@ -126,6 +126,9 @@ export const COLLECTION_LABELS: Record<RoutineCollection, string> = {
 
 // Created by the user, including the ones ELLIE generated for them.
 export function isMyRoutine(workout: Workout, userId?: string | null): boolean {
+  if (workout.isMine !== undefined) {
+    return workout.isMine;
+  }
   return (
     Boolean(userId) &&
     workout.createdBy === userId &&

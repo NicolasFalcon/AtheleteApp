@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { STACK_SCREEN_OPTIONS } from '@app/navigation/stackScreenOptions';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import { ForgotPasswordScreen } from '@app/screens/auth/ForgotPasswordScreen';
 import { LoginScreen } from '@app/screens/auth/LoginScreen';
@@ -20,7 +21,7 @@ export function AuthStackNavigator() {
           : AUTH_ROUTES.Login
       }
       key={isPasswordRecoveryActive ? 'password-recovery' : 'auth'}
-      screenOptions={{headerShown: false}}>
+      screenOptions={STACK_SCREEN_OPTIONS}>
       <Stack.Screen name={AUTH_ROUTES.Login} component={LoginScreen} />
       <Stack.Screen name={AUTH_ROUTES.Register} component={RegisterScreen} />
       <Stack.Screen

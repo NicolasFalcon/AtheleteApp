@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@app/hooks/useAuth';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExerciseNames } from '@app/hooks/useCatalog';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { fetchEllieOverview } from '@app/services/supabase/ellie';
 import {
@@ -107,7 +107,6 @@ function getPromptMode(
 export function useEllieData() {
   const { profile } = useAuth();
   const personalRecordsQuery = usePersonalRecords();
-  const exercisesQuery = useExerciseLibrary();
 
   const overviewQuery = useQuery({
     queryKey: ['ellie', 'overview', profile?.id],
@@ -119,15 +118,15 @@ export function useEllieData() {
       }),
   });
 
-  const exerciseNameMap = useMemo(() => {
-    const map: Record<string, string> = {};
-
-    (exercisesQuery.data || []).forEach(exercise => {
-      map[exercise.id] = exercise.name;
-    });
-
-    return map;
-  }, [exercisesQuery.data]);
+  // Names of the exercises with records (get_exercise, kept on the phone):
+  // never the whole catalog, and they do not block ELLIE's context.
+  const exerciseNames = useExerciseNames(
+    useMemo(
+      () => personalRecordsQuery.records.map(record => record.exerciseId),
+      [personalRecordsQuery.records],
+    ),
+  );
+  const exerciseNameMap = exerciseNames.names;
 
   const context = useMemo(() => {
     if (!profile || !overviewQuery.data) {
@@ -276,7 +275,8 @@ export function useEllieData() {
   return {
     overviewQuery,
     personalRecordsQuery,
-    exercisesQuery,
+    exerciseNames: exerciseNameMap,
+    refetchExerciseNames: exerciseNames.refetch,
     context,
     insights,
     heroInsight: insights[0] || null,

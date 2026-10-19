@@ -19,7 +19,6 @@ import {
   Eyebrow,
   GlassHeader,
   Row,
-  Segmented,
   Skeleton,
   SkeletonGroup,
   StatusBarV2,
@@ -41,7 +40,6 @@ import {
   privacyPreview,
   type PrivacyRowKey,
 } from '@app/features/social/socialModel';
-import type { SocialAudience } from '@app/features/social/socialTypes';
 import {
   useSocialResource,
   useSocialService,
@@ -138,18 +136,12 @@ export function SocialPrivacyScreen({ navigation }: Props) {
 
         {settings.status === 'ready' && data ? (
           <>
+            {/* Only friends for now (Lote 3): no "Público" option. */}
             <View style={styles.gap12}>
               <Eyebrow>Quién puede ver tu perfil</Eyebrow>
-              <Segmented<SocialAudience>
-                options={AUDIENCE_OPTIONS.map(option => ({
-                  key: option.key,
-                  label: option.label,
-                }))}
-                value={data.audience as SocialAudience}
-                onChange={audience => update({ audience })}
-              />
+              <TextV2 variant="bodyStrong">{AUDIENCE_OPTIONS[0].label}</TextV2>
               <TextV2 variant="body" tone="secondary">
-                {audienceLine(data.audience as SocialAudience)}
+                {audienceLine()}
               </TextV2>
             </View>
 

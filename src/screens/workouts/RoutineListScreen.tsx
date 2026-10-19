@@ -29,7 +29,7 @@ import {
 } from '@app/features/workouts/workoutsModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
-import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
+import { useRoutineList } from '@app/hooks/useRoutines';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { Workout } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -37,17 +37,23 @@ import type { AppScreenProps } from '@app/types/navigation';
 type Props = AppScreenProps<'RoutineList'>;
 
 // Entrenos · lista de rutinas (D-46): a type ("Fuerza") or a collection
-// ("Favoritas", "Tus rutinas", "Todas las rutinas"), like ExerciseList. Same
-// library query as the root, filtered on the device.
+// ("Favoritas", "Tus rutinas", "Todas las rutinas"), like ExerciseList.
+// list_routines page by page (cursor): "Tus rutinas" reads scope mine; the
+// rest read scope all (the same pages as the root) and filter the type,
+// favourites or search on the device, asking for every page then.
 export function RoutineListScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const workoutsQuery = useWorkoutLibrary();
   const favorites = useFavoriteWorkouts();
   const { imageFor, markBroken } = useRoutineImages();
   const [query, setQuery] = useState('');
   const scope = useMemo(() => routineScopeFrom(route.params), [route.params]);
+  const mineOnly = scope.collection === 'mine';
+  const filtered = Boolean(scope.group) || scope.collection === 'favorites' || query.trim() !== '';
+  const workoutsQuery = useRoutineList(mineOnly ? 'mine' : 'all', {
+    exhaust: filtered,
+  });
   const title = routineScopeTitle(scope);
   const userId = profile?.id;
 
@@ -65,7 +71,7 @@ export function RoutineListScreen({ navigation, route }: Props) {
     }, []),
   );
 
-  const all = useMemo(() => workoutsQuery.data ?? [], [workoutsQuery.data]);
+  const all = workoutsQuery.items;
   const visible = useMemo(
     () =>
       filterRoutines(all, {
@@ -93,7 +99,7 @@ export function RoutineListScreen({ navigation, route }: Props) {
             ? 'Cargando…'
             : plural(visible.length, 'rutina', 'rutinas')}
         </TextV2>
-        <TextV2 variant="metaStrong">A–Z</TextV2>
+        <TextV2 variant="metaStrong">Recientes</TextV2>
       </View>
     </View>
   );
@@ -158,6 +164,12 @@ export function RoutineListScreen({ navigation, route }: Props) {
         keyExtractor={item => item.id}
         renderItem={renderRow}
         ListHeaderComponent={header}
+        onEndReachedThreshold={0.6}
+        onEndReached={() => {
+          if (workoutsQuery.hasNextPage && !workoutsQuery.isFetchingNextPage) {
+            workoutsQuery.fetchNextPage().catch(() => {});
+          }
+        }}
         ListEmptyComponent={
           <View style={styles.empty}>
             <TextV2 variant="body" tone="secondary" align="center">

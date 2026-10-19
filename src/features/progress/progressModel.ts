@@ -470,23 +470,24 @@ export type HydrationDot = 'met' | 'missed' | 'today' | 'future';
 export type HydrationWeek = {
   dots: HydrationDot[];
   daysMet: number;
-  goalGlasses: number;
+  // null: the profile has no water goal (no day counts as met).
+  goalGlasses: number | null;
 };
 
 // daily_water_goal is a number of 250 ml glasses (DA-39).
 export function buildHydrationWeek(
   logs: HydrationLog[],
-  goalGlasses: number,
+  goalGlasses: number | null,
   keys: string[],
   todayKey: string,
 ): HydrationWeek {
-  const goal = Math.max(1, goalGlasses);
+  const goal = goalGlasses && goalGlasses > 0 ? goalGlasses : null;
   const byDate = new Map(logs.map(log => [log.date, log.waterMl]));
   const dots = keys.map<HydrationDot>(key => {
     if (key > todayKey) {
       return 'future';
     }
-    const met = toGlasses(byDate.get(key) ?? 0) >= goal;
+    const met = goal !== null && toGlasses(byDate.get(key) ?? 0) >= goal;
     if (met) {
       return 'met';
     }

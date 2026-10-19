@@ -74,6 +74,9 @@ export type EllieErrorCode =
   | 'rate_limited'
   | 'ai_credits_exhausted'
   | 'ai_unavailable'
+  // The AI took longer than the server's limit (504), or the app stopped
+  // waiting: "Está tardando más de lo normal" + Reintentar, never "offline".
+  | 'ai_timeout'
   | 'internal'
   // No answer from the server at all.
   | 'offline'
@@ -99,6 +102,7 @@ const KNOWN_CODES: readonly EllieErrorCode[] = [
   'rate_limited',
   'ai_credits_exhausted',
   'ai_unavailable',
+  'ai_timeout',
   'internal',
 ];
 
@@ -140,7 +144,9 @@ export function parseEllieError(status: number, body: unknown): EllieError {
             ? 'duplicate_in_progress'
             : status === 502
               ? 'ai_unavailable'
-              : status >= 500
+              : status === 504
+                ? 'ai_timeout'
+                : status >= 500
                 ? 'internal'
                 : 'unknown';
   return new EllieError(code, {
@@ -208,16 +214,38 @@ export function parseEllieReply(body: unknown): EllieReply {
 export type InvokeResult = { status: number; body: unknown };
 export type EllieInvoke = (body: Record<string, unknown>) => Promise<InvokeResult>;
 
+// The server cuts the AI at 20 s (504 ai_timeout, ~25 s with the upload and
+// the gateway): the app waits longer so it never gives up first.
+export const AI_REQUEST_TIMEOUT_MS = 35_000;
+
+// A failure to reach the server: "offline" only for a real network error; the
+// app's own wait running out is a slow answer (ai_timeout).
+export function transportError(error: unknown, timedOut: boolean): EllieError {
+  const cause = (error as { context?: unknown } | null)?.context;
+  const name = (cause as { name?: string } | null)?.name ?? (error as { name?: string } | null)?.name;
+  const message = error instanceof Error ? error.message : String(error);
+  if (timedOut || name === 'AbortError') {
+    return new EllieError('ai_timeout', { message });
+  }
+  return new EllieError('offline', { message });
+}
+
+type InvokeOptions = { timeoutMs?: number };
+
 // supabase.functions.invoke with the signed-in user's JWT. A non-2xx answer
 // comes back as an error carrying the Response; a failure to reach the server
-// is "offline".
-export function invokeFunction(name: string): EllieInvoke {
+// is "offline" (or ai_timeout when the app's wait ran out).
+export function invokeFunction(name: string, options: InvokeOptions = {}): EllieInvoke {
   return async body => {
     const client = getSupabaseClient();
     if (!client) {
       throw new EllieError('unknown', { message: 'Supabase no está configurado.' });
     }
-    const { data, error } = await client.functions.invoke(name, { body });
+    const startedAt = Date.now();
+    const { data, error } = await client.functions.invoke(name, {
+      body,
+      ...(options.timeoutMs ? { timeout: options.timeoutMs } : {}),
+    });
     if (!error) {
       return { status: 200, body: data };
     }
@@ -227,27 +255,17 @@ export function invokeFunction(name: string): EllieInvoke {
       const parsed = await (response as Response).json().catch(() => null);
       return { status, body: parsed };
     }
-    throw new EllieError('offline', { message: error.message });
+    const timedOut = Boolean(options.timeoutMs) && Date.now() - startedAt >= (options.timeoutMs as number) - 50;
+    throw transportError(error, timedOut);
   };
 }
 
-export const invokeEllieChat: EllieInvoke = async body => {
-  const client = getSupabaseClient();
-  if (!client) {
-    throw new EllieError('unknown', { message: 'Supabase no está configurado.' });
-  }
-  const { data, error } = await client.functions.invoke('ellie-chat', { body });
-  if (!error) {
-    return { status: 200, body: data };
-  }
-  const response = (error as { context?: unknown }).context;
-  if (response && typeof (response as Response).json === 'function') {
-    const status = (response as Response).status;
-    const parsed = await (response as Response).json().catch(() => null);
-    return { status, body: parsed };
-  }
-  throw new EllieError('offline', { message: error.message });
-};
+// Text: the platform's own wait. With a photo the AI is slower: the longer
+// wait above.
+export const invokeEllieChat: EllieInvoke = invokeFunction('ellie-chat');
+export const invokeEllieChatWithImage: EllieInvoke = invokeFunction('ellie-chat', {
+  timeoutMs: AI_REQUEST_TIMEOUT_MS,
+});
 
 // ── Sending ─────────────────────────────────────────────────────────────────
 // 409 duplicate_in_progress: the same message is still being answered. Wait and
@@ -258,7 +276,7 @@ export async function sendEllieMessage(
   input: EllieSendInput,
   deps: { invoke?: EllieInvoke; sleep?: (ms: number) => Promise<void> } = {},
 ): Promise<EllieReply> {
-  const invoke = deps.invoke ?? invokeEllieChat;
+  const invoke = deps.invoke ?? (input.imagePath ? invokeEllieChatWithImage : invokeEllieChat);
   const sleep = deps.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
   const body = {
     conversation_id: input.conversationId,

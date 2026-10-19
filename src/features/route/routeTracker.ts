@@ -34,15 +34,9 @@ export type TrackerState = {
   // Metres from the current position to the plan (null without plan or fix).
   planDistanceM: number | null;
   // The person took the location permission away mid-route (the recording is
-  // paused and keeps what it has).
+  // paused and keeps what it has). The pause is always manual (B-07): there
+  // is no auto-pause.
   permissionRevoked: boolean;
-  // Auto-pause: the preference, whether the current pause is automatic, when
-  // the last accepted movement happened and the first fix that looks like the
-  // person is moving again.
-  autoPause: boolean;
-  autoPaused: boolean;
-  lastMoveAt: number | null;
-  resumeCandidate: RoutePoint | null;
   // Consecutive fixes dropped as impossible jumps.
   jumpStreak: number;
   // Metres of the planned route covered so far (never goes back).
@@ -61,14 +55,21 @@ export type TrackerAction =
   | { type: 'revoked'; t: number };
 
 // ── Fix filters ─────────────────────────────────────────────────────────────
-// A fix less accurate than this is ignored; one closer than MIN_STEP_M to the
-// last is jitter and adds no distance.
+// A fix less accurate than this is ignored.
 export const MAX_ACCURACY_M = 50;
-export const MIN_STEP_M = 2;
-// Standing still, the GPS drifts by about its own accuracy: a step must exceed
-// max(accuracy, DRIFT_FLOOR_M) to count while the implied speed is below
-// STATIONARY_SPEED_MS (walking pace and up uses MIN_STEP_M only).
-export const DRIFT_FLOOR_M = 5;
+// A fix too close to the last accepted point is jitter: it adds no distance
+// and the anchor stays, so a real displacement keeps accumulating until it
+// passes the threshold (nothing is lost on a straight line).
+// Moving, steps shorter than the GPS noise add its zigzag to the distance
+// (+5–15 % walking with ~5 m of noise): a step must reach
+// max(MOVING_ACCURACY_FACTOR × accuracy, MIN_STEP_M).
+export const MIN_STEP_M = 8;
+export const MOVING_ACCURACY_FACTOR = 1.5;
+// Standing still (implied speed below STATIONARY_SPEED_MS), the GPS wanders
+// well beyond its own accuracy over a few minutes: a step must reach
+// max(STILL_ACCURACY_FACTOR × accuracy, DRIFT_FLOOR_M).
+export const DRIFT_FLOOR_M = 12;
+export const STILL_ACCURACY_FACTOR = 2.5;
 export const STATIONARY_SPEED_MS = 0.8;
 // The server rejects a whole activity whose speed between two points is above
 // 12 m/s (running) or 25 m/s (cycling). The client drops such fixes first, with
@@ -81,22 +82,20 @@ export const REANCHOR_AFTER_JUMPS = 5;
 // No fix for this long while recording = "sin señal GPS".
 export const SIGNAL_LOST_MS = 10_000;
 
-// Auto-pause (the "Pausa automática" preference). With the 5 m distance filter
-// of the location updates, standing still means no new accepted point:
-//  - running: 8 s without 5 m of movement (≈ slower than 0,6 m/s, below any
-//    walking pace) → pause; cycling: 6 s (traffic lights are quick to react to).
-//  - the pause starts at the last movement, so the stop is not counted.
-//  - resume: two consecutive moving fixes ≥ 10 m from where it stopped at
-//    ≥ 1,0 m/s (running) / 1,8 m/s (cycling); this ignores GPS drift.
-export const AUTO_PAUSE_HOLD_MS: Record<RouteSport, number> = { running: 8000, cycling: 6000 };
-export const AUTO_RESUME_SPEED_MS: Record<RouteSport, number> = { running: 1.0, cycling: 1.8 };
-export const AUTO_RESUME_MIN_M = 10;
+// "Ritmo actual" (B-08): the pace of the last CURRENT_WINDOW_SEC seconds or
+// CURRENT_WINDOW_M metres, whichever is reached first; below the minimums it
+// is not shown yet.
+export const CURRENT_WINDOW_SEC = 30;
+export const CURRENT_WINDOW_M = 150;
+export const CURRENT_MIN_M = 15;
+export const CURRENT_MIN_SEC = 5;
+// Without a new accepted point for longer than this the person is standing
+// still: the window runs to "now" and the pace slows down. Below it, it ends
+// at the last point (at walking speed a fix every other one can be held back
+// as drift until the next one, which is normal).
+export const CURRENT_STALE_MS = 10_000;
 
-export function initialTracker(
-  sport: RouteSport,
-  plan: LatLng[] | null = null,
-  autoPause = false,
-): TrackerState {
+export function initialTracker(sport: RouteSport, plan: LatLng[] | null = null): TrackerState {
   return {
     status: 'ready',
     sport,
@@ -111,10 +110,6 @@ export function initialTracker(
     deviation: INITIAL_DEVIATION,
     planDistanceM: null,
     permissionRevoked: false,
-    autoPause,
-    autoPaused: false,
-    lastMoveAt: null,
-    resumeCandidate: null,
     jumpStreak: 0,
     planAlongM: 0,
   };
@@ -147,7 +142,11 @@ function judgeFix(state: TrackerState, fix: RoutePoint, t: number): FixVerdict {
       ? { kind: 'reanchor' }
       : { kind: 'jump' };
   }
-  const threshold = speed < STATIONARY_SPEED_MS ? Math.max(fix.accuracy ?? 0, DRIFT_FLOOR_M) : MIN_STEP_M;
+  const accuracy = fix.accuracy ?? 0;
+  const threshold =
+    speed < STATIONARY_SPEED_MS
+      ? Math.max(STILL_ACCURACY_FACTOR * accuracy, DRIFT_FLOOR_M)
+      : Math.max(MOVING_ACCURACY_FACTOR * accuracy, MIN_STEP_M);
   return step < threshold ? { kind: 'jitter' } : { kind: 'accept', step };
 }
 
@@ -182,66 +181,10 @@ function acceptFix(state: TrackerState, fix: RoutePoint, t: number, step: number
     points: [...state.points, { ...fix, t }],
     distanceM: state.distanceM + step,
     lastFixAt: t,
-    lastMoveAt: t,
     now: Math.max(state.now, t),
     jumpStreak: 0,
     ...withPlan(state, fix, t),
   };
-}
-
-// Pauses by itself when the person has stopped (see AUTO_PAUSE_HOLD_MS).
-function maybeAutoPause(state: TrackerState, t: number): TrackerState {
-  if (
-    !state.autoPause ||
-    state.status !== 'recording' ||
-    state.points.length === 0 ||
-    state.lastMoveAt === null ||
-    state.lastFixAt === null ||
-    // Without signal the person did not necessarily stop.
-    t - state.lastFixAt >= SIGNAL_LOST_MS ||
-    t - state.lastMoveAt < AUTO_PAUSE_HOLD_MS[state.sport]
-  ) {
-    return state;
-  }
-  return {
-    ...state,
-    status: 'paused',
-    autoPaused: true,
-    resumeCandidate: null,
-    now: Math.max(state.now, t),
-    pauses: [...state.pauses, { from: state.lastMoveAt, to: null }],
-  };
-}
-
-// A fix while auto-paused: it resumes only on real movement.
-function resumeFromAutoPause(state: TrackerState, fix: RoutePoint, t: number): TrackerState {
-  const verdict = judgeFix(state, fix, t);
-  if (verdict.kind === 'reject' || verdict.kind === 'jump' || verdict.kind === 'reanchor') {
-    return state;
-  }
-  const last = state.points[state.points.length - 1];
-  const moved = last ? haversine(last, fix) : 0;
-  const candidate = state.resumeCandidate;
-  if (!candidate) {
-    return moved >= Math.max(fix.accuracy ?? 0, DRIFT_FLOOR_M)
-      ? { ...state, resumeCandidate: { ...fix, t }, lastFixAt: t, now: Math.max(state.now, t) }
-      : { ...state, lastFixAt: t, now: Math.max(state.now, t) };
-  }
-  const dt = (t - (candidate.t ?? t)) / 1000;
-  const speed = dt > 0 ? haversine(candidate, fix) / dt : 0;
-  if (moved >= AUTO_RESUME_MIN_M && speed >= AUTO_RESUME_SPEED_MS[state.sport]) {
-    const from = candidate.t ?? t;
-    let next: TrackerState = {
-      ...state,
-      status: 'recording',
-      autoPaused: false,
-      resumeCandidate: null,
-      pauses: state.pauses.map(p => (p.to === null ? { ...p, to: from } : p)),
-    };
-    next = acceptFix(next, candidate, from, haversine(last, candidate));
-    return acceptFix(next, fix, t, haversine(candidate, fix));
-  }
-  return { ...state, resumeCandidate: { ...fix, t }, lastFixAt: t, now: Math.max(state.now, t) };
 }
 
 export function trackerReducer(state: TrackerState, action: TrackerAction): TrackerState {
@@ -254,13 +197,12 @@ export function trackerReducer(state: TrackerState, action: TrackerAction): Trac
             startedAt: action.t,
             now: action.t,
             lastFixAt: action.t,
-            lastMoveAt: action.t,
           }
         : state;
 
     case 'alive':
       return state.status === 'recording' && action.t > (state.lastFixAt ?? 0)
-        ? maybeAutoPause({ ...state, lastFixAt: action.t, now: Math.max(state.now, action.t) }, action.t)
+        ? { ...state, lastFixAt: action.t, now: Math.max(state.now, action.t) }
         : state;
 
     case 'revoked': {
@@ -269,17 +211,15 @@ export function trackerReducer(state: TrackerState, action: TrackerAction): Trac
     }
 
     case 'tick':
-      if (state.status === 'recording') {
-        return maybeAutoPause({ ...state, now: action.t }, action.t);
-      }
-      return state.status === 'paused' ? { ...state, now: action.t } : state;
+      return state.status === 'recording' || state.status === 'paused'
+        ? { ...state, now: action.t }
+        : state;
 
     case 'pause':
       return state.status === 'recording'
         ? {
             ...state,
             status: 'paused',
-            autoPaused: false,
             now: action.t,
             pauses: [...state.pauses, { from: action.t, to: null }],
           }
@@ -290,12 +230,9 @@ export function trackerReducer(state: TrackerState, action: TrackerAction): Trac
         ? {
             ...state,
             status: 'recording',
-            autoPaused: false,
-            resumeCandidate: null,
             now: action.t,
             // The signal clock restarts: the pause is not a GPS gap.
             lastFixAt: action.t,
-            lastMoveAt: action.t,
             permissionRevoked: false,
             pauses: state.pauses.map(p => (p.to === null ? { ...p, to: action.t } : p)),
           }
@@ -306,7 +243,6 @@ export function trackerReducer(state: TrackerState, action: TrackerAction): Trac
         ? {
             ...state,
             status: 'finished',
-            autoPaused: false,
             now: action.t,
             endedAt: action.t,
             pauses: state.pauses.map(p => (p.to === null ? { ...p, to: action.t } : p)),
@@ -316,10 +252,7 @@ export function trackerReducer(state: TrackerState, action: TrackerAction): Trac
     case 'fix': {
       const { fix } = action;
       const t = fix.t ?? state.now;
-      // A manual pause does not move; an automatic one watches for movement.
-      if (state.status === 'paused' && state.autoPaused) {
-        return resumeFromAutoPause(state, fix, t);
-      }
+      // A pause (always manual) does not move.
       if (state.status !== 'recording') {
         return state;
       }
@@ -330,10 +263,7 @@ export function trackerReducer(state: TrackerState, action: TrackerAction): Trac
         case 'jump':
           return { ...state, jumpStreak: state.jumpStreak + 1 };
         case 'jitter':
-          return maybeAutoPause(
-            { ...state, now: Math.max(state.now, t), lastFixAt: Math.max(state.lastFixAt ?? 0, t) },
-            Math.max(state.now, t),
-          );
+          return { ...state, now: Math.max(state.now, t), lastFixAt: Math.max(state.lastFixAt ?? 0, t) };
         case 'reanchor':
           return acceptFix({ ...state, points: [], distanceM: 0 }, fix, t, 0);
         case 'accept':
@@ -347,11 +277,14 @@ export function trackerReducer(state: TrackerState, action: TrackerAction): Trac
 // A recording found on disk after the app was closed: it comes back paused at
 // the last instant that was saved (the time since then is not counted), and
 // the person chooses to continue, save or discard.
+// A recording saved by an older version may still carry the auto-pause
+// fields: they are dropped (the pause is manual).
 export function restoreTracker(saved: TrackerState): TrackerState {
-  if (saved.status === 'recording') {
-    return trackerReducer(saved, { type: 'pause', t: saved.now });
-  }
-  return saved.status === 'paused' ? { ...saved, autoPaused: false, resumeCandidate: null } : saved;
+  const state = { ...saved } as TrackerState & Record<string, unknown>;
+  ['autoPause', 'autoPaused', 'lastMoveAt', 'resumeCandidate'].forEach(key => {
+    delete state[key];
+  });
+  return state.status === 'recording' ? trackerReducer(state, { type: 'pause', t: state.now }) : state;
 }
 
 // ── Derived values ──────────────────────────────────────────────────────────
@@ -371,12 +304,55 @@ export function trackerSignalLost(state: TrackerState): boolean {
   );
 }
 
+// Average pace / speed of the whole activity, pauses excluded: the summary,
+// the pause view and the result.
 export function trackerPace(state: TrackerState): number | null {
   return paceSecPerKm(state.distanceM, trackerActiveSec(state));
 }
 
 export function trackerSpeed(state: TrackerState): number | null {
   return speedKmh(state.distanceM, trackerActiveSec(state));
+}
+
+// Metres and active seconds of the recent stretch: back from the latest point
+// until CURRENT_WINDOW_SEC seconds or CURRENT_WINDOW_M metres are covered. The
+// time runs to `now` once the person has stood still for CURRENT_STALE_MS
+// (it slows down) and leaves the pauses out. null when there is not enough.
+export function trackerCurrentWindow(state: TrackerState): { m: number; sec: number } | null {
+  const points = state.points;
+  const last = points[points.length - 1];
+  if (!last || last.t === undefined || state.startedAt === null) {
+    return null;
+  }
+  const end =
+    state.status === 'recording' && state.now - last.t > CURRENT_STALE_MS ? state.now : last.t;
+  let metres = 0;
+  let from = last.t;
+  for (let index = points.length - 1; index > 0; index -= 1) {
+    const a = points[index - 1];
+    const b = points[index];
+    if (a.t === undefined) {
+      break;
+    }
+    metres += haversine(a, b);
+    from = a.t;
+    if (metres >= CURRENT_WINDOW_M || activeMs(from, end, state.pauses) / 1000 >= CURRENT_WINDOW_SEC) {
+      break;
+    }
+  }
+  const sec = activeMs(from, end, state.pauses) / 1000;
+  return metres >= CURRENT_MIN_M && sec >= CURRENT_MIN_SEC ? { m: metres, sec } : null;
+}
+
+// "Ritmo actual" / "Velocidad actual" while recording (B-08).
+export function trackerCurrentPace(state: TrackerState): number | null {
+  const window = trackerCurrentWindow(state);
+  return window ? paceSecPerKm(window.m, window.sec) : null;
+}
+
+export function trackerCurrentSpeed(state: TrackerState): number | null {
+  const window = trackerCurrentWindow(state);
+  return window ? speedKmh(window.m, window.sec) : null;
 }
 
 export function trackerElevation(state: TrackerState): number {

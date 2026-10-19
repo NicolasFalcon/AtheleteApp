@@ -331,6 +331,18 @@ export function parseFeedPage(data: unknown, me: string, limit: number): FeedPag
   };
 }
 
+// ── get_user_posts ────────────────────────────────────────────────────────
+// { ok:true, items:[post] } (the format of get_feed). There is no cursor in
+// the answer: the next page is `_before` = created_at of the last item, and
+// a page shorter than the limit is the end.
+export function parseUserPostsPage(data: unknown, me: string, limit: number): FeedPage {
+  const body = asRecord(data);
+  if (!body || body.ok !== true) {
+    throw new Error(asString(body?.error) ?? 'get_user_posts failed');
+  }
+  return parseFeedPage(Array.isArray(body.items) ? body.items : [], me, limit);
+}
+
 // ── get_friend_activity ───────────────────────────────────────────────────
 // {id, user_id, kind, summary: {title, duration_min?}, created_at, user: {…}}.
 // `user` has no photo: the screen completes the author with get_social_profiles.
@@ -462,6 +474,7 @@ const SERVER_ERRORS: readonly CreatePostError[] = [
   'source_not_found',
   'routine_not_shareable',
   'photo_required',
+  'post_removed',
 ];
 
 export function parseCreatePost(data: unknown): CreatePostResult {

@@ -1,16 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Camera, EyeOff, Image as ImageIcon, MessageCircle, MoreHorizontal, X } from 'lucide-react-native';
 import { PressableScale, TextV2, useToast } from '@app/components/v2';
-import { RouteMap } from '@app/features/route/RouteMap';
 import { formatDuration, formatKm, formatPace, formatSpeed } from '@app/features/route/routeFormat';
 import { PRIVACY_TRIM_M, paceSecPerKm, speedKmh, trimEnds } from '@app/features/route/routeGeo';
 import { useRouteSession } from '@app/features/route/routeStore';
 import type { RouteActivity } from '@app/features/route/routeTypes';
 import { BigFigure, DARK, RoundButton } from '@app/features/route/v2/RouteUi';
-import { RouteThumb } from '@app/features/route/v2/RouteThumb';
-import { useRouteService } from '@app/services/route/useRouteService';
+import { RouteStaticMap } from '@app/features/route/v2/RouteStaticMap';
+import { useRouteActivity } from '@app/features/route/useRouteData';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Template = 'map' | 'photo' | 'minimal';
@@ -19,6 +18,8 @@ const TEMPLATES: { key: Template; label: string }[] = [
   { key: 'photo', label: 'Foto' },
   { key: 'minimal', label: 'Minimal' },
 ];
+// Warm dark plate of the Foto template (the photo itself is B-09).
+const PHOTO_PLATE = '#24201C';
 const TARGETS = [
   { label: 'Historia', icon: Camera },
   { label: 'WhatsApp', icon: MessageCircle },
@@ -33,20 +34,12 @@ const TARGETS = [
 export function RouteShareScreen({ navigation, route }: AppScreenProps<'RouteShare'>) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
-  const service = useRouteService();
   const session = useRouteSession();
   const [template, setTemplate] = useState<Template>('map');
-  const [activity, setActivity] = useState<RouteActivity | null>(session.finished);
-
-  useEffect(() => {
-    const id = route?.params?.activityId;
-    if (!activity && id) {
-      service
-        .getActivity(id)
-        .then(setActivity)
-        .catch(() => {});
-    }
-  }, [activity, route?.params?.activityId, service]);
+  const id = route?.params?.activityId;
+  const finished = session.finished && (!id || session.finished.id === id) ? session.finished : null;
+  // React Query (B-13): the activity is not asked for again.
+  const activity: RouteActivity | null = useRouteActivity(id ?? finished?.id, finished).data ?? null;
 
   if (!activity) {
     return <View style={[styles.screen, { backgroundColor: DARK.bg }]} />;
@@ -66,20 +59,35 @@ export function RouteShareScreen({ navigation, route }: AppScreenProps<'RouteSha
 
       <View style={styles.cardWrap}>
         <View style={styles.card}>
+          {/* The static map of the saved activity (B-06): Mapa with the dark
+              base map; Foto and Minimal with the route alone (no white box). */}
           {template === 'map' ? (
-            <RouteMap
+            <RouteStaticMap
               style={StyleSheet.absoluteFill}
               mode="dark"
-              fit={line}
+              points={line}
               padding={{ top: 60, bottom: 170, left: 24, right: 24 }}
-              route={line}
-              interactive={false}
             />
           ) : template === 'photo' ? (
-            <View style={[StyleSheet.absoluteFill, styles.photo]}>
-              <RouteThumb points={line} size={200} radius={0} strokeWidth={5} />
-            </View>
-          ) : null}
+            <RouteStaticMap
+              style={StyleSheet.absoluteFill}
+              mode="dark"
+              basemap={false}
+              background={PHOTO_PLATE}
+              points={line}
+              padding={{ top: 70, bottom: 190, left: 40, right: 40 }}
+            />
+          ) : (
+            <RouteStaticMap
+              style={styles.minimal}
+              mode="dark"
+              basemap={false}
+              endpoints={false}
+              background="transparent"
+              points={line}
+              padding={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            />
+          )}
           <TextV2 variant="eyebrow" color="#FFFFFF" style={styles.brand}>
             ATHELETE
           </TextV2>
@@ -153,7 +161,7 @@ const styles = StyleSheet.create({
   spacer: { width: 44 },
   cardWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14 },
   card: { height: '100%', aspectRatio: 9 / 16, borderRadius: 24, overflow: 'hidden', backgroundColor: '#171513' },
-  photo: { alignItems: 'center', justifyContent: 'center', paddingBottom: 120, backgroundColor: '#24201C' },
+  minimal: { position: 'absolute', top: 70, left: 40, right: 40, height: 160 },
   brand: { position: 'absolute', top: 16, left: 18, letterSpacing: 1.5 },
   overlay: { position: 'absolute', left: 18, right: 18, bottom: 18, gap: 4 },
   segment: { alignSelf: 'center', flexDirection: 'row', borderRadius: 22, padding: 3 },

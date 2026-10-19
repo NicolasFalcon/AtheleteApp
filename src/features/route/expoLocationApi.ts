@@ -16,6 +16,12 @@ export type LocationApi = {
   servicesEnabled(): Promise<boolean>;
   getCurrent(): Promise<RoutePoint | null>;
   getLastKnown(maxAgeMs: number): Promise<RoutePoint | null>;
+  // Foreground updates before recording (Ruta open, not recording): 'balanced'
+  // for a quick first fix, then 'high'. Returns the stop function.
+  watchForeground(
+    accuracy: 'balanced' | 'high',
+    onFix: (fix: RoutePoint) => void,
+  ): Promise<() => void>;
   startUpdates(): Promise<void>;
   stopUpdates(): Promise<void>;
   isUpdating(): Promise<boolean>;
@@ -73,6 +79,18 @@ export const expoLocationApi: LocationApi = {
   async getLastKnown(maxAgeMs) {
     const last = await location().getLastKnownPositionAsync({ maxAge: maxAgeMs });
     return last ? toRoutePoint(last) : null;
+  },
+  async watchForeground(accuracy, onFix) {
+    const Location = location();
+    const subscription = await Location.watchPositionAsync(
+      {
+        accuracy: accuracy === 'balanced' ? Location.Accuracy.Balanced : Location.Accuracy.High,
+        distanceInterval: 0,
+        timeInterval: 1000,
+      },
+      position => onFix(toRoutePoint(position)),
+    );
+    return () => subscription.remove();
   },
   async startUpdates() {
     const Location = location();

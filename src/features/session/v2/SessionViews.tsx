@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Image,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -25,10 +24,13 @@ import {
   X,
 } from 'lucide-react-native';
 import {
+  AppImage,
   Button,
   GlassSurface,
   PressableScale,
   TextV2,
+  isMediaImageSource,
+  type AppImageSource,
 } from '@app/components/v2';
 import {
   formatClock,
@@ -77,10 +79,11 @@ const NUMBER_WORDS = [
   'Diez',
 ];
 
-// The picture of an exercise: its signed poster when it has one, else (or if
-// it fails to load) the generic muscle image.
+// The picture of an exercise: its catalog thumb or poster (by key, signed
+// when shown) when it has one, else (or if it fails to load) the generic
+// muscle image.
 export type ExerciseImage = {
-  source: ImageSourcePropType;
+  source: AppImageSource;
   fallback: ImageSourcePropType;
 };
 export type ThumbFor = (exercise: PlannedExercise) => ExerciseImage;
@@ -94,12 +97,15 @@ function ExercisePicture({
 }) {
   const [failed, setFailed] = useState(false);
   // A new source gets a new chance.
-  const uri = typeof image.source === 'object' && 'uri' in image.source ? image.source.uri : undefined;
-  useEffect(() => setFailed(false), [uri]);
+  const identity = isMediaImageSource(image.source)
+    ? image.source.mediaKey
+    : typeof image.source === 'object' && image.source && 'uri' in image.source
+      ? image.source.uri
+      : undefined;
+  useEffect(() => setFailed(false), [identity]);
   return (
-    <Image
+    <AppImage
       source={failed ? image.fallback : image.source}
-      resizeMode="cover"
       style={style}
       onError={() => setFailed(true)}
     />

@@ -207,3 +207,22 @@ Ordenada: primero lo no oculto, más reportes primero. Un no-moderador obtiene 0
 - Siempre registra en `moderation_actions`. OK → `{"ok":true}`. Errores: `invalid_arguments`; sin ser moderador → excepción `not_moderator` (HTTP 400).
 
 Historial: `SELECT * FROM moderation_actions ORDER BY created_at DESC` — legible solo por moderadores (política `is_moderator()`); un usuario normal no obtiene filas.
+
+## Visibilidad
+- Solo amigos. No hay visibilidad pública: `audience` siempre es `"friends"` (se ignora `social_settings.audience`).
+- Se puede publicar sin tener amigos. Los posts propios salen siempre en `get_feed` y en el perfil propio.
+- Al aceptar una amistad, el nuevo amigo ve también las publicaciones anteriores (según las categorías que comparte el autor).
+
+## create_post
+- Si el mismo origen ya tiene un post activo → `{ ok:true, created:false, post_id }` (ese post se ve).
+- Si el post anterior se borró → se crea uno nuevo: `{ ok:true, created:true, post_id }`.
+- Nuevo error: `post_removed` (un moderador retiró el post de ese origen).
+- La app debe tratar `ok:false` como error y no mostrar "publicado".
+
+## get_user_posts(_user_id uuid, _limit int = 20, _before timestamptz = null)   (NUEVA)
+→ `{ ok:true, items: [post] }` con el mismo formato que `get_feed`, de más reciente a más antiguo, `_limit` ≤ 50.
+Para la página siguiente, pasa `_before = created_at` del último. Sirve para el perfil propio o el de un amigo; con otros usuarios → `items: []`. Sin sesión → `unauthorized`.
+(`get_social_profile.recent_posts` sigue con los 2 últimos y `audience` siempre es `"friends"`.)
+
+## profiles.daily_water_goal
+- En vasos de 250 ml, nunca vacío. Por defecto 10 (2.500 ml). Si se envía null o 0, se guarda 10. El usuario puede cambiarlo.

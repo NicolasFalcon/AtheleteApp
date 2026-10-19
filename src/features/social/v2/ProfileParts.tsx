@@ -1,14 +1,20 @@
 import { StyleSheet, View } from 'react-native';
-import { Lock } from 'lucide-react-native';
+import { ChevronRight, Lock } from 'lucide-react-native';
 import {
+  Button,
   Eyebrow,
   PressableScale,
+  Skeleton,
+  SkeletonGroup,
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
+import { BlockError } from '@app/features/home/v2/BlockError';
+import { postKindLabel, timeAgo } from '@app/features/social/postModel';
+import type { FeedPost } from '@app/features/social/postTypes';
 import type {
+  SocialLoadState,
   SocialRecord,
-  SocialRecentPost,
 } from '@app/features/social/socialTypes';
 
 // "RÉCORDS PERSONALES": name, NUEVO tag and the figure on the right.
@@ -49,60 +55,88 @@ export function RecordsList({ records }: { records: SocialRecord[] }) {
   );
 }
 
-const OVER: Record<SocialRecentPost['type'], string> = {
-  workout: 'ENTRENAMIENTO',
-  record: 'NUEVO RÉCORD',
-  routine: 'RUTINA',
-  achievement: 'LOGRO',
-  challenge: 'RETO',
-  photo: 'FOTO',
-};
+// What a post of the profile list is about: its attachment's title, else
+// its text, else its kind.
+export function profilePostTitle(post: FeedPost): string {
+  const attachment = post.attachment as { title?: unknown } | null;
+  const title = typeof attachment?.title === 'string' ? attachment.title.trim() : '';
+  return title || post.body?.trim() || postKindLabel(post.type);
+}
 
-// "ACTIVIDAD RECIENTE": two dark tiles. The post detail is tanda A.
-export function RecentActivity({
+// "PUBLICACIONES" of a profile (mine or a friend's): get_user_posts, 20 per
+// page, "Ver más" for the next one.
+export function ProfilePosts({
+  status,
   posts,
+  hasMore,
+  loadingMore,
+  emptyText,
   onOpen,
+  onMore,
+  onRetry,
 }: {
-  posts: SocialRecentPost[];
-  onOpen: (post: SocialRecentPost) => void;
+  status: SocialLoadState;
+  posts: FeedPost[];
+  hasMore: boolean;
+  loadingMore: boolean;
+  emptyText: string;
+  onOpen: (post: FeedPost) => void;
+  onMore: () => void;
+  onRetry: () => void;
 }) {
-  const { scene, colors, mode } = useThemeV2();
-
+  const { colors } = useThemeV2();
   return (
-    <View style={styles.activity}>
-      <Eyebrow>Actividad reciente</Eyebrow>
-      <View style={styles.tiles}>
-        {posts.slice(0, 2).map(post => (
-          <PressableScale
-            key={post.id}
-            accessibilityRole="button"
-            accessibilityLabel={`${OVER[post.type]}. ${post.title}`}
-            onPress={() => onOpen(post)}
-            style={[
-              styles.tile,
-              { backgroundColor: scene.plate },
-              // The plate is almost the Dark background: a hairline separates it.
-              mode === 'dark'
-                ? { boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.08)' }
-                : null,
-            ]}
-          >
-            <TextV2
-              variant="eyebrow"
-              color={
-                post.type === 'workout'
-                  ? scene.onDark.secondary
-                  : colors.ember.textOnDark
-              }
+    <View style={styles.block}>
+      <Eyebrow style={styles.eyebrow}>Publicaciones</Eyebrow>
+      {status === 'loading' ? (
+        <SkeletonGroup>
+          {[0, 1, 2].map(index => (
+            <View key={index} style={styles.postSkeleton}>
+              <Skeleton width="35%" height={11} />
+              <Skeleton width="80%" height={15} />
+            </View>
+          ))}
+        </SkeletonGroup>
+      ) : status === 'error' ? (
+        <BlockError message="No pudimos cargar las publicaciones." onRetry={onRetry} />
+      ) : posts.length === 0 ? (
+        <TextV2 variant="body" tone="secondary" style={styles.postsEmpty}>
+          {emptyText}
+        </TextV2>
+      ) : (
+        <>
+          {posts.map(post => (
+            <PressableScale
+              key={post.id}
+              accessibilityRole="button"
+              accessibilityLabel={`${postKindLabel(post.type)}. ${profilePostTitle(post)}`}
+              onPress={() => onOpen(post)}
+              style={[styles.postRow, { borderTopColor: colors.divider }]}
             >
-              {OVER[post.type]}
-            </TextV2>
-            <TextV2 variant="cta" color={scene.onDark.primary} numberOfLines={2}>
-              {post.title}
-            </TextV2>
-          </PressableScale>
-        ))}
-      </View>
+              <View style={styles.postTexts}>
+                <TextV2 variant="eyebrow" tone="secondary">
+                  {`${postKindLabel(post.type).toUpperCase()} · ${timeAgo(post.created_at)}`}
+                </TextV2>
+                <TextV2 variant="bodyStrong" numberOfLines={2}>
+                  {profilePostTitle(post)}
+                </TextV2>
+              </View>
+              <ChevronRight size={18} color={colors.text.tertiary} strokeWidth={2} />
+            </PressableScale>
+          ))}
+          {hasMore ? (
+            <Button
+              label="Ver más"
+              variant="secondary"
+              size="md"
+              loading={loadingMore}
+              disabled={loadingMore}
+              onPress={onMore}
+              style={styles.more}
+            />
+          ) : null}
+        </>
+      )}
     </View>
   );
 }
@@ -121,7 +155,6 @@ export function PrivacyLine({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
-  activity: { gap: 12 },
   block: { gap: 0 },
   eyebrow: { paddingBottom: 4 },
   recordRow: {
@@ -139,15 +172,17 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     justifyContent: 'center',
   },
-  tiles: { flexDirection: 'row', gap: 10 },
-  tile: {
-    flex: 1,
-    height: 150,
-    borderRadius: 20,
-    padding: 12,
-    justifyContent: 'flex-end',
-    gap: 2,
+  postSkeleton: { gap: 8, paddingVertical: 12 },
+  postsEmpty: { paddingVertical: 8 },
+  postRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
   },
+  postTexts: { flex: 1, gap: 2 },
+  more: { marginTop: 8 },
   privacy: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   privacyText: { flex: 1 },
 });

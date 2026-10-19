@@ -7,16 +7,22 @@ import { APP_ROUTES } from '@app/constants/routes';
 import { draftFromAnalysis, toSaveInput, type MealDraft } from '@app/features/nutrition/mealDraft';
 import { formatThousands } from '@app/features/nutrition/nutritionModel';
 import { QuickKcalSheet, type QuickKcalResult } from '@app/features/nutrition/v2/QuickKcalSheet';
+import { createPhotoRequestSession } from '@app/features/vision/photoRequest';
 import { pickFromGallery } from '@app/features/vision/picker';
 import { uploadVisionImage } from '@app/features/vision/imageUpload';
-import { lowQuotaNotice, type VisionAction, type VisionFailureInput } from '@app/features/vision/visionCopy';
+import {
+  lowQuotaNotice,
+  visionFailureFrom,
+  type VisionAction,
+  type VisionFailureInput,
+} from '@app/features/vision/visionCopy';
 import { CameraCapture } from '@app/features/vision/v2/CameraCapture';
 import { VisionFailureSheet } from '@app/features/vision/v2/VisionFailureSheet';
 import { useVisionUsage } from '@app/features/vision/useVisionUsage';
 import { useAuth } from '@app/hooks/useAuth';
 import { useMealMutations } from '@app/hooks/useMeals';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
-import { EllieError } from '@app/services/ellie/ellieService';
+import { createUuid } from '@app/lib/uuid';
 import { analyzeMeal, VisionError } from '@app/services/vision/visionService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -50,6 +56,8 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
   const [quickReason, setQuickReason] = useState<string | null>(null);
   // What is already in storage for this photo: a retry does not upload again.
   const uploaded = useRef<{ uri: string; path: string; localUri: string } | null>(null);
+  // client_request_id: one per photo, the same on every retry of it.
+  const requests = useRef(createPhotoRequestSession(createUuid));
   const cancelled = useRef(false);
 
   useEffect(() => {
@@ -73,7 +81,10 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
           const sent = await uploadVisionImage({ kind: 'meal', userId, uri });
           uploaded.current = { uri, path: sent.path, localUri: sent.uri };
         }
-        const { draft, usage } = await analyzeMeal({ imagePath: uploaded.current.path });
+        const { draft, usage } = await analyzeMeal({
+          imagePath: uploaded.current.path,
+          clientRequestId: requests.current.idFor(uri),
+        });
         quota.record(usage);
         if (cancelled.current) {
           return;
@@ -90,11 +101,7 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
         if (error instanceof VisionError && error.usage) {
           quota.record(error.usage);
         }
-        const failure: VisionFailureInput =
-          error instanceof EllieError
-            ? { code: error.code, used: error.used, limit: error.limit }
-            : { code: error instanceof Error && error.name === 'ImageTooLargeError' ? 'image_too_large' : 'offline' };
-        setPhase({ kind: 'failed', uri, failure });
+        setPhase({ kind: 'failed', uri, failure: visionFailureFrom(error) });
       }
     },
     [navigation, quota, userId],
@@ -118,6 +125,7 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
     switch (action) {
       case 'other_photo':
         uploaded.current = null;
+        requests.current.reset();
         setPhase({ kind: 'camera' });
         break;
       case 'retry':

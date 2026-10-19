@@ -10,6 +10,7 @@ import {
   Share2,
 } from 'lucide-react-native';
 import {
+  BackButton,
   Button,
   Eyebrow,
   GlassSurface,
@@ -33,18 +34,22 @@ import {
   zoneLabel,
 } from '@app/features/workouts/workoutsModel';
 import { EQUIPMENT_ICONS } from '@app/features/workouts/v2/workoutIcons';
+import {
+  deletedRoutineText,
+  routineErrorCopy,
+} from '@app/features/workouts/routineErrors';
 import { useAuth } from '@app/hooks/useAuth';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExercises } from '@app/hooks/useCatalog';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
-import { useRoutineBuilder } from '@app/hooks/useRoutineBuilder';
-import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
+import { useRoutine, useRoutineMutations } from '@app/hooks/useRoutines';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
 import {
   DEFAULT_WORKOUT_THUMBNAIL,
   resolveWorkoutThumbnailSource,
 } from '@app/lib/workoutThumbnails';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { findExerciseByName, getWorkoutAccess } from '@app/shared';
+import { getWorkoutAccess, type WorkoutExercise } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'WorkoutDetail'>;
@@ -53,40 +58,37 @@ const HERO_HEIGHT = 470;
 
 // Detalle de rutina v2 (WORKOUTS_06): photographic hero with title and
 // figures, a sheet that rises over it with the exercises as a Routine Path,
-// and a fixed CTA. No Resumen / Ejercicios / Reviews tabs.
+// and a fixed CTA. No Resumen / Ejercicios / Reviews tabs. The routine is
+// always read with get_routine(id) (official, editorial, ELLIE or the user's),
+// never from a cached list (B-03).
 export function WorkoutDetailScreen({ navigation, route }: Props) {
   const { colors, layout, radius } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const workoutsQuery = useWorkoutLibrary();
-  const exercisesQuery = useExerciseLibrary();
+  const language = useProfileLanguage();
+  const routineQuery = useRoutine(route.params.workoutId);
   const favorites = useFavoriteWorkouts();
-  const routineBuilder = useRoutineBuilder();
+  const mutations = useRoutineMutations();
   const [imageBroken, setImageBroken] = useState(false);
-  const workout = useMemo(
-    () =>
-      (workoutsQuery.data || []).find(
-        item => item.id === route.params.workoutId,
-      ) || null,
-    [route.params.workoutId, workoutsQuery.data],
-  );
+  const workout = routineQuery.data ?? null;
   const { workoutSession, startSession, isStartingSession } =
     useWorkoutSession(workout);
   const back = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
 
-  const library = useMemo(
-    () => exercisesQuery.data || [],
-    [exercisesQuery.data],
+  // Zone and equipment of each exercise (get_exercise, kept on the phone):
+  // only the "Trabaja" / "Necesitas" pills wait for them.
+  const details = useExercises(
+    useMemo(
+      () => (workout?.exercises ?? []).map(exercise => exercise.exerciseId),
+      [workout?.exercises],
+    ),
   );
   const matched = useMemo(
     () =>
       (workout?.exercises || []).map(exercise =>
-        exercise.exerciseId
-          ? library.find(item => item.id === exercise.exerciseId) ??
-            findExerciseByName(library, exercise.name)
-          : findExerciseByName(library, exercise.name),
+        exercise.exerciseId ? details.byId[exercise.exerciseId] : undefined,
       ),
-    [library, workout?.exercises],
+    [details.byId, workout?.exercises],
   );
 
   const backButton = (
@@ -97,21 +99,24 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
       onPress={back}
     />
   );
+  // Error / not found are on the light background: the plain back button
+  // (the glass one is white on white, B-04).
+  const shellBack = <BackButton onPress={back} />;
 
-  if (workoutsQuery.error) {
+  if (routineQuery.error) {
     return (
-      <Shell top={insets.top} colors={colors} backButton={backButton}>
+      <Shell top={insets.top} colors={colors} backButton={shellBack}>
         <BlockError
-          message="No pudimos cargar la rutina."
+          message={routineErrorCopy(routineQuery.error, language).message}
           onRetry={() => {
-            workoutsQuery.refetch().catch(() => {});
+            routineQuery.refetch().catch(() => {});
           }}
         />
       </Shell>
     );
   }
 
-  if (workoutsQuery.isLoading || !favorites.loaded) {
+  if (routineQuery.isLoading || !favorites.loaded) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg }]}>
         <StatusBarV2 style="light" />
@@ -142,7 +147,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
 
   if (!workout) {
     return (
-      <Shell top={insets.top} colors={colors} backButton={backButton}>
+      <Shell top={insets.top} colors={colors} backButton={shellBack}>
         <View style={styles.notFound}>
           <TextV2 variant="section" align="center">
             Rutina no encontrada
@@ -194,6 +199,34 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
   const equipment = EQUIPMENT.filter(item =>
     matched.some(exercise => exercise?.equipment === item.key),
   );
+
+  // Backend order (warmup → main → cooldown). F-06 will design the warm-up;
+  // for now it is the same path under its own label.
+  const toStep = (exercise: WorkoutExercise) => {
+    const libraryExercise = exercise.exerciseId
+      ? details.byId[exercise.exerciseId]
+      : undefined;
+    return {
+      key: exercise.id,
+      title: exercise.name,
+      subtitle: pathMeta(exercise),
+      thumbnail: {
+        mediaKey: exercise.thumbKey,
+        fallback: exerciseThumbnail(libraryExercise?.bodyPart),
+      },
+      trailing: exercise.exerciseId ? (
+        <ChevronRight size={18} color={colors.text.tertiary} strokeWidth={2} />
+      ) : undefined,
+      onPress: exercise.exerciseId
+        ? () =>
+            navigation.navigate(APP_ROUTES.ExerciseDetail, {
+              exerciseId: exercise.exerciseId as string,
+            })
+        : undefined,
+    };
+  };
+  const warmup = workout.exercises.filter(exercise => exercise.block === 'warmup');
+  const path = workout.exercises.filter(exercise => exercise.block !== 'warmup');
 
   const start = async () => {
     try {
@@ -250,13 +283,17 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await routineBuilder.deleteRoutine(workout.id);
+              const result = await mutations.deleteRoutine(workout.id);
               back();
+              if (result.archived) {
+                Alert.alert(
+                  'Rutina archivada',
+                  deletedRoutineText(true, language),
+                );
+              }
             } catch (error) {
-              Alert.alert(
-                'No pudimos eliminar la rutina',
-                error instanceof Error ? error.message : 'Inténtalo otra vez.',
-              );
+              const copy = routineErrorCopy(error, language);
+              Alert.alert('No pudimos eliminar la rutina', copy.message);
             }
           },
         },
@@ -359,47 +396,22 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
             </TextV2>
           ) : null}
 
+          {warmup.length > 0 ? (
+            <View style={styles.block}>
+              <Eyebrow>Calentamiento</Eyebrow>
+              <RoutinePath steps={warmup.map(toStep)} />
+            </View>
+          ) : null}
+
           <View style={styles.block}>
-            <Eyebrow>{`Recorrido · ${workout.exercises.length} ejercicios`}</Eyebrow>
-            {exercisesQuery.error ? (
-              <BlockError
-                message="No pudimos cargar los ejercicios."
-                onRetry={() => {
-                  exercisesQuery.refetch().catch(() => {});
-                }}
-              />
-            ) : workout.exercises.length === 0 ? (
+            <Eyebrow>{`Recorrido · ${path.length} ejercicios`}</Eyebrow>
+            {workout.exercises.length === 0 ? (
               <TextV2 variant="body" tone="secondary">
                 Esta rutina aún no tiene ejercicios.
               </TextV2>
-            ) : (
-              <RoutinePath
-                steps={workout.exercises.map((exercise, index) => {
-                  const libraryExercise = matched[index];
-                  return {
-                    key: exercise.id,
-                    title: exercise.name,
-                    subtitle: pathMeta(exercise, libraryExercise?.recommendedSetsReps),
-                    thumbnail: libraryExercise?.thumbnailUrl
-                      ? { uri: libraryExercise.thumbnailUrl }
-                      : exerciseThumbnail(libraryExercise?.bodyPart),
-                    trailing: libraryExercise ? (
-                      <ChevronRight
-                        size={18}
-                        color={colors.text.tertiary}
-                        strokeWidth={2}
-                      />
-                    ) : undefined,
-                    onPress: libraryExercise
-                      ? () =>
-                          navigation.navigate(APP_ROUTES.ExerciseDetail, {
-                            exerciseId: libraryExercise.id,
-                          })
-                      : undefined,
-                  };
-                })}
-              />
-            )}
+            ) : path.length > 0 ? (
+              <RoutinePath steps={path.map(toStep)} />
+            ) : null}
           </View>
 
           {zones.length > 0 ? (

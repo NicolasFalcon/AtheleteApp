@@ -45,7 +45,7 @@ import { RecentActivity } from '@app/features/route/v2/RecentActivity';
 import { RouteBests } from '@app/features/route/v2/RouteBests';
 import { useAuth } from '@app/hooks/useAuth';
 import { useBadgeShelves } from '@app/hooks/useBadgeShelves';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExerciseNames } from '@app/hooks/useCatalog';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { useProfilePhotoUri } from '@app/hooks/useProfilePhotoUri';
 import { useProfileStats } from '@app/hooks/useProfileStats';
@@ -76,7 +76,6 @@ export function ProfileScreen({ navigation }: Props) {
   const badges = useBadgeShelves();
   const stats = useProfileStats();
   const recordsQuery = usePersonalRecords();
-  const library = useExerciseLibrary();
   const [selected, setSelected] = useState<ShelfItem | null>(null);
 
   const profile = realProfile;
@@ -93,14 +92,14 @@ export function ProfileScreen({ navigation }: Props) {
       .filter(item => !item.earned && item.progress)
       .sort((a, b) => (b.progress?.ratio ?? 0) - (a.progress?.ratio ?? 0))[0] ?? null;
 
-  const names = useMemo(() => {
-    const byId: Record<string, string> = {};
-    (library.data ?? []).forEach(exercise => {
-      byId[exercise.id] = exercise.name;
-    });
-    return byId;
-  }, [library.data]);
-  const records = recordsQuery.data ?? [];
+  const records = useMemo(() => recordsQuery.data ?? [], [recordsQuery.data]);
+  // The six latest records of the timeline (get_exercise, kept on the phone).
+  const { names } = useExerciseNames(
+    useMemo(
+      () => records.slice(0, 6).map(record => record.exerciseId),
+      [records],
+    ),
+  );
   const firstSession = stats.data?.firstSession ?? null;
 
   const timeline = buildTimeline({

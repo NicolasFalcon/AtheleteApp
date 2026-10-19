@@ -25,7 +25,7 @@ import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
 import { formatDuration, formatKg } from '@app/features/session/sessionModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExerciseNames } from '@app/hooks/useCatalog';
 import { invalidatePersonalRecordQueries } from '@app/lib/queryInvalidation';
 import {
   detectSessionPRs,
@@ -117,7 +117,6 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
     // Once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const exercisesQuery = useExerciseLibrary();
   const [prSheetOpen, setPrSheetOpen] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [registeredCount, setRegisteredCount] = useState<number | null>(null);
@@ -135,13 +134,15 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const done = () =>
     navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
 
-  const exerciseName = useCallback(
-    (exerciseId: string) =>
-      exercisesQuery.data?.find(item => item.id === exerciseId)?.name ?? 'Ejercicio',
-    [exercisesQuery.data],
-  );
-
   const records = useMemo(() => prsQuery.data ?? [], [prsQuery.data]);
+  // Names of the exercises with a new record (get_exercise, on the phone).
+  const { names } = useExerciseNames(
+    useMemo(() => records.map(record => record.exerciseId), [records]),
+  );
+  const exerciseName = useCallback(
+    (exerciseId: string) => names[exerciseId] ?? 'Ejercicio',
+    [names],
+  );
   const badge = useMemo(
     () => ALL_BADGES.find(item => item.id === newBadges[0]) ?? null,
     // newBadges comes from the params (stable per screen).

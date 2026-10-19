@@ -30,12 +30,10 @@ import {
   prTypeLabels,
   type PrDraft,
 } from '@app/features/progress/recordsModel';
-import type {
-  LibraryExercise,
-  PersonalRecord,
-  PRInsert,
-  PRType,
-} from '@app/shared';
+import { zoneLabel } from '@app/features/workouts/workoutsModel';
+import { useExerciseBrowse } from '@app/hooks/useCatalog';
+import { useDebouncedValue } from '@app/hooks/useDebouncedValue';
+import type { PersonalRecord, PRInsert, PRType } from '@app/shared';
 
 const TYPE_ICONS: Record<PRType, LucideIcon> = {
   weight_reps: Dumbbell,
@@ -55,7 +53,6 @@ export function RegisterRecordSheet({
   open,
   onClose,
   exercise,
-  exercises,
   records,
   saving,
   error,
@@ -64,7 +61,6 @@ export function RegisterRecordSheet({
   open: boolean;
   onClose: () => void;
   exercise: RecordExercise | null;
-  exercises: LibraryExercise[];
   // Every record of the user (the best mark of each type comes from here).
   records: PersonalRecord[];
   saving: boolean;
@@ -134,12 +130,13 @@ export function RegisterRecordSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, current?.id]);
 
-  const matches = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return exercises
-      .filter(item => !term || item.name.toLowerCase().includes(term))
-      .slice(0, 40);
-  }, [exercises, query]);
+  // The picker searches the catalog on the server (list_exercises, 300 ms).
+  const debouncedQuery = useDebouncedValue(query, 300);
+  const search = useExerciseBrowse(
+    { zone: null, equipment: [], level: null, q: debouncedQuery },
+    { enabled: open && !current },
+  );
+  const matches = useMemo(() => search.items.slice(0, 40), [search.items]);
 
   const comparison = compareDraft(draft, bestOf(prType));
   const valid = Boolean(current) && isDraftValid(draft);
@@ -160,7 +157,7 @@ export function RegisterRecordSheet({
         >
           <TextV2 variant="cta">{item.name}</TextV2>
           <TextV2 variant="meta" tone="secondary">
-            {item.bodyPart}
+            {item.musclesWorked.primary[0] ?? zoneLabel(item.bodyPart)}
           </TextV2>
         </PressableScale>
       ))}

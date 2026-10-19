@@ -25,16 +25,17 @@ import { MOVEKIT_POSTER } from '@app/features/workouts/workoutAssets';
 // (fixed camera, autoplay, loop, no audio) once the assets and a video
 // player exist. Wire here, and only here:
 //   - `exercise.videoUrl` → player source; poster = first clean frame;
-//   - play / pause, speed 1× / 0,5× (the controls below are already laid out
-//     and intentionally inactive);
-//   - phase segments + the technique step that lights up with the loop.
+//   - play / pause, speed 0,5× / 1× / 1,5× and fullscreen. No progress bar:
+//     the video loops (B-19).
 // No video library is installed on purpose (no new native dependencies).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const PHASES = 4;
-// Static frame of the poster (phase 2 of 4: lowering). TODO(movekit): drive
-// it with the video time.
-const ACTIVE_PHASE = 1;
+// Speeds, in the order the button cycles through them (B-19).
+type Speed = '1×' | '1,5×' | '0,5×';
+const SPEEDS: readonly Speed[] = ['1×', '1,5×', '0,5×'];
+const RATE: Record<Speed, number> = { '0,5×': 0.5, '1×': 1, '1,5×': 1.5 };
+const nextSpeed = (current: Speed): Speed =>
+  SPEEDS[(SPEEDS.indexOf(current) + 1) % SPEEDS.length];
 
 export type MoveKitVariant = 'bleed' | 'lightbox';
 
@@ -65,7 +66,7 @@ export function MoveKitPlayer({
 }: MoveKitPlayerProps) {
   const { colors } = useThemeV2();
   const { width } = useWindowDimensions();
-  const [speed, setSpeed] = useState<'1×' | '0,5×'>('1×');
+  const [speed, setSpeed] = useState<Speed>('1×');
   const [paused, setPaused] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const lightbox = variant === 'lightbox';
@@ -91,7 +92,7 @@ export function MoveKitPlayer({
               repeat
               muted
               paused={paused}
-              rate={speed === '1×' ? 1 : 0.5}
+              rate={RATE[speed as Speed] ?? 1}
               poster={{
                 source: (posterUrl
                   ? { uri: posterUrl }
@@ -131,15 +132,13 @@ export function MoveKitPlayer({
             VIDEO NO DISPONIBLE
           </TextV2>
         )}
+        {/* No progress bar: the video loops (B-19). */}
         <View style={styles.controls}>
-          <PhaseSegments height={2} />
           <View style={styles.buttons}>
             <PressableScale
               accessibilityRole="button"
               accessibilityLabel={`Velocidad ${speed}`}
-              onPress={() =>
-                setSpeed(current => (current === '1×' ? '0,5×' : '1×'))
-              }
+              onPress={() => setSpeed(nextSpeed)}
               style={styles.speed}
             >
               <TextV2
@@ -191,30 +190,12 @@ export function MoveKitPlayer({
         videoUrl={videoFailed ? null : videoUrl}
         speed={speed}
         paused={paused}
-        onSpeedChange={() =>
-          setSpeed(current => (current === '1×' ? '0,5×' : '1×'))
-        }
+        onSpeedChange={() => setSpeed(nextSpeed)}
         onPauseChange={() => setPaused(current => !current)}
         onVideoError={() => setVideoFailed(true)}
         onClose={() => onFullscreenChange(false)}
       />
     </>
-  );
-}
-
-function PhaseSegments({ height }: { height: number }) {
-  return (
-    <View style={styles.segments}>
-      {Array.from({ length: PHASES }, (_, index) => (
-        <View
-          key={index}
-          style={[styles.segment, { height, borderRadius: height / 2 }]}
-        >
-          {index < ACTIVE_PHASE ? <View style={styles.segmentDone} /> : null}
-          {index === ACTIVE_PHASE ? <View style={styles.segmentFill} /> : null}
-        </View>
-      ))}
-    </View>
   );
 }
 
@@ -314,7 +295,7 @@ function MoveKitFullscreen({
             repeat
             muted
             paused={paused}
-            rate={speed === '1×' ? 1 : 0.5}
+            rate={RATE[speed as Speed] ?? 1}
             poster={{
               source: (posterUrl
                 ? { uri: posterUrl }
@@ -439,27 +420,8 @@ const styles = StyleSheet.create({
     bottom: 22,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: 14,
-  },
-  segments: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 3,
-  },
-  segment: {
-    flex: 1,
-    backgroundColor: 'rgba(18,18,18,.1)',
-    overflow: 'hidden',
-  },
-  segmentDone: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#121212',
-  },
-  segmentFill: {
-    width: '45%',
-    height: '100%',
-    backgroundColor: '#FF5B1F',
   },
   buttons: {
     flexDirection: 'row',

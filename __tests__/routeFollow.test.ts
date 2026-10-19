@@ -24,7 +24,7 @@ const flush = async () => {
 async function follow(plan: LatLng[], sport: RouteSport = 'running') {
   const api = createFakeLocationApi();
   const source = new RealLocationSource(api);
-  let state: TrackerState = initialTracker(sport, plan, true);
+  let state: TrackerState = initialTracker(sport, plan);
   const dispatch = (action: TrackerAction) => {
     state = trackerReducer(state, action);
   };

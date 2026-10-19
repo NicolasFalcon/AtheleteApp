@@ -1,37 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { LocationAccess } from '@app/features/route/locationSource';
 import { getLocationSource } from '@app/features/route/locationSourceFactory';
+import { isReadyFix, locationStore } from '@app/features/route/locationStore';
 import { routeStore } from '@app/features/route/routeStore';
 import type { RoutePoint } from '@app/features/route/routeTypes';
 
-const FIX_RETRY_MS = 3000;
-
-// Permission state and the person's current position for the Ruta screens
-// that need to know where they are (Salir ahora, Generar, Crear a mano). The
-// position also goes to `routeStore.origin`. It is re-read when the app comes
-// back from Ajustes, and retried every few seconds until a fix arrives.
+// Permission state and where the person is, for the Ruta screens that need it
+// (Salir ahora, Generar, Crear a mano). The position comes from the shared
+// `locationStore`: the last known one at once (approximate), a reused one for
+// 3 min after leaving Ruta, and the foreground search while the screen is
+// focused; it stops when the screen loses focus (the recording has its own
+// updates). The position also goes to `routeStore.origin`.
 export function useLocationAccess() {
   const source = getLocationSource();
   const [access, setAccess] = useState<LocationAccess | null>(null);
-  const [fix, setFix] = useState<RoutePoint | null>(null);
+  const snapshot = useSyncExternalStore(locationStore.subscribe, locationStore.get, locationStore.get);
   const alive = useRef(true);
+  const usable = access?.permission === 'granted' && access.precise;
 
   const refresh = useCallback(async () => {
     const next = await source.getAccess().catch(() => null);
-    if (!alive.current || !next) {
-      return;
+    if (alive.current && next) {
+      setAccess(next);
     }
-    setAccess(next);
-    if (next.permission === 'granted' && next.precise) {
-      const here = await source.getCurrent().catch(() => null);
-      if (alive.current && here) {
-        setFix(here);
-        routeStore.patch({ origin: { lat: here.lat, lon: here.lon } });
-      }
-    } else {
-      setFix(null);
-    }
+    return next;
   }, [source]);
 
   const request = useCallback(async () => {
@@ -40,13 +34,13 @@ export function useLocationAccess() {
       return null;
     }
     setAccess(next);
-    refresh().catch(() => undefined);
     return next;
-  }, [refresh, source]);
+  }, [source]);
 
   useEffect(() => {
     alive.current = true;
     refresh().catch(() => undefined);
+    // Back from Ajustes: the permission may have changed.
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') {
         refresh().catch(() => undefined);
@@ -58,16 +52,35 @@ export function useLocationAccess() {
     };
   }, [refresh]);
 
-  const usable = access?.permission === 'granted' && access.precise;
-  useEffect(() => {
-    if (!usable || fix) {
-      return undefined;
-    }
-    const timer = setInterval(() => {
-      refresh().catch(() => undefined);
-    }, FIX_RETRY_MS);
-    return () => clearInterval(timer);
-  }, [fix, refresh, usable]);
+  // While the screen is focused and the permission allows it: show the known
+  // position and look for a real one; stop when leaving.
+  useFocusEffect(
+    useCallback(() => {
+      if (!usable) {
+        return undefined;
+      }
+      locationStore.warm().catch(() => undefined);
+      locationStore.start();
+      return () => locationStore.stop();
+    }, [usable]),
+  );
 
-  return { access, fix, usable, request, refresh };
+  const point: RoutePoint | null = usable ? snapshot.fix?.point ?? null : null;
+  useEffect(() => {
+    if (point) {
+      routeStore.patch({ origin: { lat: point.lat, lon: point.lon } });
+    }
+  }, [point]);
+
+  return {
+    access,
+    // The best position known (may be approximate: see `approximate`).
+    fix: point,
+    approximate: usable ? Boolean(snapshot.fix?.approximate) : false,
+    // Accurate enough to record (≤ 30 m, not the last known one).
+    ready: usable && isReadyFix(snapshot.fix),
+    usable,
+    request,
+    refresh,
+  };
 }

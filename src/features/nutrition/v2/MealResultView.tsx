@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ArrowUp, Camera, Minus, Plus, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -21,12 +21,16 @@ import {
   isLowConfidence,
   itemValues,
   mealTypeLabel,
+  perUnitLine,
   removeItem,
   setMealType,
   stepItem,
+  unitLabel,
+  unitLine,
   type MealDraft,
 } from '@app/features/nutrition/mealDraft';
 import { formatThousands } from '@app/features/nutrition/nutritionModel';
+import { MealPhoto } from '@app/features/nutrition/v2/MealPhoto';
 import { useSignedImage } from '@app/hooks/useSignedImage';
 
 const HERO = 300;
@@ -100,8 +104,12 @@ export function MealResultView({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
         >
-          <View style={[styles.hero, { backgroundColor: colors.surface.muted }]}>
-            {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+          <MealPhoto
+            uri={uri}
+            height={HERO}
+            label={es ? 'Ver la foto' : 'See the photo'}
+            closeLabel={es ? 'Cerrar' : 'Close'}
+          >
             <View style={[styles.heroTop, { paddingTop: insets.top + 8 }]}>
               <PressableScale
                 accessibilityRole="button"
@@ -130,7 +138,7 @@ export function MealResultView({
                 </TextV2>
               </View>
             ) : null}
-          </View>
+          </MealPhoto>
 
           <View style={styles.body}>
             <TextInput
@@ -209,9 +217,19 @@ export function MealResultView({
                           <TextV2 variant="bodyStrong" numberOfLines={2}>
                             {item.name}
                           </TextV2>
+                          {values.unit ? (
+                            <TextV2 variant="meta" tone="secondary">
+                              {unitLine(values, language)}
+                            </TextV2>
+                          ) : null}
                           <TextV2 variant="meta" tone="secondary">
                             {`P ${values.protein} · C ${values.carbs} · G ${values.fats} g`}
                           </TextV2>
+                          {values.unit ? (
+                            <TextV2 variant="meta" tone="tertiary">
+                              {perUnitLine(values.unit, language)}
+                            </TextV2>
+                          ) : null}
                         </View>
                         <TextV2 variant="bodyStrong">{`${formatThousands(values.kcal)} kcal`}</TextV2>
                       </View>
@@ -225,7 +243,11 @@ export function MealResultView({
                           >
                             <Minus size={16} color={colors.text.primary} strokeWidth={2.2} />
                           </PressableScale>
-                          <TextV2 variant="bodyStrong" style={styles.grams}>{`${item.grams} g`}</TextV2>
+                          <TextV2 variant="bodyStrong" style={styles.grams}>
+                            {item.unit
+                              ? `${item.unit.count} ${unitLabel(item.unit.label, item.unit.count, language)}`
+                              : `${item.grams} g`}
+                          </TextV2>
                           <PressableScale
                             accessibilityRole="button"
                             accessibilityLabel={es ? 'Más' : 'More'}
@@ -313,7 +335,6 @@ export function MealResultView({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   flex: { flex: 1 },
-  hero: { height: HERO, overflow: 'hidden' },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
   round44: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(14,13,12,.45)', alignItems: 'center', justifyContent: 'center' },
   retake: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: 'rgba(14,13,12,.45)' },

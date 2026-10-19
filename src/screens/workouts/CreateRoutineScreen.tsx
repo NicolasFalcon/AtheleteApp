@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery } from '@tanstack/react-query';
 import {
   Button,
   GlassSurface,
@@ -30,13 +36,15 @@ import {
   clampDuration,
   type ZoneKey,
 } from '@app/features/workouts/workoutsModel';
+import { routineErrorCopy } from '@app/features/workouts/routineErrors';
 import { useAuth } from '@app/hooks/useAuth';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
-import { useRoutineBuilder } from '@app/hooks/useRoutineBuilder';
+import { useExercise, useExerciseBrowse } from '@app/hooks/useCatalog';
+import { useDebouncedValue } from '@app/hooks/useDebouncedValue';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
+import { useRoutine, useRoutineMutations } from '@app/hooks/useRoutines';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { fetchRoutineById } from '@app/services/supabase/routines';
+import type { RoutineInput } from '@app/services/routines/routinesService';
 import {
-  findExerciseByName,
   getWorkoutAccess,
   type LibraryExercise,
   type Workout,
@@ -100,8 +108,8 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const exercisesQuery = useExerciseLibrary();
-  const routineBuilder = useRoutineBuilder();
+  const language = useProfileLanguage();
+  const mutations = useRoutineMutations();
 
   const params = route.params;
   const initialWorkoutId =
@@ -109,10 +117,6 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
   const initialExerciseId =
     params && 'initialExerciseId' in params
       ? params.initialExerciseId
-      : undefined;
-  const initialExerciseName =
-    params && 'initialExerciseName' in params
-      ? params.initialExerciseName
       : undefined;
 
   const mode: 'create' | 'edit' = initialWorkoutId ? 'edit' : 'create';
@@ -126,7 +130,6 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
   const [calories, setCalories] = useState(estimateCalories(45, 0));
   const [hasManualCalories, setHasManualCalories] = useState(false);
   const [targetFocusInput, setTargetFocusInput] = useState('');
-  const [tagsInput, setTagsInput] = useState('');
   const [selectedExercises, setSelectedExercises] = useState<BuilderExercise[]>(
     [],
   );
@@ -137,11 +140,18 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     number | null
   >(null);
   const hasInitialized = useRef(false);
-  const editWorkoutQuery = useQuery({
-    queryKey: ['workouts', 'detail', initialWorkoutId || 'new'],
-    enabled: mode === 'edit' && Boolean(initialWorkoutId),
-    queryFn: async () => fetchRoutineById(initialWorkoutId!),
-  });
+  // Editing reads the routine with get_routine (the same as the detail).
+  const editWorkoutQuery = useRoutine(mode === 'edit' ? initialWorkoutId : null);
+  // "Agregar a rutina" from an exercise: that exercise (get_exercise).
+  const initialExerciseQuery = useExercise(
+    mode === 'create' ? initialExerciseId : null,
+  );
+  // Picker: list_exercises page by page, search on the server (300 ms).
+  const debouncedQuery = useDebouncedValue(searchQuery, 300);
+  const pickerQuery = useExerciseBrowse(
+    { zone: zoneFilter, equipment: [], level: null, q: debouncedQuery },
+    { enabled: step === 'exercises' },
+  );
 
   const workout = useMemo(
     () => editWorkoutQuery.data || null,
@@ -153,7 +163,7 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
   );
 
   useEffect(() => {
-    if (hasInitialized.current || exercisesQuery.isLoading) {
+    if (hasInitialized.current || initialExerciseQuery.isLoading) {
       return;
     }
 
@@ -170,16 +180,11 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
       setCalories(workout.calories);
       setHasManualCalories(true);
       setTargetFocusInput((workout.targetMuscles || []).join(', '));
-      setTagsInput((workout.tags || []).join(', '));
+      // Each exercise keeps its block (warmup / main / cooldown).
       setSelectedExercises(
         workout.exercises.map(exercise => ({
           ...exercise,
           notes: exercise.notes ?? '',
-          libraryExercise: exercise.exerciseId
-            ? exercisesQuery.data?.find(item => item.id === exercise.exerciseId)
-            : exercisesQuery.data
-            ? findExerciseByName(exercisesQuery.data, exercise.name)
-            : undefined,
         })),
       );
       hasInitialized.current = true;
@@ -187,31 +192,15 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     }
 
     const initialExercises: BuilderExercise[] = [];
-    if (initialExerciseId && exercisesQuery.data) {
-      const libraryExercise = exercisesQuery.data.find(
-        item => item.id === initialExerciseId,
-      );
-
-      if (libraryExercise) {
-        initialExercises.push(createBuilderExercise(libraryExercise));
-      } else if (initialExerciseName) {
-        const fallbackExercise = findExerciseByName(
-          exercisesQuery.data,
-          initialExerciseName,
-        );
-        if (fallbackExercise) {
-          initialExercises.push(createBuilderExercise(fallbackExercise));
-        }
-      }
+    if (initialExerciseQuery.data) {
+      initialExercises.push(createBuilderExercise(initialExerciseQuery.data));
     }
 
     setSelectedExercises(initialExercises);
     hasInitialized.current = true;
   }, [
-    exercisesQuery.data,
-    exercisesQuery.isLoading,
-    initialExerciseId,
-    initialExerciseName,
+    initialExerciseQuery.data,
+    initialExerciseQuery.isLoading,
     initialWorkoutId,
     mode,
     workout,
@@ -225,17 +214,18 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     setCalories(estimateCalories(duration, selectedExercises.length));
   }, [duration, hasManualCalories, selectedExercises.length]);
 
-  const filteredExercises = useMemo(() => {
-    const allExercises = exercisesQuery.data || [];
-    return allExercises.filter(exercise => {
-      const matchesSearch = exercise.name
-        .toLowerCase()
-        .includes(searchQuery.trim().toLowerCase());
-      const matchesZone = !zoneFilter || exercise.bodyPart === zoneFilter;
-
-      return matchesSearch && matchesZone;
-    });
-  }, [zoneFilter, exercisesQuery.data, searchQuery]);
+  const pickerExercises = pickerQuery.items;
+  const loadMoreExercises = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (step !== 'exercises') {
+      return;
+    }
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    const nearEnd =
+      contentOffset.y + layoutMeasurement.height > contentSize.height - 600;
+    if (nearEnd && pickerQuery.hasNextPage && !pickerQuery.isFetchingNextPage) {
+      pickerQuery.fetchNextPage().catch(() => {});
+    }
+  };
 
   const selectedExerciseIds = selectedExercises
     .map(exercise => exercise.exerciseId)
@@ -352,70 +342,66 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     }
 
     const parsedTargetMuscles = parseCommaSeparatedList(targetFocusInput);
-    const parsedTags = parseCommaSeparatedList(tagsInput);
     const targetMuscles =
       parsedTargetMuscles.length > 0
         ? parsedTargetMuscles
         : inferTargetMuscles(selectedExercises);
 
-    const payload: Omit<Workout, 'id'> = {
+    // save_user_routine needs a catalog exercise for every row (an old row
+    // without one has to be replaced or removed first).
+    const missing = selectedExercises.filter(exercise => !exercise.exerciseId);
+    if (missing.length > 0) {
+      Alert.alert(
+        language === 'en' ? 'Exercise not available' : 'Ejercicio no disponible',
+        language === 'en'
+          ? `${missing[0].name} is no longer in the catalogue. Replace or remove it.`
+          : `${missing[0].name} ya no está en el catálogo. Cámbialo o quítalo.`,
+      );
+      return;
+    }
+
+    const input: RoutineInput = {
       title: title.trim(),
+      description: description.trim() || null,
       type,
       duration,
       difficulty,
       calories,
       targetMuscles,
       exercises: selectedExercises.map(exercise => ({
-        id: exercise.id,
-        exerciseId: exercise.exerciseId || null,
-        name: exercise.name,
-        sets: exercise.sets,
-        reps: exercise.duration ? undefined : exercise.reps,
-        duration: exercise.duration,
+        exerciseId: exercise.exerciseId as string,
+        block: exercise.block ?? 'main',
+        sets: exercise.sets ?? null,
+        reps: exercise.duration ? null : exercise.reps ?? null,
+        duration: exercise.duration ?? null,
         restTime: exercise.restTime,
-        notes: exercise.notes.trim() ? exercise.notes.trim() : undefined,
+        notes: exercise.notes.trim() ? exercise.notes.trim() : null,
+        plannedWeightKg: exercise.plannedWeightKg ?? null,
       })),
-      isPremium: workout?.isPremium || false,
-      description: description.trim() || undefined,
-      imageUrl: workout?.imageUrl,
-      tags: parsedTags,
-      createdByAi: workout?.createdByAi || false,
-      createdBy: workout?.createdBy,
-      isPublic: workout?.isPublic || false,
-      source: workout?.source || 'custom',
-      sourceType: workout?.sourceType,
-      collectionType: workout?.collectionType,
-      collectionTitle: workout?.collectionTitle,
-      collectionBadge: workout?.collectionBadge,
-      inspirationStyle: workout?.inspirationStyle,
-      isFeatured: workout?.isFeatured,
     };
 
     try {
       const savedWorkout =
         mode === 'edit' && initialWorkoutId
-          ? await routineBuilder.updateRoutine({
-              workoutId: initialWorkoutId,
-              workout: payload,
-            })
-          : await routineBuilder.createRoutine(payload);
+          ? await mutations.updateRoutine({ id: initialWorkoutId, input })
+          : (await mutations.createRoutine(input)).routine;
 
       navigation.replace(APP_ROUTES.WorkoutDetail, {
         workoutId: savedWorkout.id,
       });
     } catch (error) {
+      const copy = routineErrorCopy(error, language);
       Alert.alert(
         mode === 'edit'
           ? 'No pudimos guardar los cambios'
           : 'No pudimos crear la rutina',
-        error instanceof Error ? error.message : 'Inténtalo otra vez.',
+        copy.message,
       );
     }
   };
 
   const stepIndex = step === 'details' ? 0 : step === 'exercises' ? 1 : 2;
-  const saving =
-    routineBuilder.isCreatingRoutine || routineBuilder.isUpdatingRoutine;
+  const saving = mutations.isCreating || mutations.isUpdating;
   const canNext =
     stepIndex === 0
       ? title.trim().length > 0
@@ -443,8 +429,8 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
   const changeDuration = (delta: number) =>
     setDuration(current => clampDuration(current + delta));
 
-  const loading = exercisesQuery.isLoading || editWorkoutQuery.isLoading;
-  const loadError = exercisesQuery.error || editWorkoutQuery.error;
+  const loading = initialExerciseQuery.isLoading || editWorkoutQuery.isLoading;
+  const loadError = initialExerciseQuery.error || editWorkoutQuery.error;
 
   const renderBody = () => {
     if (loadError) {
@@ -453,8 +439,8 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
           message="No pudimos cargar los datos de la rutina."
           onRetry={() => {
             // refetch() ignores `enabled`: retry only what failed.
-            if (exercisesQuery.error) {
-              exercisesQuery.refetch().catch(() => {});
+            if (initialExerciseQuery.error) {
+              initialExerciseQuery.refetch().catch(() => {});
             }
             if (editWorkoutQuery.error) {
               editWorkoutQuery.refetch().catch(() => {});
@@ -523,7 +509,12 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     if (step === 'exercises') {
       return (
         <PickStep
-          exercises={filteredExercises}
+          exercises={pickerExercises}
+          loading={pickerQuery.isLoading || pickerQuery.isFetchingNextPage}
+          error={Boolean(pickerQuery.error)}
+          onRetry={() => {
+            pickerQuery.refetch().catch(() => {});
+          }}
           selectedIds={selectedExerciseIds}
           query={searchQuery}
           zone={zoneFilter}
@@ -573,6 +564,8 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
         onBack={handleBack}
       />
       <ScrollView
+        onScroll={loadMoreExercises}
+        scrollEventThrottle={64}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[

@@ -34,10 +34,11 @@ import type { RelationshipState } from '@app/features/social/socialTypes';
 import {
   useSocialResource,
   useSocialService,
+  useUserPosts,
 } from '@app/features/social/useSocial';
 import {
   PrivacyLine,
-  RecentActivity,
+  ProfilePosts,
   RecordsList,
 } from '@app/features/social/v2/ProfileParts';
 import { safeGoBack } from '@app/navigation/safeGoBack';
@@ -116,6 +117,9 @@ export function SocialProfileScreen({ navigation, route }: Props) {
     acceptsRequests: data?.acceptsRequests,
   });
   const sections = profileSections(relationship, detail);
+  // My profile or a friend's: every post, page by page (get_user_posts).
+  const canSeePosts = relationship === 'self' || relationship === 'friends';
+  const userPosts = useUserPosts(userId, lookup.status === 'ready' && canSeePosts);
   const name = profile?.name ?? 'Usuario';
   const photo = useFriendPhoto(
     profile?.profile_photo_url,
@@ -358,10 +362,22 @@ export function SocialProfileScreen({ navigation, route }: Props) {
               {sections.records && detail.records ? (
                 <RecordsList records={detail.records} />
               ) : null}
-              {sections.recentPosts && detail.recent_posts ? (
-                <RecentActivity
-                  posts={detail.recent_posts}
-                  onOpen={() => show('Las publicaciones llegan con el feed')}
+              {canSeePosts ? (
+                <ProfilePosts
+                  status={userPosts.status}
+                  posts={userPosts.posts}
+                  hasMore={userPosts.hasMore}
+                  loadingMore={userPosts.loadingMore}
+                  emptyText={
+                    relationship === 'self'
+                      ? 'Aún no has publicado nada. Comparte un entreno, un récord o una foto.'
+                      : `${firstName(name)} aún no ha publicado nada.`
+                  }
+                  onOpen={post =>
+                    navigation.navigate(APP_ROUTES.SocialPost, { postId: post.id })
+                  }
+                  onMore={userPosts.loadMore}
+                  onRetry={userPosts.reload}
                 />
               ) : null}
               <PrivacyLine

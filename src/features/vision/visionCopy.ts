@@ -1,5 +1,6 @@
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
-import type { EllieErrorCode } from '@app/services/ellie/ellieService';
+import { isNetworkError } from '@app/features/session/sessionOutbox';
+import { EllieError, type EllieErrorCode } from '@app/services/ellie/ellieService';
 
 // What the person sees when a photo cannot be analysed (design §23.5 for
 // meals, §10 for machines), es / en. Safe wording only.
@@ -24,6 +25,19 @@ export type VisionFailureCopy = {
 export type VisionFailureInput = { code: EllieErrorCode; used?: number; limit?: number };
 
 const T = (es: string, en: string, language: EllieLanguage) => (language === 'es' ? es : en);
+
+// Any failure of the photo flow (upload or analysis) as the input of the copy:
+// "offline" only for a real network error; anything else unexpected is a
+// failure on our side (retry), never "sin conexión".
+export function visionFailureFrom(error: unknown): VisionFailureInput {
+  if (error instanceof EllieError) {
+    return { code: error.code, used: error.used, limit: error.limit };
+  }
+  if (error instanceof Error && error.name === 'ImageTooLargeError') {
+    return { code: 'image_too_large' };
+  }
+  return { code: isNetworkError(error) ? 'offline' : 'internal' };
+}
 
 export function visionFailureCopy(
   input: VisionFailureInput,
@@ -52,6 +66,20 @@ export function visionFailureCopy(
           language,
         ),
         actions: ['other_photo', 'manual'],
+      };
+    case 'ai_timeout':
+      return {
+        title: T('Está tardando más de lo normal', 'This is taking longer than usual', language),
+        text: T(
+          meal
+            ? 'El análisis de tu plato va lento ahora mismo. Tu foto sigue aquí; inténtalo otra vez.'
+            : 'El análisis de la máquina va lento ahora mismo. Tu foto sigue aquí; inténtalo otra vez.',
+          meal
+            ? 'Analysing your plate is slow right now. Your photo is still here; try again.'
+            : 'Analysing the machine is slow right now. Your photo is still here; try again.',
+          language,
+        ),
+        actions: ['retry', meal ? 'quick_kcal' : 'manual'],
       };
     case 'offline':
       return {

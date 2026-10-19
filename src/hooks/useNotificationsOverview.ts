@@ -169,12 +169,10 @@ export function useNotificationsOverview() {
     unreadCount: notifications.filter(item => item.unread).length,
     isLoading:
       ellieData.overviewQuery.isLoading ||
-      ellieData.personalRecordsQuery.isLoading ||
-      ellieData.exercisesQuery.isLoading,
+      ellieData.personalRecordsQuery.isLoading,
     error:
       ellieData.overviewQuery.error ||
       ellieData.personalRecordsQuery.error ||
-      ellieData.exercisesQuery.error ||
       null,
   };
 }

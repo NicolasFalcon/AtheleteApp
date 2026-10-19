@@ -10,6 +10,7 @@ import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import { BigFigure, BottomPanel, RoundButton, StatRow } from '@app/features/route/v2/RouteUi';
 import { ORS_ATTRIBUTION, isSavedRoute } from '@app/features/route/routeMappers';
 import { RouteServiceError } from '@app/services/route/routeService';
+import { useInvalidateRoute } from '@app/features/route/useRouteData';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -20,6 +21,7 @@ export function RoutePreviewScreen({ navigation }: AppScreenProps<'RoutePreview'
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const service = useRouteService();
+  const invalidate = useInvalidateRoute();
   const { draft } = useRouteSession();
   const [saved, setSaved] = useState(false);
 
@@ -102,6 +104,7 @@ export function RoutePreviewScreen({ navigation }: AppScreenProps<'RoutePreview'
                   .saveRoute(draft)
                   .then(next => {
                     routeStore.patch({ draft: next });
+                    invalidate();
                     setSaved(true);
                     toast.show('Ruta guardada en Tus rutas');
                   })

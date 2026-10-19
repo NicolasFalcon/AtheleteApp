@@ -28,9 +28,12 @@ import {
   SearchField,
   Segmented,
   Sheet,
+  Skeleton,
+  SkeletonGroup,
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
+import { BlockError } from '@app/features/home/v2/BlockError';
 import type {
   BuilderExercise,
   ExerciseMetricMode,
@@ -308,6 +311,9 @@ function RoundButton({
 // ── Step 2 · Ejercicios ────────────────────────────────────────────────────
 export function PickStep({
   exercises,
+  loading = false,
+  error = false,
+  onRetry,
   selectedIds,
   query,
   zone,
@@ -317,7 +323,11 @@ export function PickStep({
   onToggle,
   onCancelReplace,
 }: {
+  // list_exercises pages loaded so far (more come while scrolling).
   exercises: LibraryExercise[];
+  loading?: boolean;
+  error?: boolean;
+  onRetry?: () => void;
   selectedIds: string[];
   query: string;
   zone: ZoneKey | null;
@@ -375,7 +385,12 @@ export function PickStep({
         </ScrollView>
       </View>
       <View>
-        {exercises.length === 0 ? (
+        {error ? (
+          <BlockError
+            message="No pudimos cargar los ejercicios."
+            onRetry={() => onRetry?.()}
+          />
+        ) : exercises.length === 0 && !loading ? (
           <TextV2
             variant="body"
             tone="secondary"
@@ -397,7 +412,10 @@ export function PickStep({
               style={[styles.pickRow, { borderBottomColor: colors.divider }]}
             >
               <DarkThumb
-                source={exerciseThumbnail(exercise.bodyPart)}
+                source={{
+                  mediaKey: exercise.thumbKey,
+                  fallback: exerciseThumbnail(exercise.bodyPart),
+                }}
                 size={60}
                 radius={16}
                 ring={
@@ -448,6 +466,19 @@ export function PickStep({
             </PressableScale>
           );
         })}
+        {loading && !error ? (
+          <SkeletonGroup>
+            {[0, 1, 2].map(index => (
+              <View key={index} style={styles.pickRow}>
+                <Skeleton width={60} height={60} radius={16} />
+                <View style={styles.flexGap2}>
+                  <Skeleton width="70%" height={16} />
+                  <Skeleton width="45%" height={12} />
+                </View>
+              </View>
+            ))}
+          </SkeletonGroup>
+        ) : null}
       </View>
     </>
   );

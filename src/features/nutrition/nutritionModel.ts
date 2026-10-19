@@ -4,8 +4,16 @@ import type { DailyNutritionLog, NutritionPlan } from '@app/shared';
 // it: Nutrición, the rings of Inicio and the blocks of Progreso. Pure.
 
 // ── Water: profiles.daily_water_goal is stored in 250 ml glasses (DA-39) ────
+// It is the only goal, the same ELLIE reads (B-25): the app never calculates
+// one or falls back to a fixed number. Without it there is no goal.
 export const GLASS_ML = 250;
-export const DEFAULT_WATER_GOAL_GLASSES = 14;
+
+export function waterGoalGlasses(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? Math.round(value) : null;
+}
+
+export const waterGoalMl = (goalGlasses: number | null): number =>
+  goalGlasses ? goalGlasses * GLASS_ML : 0;
 
 export function toGlasses(ml: number): number {
   return Math.round(Math.max(0, ml) / GLASS_ML);
@@ -46,7 +54,8 @@ export type DayTotals = {
   macros: MacroTotal[];
   water: {
     glasses: number;
-    goalGlasses: number;
+    // null: the profile has no water goal.
+    goalGlasses: number | null;
     liters: number;
     progress: number; // 0–1
     pct: number;
@@ -72,10 +81,7 @@ export function buildDayTotals(input: {
   const { plan, log } = input;
   const consumed = Math.max(0, log?.calories ?? 0);
   const target = plan ? plan.targetCalories : null;
-  const goalGlasses = Math.max(
-    1,
-    input.goalGlasses || DEFAULT_WATER_GOAL_GLASSES,
-  );
+  const goalGlasses = waterGoalGlasses(input.goalGlasses);
   const glasses = toGlasses(input.waterMl);
 
   const goals: Record<MacroKey, number | null> = {
@@ -110,9 +116,9 @@ export function buildDayTotals(input: {
       glasses,
       goalGlasses,
       liters: (glasses * GLASS_ML) / 1000,
-      progress: clamp01(glasses / goalGlasses),
-      pct: Math.round(clamp01(glasses / goalGlasses) * 100),
-      done: glasses >= goalGlasses,
+      progress: ratio(glasses, goalGlasses),
+      pct: Math.round(ratio(glasses, goalGlasses) * 100),
+      done: goalGlasses !== null && glasses >= goalGlasses,
     },
   };
 }

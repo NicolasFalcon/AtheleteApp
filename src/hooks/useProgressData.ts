@@ -1,7 +1,7 @@
 import {useMemo} from 'react';
 import {useQuery} from '@tanstack/react-query';
 import {useAuth} from '@app/hooks/useAuth';
-import {useExerciseLibrary} from '@app/hooks/useExerciseLibrary';
+import {useExerciseNames} from '@app/hooks/useCatalog';
 import {usePersonalRecords} from '@app/hooks/usePersonalRecords';
 import {fetchProgressOverview} from '@app/services/supabase/progress';
 import {generateProgressInsights} from '@app/shared';
@@ -18,20 +18,26 @@ export function useProgressData() {
       }),
   });
   const recordsQuery = usePersonalRecords();
-  const exercisesQuery = useExerciseLibrary();
+  // Names of the exercises with records only (get_exercise, kept on the
+  // phone); never the whole catalog. They do not block the screen.
+  const exerciseNames = useExerciseNames(
+    useMemo(
+      () => recordsQuery.records.map(record => record.exerciseId),
+      [recordsQuery.records],
+    ),
+  );
+  const names = exerciseNames.names;
 
   const recordSummaries = useMemo(() => {
-    if (!recordsQuery.records.length || !exercisesQuery.data?.length) {
+    if (!recordsQuery.records.length) {
       return [];
     }
 
     return recordsQuery.records.map(record => ({
       ...record,
-      exerciseName:
-        exercisesQuery.data?.find(exercise => exercise.id === record.exerciseId)
-          ?.name || 'Ejercicio',
+      exerciseName: names[record.exerciseId] || 'Ejercicio',
     }));
-  }, [exercisesQuery.data, recordsQuery.records]);
+  }, [names, recordsQuery.records]);
 
   const insights = useMemo(() => {
     if (!overviewQuery.data || !profile) {
@@ -53,12 +59,11 @@ export function useProgressData() {
   return {
     overviewQuery,
     recordsQuery,
-    exercisesQuery,
+    exerciseNames: names,
+    refetchExerciseNames: exerciseNames.refetch,
     recordSummaries,
     insights,
-    isLoading:
-      overviewQuery.isLoading || recordsQuery.isLoading || exercisesQuery.isLoading,
-    error:
-      overviewQuery.error || recordsQuery.error || exercisesQuery.error || null,
+    isLoading: overviewQuery.isLoading || recordsQuery.isLoading,
+    error: overviewQuery.error || recordsQuery.error || null,
   };
 }

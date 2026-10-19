@@ -9,6 +9,7 @@ import { usePushEvents } from '@app/features/push/usePushEvents';
 import { usePushRegistration } from '@app/features/push/usePushRegistration';
 import { useRouteQueueFlush } from '@app/features/route/useRouteQueueFlush';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useCatalogBoot } from '@app/hooks/useCatalog';
 import { RootNavigator } from '@app/navigation/RootNavigator';
 
 function AppContent() {
@@ -18,6 +19,8 @@ function AppContent() {
   usePushRegistration();
   usePushEvents();
   useLocalReminders();
+  // catalog_version() at launch; the saved catalog and signed URLs load.
+  useCatalogBoot();
 
   return (
     <>

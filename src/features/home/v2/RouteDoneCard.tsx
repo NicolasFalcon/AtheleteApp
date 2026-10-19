@@ -2,15 +2,15 @@ import { StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { ArrowRight, Check } from 'lucide-react-native';
 import { PressableScale, TextV2 } from '@app/components/v2';
-import { RouteMap } from '@app/features/route/RouteMap';
+import { RouteStaticMap } from '@app/features/route/v2/RouteStaticMap';
 import { formatDuration, formatKm, formatPace, formatSpeed } from '@app/features/route/routeFormat';
 import { paceSecPerKm, speedKmh } from '@app/features/route/routeGeo';
 import type { RouteActivity } from '@app/features/route/routeTypes';
 
 // Inicio · "Tu ruta" card, real state (HOME_16/17): today's route on the dark
-// map, distance, time and pace, and "Ver actividad". Dark in both themes.
-// TODO(route-share): a static map snapshot instead of a live map instance
-// inside the scroll.
+// static map (the saved polyline, no GPS: B-06), distance, time and pace, and
+// "Ver actividad". Dark in both themes. The texts sit under the route (the
+// map leaves that band free) and never wrap into each other.
 export function RouteDoneCard({
   activity,
   ago,
@@ -28,13 +28,11 @@ export function RouteDoneCard({
     : `${formatSpeed(speedKmh(activity.distanceM, activity.movingSec))} km/h`;
   return (
     <View style={styles.card}>
-      <RouteMap
+      <RouteStaticMap
         style={StyleSheet.absoluteFill}
         mode="dark"
-        fit={activity.points.length > 1 ? activity.points : undefined}
-        padding={{ top: 24, bottom: 150, left: 40, right: 40 }}
-        route={activity.points.length > 1 ? activity.points : undefined}
-        interactive={false}
+        points={activity.points}
+        padding={{ top: 24, bottom: MAP_BOTTOM, left: 40, right: 40 }}
       />
       <LinearGradient
         pointerEvents="none"
@@ -50,14 +48,14 @@ export function RouteDoneCard({
           <TextV2 style={styles.big}>{formatKm(activity.distanceM)}</TextV2>
           <TextV2 style={styles.unit}>km</TextV2>
         </View>
-        <TextV2 variant="body" color="#D8D6D1">
+        <TextV2 variant="body" color="#D8D6D1" numberOfLines={1}>
           {formatDuration(activity.movingSec)} · {pace}
         </TextV2>
         <View style={styles.doneRow}>
           <View style={styles.check}>
             <Check size={11} color="#FFFFFF" strokeWidth={3} />
           </View>
-          <TextV2 variant="meta" color="#A8A6A1">
+          <TextV2 variant="meta" color="#A8A6A1" numberOfLines={1} style={styles.flex}>
             {running ? 'Running' : 'Ciclismo'} · completada · {ago}
           </TextV2>
         </View>
@@ -79,8 +77,12 @@ export function RouteDoneCard({
   );
 }
 
+// The route stays above the texts: this band at the bottom is theirs.
+const MAP_BOTTOM = 212;
+
 const styles = StyleSheet.create({
-  card: { height: 316, borderRadius: 24, overflow: 'hidden', backgroundColor: '#141312' },
+  card: { height: 340, borderRadius: 24, overflow: 'hidden', backgroundColor: '#141312' },
+  flex: { flex: 1 },
   bottom: { position: 'absolute', left: 20, right: 20, bottom: 20, gap: 4 },
   figure: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   big: { fontSize: 56, lineHeight: 60, fontWeight: '800', letterSpacing: -2, color: '#FFFFFF' },

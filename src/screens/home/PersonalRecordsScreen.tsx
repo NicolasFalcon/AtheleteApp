@@ -38,7 +38,7 @@ import {
   RegisterRecordSheet,
   type RecordExercise,
 } from '@app/features/progress/v2/RegisterRecordSheet';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExerciseNames } from '@app/hooks/useCatalog';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import { SceneScope } from '@app/providers/ThemeProvider';
@@ -60,9 +60,12 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
   const toast = useToast();
   const exerciseId = route.params?.exerciseId;
   const recordsQuery = usePersonalRecords();
-  const exercisesQuery = useExerciseLibrary();
 
   const [sheetOpen, setSheetOpen] = useState(false);
+  // Detail: where the dark plate ends, and whether the light content is
+  // under the back button (B-04).
+  const [plateBottom, setPlateBottom] = useState(Number.POSITIVE_INFINITY);
+  const [backOnLight, setBackOnLight] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [celebration, setCelebration] = useState<{
     value: string;
@@ -72,22 +75,25 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
 
   const now = useMemo(() => new Date(), []);
   const records = recordsQuery.records;
-  const library = exercisesQuery.data;
+  // Names of the exercises with records (get_exercise, kept on the phone).
+  const { names } = useExerciseNames(
+    useMemo(
+      () => [...records.map(record => record.exerciseId), exerciseId],
+      [exerciseId, records],
+    ),
+  );
   const groups = useMemo(
     () =>
       groupRecords(
         records,
-        id =>
-          library?.find(item => item.id === id)?.name ??
-          route.params?.exerciseName ??
-          'Ejercicio',
+        id => names[id] ?? route.params?.exerciseName ?? 'Ejercicio',
         now,
       ),
-    [library, now, records, route.params?.exerciseName],
+    [names, now, records, route.params?.exerciseName],
   );
 
-  const loading = recordsQuery.isLoading || exercisesQuery.isLoading;
-  const failed = Boolean(recordsQuery.error || exercisesQuery.error);
+  const loading = recordsQuery.isLoading;
+  const failed = Boolean(recordsQuery.error);
   const group = exerciseId
     ? groups.find(item => item.exerciseId === exerciseId) ?? null
     : null;
@@ -97,7 +103,7 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
         name:
           group?.exerciseName ??
           route.params?.exerciseName ??
-          library?.find(item => item.id === exerciseId)?.name ??
+          names[exerciseId] ??
           'Ejercicio',
       }
     : null;
@@ -105,7 +111,6 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
   const back = () => safeGoBack(navigation, BACK_FALLBACKS);
   const retry = () => {
     recordsQuery.refetch().catch(() => {});
-    exercisesQuery.refetch().catch(() => {});
   };
 
   const save = async (
@@ -170,7 +175,6 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
       open={sheetOpen}
       onClose={() => setSheetOpen(false)}
       exercise={sheetExercise}
-      exercises={library ?? []}
       records={records}
       saving={recordsQuery.isAddingRecord}
       error={saveError}
@@ -230,7 +234,18 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 140 }}
+          scrollEventThrottle={32}
+          onScroll={event => {
+            // B-04: the back button is light over the dark plate and dark
+            // once the light history passes under it.
+            const below =
+              event.nativeEvent.contentOffset.y + insets.top + 48 > plateBottom;
+            if (below !== backOnLight) {
+              setBackOnLight(below);
+            }
+          }}
         >
+          <View onLayout={event => setPlateBottom(event.nativeEvent.layout.height)}>
           {group ? (
             <RecordPlate group={group} top={insets.top + 58} width={width} />
           ) : (
@@ -250,6 +265,7 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
               </View>
             </SceneScope>
           )}
+          </View>
           {group ? (
             <View
               style={[styles.history, { paddingHorizontal: layout.gutter }]}
@@ -258,11 +274,17 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
             </View>
           ) : null}
         </ScrollView>
-        <SceneScope>
+        {backOnLight ? (
           <View style={[styles.back, { top: insets.top + 4 }]}>
-            <BackButton onPress={back} variant="glass" />
+            <BackButton onPress={back} />
           </View>
-        </SceneScope>
+        ) : (
+          <SceneScope>
+            <View style={[styles.back, { top: insets.top + 4 }]}>
+              <BackButton onPress={back} variant="glass" />
+            </View>
+          </SceneScope>
+        )}
         <GlassSurface
           kind="nav"
           style={[

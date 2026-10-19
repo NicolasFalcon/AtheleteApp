@@ -88,6 +88,10 @@ export interface SocialService {
 
   // ── Contenido (tanda A) ──
   getFeed(cursor: string | null, limit: number): Promise<FeedPage>;
+  // get_user_posts: the posts of my profile or of a friend's, newest first;
+  // `before` = created_at of the last one already loaded (null: the first
+  // page). Anyone else → no posts.
+  getUserPosts(userId: string, before: string | null, limit: number): Promise<FeedPage>;
   getFriendActivity(limit: number): Promise<ActivityItem[]>;
   getPost(postId: string): Promise<FeedPost | null>;
   toggleLike(postId: string, like: boolean): Promise<ToggleLikeResult>;

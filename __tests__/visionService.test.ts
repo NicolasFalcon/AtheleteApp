@@ -41,11 +41,14 @@ const scanBody = (extra: object = {}) => ({
 describe('ellie-vision · meal', () => {
   it('sends mode meal with the photo path and the note, and returns the editable draft', async () => {
     const invoke = jest.fn<ReturnType<EllieInvoke>, Parameters<EllieInvoke>>(async () => ({ status: 200, body: mealBody }));
-    const { draft, usage } = await analyzeMeal({ imagePath: 'u/meals/a.jpg', hint: 'es medio plato' }, { invoke });
+    const { draft, usage } = await analyzeMeal(
+      { imagePath: 'u/meals/a.jpg', clientRequestId: 'req-1', hint: 'es medio plato' },
+      { invoke },
+    );
     expect(invoke).toHaveBeenCalledWith({
       mode: 'meal',
       image_path: 'u/meals/a.jpg',
-      client_request_id: null,
+      client_request_id: 'req-1',
       hint: 'es medio plato',
     });
     expect(draft).toMatchObject({ title: 'Pollo con arroz', mealTypeSuggestion: 'lunch', confidence: 0.9 });
@@ -136,8 +139,8 @@ describe('vision error mapping', () => {
     const invoke: EllieInvoke = async () => {
       throw new TypeError('Network request failed');
     };
-    await expect(analyzeMeal({ imagePath: 'p' }, { invoke })).rejects.toMatchObject({ code: 'offline' });
-    await expect(analyzeMeal({ imagePath: 'p' }, { invoke })).rejects.toBeInstanceOf(EllieError);
+    await expect(analyzeMeal({ imagePath: 'p', clientRequestId: 'r' }, { invoke })).rejects.toMatchObject({ code: 'offline' });
+    await expect(analyzeMeal({ imagePath: 'p', clientRequestId: 'r' }, { invoke })).rejects.toBeInstanceOf(EllieError);
   });
 });
 

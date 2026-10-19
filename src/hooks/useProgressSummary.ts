@@ -38,7 +38,7 @@ export function useProgressSummary() {
       Promise.all([
         progress.overviewQuery.refetch(),
         progress.recordsQuery.refetch(),
-        progress.exercisesQuery.refetch(),
+        progress.refetchExerciseNames(),
         trainingQuery.refetch(),
       ]),
   };

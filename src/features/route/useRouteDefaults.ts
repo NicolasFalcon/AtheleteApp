@@ -4,9 +4,10 @@ import type { RouteVisibility } from '@app/features/route/routeTypes';
 import { getSocialService } from '@app/services/social/socialSource';
 
 // Privacy defaults of Ruta live in `social_settings` (route_default_visibility,
-// route_hide_endpoints_default, route_auto_pause). They are read once per app
-// run into the session store, and written back when the person changes them
-// in the privacy sheet or the auto-pause chip.
+// route_hide_endpoints_default). They are read once per app run into the
+// session store, and written back when the person changes them in the privacy
+// sheet. The pause is always manual (B-07): route_auto_pause is no longer
+// read or written.
 let loaded = false;
 
 const VISIBILITIES: readonly RouteVisibility[] = ['me', 'friends', 'public'];
@@ -31,7 +32,6 @@ export function useRouteDefaults(): void {
         routeStore.patch({
           ...(visibility ? { visibility } : {}),
           hideEndpoints: settings.route_hide_endpoints_default !== false,
-          autoPause: settings.route_auto_pause !== false,
         });
       })
       .catch(() => {});
@@ -42,13 +42,11 @@ export function useRouteDefaults(): void {
 export function saveRouteDefaults(next: {
   visibility?: RouteVisibility;
   hideEndpoints?: boolean;
-  autoPause?: boolean;
 }): void {
   getSocialService()
     .updateSettings({
       ...(next.visibility ? { route_default_visibility: next.visibility } : {}),
       ...(next.hideEndpoints !== undefined ? { route_hide_endpoints_default: next.hideEndpoints } : {}),
-      ...(next.autoPause !== undefined ? { route_auto_pause: next.autoPause } : {}),
     })
     .catch(() => {});
 }

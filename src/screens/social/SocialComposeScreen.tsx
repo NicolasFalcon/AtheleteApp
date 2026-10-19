@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Globe, ImagePlus, Users, X } from 'lucide-react-native';
+import { ImagePlus, Users, X } from 'lucide-react-native';
 import {
   ATTACHMENT_ICONS,
   AttachmentPreview,
@@ -30,6 +30,7 @@ import { LEGAL_IS_PLACEHOLDER, TERMS_URL } from '@app/constants/legal';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import {
   createPostErrorCopy,
+  publishedToast,
   POST_BODY_MAX,
   POST_ISSUES,
   validatePhoto,
@@ -48,6 +49,7 @@ import {
   useSocialService,
 } from '@app/features/social/useSocial';
 import { useAuth } from '@app/hooks/useAuth';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -85,13 +87,13 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   const toast = useToast();
   const service = useSocialService();
   const { profile } = useAuth();
+  const language = useProfileLanguage();
   const { attach, sourceId } = route.params ?? {};
   const sources = useSocialResource(
     'getAttachmentSources',
     s => s.getAttachmentSources(attach && sourceId ? { kind: attach, sourceId } : undefined),
     [attach ?? null, sourceId ?? null],
   );
-  const settings = useSocialResource('getSettings', s => s.getSettings());
   const shared = Boolean(attach);
 
   const [text, setText] = useState('');
@@ -120,8 +122,8 @@ export function SocialComposeScreen({ navigation, route }: Props) {
 
   const selected: AttachmentSource | null =
     sources.data?.find(item => item.kind === attachment) ?? null;
-  const audience = settings.data?.audience === 'public' ? 'Público' : 'Amigos';
-  const AudienceIcon = audience === 'Público' ? Globe : Users;
+  // Only friends for now (Lote 3): there is no public audience.
+  const audience = language === 'en' ? 'Friends' : 'Amigos';
   const remaining = POST_BODY_MAX - text.length;
 
   const pickPhoto = async () => {
@@ -172,16 +174,19 @@ export function SocialComposeScreen({ navigation, route }: Props) {
         onStep: setStep,
       });
       if (outcome.ok) {
-        // Repeating the same source gives the same post: "ya lo compartiste".
-        toast.show(outcome.created ? 'Publicado para tus amigos' : 'Ya lo habías compartido');
+        // created:false = that source already has a post: it is opened (never
+        // "publicado"). Either way the feed and the own profile reload (the
+        // service wrapper) and the person lands on the post.
+        toast.show(publishedToast(outcome.created, language));
         navigation.replace(APP_ROUTES.SocialPost, { postId: outcome.postId });
         return;
       }
+      // Any ok:false (post_removed too) is a failure with its text.
       haptics.error();
-      setFailure(createPostErrorCopy(outcome.error));
+      setFailure(createPostErrorCopy(outcome.error, language));
     } catch {
       haptics.error();
-      setFailure(createPostErrorCopy('unknown'));
+      setFailure(createPostErrorCopy('unknown', language));
     }
     setPublishing(false);
   };
@@ -266,7 +271,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
                 onPress={() => navigation.navigate(APP_ROUTES.SocialPrivacy)}
                 style={[styles.audience, { backgroundColor: colors.surface.muted }]}
               >
-                <AudienceIcon size={12} strokeWidth={2} color={colors.text.primary} />
+                <Users size={12} strokeWidth={2} color={colors.text.primary} />
                 <TextV2 variant="captionStrong">{audience}</TextV2>
               </PressableScale>
             </View>

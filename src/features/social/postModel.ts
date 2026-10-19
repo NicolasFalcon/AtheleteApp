@@ -113,44 +113,87 @@ export type CreatePostErrorCopy = {
   goToPrivacy: boolean;
 };
 
-export function createPostErrorCopy(error: CreatePostError): CreatePostErrorCopy {
-  const plain = (message: string): CreatePostErrorCopy => ({ message, goToPrivacy: false });
-  switch (error) {
-    case 'category_not_shared':
-      return {
-        message: 'Tienes desactivado compartir esto en Privacidad social.',
-        goToPrivacy: true,
-      };
-    case 'photos_not_shared':
-      return {
-        message: 'Tienes desactivado compartir fotos en Privacidad social.',
-        goToPrivacy: true,
-      };
-    case 'photo_not_allowed':
-      return plain('La foto solo se puede añadir a un entrenamiento o publicarla sola.');
-    case 'photo_required':
-      return plain('Una publicación de foto necesita una foto.');
-    case 'photo_not_owned':
-      return plain('No pudimos usar esa foto. Elígela otra vez.');
-    case 'photo_type':
-      return plain('Usa una foto JPG, PNG o WebP.');
-    case 'photo_size':
-      return plain('La foto pesa más de 5 MB.');
-    case 'upload_failed':
-      return plain('No se pudo subir la foto. Revisa tu conexión e inténtalo de nuevo.');
-    case 'invalid_source':
-    case 'source_not_found':
-      return plain('Ya no encontramos lo que querías compartir. Elige otro adjunto.');
-    case 'routine_not_shareable':
-      return plain('Solo puedes compartir rutinas que hayas creado tú, no copias ni las de ELLIE.');
-    case 'route_private':
-      return plain('Esta ruta es solo tuya. Cambia su privacidad para compartirla.');
-    case 'invalid_type':
-    case 'validation':
-      return plain('Revisa la publicación: falta algo o no es válido.');
-    default:
-      return plain('No se pudo publicar. Inténtalo de nuevo.');
+// Every ok:false of create_post is a failure with its own text (es / en);
+// an unknown one is the generic message. Never "publicado".
+const POST_ERROR_TEXT: Record<CreatePostError, { es: string; en: string }> = {
+  category_not_shared: {
+    es: 'Tienes desactivado compartir esto en Privacidad social.',
+    en: 'Sharing this is turned off in your social privacy.',
+  },
+  photos_not_shared: {
+    es: 'Tienes desactivado compartir fotos en Privacidad social.',
+    en: 'Sharing photos is turned off in your social privacy.',
+  },
+  photo_not_allowed: {
+    es: 'La foto solo se puede añadir a un entrenamiento o publicarla sola.',
+    en: 'A photo can only go with a workout or on its own.',
+  },
+  photo_required: {
+    es: 'Una publicación de foto necesita una foto.',
+    en: 'A photo post needs a photo.',
+  },
+  photo_not_owned: {
+    es: 'No pudimos usar esa foto. Elígela otra vez.',
+    en: "We couldn't use that photo. Pick it again.",
+  },
+  photo_type: { es: 'Usa una foto JPG, PNG o WebP.', en: 'Use a JPG, PNG or WebP photo.' },
+  photo_size: { es: 'La foto pesa más de 5 MB.', en: 'The photo is over 5 MB.' },
+  upload_failed: {
+    es: 'No se pudo subir la foto. Revisa tu conexión e inténtalo de nuevo.',
+    en: "The photo couldn't be uploaded. Check your connection and try again.",
+  },
+  invalid_source: {
+    es: 'Ya no encontramos lo que querías compartir. Elige otro adjunto.',
+    en: "We can't find what you wanted to share anymore. Pick another one.",
+  },
+  source_not_found: {
+    es: 'Ya no encontramos lo que querías compartir. Elige otro adjunto.',
+    en: "We can't find what you wanted to share anymore. Pick another one.",
+  },
+  routine_not_shareable: {
+    es: 'Solo puedes compartir rutinas que hayas creado tú, no copias ni las de ELLIE.',
+    en: "You can only share routines you created, not copies or ELLIE's.",
+  },
+  route_private: {
+    es: 'Esta ruta es solo tuya. Cambia su privacidad para compartirla.',
+    en: 'This route is only yours. Change its privacy to share it.',
+  },
+  post_removed: {
+    es: 'Un moderador retiró la publicación de esto, así que no se puede volver a compartir.',
+    en: "A moderator removed the post of this, so it can't be shared again.",
+  },
+  invalid_type: {
+    es: 'Revisa la publicación: falta algo o no es válido.',
+    en: "Check the post: something is missing or isn't valid.",
+  },
+  validation: {
+    es: 'Revisa la publicación: falta algo o no es válido.',
+    en: "Check the post: something is missing or isn't valid.",
+  },
+  unknown: {
+    es: 'No se pudo publicar. Inténtalo de nuevo.',
+    en: "It couldn't be posted. Try again.",
+  },
+};
+
+export function createPostErrorCopy(
+  error: CreatePostError,
+  language: 'es' | 'en' = 'es',
+): CreatePostErrorCopy {
+  const text = POST_ERROR_TEXT[error] ?? POST_ERROR_TEXT.unknown;
+  return {
+    message: text[language],
+    goToPrivacy: error === 'category_not_shared' || error === 'photos_not_shared',
+  };
+}
+
+// What the person reads after create_post answered ok: a new post, or the
+// one that already existed for that source (it is opened, never "publicado").
+export function publishedToast(created: boolean, language: 'es' | 'en' = 'es'): string {
+  if (language === 'en') {
+    return created ? 'Posted for your friends' : 'You had already shared it: here it is';
   }
+  return created ? 'Publicado para tus amigos' : 'Ya lo habías compartido: aquí está';
 }
 
 // ── Likes (optimistic) ─────────────────────────────────────────────────────

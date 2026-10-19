@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Heart, SlidersHorizontal } from 'lucide-react-native';
@@ -36,23 +36,26 @@ import {
 } from '@app/features/workouts/workoutsModel';
 import { ExerciseFiltersSheet } from '@app/features/workouts/v2/ExerciseFiltersSheet';
 import { EQUIPMENT_ICONS } from '@app/features/workouts/v2/workoutIcons';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExerciseBrowse, useExercises } from '@app/hooks/useCatalog';
+import { useDebouncedValue } from '@app/hooks/useDebouncedValue';
 import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
+import { catalogPerf } from '@app/lib/perf/catalogPerf';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { LibraryExercise } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'ExerciseList'>;
 
-// Entrenos · lista filtrada (WORKOUTS_04) + Filtros (WORKOUTS_05). Real
-// library, filtered on the device (the same list that feeds the zone and
-// equipment counts of Ejercicios).
+// Entrenos · lista filtrada (WORKOUTS_04) + Filtros (WORKOUTS_05).
+// list_exercises page by page (30, infinite scroll), zone / equipment / level
+// and the search on the server (search waits 300 ms of typing). "Solo
+// favoritos" reads the favourite exercises one by one (get_exercise, kept on
+// the phone) and filters them here.
 export function ExerciseListScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const params = route.params ?? {};
   const zone = (params.zone as ZoneKey | undefined) ?? null;
-  const exercisesQuery = useExerciseLibrary();
   const favorites = useFavoriteExercises();
   const [query, setQuery] = useState('');
   const [filtersOpen, setFiltersOpen] = useState(Boolean(params.openFilters));
@@ -68,18 +71,49 @@ export function ExerciseListScreen({ navigation, route }: Props) {
     ? equipmentLabel(params.equipment)
     : 'Todos los ejercicios';
 
-  const all = useMemo(() => exercisesQuery.data ?? [], [exercisesQuery.data]);
-  const visible = useMemo(
+  const debouncedQuery = useDebouncedValue(query, 300);
+  const browse = useExerciseBrowse(
+    {
+      zone: filters.bodyPart,
+      equipment: filters.equipment,
+      level: filters.level,
+      q: debouncedQuery,
+    },
+    { enabled: !filters.favoritesOnly },
+  );
+  const favoriteDetails = useExercises(
+    filters.favoritesOnly ? favorites.favoriteExerciseIds : [],
+  );
+  const favoriteList = useMemo(
     () =>
-      filterExercises(all, filters, {
+      filterExercises(Object.values(favoriteDetails.byId), filters, {
         query,
         favoriteIds: favorites.favoriteExerciseIds,
-      }),
-    [all, favorites.favoriteExerciseIds, filters, query],
+      }).sort((a, b) => a.name.localeCompare(b.name)),
+    [favoriteDetails.byId, favorites.favoriteExerciseIds, filters, query],
   );
+  const exercisesQuery = filters.favoritesOnly
+    ? {
+        isLoading: favoriteDetails.isLoading,
+        error: favoriteDetails.error,
+        refetch: favoriteDetails.refetch,
+      }
+    : browse;
+  const visible = filters.favoritesOnly ? favoriteList : browse.items;
+  const searching = query !== debouncedQuery;
+
+  // [perf] (dev only): time until the first page is on screen.
+  useEffect(() => {
+    catalogPerf.screenOpened();
+  }, []);
+  useEffect(() => {
+    catalogPerf.firstPageShown(visible.length);
+  }, [visible.length]);
   const filterCount = activeFilterCount(filters);
   const countLine = [
-    plural(visible.length, 'ejercicio', 'ejercicios'),
+    filters.favoritesOnly || !browse.hasNextPage
+      ? plural(visible.length, 'ejercicio', 'ejercicios')
+      : `${visible.length}+ ejercicios`,
     filterCount > 0 ? plural(filterCount, 'filtro', 'filtros') : null,
   ]
     .filter(Boolean)
@@ -98,11 +132,10 @@ export function ExerciseListScreen({ navigation, route }: Props) {
       equipment={equipmentLabel(item.equipment)}
       levelLabel={LEVEL_LABELS[item.level] ?? levelLabel(item.level)}
       levelBars={levelBars(item.level)}
-      thumbnail={
-        item.thumbnailUrl
-          ? { uri: item.thumbnailUrl }
-          : exerciseThumbnail(item.bodyPart)
-      }
+      thumbnail={{
+        mediaKey: item.thumbKey,
+        fallback: exerciseThumbnail(item.bodyPart),
+      }}
       favorite={favorites.isExerciseFavorite(item.id)}
       onPress={() =>
         navigation.navigate(APP_ROUTES.ExerciseDetail, { exerciseId: item.id })
@@ -157,7 +190,7 @@ export function ExerciseListScreen({ navigation, route }: Props) {
           style={styles.flex}
           numberOfLines={1}
         >
-          {exercisesQuery.isLoading ? 'Cargando…' : countLine}
+          {exercisesQuery.isLoading || searching ? 'Cargando…' : countLine}
         </TextV2>
         <TextV2 variant="metaStrong">A–Z</TextV2>
       </View>
@@ -195,6 +228,25 @@ export function ExerciseListScreen({ navigation, route }: Props) {
       keyExtractor={item => item.id}
       renderItem={renderRow}
       ListHeaderComponent={header}
+      onEndReachedThreshold={0.6}
+      onEndReached={() => {
+        if (!filters.favoritesOnly && browse.hasNextPage && !browse.isFetchingNextPage) {
+          browse.fetchNextPage().catch(() => {});
+        }
+      }}
+      ListFooterComponent={
+        browse.isFetchingNextPage ? (
+          <SkeletonGroup>
+            <View style={styles.skeletonRow}>
+              <Skeleton width={76} height={76} radius={20} />
+              <View style={styles.flexGap}>
+                <Skeleton width="70%" height={16} />
+                <Skeleton width="50%" height={12} />
+              </View>
+            </View>
+          </SkeletonGroup>
+        ) : null
+      }
       ListEmptyComponent={
         <View style={styles.empty}>
           <TextV2 variant="body" tone="secondary" align="center">
@@ -245,12 +297,6 @@ export function ExerciseListScreen({ navigation, route }: Props) {
       <ExerciseFiltersSheet
         open={filtersOpen}
         filters={filters}
-        countFor={draft =>
-          filterExercises(all, draft, {
-            query,
-            favoriteIds: favorites.favoriteExerciseIds,
-          }).length
-        }
         onApply={next => {
           setFilters(next);
           setFiltersOpen(false);

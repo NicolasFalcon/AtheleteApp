@@ -9,7 +9,8 @@ import { flushSessionOutbox } from '@app/services/supabase/session';
 const AFTER_SYNC_KEYS = [
   ['home'],
   ['progress'],
-  ['workouts'],
+  // Today's suggestion changes with a saved session.
+  ['routines', 'today'],
   ['ellie'],
   ['profile'],
   ['workout-session'],

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   ScrollView,
@@ -19,32 +19,33 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { recommendRoutines } from '@app/features/workouts/workoutsModel';
 import { ExercisesView } from '@app/features/workouts/v2/ExercisesView';
 import { RoutinesView } from '@app/features/workouts/v2/RoutinesView';
 import { useAuth } from '@app/hooks/useAuth';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useCatalogTotal } from '@app/hooks/useCatalog';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
+import { useRoutineList, useTodaySuggestion } from '@app/hooks/useRoutines';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
-import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Workouts'>;
 type Segment = 'routines' | 'exercises';
 
 // Entrenos v2 (Workouts.dc.html · WORKOUTS_01–03): root header with "+",
-// segmented Rutinas / Ejercicios. The whole library is loaded once (the same
-// query as Inicio and the routine detail) and filtered on the device, so
-// counts per type, zone and equipment are real.
+// segmented Rutinas / Ejercicios. Rutinas: every visible routine through
+// list_routines (paginated; the counts per type need them all) and today's
+// suggestion as the hero. Ejercicios: the catalog total only; each zone,
+// equipment or search opens its server list.
 export function WorkoutsScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const tabBarMotion = useTabBarMotion();
   const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
-  const workoutsQuery = useWorkoutLibrary();
-  const exercisesQuery = useExerciseLibrary();
+  const routinesQuery = useRoutineList('all', { exhaust: true });
+  const suggestionQuery = useTodaySuggestion();
+  const catalogTotal = useCatalogTotal();
   const favorites = useFavoriteWorkouts();
   const [segment, setSegment] = useState<Segment>(
     route.params?.segment ?? 'routines',
@@ -73,20 +74,13 @@ export function WorkoutsScreen({ navigation, route }: Props) {
         firstFocus.current = false;
         return;
       }
-      workoutsQuery.refetch().catch(() => {});
+      routinesQuery.refetch().catch(() => {});
       // refetch is stable.
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
   );
 
-  const workouts = useMemo(
-    () => workoutsQuery.data ?? [],
-    [workoutsQuery.data],
-  );
-  const nextSession = useMemo(
-    () => recommendRoutines(workouts, profile?.goal, 1)[0] ?? null,
-    [profile?.goal, workouts],
-  );
+  const workouts = routinesQuery.items;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -135,11 +129,11 @@ export function WorkoutsScreen({ navigation, route }: Props) {
         {segment === 'routines' ? (
           <RoutinesView
             workouts={workouts}
-            nextSession={nextSession}
-            loading={workoutsQuery.isLoading || !favorites.loaded}
-            error={Boolean(workoutsQuery.error)}
+            suggestion={suggestionQuery.data?.suggestion ?? null}
+            loading={routinesQuery.isLoading || !favorites.loaded}
+            error={Boolean(routinesQuery.error)}
             onRetry={() => {
-              workoutsQuery.refetch().catch(() => {});
+              routinesQuery.refetch().catch(() => {});
             }}
             userId={profile?.id}
             favoriteIds={favorites.favoriteWorkoutIds}
@@ -161,12 +155,10 @@ export function WorkoutsScreen({ navigation, route }: Props) {
           />
         ) : (
           <ExercisesView
-            exercises={exercisesQuery.data ?? []}
-            loading={exercisesQuery.isLoading}
-            error={Boolean(exercisesQuery.error)}
-            onRetry={() => {
-              exercisesQuery.refetch().catch(() => {});
-            }}
+            total={catalogTotal}
+            loading={false}
+            error={false}
+            onRetry={() => {}}
             onSearch={() =>
               navigation.navigate(APP_ROUTES.ExerciseList, {
                 focusSearch: true,

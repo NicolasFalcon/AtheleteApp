@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import {
-  Image,
   StyleSheet,
   View,
-  type ImageSourcePropType,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Heart } from 'lucide-react-native';
+import { AppImage, type AppImageSource } from '@app/components/v2/AppImage';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -19,7 +18,8 @@ export type ExerciseRowProps = {
   equipment: string;
   levelLabel: string;
   levelBars: number; // 1–3
-  thumbnail: ImageSourcePropType;
+  // A catalog thumb ({ mediaKey, fallback }) or a local picture.
+  thumbnail: AppImageSource;
   favorite: boolean;
   onPress: () => void;
   onToggleFavorite: () => void;
@@ -147,7 +147,7 @@ export function DarkThumb({
   badge,
   ring,
 }: {
-  source: ImageSourcePropType;
+  source: AppImageSource;
   size: number;
   radius: number;
   badge?: string;
@@ -176,7 +176,7 @@ export function DarkThumb({
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#thumbGlow)" />
         </Svg>
-        <Image source={source} resizeMode="cover" style={styles.fill} />
+        <AppImage source={source} style={styles.fill} />
       </View>
       {badge ? (
         <View style={styles.badge}>

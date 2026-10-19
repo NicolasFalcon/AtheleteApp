@@ -17,12 +17,11 @@ import { pickFromGallery } from '@app/features/vision/picker';
 import { CameraCapture } from '@app/features/vision/v2/CameraCapture';
 import { VisionFailureSheet } from '@app/features/vision/v2/VisionFailureSheet';
 import { useVisionUsage } from '@app/features/vision/useVisionUsage';
-import { lowQuotaNotice, type VisionAction, type VisionFailureInput } from '@app/features/vision/visionCopy';
+import { lowQuotaNotice, visionFailureFrom, type VisionAction, type VisionFailureInput } from '@app/features/vision/visionCopy';
 import { useAuth } from '@app/hooks/useAuth';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { loadExercises } from '@app/hooks/useCatalog';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { createUuid } from '@app/lib/uuid';
-import { EllieError } from '@app/services/ellie/ellieService';
 import { chooseMachineCandidate, scanMachine, VisionError } from '@app/services/vision/visionService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -48,7 +47,6 @@ export function MachineScanScreen({ navigation }: AppScreenProps<'MachineScan'>)
   const { profile, signOut } = useAuth();
   const userId = profile?.id;
   const quota = useVisionUsage('machine');
-  const library = useExerciseLibrary();
   const [phase, setPhase] = useState<Phase>({ kind: 'camera' });
   const [step, setStep] = useState(0);
   const [pickError, setPickError] = useState(false);
@@ -93,11 +91,7 @@ export function MachineScanScreen({ navigation }: AppScreenProps<'MachineScan'>)
         if (error instanceof VisionError && error.usage) {
           quota.record(error.usage);
         }
-        const failure: VisionFailureInput =
-          error instanceof EllieError
-            ? { code: error.code, used: error.used, limit: error.limit }
-            : { code: error instanceof Error && error.name === 'ImageTooLargeError' ? 'image_too_large' : 'offline' };
-        setPhase({ kind: 'failed', uri, failure });
+        setPhase({ kind: 'failed', uri, failure: visionFailureFrom(error) });
       }
     },
     [quota, userId],
@@ -109,6 +103,8 @@ export function MachineScanScreen({ navigation }: AppScreenProps<'MachineScan'>)
     setPhase({ kind: 'choosing', uri, result });
     try {
       const chosen = await chooseMachineCandidate(result.scanId, equipmentId);
+      // The machine's exercises one by one (get_exercise), not the catalog.
+      const exercises = await loadExercises(chosen.exerciseIds, language);
       setPhase({
         kind: 'result',
         uri,
@@ -117,7 +113,7 @@ export function MachineScanScreen({ navigation }: AppScreenProps<'MachineScan'>)
           scanId: result.scanId,
           name: candidate?.name ?? '',
           confidence: candidate?.confidence ?? 0,
-          exercises: exercisesFromIds(chosen.exerciseIds, library.data ?? []),
+          exercises: exercisesFromIds(chosen.exerciseIds, exercises),
         },
       });
     } catch {

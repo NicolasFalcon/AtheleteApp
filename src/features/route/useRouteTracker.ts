@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import type { LocationSource } from '@app/features/route/locationSource';
+import { locationStore } from '@app/features/route/locationStore';
 import {
   initialTracker,
   trackerReducer,
@@ -31,7 +32,11 @@ export function useRouteTracker(options: {
       return undefined;
     }
     const stop = source.watch(
-      fix => dispatch({ type: 'fix', fix }),
+      fix => {
+        dispatch({ type: 'fix', fix });
+        // Coming back to Ruta after the outing starts from here (B-13).
+        locationStore.record(fix);
+      },
       event => {
         if (event.type === 'alive') {
           dispatch({ type: 'alive', t: event.t });

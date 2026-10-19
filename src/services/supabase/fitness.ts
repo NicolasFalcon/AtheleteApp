@@ -4,25 +4,19 @@ import { getLocalDateKey } from '@app/lib/date';
 import { awardGamificationEventBestEffort } from '@app/services/supabase/gamification';
 import {
   calculateHydrationStreak,
-  dedupeFeaturedTemplates,
   getChallengeDay,
   getCompletedChallengeDays,
   getCurrentChallengeStreak,
-  mapTemplateExerciseRowToExercise,
-  mapTemplateRowToWorkout,
   type DailyNutritionLog,
   type HabitChallenge,
   type HydrationLog,
-  type LibraryExercise,
   type NutritionPlan,
   type Workout,
-  type WorkoutExercise,
   type WorkoutSession,
 } from '@app/shared';
-import { fetchExerciseCatalog } from '@app/services/supabase/exerciseCatalog';
 import {
-  DEFAULT_WATER_GOAL_GLASSES,
-  GLASS_ML,
+  waterGoalGlasses,
+  waterGoalMl,
 } from '@app/features/nutrition/nutritionModel';
 import { getSupabaseClient } from '@app/services/supabase/client';
 import type { Database, Json } from '@app/types/supabase';
@@ -35,43 +29,8 @@ type DailyNutritionLogRow =
   Database['public']['Tables']['daily_nutrition_logs']['Row'];
 type HabitLogRow = Database['public']['Tables']['habit_logs']['Row'];
 type NutritionPlanRow = Database['public']['Tables']['nutrition_plans']['Row'];
-type TemplateExerciseRow =
-  Database['public']['Tables']['template_exercises']['Row'];
 type WorkoutSessionRow =
   Database['public']['Tables']['workout_sessions']['Row'];
-type WorkoutTemplateRow =
-  Database['public']['Tables']['workout_templates']['Row'];
-
-const WORKOUT_LIBRARY_PAGE_SIZE = 10;
-const EXERCISE_LIBRARY_PAGE_SIZE = 12;
-
-export type WorkoutLibrarySource = 'library' | 'ellie' | 'mine';
-
-export type WorkoutLibraryPageParams = {
-  userId?: string;
-  source: WorkoutLibrarySource;
-  search: string;
-  type: string;
-  favoriteIds: string[] | null;
-  page: number;
-  pageSize?: number;
-};
-
-export type ExerciseLibraryPageParams = {
-  search: string;
-  equipment: string;
-  bodyPart: string;
-  level: string;
-  favoriteIds: string[] | null;
-  page: number;
-  pageSize?: number;
-};
-
-export type PaginatedResult<T> = {
-  items: T[];
-  total: number;
-  nextPage: number | undefined;
-};
 
 export type HomeOverview = {
   // Latest session completed today (local date).
@@ -103,9 +62,10 @@ export type HomeOverview = {
   todayNutritionLog: DailyNutritionLog | null;
   hydration: {
     todayMl: number;
+    // 0 / null: the profile has no water goal.
     goalMl: number;
     todayGlasses: number;
-    goalGlasses: number;
+    goalGlasses: number | null;
     todayPercentage: number;
     streak: number;
   };
@@ -348,126 +308,6 @@ function buildHabitLogMap(
   });
 
   return map;
-}
-
-export async function fetchWorkoutLibrary(_userId?: string): Promise<Workout[]> {
-  const client = getClient();
-  let builder = client
-    .from('workout_templates')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  // The product library is the official V1 catalog. Public/user/ELLIE
-  // templates are separate collections and must not inflate this list.
-  builder = builder.is('created_by', null);
-
-  const { data: templates, error: templateError } = await builder;
-
-  if (templateError) {
-    throw templateError;
-  }
-
-  const templateRows = (templates || []) as WorkoutTemplateRow[];
-
-  if (templateRows.length === 0) {
-    return [];
-  }
-
-  const templateIds = templateRows.map(template => template.id);
-  const { data: exerciseRows, error: exerciseError } = await client
-    .from('template_exercises')
-    .select('*, exercises(id, exercise_translations(locale, name))')
-    .in('template_id', templateIds)
-    .order('sort_order');
-
-  if (exerciseError) {
-    throw exerciseError;
-  }
-
-  const templateExerciseRows = (exerciseRows || []) as TemplateExerciseRow[];
-
-  const exercisesByTemplate = templateExerciseRows.reduce<
-    Record<string, WorkoutExercise[]>
-  >((accumulator, exercise) => {
-    if (!accumulator[exercise.template_id]) {
-      accumulator[exercise.template_id] = [];
-    }
-
-    accumulator[exercise.template_id].push(
-      mapTemplateExerciseRowToExercise(exercise),
-    );
-
-    return accumulator;
-  }, {});
-
-  return dedupeFeaturedTemplates(templateRows).map(template =>
-    mapTemplateRowToWorkout(template, exercisesByTemplate),
-  );
-}
-
-export async function fetchWorkoutLibraryPage(
-  params: WorkoutLibraryPageParams,
-): Promise<PaginatedResult<Workout>> {
-  if (params.favoriteIds?.length === 0) {
-    return { items: [], total: 0, nextPage: undefined };
-  }
-
-  const client = getClient();
-  const pageSize = params.pageSize || WORKOUT_LIBRARY_PAGE_SIZE;
-  const from = params.page * pageSize;
-  const to = from + pageSize - 1;
-  let builder = client
-    .from('workout_templates')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(from, to);
-
-  if (params.source === 'library') {
-    builder = builder.is('created_by', null);
-  } else {
-    if (!params.userId) {
-      return { items: [], total: 0, nextPage: undefined };
-    }
-
-    builder = builder.eq('created_by', params.userId).eq('is_public', false);
-    builder =
-      params.source === 'ellie'
-        ? builder.or('created_by_ai.eq.true,source.eq.ellie')
-        : builder
-            .or('created_by_ai.eq.false,created_by_ai.is.null')
-            .or('source.neq.ellie,source.is.null');
-  }
-
-  const normalizedSearch = params.search.trim();
-
-  if (normalizedSearch) {
-    builder = builder.ilike('title', `%${normalizedSearch}%`);
-  }
-
-  if (params.type !== 'all') {
-    builder = builder.eq('type', params.type);
-  }
-
-  if (params.favoriteIds && params.favoriteIds.length > 0) {
-    builder = builder.in('id', params.favoriteIds);
-  }
-
-  const { data, error, count } = await builder;
-
-  if (error) {
-    throw error;
-  }
-
-  const rows = (data || []) as WorkoutTemplateRow[];
-  const items = dedupeFeaturedTemplates(rows).map(row =>
-    mapTemplateRowToWorkout(row, {}),
-  );
-
-  return {
-    items,
-    total: count || 0,
-    nextPage: rows.length === pageSize ? params.page + 1 : undefined,
-  };
 }
 
 // The pending rows (`in_progress` or `saved`): the single read behind both
@@ -774,52 +614,6 @@ export async function resumeWorkoutSession(
   return mapWorkoutSession(data as WorkoutSessionRow);
 }
 
-export async function fetchExerciseLibrary(): Promise<LibraryExercise[]> {
-  return fetchExerciseCatalog('es');
-}
-
-export async function fetchExerciseLibraryPage(
-  params: ExerciseLibraryPageParams,
-): Promise<PaginatedResult<LibraryExercise>> {
-  if (params.favoriteIds?.length === 0) {
-    return { items: [], total: 0, nextPage: undefined };
-  }
-
-  const pageSize = params.pageSize || EXERCISE_LIBRARY_PAGE_SIZE;
-  const from = params.page * pageSize;
-  const normalizedSearch = params.search.trim();
-  const favoriteIds = params.favoriteIds
-    ? new Set(params.favoriteIds)
-    : null;
-  const rows = (await fetchExerciseCatalog('es')).filter(exercise => {
-    if (
-      normalizedSearch &&
-      !exercise.name.toLocaleLowerCase('es').includes(
-        normalizedSearch.toLocaleLowerCase('es'),
-      )
-    ) {
-      return false;
-    }
-    if (params.equipment !== 'all' && exercise.equipment !== params.equipment) {
-      return false;
-    }
-    if (params.bodyPart !== 'all' && exercise.bodyPart !== params.bodyPart) {
-      return false;
-    }
-    if (params.level !== 'all' && exercise.level !== params.level) {
-      return false;
-    }
-    return !favoriteIds || favoriteIds.has(exercise.id);
-  });
-  const items = rows.slice(from, from + pageSize);
-
-  return {
-    items,
-    total: rows.length,
-    nextPage: from + items.length < rows.length ? params.page + 1 : undefined,
-  };
-}
-
 export async function fetchHomeOverview(params: {
   userId: string;
   dailyWaterGoal?: number | null;
@@ -1031,8 +825,9 @@ export async function fetchHomeOverview(params: {
 
   // daily_water_goal is a number of glasses: goal (ml) = glasses × 250, the
   // rule the server uses for the hydration badges too.
-  const goalGlasses = params.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES;
-  const goalMl = goalGlasses * GLASS_ML;
+  // profiles.daily_water_goal only (B-25); without it there is no goal.
+  const goalGlasses = waterGoalGlasses(params.dailyWaterGoal);
+  const goalMl = waterGoalMl(goalGlasses);
   const todayHydration =
     (hydrationTodayResult.data?.[0] as DailyHydrationLogRow) || null;
   const todayMl = todayHydration?.water_ml || 0;

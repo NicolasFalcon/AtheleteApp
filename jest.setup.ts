@@ -47,3 +47,12 @@ jest.mock('react-native-screens', () => {
     ScreenStackHeaderSubview: MockScreen,
   };
 });
+
+// expo-image (native, ESM source): a plain Image in tests.
+jest.mock('expo-image', () => {
+  const React = require('react');
+  const {Image} = require('react-native');
+  const ExpoImage = ({source, contentFit: _fit, cachePolicy: _cache, recyclingKey: _key, transition: _t, ...props}: any) =>
+    React.createElement(Image, {...props, source});
+  return {Image: ExpoImage};
+});

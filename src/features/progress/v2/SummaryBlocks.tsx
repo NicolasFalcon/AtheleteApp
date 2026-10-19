@@ -175,7 +175,9 @@ export function NutritionHydrationRow({
           ))}
         </View>
         <TextV2 variant="caption" color={colors.text.secondary}>
-          {`Días con ${hydration.goalGlasses} vasos`}
+          {hydration.goalGlasses
+            ? `Días con ${hydration.goalGlasses} vasos`
+            : 'Sin meta de agua en tu perfil'}
         </TextV2>
       </PressableScale>
     </View>

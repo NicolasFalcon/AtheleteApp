@@ -11,7 +11,8 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
 export type EquipmentBubbleProps = {
   label: string;
-  count: number;
+  // null: unknown (the catalog has no per-equipment count): hidden.
+  count?: number | null;
   icon: LucideIcon;
   image: ImageSourcePropType;
   onPress: () => void;
@@ -30,7 +31,9 @@ export function EquipmentBubble({
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel={`${label}, ${count} ejercicios`}
+      accessibilityLabel={
+        typeof count === 'number' ? `${label}, ${count} ejercicios` : label
+      }
       onPress={onPress}
       style={styles.wrap}
     >
@@ -53,9 +56,11 @@ export function EquipmentBubble({
       <TextV2 variant="metaStrong" align="center" style={styles.label}>
         {label}
       </TextV2>
-      <TextV2 variant="eyebrow" tone="secondary" style={styles.count}>
-        {String(count)}
-      </TextV2>
+      {typeof count === 'number' ? (
+        <TextV2 variant="eyebrow" tone="secondary" style={styles.count}>
+          {String(count)}
+        </TextV2>
+      ) : null}
     </PressableScale>
   );
 }

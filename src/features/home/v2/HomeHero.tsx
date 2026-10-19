@@ -41,8 +41,11 @@ export type HeroWorkout = {
   title: string;
   typeLabel: string;
   minutes: number;
-  exercises: number;
-  calories: number;
+  // get_today_suggestion has no count or kcal: those stats are left out.
+  exercises?: number | null;
+  calories?: number | null;
+  // Why this routine today ("Ayer hiciste tren superior").
+  reason?: string | null;
 };
 
 export type HomeHeroData = {
@@ -522,11 +525,20 @@ function WorkoutContent({
       <TextV2 variant="title22" numberOfLines={2} style={styles.tight}>
         {workout?.title ?? 'Elige tu entreno de hoy'}
       </TextV2>
+      {workout?.reason ? (
+        <TextV2 variant="meta" tone="tertiary" numberOfLines={2}>
+          {workout.reason}
+        </TextV2>
+      ) : null}
       {workout ? (
         <View style={styles.stats}>
           <Stat value={workout.minutes} label="minutos" />
-          <Stat value={workout.exercises} label="ejercicios" />
-          <Stat value={workout.calories} label="kcal" />
+          {typeof workout.exercises === 'number' ? (
+            <Stat value={workout.exercises} label="ejercicios" />
+          ) : null}
+          {typeof workout.calories === 'number' ? (
+            <Stat value={workout.calories} label="kcal" />
+          ) : null}
         </View>
       ) : null}
       <Button
@@ -638,6 +650,11 @@ function NewContent({
       <TextV2 variant="title22" numberOfLines={2} style={styles.tight}>
         {workout?.title ?? 'Elige tu primera rutina'}
       </TextV2>
+      {workout?.reason ? (
+        <TextV2 variant="meta" tone="tertiary" numberOfLines={2}>
+          {workout.reason}
+        </TextV2>
+      ) : null}
       {workout ? (
         <View style={styles.baseline}>
           <TextV2 variant="displayM" style={styles.doneValue}>

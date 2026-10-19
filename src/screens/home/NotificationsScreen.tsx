@@ -147,13 +147,7 @@ export function NotificationsScreen({ navigation }: Props) {
     item => item.id === NUTRITION_PLAN_MISSING_ID,
   );
 
-  const exerciseNames = useMemo(() => {
-    const map: Record<string, string> = {};
-    (ellieData.exercisesQuery.data || []).forEach(exercise => {
-      map[exercise.id] = exercise.name;
-    });
-    return map;
-  }, [ellieData.exercisesQuery.data]);
+  const exerciseNames = ellieData.exerciseNames;
 
   const now = new Date();
   const milestones = data
@@ -179,7 +173,7 @@ export function NotificationsScreen({ navigation }: Props) {
   const retry = () => {
     ellieData.overviewQuery.refetch().catch(() => {});
     ellieData.personalRecordsQuery.refetch().catch(() => {});
-    ellieData.exercisesQuery.refetch().catch(() => {});
+    ellieData.refetchExerciseNames().catch(() => {});
   };
 
   return (

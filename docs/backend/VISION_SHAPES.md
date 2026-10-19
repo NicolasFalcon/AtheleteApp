@@ -120,3 +120,45 @@ Tabla `nutrition_meals`. El dueño puede leerla directamente; solo se escribe co
 
 ## 5. Foto de comida en el chat de ELLIE
 Ver `ELLIE_SHAPES.md` → tool `meal_analysis`. La app muestra "Registrar en Calorías" y llama `save_meal` con `source = 'chat'`, `chat_message_id = message.id` y el `image_path` del chat.
+
+## 6. Cambios Lote 2 (IA)
+### Imagen y velocidad
+- El servidor reduce la foto a ~1024 px (JPEG, calidad ~0,8) y se la envía al modelo incrustada en base64. Modelo: `google/gemini-3-flash-preview`, con razonamiento mínimo y un límite de salida.
+- Límite de 20 s en el servidor → **504 `ai_timeout`**, reintentable. **Se devuelve el cupo.**
+
+### Idempotencia en mode=meal
+- `client_request_id` también vale para `meal`. Si se repite, devuelve el mismo `draft` (`replayed: true`) y no cobra cupo. Si el primero sigue en curso (<60 s) → **409 `duplicate_in_progress`**.
+
+### Borrador de comida (mode=meal y tool `meal_analysis`): campos nuevos por item
+```json
+{ "name": "huevos fritos", "unit_count": 2, "unit_label": "huevo",
+  "grams_per_unit": 50, "kcal_per_unit": 70, "protein_per_unit": 6, "carbs_per_unit": 0.4, "fats_per_unit": 5,
+  "grams": 100, "kcal": 140, "protein": 12, "carbs": 0.8, "fats": 10, "kcal_adjusted": false }
+```
+- Si el alimento no es contable: `unit_count`, `unit_label` y `*_per_unit` llegan en `null`.
+- `grams`, `kcal` y las macros son los totales del item.
+- El servidor comprueba que kcal ≈ 4·P + 4·C + 9·G (±10 %). Si no cuadra, recalcula las kcal y marca `kcal_adjusted: true`.
+- `save_meal`/`update_meal` guardan `unit_count`, `unit_label` y `*_per_unit` cuando `unit_count > 0` (`kcal_adjusted` no se guarda).
+
+### mode=machine en dos pasos (tabla `machine_types`)
+- Paso 1: el modelo identifica la máquina concreta entre las de `machine_types` (45; lectura con JWT): `id, slug, name_es, name_en, equipment_id, primary_muscles[], patterns[]`.
+- Paso 2: el servidor filtra el catálogo por equipo + músculo/patrón, y el modelo elige de esa lista entre 3 y 6 ejercicios, ordenados.
+- Respuesta: se añade `machine_type`. `exercise_ids` y `exercises` son ahora 3–6 ejercicios ordenados (antes eran todos los del equipo):
+```json
+{ "ok": true, "scan_id": "uuid", "match": "confident",
+  "machine_type": { "id": "uuid", "slug": "leg-press", "name": "Prensa de piernas" },
+  "equipment": { "id": "uuid", "slug": "machine", "name": "Máquina" },
+  "confidence": 1,
+  "candidates": [{ "equipment_id": "uuid", "slug": "machine", "name": "Máquina", "confidence": 1,
+                   "machine_type_id": "uuid", "machine_type_slug": "leg-press", "machine_type_name": "Prensa de piernas" }],
+  "exercise_ids": ["uuid","uuid","uuid"], "exercises": [{ "id": "uuid", "slug": "machine-leg-press", "name": "Prensa de Piernas en Máquina" }],
+  "usage": { "kind": "machine", "used": 1, "limit": 10, "remaining": 9 } }
+```
+- `ambiguous`: `machine_type` es null. `choose_machine_candidate(_scan_id, _equipment_id)` funciona igual y devuelve los ejercicios del equipo elegido.
+- `machine_scans` añade la columna `machine_type_id`.
+
+### Errores nuevos
+| HTTP | error | notas |
+|---|---|---|
+| 409 | duplicate_in_progress | mismo `client_request_id` de comida todavía en curso |
+| 504 | ai_timeout | más de 20 s; cupo devuelto; reintentable |

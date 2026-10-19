@@ -79,6 +79,7 @@ import {
   parseCreatePost,
   parseFeedPage,
   parseFeedPost,
+  parseUserPostsPage,
   toFeedComments,
   withActivityAuthors,
   type PostgrestLike,
@@ -575,6 +576,26 @@ export const supabaseSocialService: SocialService = {
       return failed(error);
     }
     const page = parseFeedPage(data, me, limit);
+    await prefetchPostPhotos(page.posts);
+    return page;
+  },
+
+  async getUserPosts(userId, before, limit): Promise<FeedPage> {
+    const me = await currentUserId();
+    // Not in the generated database types yet (Lote 3).
+    const rpc = client().rpc as unknown as (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: (PostgrestLike & object) | null }>;
+    const { data, error } = await rpc.call(client(), 'get_user_posts', {
+      _user_id: userId,
+      _limit: Math.min(50, Math.max(1, limit)),
+      ...(before ? { _before: before } : {}),
+    });
+    if (error) {
+      return failed(error);
+    }
+    const page = parseUserPostsPage(data, me, limit);
     await prefetchPostPhotos(page.posts);
     return page;
   },

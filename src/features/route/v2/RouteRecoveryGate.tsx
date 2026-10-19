@@ -80,7 +80,6 @@ export function RouteRecoveryGate() {
       plan: recording.plan,
       visibility: recording.visibility,
       hideEndpoints: recording.hideEndpoints,
-      autoPause: recording.state.autoPause,
       resume: recording,
     });
     setRecording(null);

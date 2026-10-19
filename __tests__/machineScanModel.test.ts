@@ -7,7 +7,7 @@ import {
 import type { MachineScan } from '../src/services/vision/visionService';
 
 const base: MachineScan = {
-  scanId: 's1', replayed: false, match: 'confident', confidence: 0.9,
+  scanId: 's1', replayed: false, match: 'confident', confidence: 0.9, machineType: null,
   equipment: { id: 'e1', slug: 'barbell', name: 'Barra' },
   candidates: [{ equipmentId: 'e1', slug: 'barbell', name: 'Barra', confidence: 0.9 }],
   exerciseIds: ['x1'], exercises: [{ id: 'x1', slug: 'squat', name: 'Sentadilla' }], usage: null,

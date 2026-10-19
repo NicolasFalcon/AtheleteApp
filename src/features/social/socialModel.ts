@@ -447,18 +447,15 @@ export const PRIVACY_ROWS: ReadonlyArray<{
   },
 ];
 
+// Only friends for now (Lote 3): the server ignores social_settings.audience
+// and there is no public option in the app.
 export const AUDIENCE_OPTIONS: ReadonlyArray<{
   key: SocialAudience;
   label: string;
-}> = [
-  { key: 'friends', label: 'Solo amigos' },
-  { key: 'public', label: 'Público' },
-];
+}> = [{ key: 'friends', label: 'Solo amigos' }];
 
-export function audienceLine(audience: SocialAudience): string {
-  return audience === 'friends'
-    ? 'Solo tus amigos ven tu actividad. Cualquiera puede encontrarte por tu nombre de usuario.'
-    : 'Cualquier atleta puede ver lo que actives abajo en tu perfil. Tus amigos, además, pueden retarte.';
+export function audienceLine(_audience?: SocialAudience): string {
+  return 'Solo tus amigos ven tu actividad. Cualquiera puede encontrarte por tu nombre de usuario.';
 }
 
 // "Así te ven tus amigos".

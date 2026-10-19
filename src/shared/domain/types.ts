@@ -34,10 +34,24 @@ export const ROUTINE_CATEGORY_VALUES = [
 ] as const;
 export type RoutineCategory = (typeof ROUTINE_CATEGORY_VALUES)[number];
 
+// template_exercises.block (docs/backend/ROUTINES_SHAPES.md): read in this
+// order, warmup → main → cooldown; main by default.
+export type RoutineBlock = 'warmup' | 'main' | 'cooldown';
+
+// Computed by the backend from workout_templates.source.
+export type RoutineOrigin = 'official' | 'editorial' | 'ellie' | 'user';
+
 export type WorkoutExercise = {
   id: string;
   exerciseId?: string | null;
   name: string;
+  block?: RoutineBlock;
+  // Base 1, as get_routine returns it.
+  position?: number;
+  // movekit/thumbs/<slug>.webp (signed through exercise-media-url).
+  thumbKey?: string | null;
+  trackingMetrics?: string[];
+  isUnilateral?: boolean;
   sets?: number;
   reps?: number;
   duration?: number;
@@ -73,6 +87,16 @@ export type Workout = {
   collectionBadge?: string;
   inspirationStyle?: string;
   isFeatured?: boolean;
+  // From the routine RPCs (get_routine / list_routines).
+  origin?: RoutineOrigin;
+  isMine?: boolean;
+  canEdit?: boolean;
+  archived?: boolean;
+  thumbKey?: string | null;
+  // list_routines has the count, not the exercises.
+  exerciseCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type WorkoutSession = {

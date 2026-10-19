@@ -4,6 +4,7 @@ import type {
   EllieGeneratedNutritionPlan,
   EllieGeneratedWorkout,
 } from '@app/services/supabase/ellie-actions';
+import { plainMarkdown } from '@app/features/ellie/markdown';
 
 // ELLIE · conversación v2: pure state of the chat (messages, send states,
 // generative cards, errors) so the screen and the hook only wire it.
@@ -63,6 +64,10 @@ export type WorkoutCardMessage = {
   workout: EllieGeneratedWorkout;
   stage: WorkoutStage;
   workoutId?: string;
+  // chat_messages.id of the message that carries this plan (tool
+  // generate_workout_plan): what save_user_routine receives. "Otra versión"
+  // keeps the card id but the plan comes from a new message.
+  messageId?: string;
 };
 
 // The analysis of a photo of a meal (tool meal_analysis). Whether it was
@@ -313,7 +318,8 @@ export function lastLine(
   if (!last) {
     return null;
   }
-  const text = last.content.replace(/\s+/g, ' ').trim();
+  // Without markdown marks (B-24).
+  const text = plainMarkdown(last.content).replace(/\s+/g, ' ').trim();
   return { text, when: relativeWhen(last.createdAt, now) };
 }
 

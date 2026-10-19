@@ -10,13 +10,13 @@ import {
 import { MealResultView } from '@app/features/nutrition/v2/MealResultView';
 import { useVisionUsage } from '@app/features/vision/useVisionUsage';
 import { VisionFailureSheet } from '@app/features/vision/v2/VisionFailureSheet';
-import type { VisionAction, VisionFailureInput } from '@app/features/vision/visionCopy';
+import { visionFailureFrom, type VisionAction, type VisionFailureInput } from '@app/features/vision/visionCopy';
 import { useAuth } from '@app/hooks/useAuth';
 import { useMealMutations } from '@app/hooks/useMeals';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { useRegisteredMeal } from '@app/hooks/useRegisteredMeal';
+import { createUuid } from '@app/lib/uuid';
 import { mealRegistrar } from '@app/features/nutrition/mealRegistrar';
-import { EllieError } from '@app/services/ellie/ellieService';
 import { analyzeMeal, VisionError } from '@app/services/vision/visionService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -89,7 +89,12 @@ export function MealReviewScreen({ navigation, route }: AppScreenProps<'MealRevi
     setHinting(true);
     setHintNote(null);
     try {
-      const { draft: next, usage } = await analyzeMeal({ imagePath: draft.imagePath, hint: text });
+      // A note is a new request: its own client_request_id.
+      const { draft: next, usage } = await analyzeMeal({
+        imagePath: draft.imagePath,
+        clientRequestId: createUuid(),
+        hint: text,
+      });
       quota.record(usage);
       const fresh = draftFromAnalysis(next, new Date());
       setDraft(current => ({
@@ -103,11 +108,7 @@ export function MealReviewScreen({ navigation, route }: AppScreenProps<'MealRevi
       if (cause instanceof VisionError && cause.usage) {
         quota.record(cause.usage);
       }
-      setFailure(
-        cause instanceof EllieError
-          ? { code: cause.code, used: cause.used, limit: cause.limit }
-          : { code: 'offline' },
-      );
+      setFailure(visionFailureFrom(cause));
     } finally {
       setHinting(false);
     }

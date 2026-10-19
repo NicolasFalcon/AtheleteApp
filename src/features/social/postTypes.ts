@@ -243,6 +243,8 @@ export type CreatePostError =
   // A route whose visibility is "Solo yo" cannot be posted (Ruta, 5c).
   | 'route_private'
   | 'photo_required'
+  // A moderator removed the post of that source (Lote 3).
+  | 'post_removed'
   // The app, before sending: type, size or an invalid post.
   | 'photo_type'
   | 'photo_size'

@@ -1,3 +1,4 @@
+export * from '@app/components/v2/AppImage';
 export * from '@app/components/v2/AnswerTile';
 export * from '@app/components/v2/ArcGauge';
 export * from '@app/components/v2/AuthFormLayout';

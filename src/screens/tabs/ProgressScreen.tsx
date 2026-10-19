@@ -56,7 +56,7 @@ import {
   RecordsBlock,
   TrainingWeekBlock,
 } from '@app/features/progress/v2/SummaryBlocks';
-import { DEFAULT_WATER_GOAL_GLASSES } from '@app/features/nutrition/nutritionModel';
+import { waterGoalGlasses } from '@app/features/nutrition/nutritionModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useProgressSummary } from '@app/hooks/useProgressSummary';
@@ -138,7 +138,7 @@ export function ProgressScreen({ navigation, route }: Props) {
       records: recordsData,
       hasPlan: Boolean(overview?.nutritionPlan),
       goalProtein: overview?.nutritionPlan?.targetProtein,
-      goalGlasses: overview?.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES,
+      goalGlasses: waterGoalGlasses(overview?.dailyWaterGoal),
     }),
     [overview, recordsData, sessionsData],
   );
@@ -159,9 +159,7 @@ export function ProgressScreen({ navigation, route }: Props) {
   const model = useMemo(() => {
     const todayKey = getLocalDateKey(now);
     const keys = weekKeys(now);
-    const names = (id: string) =>
-      summary.exercisesQuery.data?.find(item => item.id === id)?.name ??
-      'Ejercicio';
+    const names = (id: string) => summary.exerciseNames[id] ?? 'Ejercicio';
     return {
       hero: buildHero(sessions, now),
       week: buildWeek(sessions, now, {
@@ -185,7 +183,7 @@ export function ProgressScreen({ navigation, route }: Props) {
     profile?.trainingDaysPerWeek,
     records,
     sessions,
-    summary.exercisesQuery.data,
+    summary.exerciseNames,
   ]);
 
   const copyTop = insets.top + 82;

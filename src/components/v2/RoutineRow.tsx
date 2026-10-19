@@ -1,12 +1,11 @@
 import {
-  Image,
   StyleSheet,
   View,
-  type ImageSourcePropType,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { Heart } from 'lucide-react-native';
+import { AppImage, type AppImageSource } from '@app/components/v2/AppImage';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -14,7 +13,8 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 export type RoutineRowProps = {
   title: string;
   meta: string;
-  image: ImageSourcePropType;
+  // The routine thumb ({ mediaKey, fallback }) or a local picture.
+  image: AppImageSource;
   mine?: boolean; // "Tuya": only the user's own routines are marked
   favorite: boolean;
   onPress: () => void;
@@ -47,9 +47,8 @@ export function RoutineRow({
         style={styles.main}
       >
         <View style={[styles.photo, { backgroundColor: scene.dotRing }]}>
-          <Image
+          <AppImage
             source={image}
-            resizeMode="cover"
             style={styles.fill}
             onError={onImageError}
           />

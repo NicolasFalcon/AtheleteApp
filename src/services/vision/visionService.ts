@@ -1,4 +1,5 @@
 import {
+  AI_REQUEST_TIMEOUT_MS,
   EllieError,
   invokeFunction,
   parseEllieError,
@@ -17,6 +18,18 @@ export type VisionUsage = {
   remaining: number;
 };
 
+// A countable food ("2 huevos") also carries its values per unit; then
+// grams, kcal and macros are the item's totals (VISION_SHAPES.md §6).
+export type MealUnit = {
+  count: number;
+  label: string;
+  gramsPer: number;
+  kcalPer: number;
+  proteinPer: number;
+  carbsPer: number;
+  fatsPer: number;
+};
+
 export type MealItem = {
   name: string;
   grams: number;
@@ -24,6 +37,10 @@ export type MealItem = {
   protein: number;
   carbs: number;
   fats: number;
+  // null: not countable (by grams).
+  unit?: MealUnit | null;
+  // The server recalculated the kcal from the macros (not saved).
+  kcalAdjusted?: boolean;
 };
 
 export type MealTotals = { kcal: number; protein: number; carbs: number; fats: number };
@@ -42,13 +59,24 @@ export type MealAnalysis = {
 };
 
 export type MachineEquipment = { id: string; slug: string; name: string };
-export type MachineCandidate = { equipmentId: string; slug: string; name: string; confidence: number };
+// The concrete machine (machine_types): "Prensa de piernas".
+export type MachineType = { id: string; slug: string; name: string };
+export type MachineCandidate = {
+  equipmentId: string;
+  slug: string;
+  name: string;
+  confidence: number;
+  machineTypeId?: string | null;
+  machineTypeName?: string | null;
+};
 export type MachineExercise = { id: string; slug: string; name: string };
 
 export type MachineScan = {
   scanId: string;
   replayed: boolean;
   match: 'confident' | 'ambiguous';
+  // null when ambiguous.
+  machineType: MachineType | null;
   equipment: MachineEquipment | null;
   confidence: number;
   candidates: MachineCandidate[];
@@ -80,6 +108,24 @@ export function parseMealType(value: unknown): MealType | null {
   return MEAL_TYPES.includes(value as MealType) ? (value as MealType) : null;
 }
 
+// The per-unit values of a countable food; null when it is by grams.
+export function parseMealUnit(item: Record<string, unknown>): MealUnit | null {
+  const count = typeof item.unit_count === 'number' && Number.isFinite(item.unit_count) ? item.unit_count : 0;
+  const label = str(item.unit_label).trim();
+  if (count <= 0 || !label) {
+    return null;
+  }
+  return {
+    count,
+    label,
+    gramsPer: num(item.grams_per_unit),
+    kcalPer: num(item.kcal_per_unit),
+    proteinPer: num(item.protein_per_unit),
+    carbsPer: num(item.carbs_per_unit),
+    fatsPer: num(item.fats_per_unit),
+  };
+}
+
 export function parseMealItems(value: unknown): MealItem[] {
   return (Array.isArray(value) ? value : []).flatMap((raw): MealItem[] => {
     const item = asRecord(raw);
@@ -95,6 +141,8 @@ export function parseMealItems(value: unknown): MealItem[] {
         protein: num(item.protein),
         carbs: num(item.carbs),
         fats: num(item.fats),
+        unit: parseMealUnit(item),
+        kcalAdjusted: item.kcal_adjusted === true,
       },
     ];
   });
@@ -147,6 +195,7 @@ export function parseMachineScan(body: unknown): MachineScan {
     throw new EllieError('unknown', { message: 'Unreadable ellie-vision response' });
   }
   const equipment = asRecord(record.equipment);
+  const machineType = asRecord(record.machine_type);
   const list = <T,>(value: unknown, map: (row: Record<string, unknown>) => T | null): T[] =>
     (Array.isArray(value) ? value : []).flatMap(raw => {
       const row = asRecord(raw);
@@ -157,6 +206,10 @@ export function parseMachineScan(body: unknown): MachineScan {
     scanId: record.scan_id,
     replayed: record.replayed === true,
     match: record.match === 'ambiguous' ? 'ambiguous' : 'confident',
+    machineType:
+      machineType && typeof machineType.id === 'string'
+        ? { id: machineType.id, slug: str(machineType.slug), name: str(machineType.name) }
+        : null,
     equipment:
       equipment && typeof equipment.id === 'string'
         ? { id: equipment.id, slug: str(equipment.slug), name: str(equipment.name) }
@@ -164,7 +217,14 @@ export function parseMachineScan(body: unknown): MachineScan {
     confidence: num(record.confidence),
     candidates: list(record.candidates, row =>
       typeof row.equipment_id === 'string'
-        ? { equipmentId: row.equipment_id, slug: str(row.slug), name: str(row.name), confidence: num(row.confidence) }
+        ? {
+            equipmentId: row.equipment_id,
+            slug: str(row.slug),
+            name: str(row.name),
+            confidence: num(row.confidence),
+            machineTypeId: typeof row.machine_type_id === 'string' ? row.machine_type_id : null,
+            machineTypeName: typeof row.machine_type_name === 'string' ? row.machine_type_name : null,
+          }
         : null,
     ),
     exerciseIds: (Array.isArray(record.exercise_ids) ? record.exercise_ids : []).filter(
@@ -194,30 +254,53 @@ export function parseVisionError(status: number, body: unknown): VisionError {
   return new VisionError(parseEllieError(status, body), parseVisionUsage(asRecord(body)?.usage));
 }
 
-const invokeVision = invokeFunction('ellie-vision');
+// Waits longer than the server's AI limit (see AI_REQUEST_TIMEOUT_MS).
+const invokeVision = invokeFunction('ellie-vision', { timeoutMs: AI_REQUEST_TIMEOUT_MS });
 
-async function call(body: Record<string, unknown>, invoke: EllieInvoke): Promise<InvokeResult> {
-  let result: InvokeResult;
-  try {
-    result = await invoke(body);
-  } catch (error) {
-    throw error instanceof EllieError ? error : new EllieError('offline', { message: String(error) });
+// 409 duplicate_in_progress: the same request (client_request_id) is still
+// being answered. Wait and ask again silently, at most 3 times, longer each
+// time.
+export const VISION_DUPLICATE_WAITS_MS = [2000, 4000, 8000] as const;
+
+export type VisionDeps = { invoke?: EllieInvoke; sleep?: (ms: number) => Promise<void> };
+
+async function call(body: Record<string, unknown>, deps: VisionDeps): Promise<InvokeResult> {
+  const invoke = deps.invoke ?? invokeVision;
+  const sleep = deps.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
+  for (let attempt = 0; ; attempt += 1) {
+    let result: InvokeResult;
+    try {
+      result = await invoke(body);
+    } catch (error) {
+      throw error instanceof EllieError ? error : new EllieError('offline', { message: String(error) });
+    }
+    if (result.status >= 200 && result.status < 300) {
+      return result;
+    }
+    const failure = parseVisionError(result.status, result.body);
+    if (failure.code === 'duplicate_in_progress' && attempt < VISION_DUPLICATE_WAITS_MS.length) {
+      await sleep(VISION_DUPLICATE_WAITS_MS[attempt]);
+      continue;
+    }
+    throw failure;
   }
-  if (result.status < 200 || result.status >= 300) {
-    throw parseVisionError(result.status, result.body);
-  }
-  return result;
 }
 
-export type VisionDeps = { invoke?: EllieInvoke };
-
+// `clientRequestId` is created once per photo (and per note to ELLIE) and
+// reused on every retry: the server answers the same draft (replayed) and
+// charges nothing again.
 export async function analyzeMeal(
-  input: { imagePath: string; hint?: string | null },
+  input: { imagePath: string; clientRequestId: string; hint?: string | null },
   deps: VisionDeps = {},
 ): Promise<{ draft: MealAnalysis; usage: VisionUsage | null }> {
   const { body } = await call(
-    { mode: 'meal', image_path: input.imagePath, client_request_id: null, hint: input.hint ?? null },
-    deps.invoke ?? invokeVision,
+    {
+      mode: 'meal',
+      image_path: input.imagePath,
+      client_request_id: input.clientRequestId,
+      hint: input.hint ?? null,
+    },
+    deps,
   );
   const record = asRecord(body);
   const draft = parseMealAnalysis(record?.draft);
@@ -235,7 +318,7 @@ export async function scanMachine(
 ): Promise<MachineScan> {
   const { body } = await call(
     { mode: 'machine', image_path: input.imagePath, client_request_id: input.clientRequestId, hint: null },
-    deps.invoke ?? invokeVision,
+    deps,
   );
   return parseMachineScan(body);
 }

@@ -9,7 +9,7 @@ import {
   type NutritionPlan,
   type WorkoutSession,
 } from '@app/shared';
-import {DEFAULT_WATER_GOAL_GLASSES} from '@app/features/nutrition/nutritionModel';
+import {waterGoalGlasses} from '@app/features/nutrition/nutritionModel';
 import {getSupabaseClient} from '@app/services/supabase/client';
 import type {Database, Json} from '@app/types/supabase';
 
@@ -38,7 +38,8 @@ export type ProgressOverview = {
   hydrationLogs: HydrationLog[];
   habitLogs: Record<string, boolean[]>;
   challenge: ProgressChallenge | null;
-  dailyWaterGoal: number;
+  // profiles.daily_water_goal (glasses); null: no goal.
+  dailyWaterGoal: number | null;
 };
 
 function getClient() {
@@ -299,6 +300,6 @@ export async function fetchProgressOverview(params: {
     hydrationLogs,
     habitLogs,
     challenge,
-    dailyWaterGoal: params.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES,
+    dailyWaterGoal: waterGoalGlasses(params.dailyWaterGoal),
   };
 }

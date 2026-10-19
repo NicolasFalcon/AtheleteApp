@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 import { Share2, Trash2, Users, X } from 'lucide-react-native';
 import {
   Button,
@@ -27,14 +28,16 @@ import { routeStore, useRouteSession } from '@app/features/route/routeStore';
 import { hiddenEnds } from '@app/features/route/routeSummary';
 import type { RouteActivity } from '@app/features/route/routeTypes';
 import { BigFigure, RoundButton, StatRow } from '@app/features/route/v2/RouteUi';
-import { useInvalidateRoute } from '@app/features/route/useRouteData';
+import { useInvalidateRoute, useRouteActivity } from '@app/features/route/useRouteData';
 import {
   RoutePrivacySheet,
   visibilityLabel,
   type RoutePrivacyValue,
 } from '@app/features/route/v2/RoutePrivacySheet';
-import { createPostErrorCopy } from '@app/features/social/postModel';
+import { createPostErrorCopy, publishedToast } from '@app/features/social/postModel';
 import type { CreatePostError } from '@app/features/social/postTypes';
+import { invalidateSocialContent } from '@app/features/social/useSocial';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { RouteServiceError } from '@app/services/route/routeService';
 import { useRouteService } from '@app/services/route/useRouteService';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -61,30 +64,29 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
   const service = useRouteService();
   const session = useRouteSession();
   const invalidate = useInvalidateRoute();
+  const queryClient = useQueryClient();
+  const language = useProfileLanguage();
   const activityId = route?.params?.activityId;
-  const [activity, setActivity] = useState<RouteActivity | null>(
-    session.finished && (!activityId || session.finished.id === activityId) ? session.finished : null,
-  );
+  // The one just finished is already in memory; otherwise get_route_activity
+  // through React Query (kept: coming back does not ask again, B-13). Privacy
+  // edits are applied on top of it.
+  const justFinished =
+    session.finished && (!activityId || session.finished.id === activityId) ? session.finished : null;
+  const activityQuery = useRouteActivity(activityId ?? justFinished?.id, justFinished);
+  const [edited, setActivity] = useState<RouteActivity | null>(null);
+  const activity: RouteActivity | null = edited ?? activityQuery.data ?? null;
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [posting, setPosting] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [pendingPrivacy, setPendingPrivacy] = useState<RoutePrivacyValue | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
+  const unavailable =
+    activityQuery.isError || (activityQuery.isSuccess && activityQuery.data === null);
   // Someone else's activity (the param says so before it loads; the server
   // says so after).
   const viewer = Boolean(route?.params?.viewer) || activity?.isOwner === false;
 
-  useEffect(() => {
-    if (activity || !activityId) {
-      return;
-    }
-    service
-      .getActivity(activityId)
-      .then(found => (found ? setActivity(found) : setUnavailable(true)))
-      .catch(() => setUnavailable(true));
-  }, [activity, activityId, service]);
 
   const shown = useMemo(() => {
     if (!activity) {
@@ -134,18 +136,22 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
       .shareToCommunity(activity.id)
       .then(result => {
         routeStore.patch({ posted: true });
-        // created:false = the same activity was already shared.
-        toast.show(result.created ? 'Publicada en Comunidad' : 'Ya la habías compartido');
+        // The feed and the own profile show it; the person lands on the post
+        // (created:false = it was already shared: that post is opened).
+        invalidateSocialContent(queryClient);
+        toast.show(publishedToast(result.created, language));
+        navigation.navigate(APP_ROUTES.SocialPost, { postId: result.postId });
       })
       .catch(error => {
         const code = error instanceof RouteServiceError ? error.code : 'unknown';
         if (code === 'route_private') {
           // "Solo yo": open the privacy of this activity.
-          toast.show(createPostErrorCopy('route_private').message);
+          toast.show(createPostErrorCopy('route_private', language).message);
           setPrivacyOpen(true);
           return;
         }
-        toast.show(createPostErrorCopy(code as CreatePostError).message);
+        // Any ok:false (post_removed too) is an error with its text.
+        toast.show(createPostErrorCopy(code as CreatePostError, language).message, { tone: 'error' });
       })
       .finally(() => setPosting(false));
   };

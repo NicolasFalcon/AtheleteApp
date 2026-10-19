@@ -91,3 +91,8 @@ Marcado [confirmar]: forma exacta no verificada con una respuesta real; la app d
 - Borrar la actividad de un récord automático lo recalcula con las demás (o lo borra si no queda ninguna). Los manuales no se tocan.
 - get_route_personal_bests() → {ok, bests: [{sport, distance_key, best_sec, activity_id, source, achieved_at}]}.
 - new_best en el post de ruta: la distancia más larga cuyo récord salió de esa actividad, o null.
+
+## create_post('route', activity_id)
+- El post sale siempre con `audience: "friends"`, aunque la actividad tenga `visibility: "public"`. `visibility: "me"` sigue devolviendo `route_private`.
+- Volver a compartir una ruta cuyo post se borró crea uno nuevo (`created:true`); antes devolvía el id del borrado.
+- `visibility: "public"` en `save_route_activity` se sigue aceptando, pero hoy equivale a amigos.

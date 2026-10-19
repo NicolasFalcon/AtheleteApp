@@ -4,6 +4,7 @@ import {
   View,
   type ImageSourcePropType,
 } from 'react-native';
+import { getWorkoutThumbnail } from '@app/lib/workoutThumbnails';
 import LinearGradient from 'react-native-linear-gradient';
 import {
   Heart,
@@ -22,7 +23,6 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { useRoutineImages } from '@app/features/workouts/v2/useRoutineImages';
 import { TYPE_IMAGES } from '@app/features/workouts/workoutAssets';
 import {
   COLLECTION_LABELS,
@@ -30,16 +30,19 @@ import {
   countByCollection,
   countByGroup,
   GROUP_TILES,
+  LEVEL_LABELS,
   TYPE_LABELS,
+  groupOf,
   plural,
-  routineHeroMeta,
   type RoutineCollection,
 } from '@app/features/workouts/workoutsModel';
+import type { RoutineSuggestion } from '@app/services/routines/routinesService';
 import type { Workout, WorkoutType } from '@app/shared';
 
 export type RoutinesViewProps = {
   workouts: Workout[];
-  nextSession: Workout | null;
+  // get_today_suggestion (null: none today → no hero).
+  suggestion: RoutineSuggestion | null;
   loading: boolean;
   error: boolean;
   onRetry: () => void;
@@ -62,7 +65,7 @@ const COLLECTION_ICONS: Record<RoutineCollection, LucideIcon> = {
 // the 5 type cards plus Favoritas / Tus rutinas / Todas; lists live in RoutineList.
 export function RoutinesView({
   workouts,
-  nextSession,
+  suggestion,
   loading,
   error,
   onRetry,
@@ -74,7 +77,6 @@ export function RoutinesView({
   onSearch,
 }: RoutinesViewProps) {
   const { layout } = useThemeV2();
-  const { imageFor, markBroken } = useRoutineImages();
 
   if (error) {
     return (
@@ -91,20 +93,19 @@ export function RoutinesView({
 
   return (
     <>
-      {nextSession ? (
+      {suggestion ? (
         <PressableScale
           accessibilityRole="button"
-          accessibilityLabel={`Tu próxima sesión: ${nextSession.title}`}
-          onPress={() => onOpenWorkout(nextSession.id)}
+          accessibilityLabel={`Tu próxima sesión: ${suggestion.title}. ${suggestion.reason}`}
+          onPress={() => onOpenWorkout(suggestion.routineId)}
           style={{ marginHorizontal: -layout.gutter }}
         >
           <WorkoutHero
-            image={imageFor(nextSession)}
-            onImageError={() => markBroken(nextSession.id)}
+            image={suggestionImage(suggestion)}
             height={300}
             eyebrow="Tu próxima sesión"
-            title={nextSession.title}
-            meta={routineHeroMeta(nextSession)}
+            title={suggestion.title}
+            meta={suggestionMeta(suggestion)}
             metaTrailing={<PlayDisc />}
           />
         </PressableScale>
@@ -140,6 +141,26 @@ export function RoutinesView({
       </View>
     </>
   );
+}
+
+// Photo of the suggested routine (local, by its group and zone).
+export function suggestionImage(suggestion: RoutineSuggestion): ImageSourcePropType {
+  return getWorkoutThumbnail(
+    groupOf(suggestion) ?? undefined,
+    suggestion.zone ? [suggestion.zone] : [],
+    suggestion.title,
+  );
+}
+
+// "45 min · Intermedio · Ayer hiciste tren superior"
+export function suggestionMeta(suggestion: RoutineSuggestion): string {
+  return [
+    `${suggestion.duration} min`,
+    LEVEL_LABELS[suggestion.difficulty],
+    suggestion.reason,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 function PlayDisc() {

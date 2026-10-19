@@ -19,8 +19,9 @@ import {
 type ExerciseFiltersSheetProps = {
   open: boolean;
   filters: ExerciseFilters;
-  // Live count of the draft filters ("Ver 8 ejercicios").
-  countFor: (filters: ExerciseFilters) => number;
+  // Live count of the draft filters ("Ver 8 ejercicios"); without it (the
+  // list is paginated on the server) the CTA reads "Ver ejercicios".
+  countFor?: (filters: ExerciseFilters) => number | null;
   onApply: (filters: ExerciseFilters) => void;
   onClose: () => void;
 };
@@ -50,7 +51,7 @@ export function ExerciseFiltersSheet({
         : [...current.equipment, key],
     }));
 
-  const count = countFor(draft);
+  const count = countFor ? countFor(draft) : null;
 
   return (
     <Sheet
@@ -60,7 +61,11 @@ export function ExerciseFiltersSheet({
       title="Filtros"
       footer={
         <Button
-          label={`Ver ${count} ${count === 1 ? 'ejercicio' : 'ejercicios'}`}
+          label={
+            count === null
+              ? 'Ver ejercicios'
+              : `Ver ${count} ${count === 1 ? 'ejercicio' : 'ejercicios'}`
+          }
           fullWidth
           style={styles.cta}
           onPress={() => onApply(draft)}

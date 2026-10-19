@@ -32,17 +32,13 @@ export async function invalidateWorkoutQueries(
   userId: string,
 ) {
   await Promise.allSettled([
+    // list_routines (a copy saved from Comunidad shows up in Entrenos) and
+    // today's suggestion (a saved session changes it).
     queryClient.invalidateQueries({
-      queryKey: ['workouts', 'library', userId],
+      queryKey: ['routines', 'list'],
     }),
     queryClient.invalidateQueries({
-      queryKey: ['workouts', 'browse'],
-    }),
-    queryClient.invalidateQueries({
-      queryKey: ['workouts', 'editable', userId],
-    }),
-    queryClient.invalidateQueries({
-      queryKey: ['workouts', 'detail'],
+      queryKey: ['routines', 'today'],
     }),
     queryClient.invalidateQueries({
       queryKey: ['workout-session', userId],

@@ -29,8 +29,8 @@ import {
 } from '@app/features/workouts/workoutAssets';
 import type { ZoneKey } from '@app/features/workouts/workoutsModel';
 import { useAuth } from '@app/hooks/useAuth';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
-import { useWorkoutLibrary } from '@app/hooks/useWorkoutLibrary';
+import { useExercise } from '@app/hooks/useCatalog';
+import { useRoutine } from '@app/hooks/useRoutines';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
 import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
 import { resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
@@ -52,15 +52,10 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const userId = profile?.id;
-  const workoutsQuery = useWorkoutLibrary();
-  const exercisesQuery = useExerciseLibrary();
-  const workout = useMemo(
-    () =>
-      (workoutsQuery.data ?? []).find(
-        item => item.id === route.params.workoutId,
-      ) ?? null,
-    [route.params.workoutId, workoutsQuery.data],
-  );
+  // "Comenzar" always reads get_routine(id) (B-03): any routine the user can
+  // see, also their own and ELLIE's.
+  const routineQuery = useRoutine(route.params.workoutId);
+  const workout = routineQuery.data ?? null;
   const {
     workoutSession,
     isLoading: sessionLoading,
@@ -126,59 +121,44 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     [navigation, refreshSurfaces],
   );
 
-  // The plan reads the library (recommended sets and reps), so it waits for it.
-  const libraryData = exercisesQuery.data;
-  const recommendedFor = useCallback(
-    (exerciseId: string) =>
-      libraryData?.find(item => item.id === exerciseId)?.recommendedSetsReps,
-    [libraryData],
-  );
-  const planReady = !exercisesQuery.isLoading;
-
   const runner = useSessionRunner({
-    workout: planReady ? workout : null,
+    workout,
     sessionId,
     userId,
-    recommendedFor,
     onCompleted,
     onLeave: goHome,
   });
 
-  const library = exercisesQuery.data;
-  const bodyPartOf = useCallback(
-    (exerciseId: string | null) =>
-      exerciseId
-        ? library?.find(item => item.id === exerciseId)?.bodyPart ?? null
-        : null,
-    [library],
-  );
-  // The posters come with the exercise library (one batched signing through
-  // exercise-media-url, cached by React Query); the muscle image stays as the
-  // fallback for an exercise without poster or one that fails to load.
-  const posterOf = useCallback(
-    (exerciseId: string | null) =>
-      exerciseId
-        ? library?.find(item => item.id === exerciseId)?.thumbnailUrl || null
-        : null,
-    [library],
-  );
-  const imageFor = useCallback(
-    (exerciseId: string | null, fallback: ImageSourcePropType): ExerciseImage => {
-      const poster = posterOf(exerciseId);
-      return { source: poster ? { uri: poster } : fallback, fallback };
-    },
-    [posterOf],
-  );
+  // Rows and rest cards: the thumb of each exercise (thumb_key of
+  // get_routine). The hero card: the poster of the current exercise
+  // (get_exercise, kept on the phone). The muscle image stays as the fallback
+  // for an exercise without media or one that fails to load.
+  const thumbKeys = useMemo(() => {
+    const keys: Record<string, string | null | undefined> = {};
+    (workout?.exercises ?? []).forEach(exercise => {
+      if (exercise.exerciseId) {
+        keys[exercise.exerciseId] = exercise.thumbKey;
+      }
+    });
+    return keys;
+  }, [workout?.exercises]);
   const thumbFor: ThumbFor = useCallback(
-    exercise =>
-      imageFor(exercise.exerciseId, exerciseThumbnail(bodyPartOf(exercise.exerciseId))),
-    [bodyPartOf, imageFor],
+    exercise => {
+      const fallback = exerciseThumbnail(null);
+      return {
+        source: {
+          mediaKey: exercise.exerciseId ? thumbKeys[exercise.exerciseId] : null,
+          fallback,
+        },
+        fallback,
+      };
+    },
+    [thumbKeys],
   );
+  const currentExercise = useExercise(runner.current?.exerciseId ?? null).data;
   const cardImage = useMemo((): ExerciseImage | null => {
-    const zone = runner.current
-      ? (bodyPartOf(runner.current.exerciseId) as ZoneKey | null)
-      : null;
-    const generic =
+    const zone = (currentExercise?.bodyPart as ZoneKey | undefined) ?? null;
+    const generic: ImageSourcePropType | null =
       zone && ZONE_IMAGES[zone]
         ? ZONE_IMAGES[zone]
         : workout
@@ -192,8 +172,11 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     if (!generic) {
       return null;
     }
-    return imageFor(runner.current?.exerciseId ?? null, generic);
-  }, [bodyPartOf, imageFor, runner, workout]);
+    return {
+      source: { mediaKey: currentExercise?.posterKey ?? null, fallback: generic },
+      fallback: generic,
+    };
+  }, [currentExercise?.bodyPart, currentExercise?.posterKey, workout]);
 
   if (runner.rest) {
     lastRestKind.current = runner.rest.kind;
@@ -287,7 +270,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     !workout || runner.loadState !== 'ready' || !sessionId;
   readyRef.current = !notReady;
   const failed =
-    workoutsQuery.error || startFailed || runner.loadState === 'error';
+    routineQuery.error || startFailed || runner.loadState === 'error';
 
   let body: React.ReactNode = null;
   if (notReady) {
@@ -298,13 +281,13 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
             message="No pudimos abrir la sesión."
             onRetry={() => {
               setStartFailed(false);
-              if (workoutsQuery.error) {
-                workoutsQuery.refetch().catch(() => {});
+              if (routineQuery.error) {
+                routineQuery.refetch().catch(() => {});
               }
               runner.retryLoad();
             }}
           />
-        ) : !workoutsQuery.isLoading && !workout ? (
+        ) : routineQuery.notFound ? (
           <TextV2 variant="body" color={SESSION_COLORS.meta} align="center">
             Esta rutina ya no está disponible.
           </TextV2>

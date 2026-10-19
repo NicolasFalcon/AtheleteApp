@@ -230,27 +230,42 @@ export function StatRow({
 }
 
 // "GPS listo · ±4 m" / "Buscando GPS…".
+// The real accuracy: "Buscando GPS…" without a position, "Ubicación
+// aproximada" with the last known one, "Mejorando precisión · ±45 m" while it
+// is above 30 m and "GPS listo · ±8 m" when it can record (B-11).
 export function GpsChip({
   ready,
   accuracyM,
+  approximate = false,
+  located = ready,
   dark = false,
 }: {
   ready: boolean;
   accuracyM?: number;
+  approximate?: boolean;
+  // There is a position (approximate or not).
+  located?: boolean;
   dark?: boolean;
 }) {
   const { colors } = useThemeV2();
+  const label = ready
+    ? `GPS listo${accuracyM ? ` · ±${accuracyM} m` : ''}`
+    : !located
+      ? 'Buscando GPS…'
+      : approximate
+        ? 'Ubicación aproximada'
+        : `Mejorando precisión${accuracyM ? ` · ±${accuracyM} m` : ''}`;
   return (
     <View style={styles.gps}>
       <View style={[styles.gpsDot, { backgroundColor: ready ? colors.ember.base : colors.text.disabled }]} />
       <TextV2 variant="metaStrong" color={dark ? DARK.text : undefined}>
-        {ready ? `GPS listo${accuracyM ? ` · ±${accuracyM} m` : ''}` : 'Buscando GPS…'}
+        {label}
       </TextV2>
     </View>
   );
 }
 
-// Muted 44 pt pill (Pausa automática, privacy).
+// Muted 44 pt pill (privacy).
 export function Chip({
   icon: Icon,
   label,

@@ -43,7 +43,6 @@ export type RouteSession = {
   // Privacy of this and the next outings.
   visibility: RouteVisibility;
   hideEndpoints: boolean;
-  autoPause: boolean;
   // The activity just finished and whether it was posted to Comunidad.
   finished: RouteActivity | null;
   posted: boolean;
@@ -70,7 +69,6 @@ export const INITIAL_SESSION: RouteSession = {
   origin: null,
   visibility: 'friends',
   hideEndpoints: true,
-  autoPause: true,
   finished: null,
   posted: false,
   resume: null,

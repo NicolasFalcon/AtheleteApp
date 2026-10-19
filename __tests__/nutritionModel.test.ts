@@ -39,7 +39,8 @@ describe('day totals', () => {
     expect(totals.kcal).toMatchObject({ consumed: 1240, target: null, progress: 0, done: false });
     expect(totals.macros.every(macro => macro.goal === null && macro.pct === 0)).toBe(true);
     expect(kcalLine(totals)).toMatch(/Sin plan activo/);
-    expect(totals.water.goalGlasses).toBe(14);
+    // B-25: without profiles.daily_water_goal there is no water goal (no fixed 14).
+    expect(totals.water).toMatchObject({ goalGlasses: null, progress: 0, done: false });
   });
 
   it('caps at the goal and reports it done', () => {

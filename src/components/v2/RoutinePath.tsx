@@ -2,10 +2,10 @@ import type { ReactNode } from 'react';
 import {
   StyleSheet,
   View,
-  type ImageSourcePropType,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import type { AppImageSource } from '@app/components/v2/AppImage';
 import { DarkThumb } from '@app/components/v2/ExerciseRow';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
@@ -15,7 +15,7 @@ export type RoutinePathStep = {
   key: string;
   title: string;
   subtitle?: string;
-  thumbnail?: ImageSourcePropType;
+  thumbnail?: AppImageSource;
   trailing?: ReactNode;
   onPress?: () => void;
 };

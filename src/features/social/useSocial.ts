@@ -60,11 +60,34 @@ function isWrite(name: string): boolean {
   return !name.startsWith('get');
 }
 
+// The feed is a local loader (useFeed), outside React Query: a publication,
+// an edit or a deletion asks every mounted feed to reload itself silently.
+const feedListeners = new Set<() => void>();
+const FEED_WRITES: readonly string[] = ['createPost', 'deletePost', 'editPost'];
+
+export function invalidateFeed(): void {
+  feedListeners.forEach(listener => listener());
+}
+
+export function onFeedInvalidated(listener: () => void): () => void {
+  feedListeners.add(listener);
+  return () => {
+    feedListeners.delete(listener);
+  };
+}
+
+// After a write outside useSocialService (the Ruta share): the social cache
+// (own profile, posts) and the feed.
+export function invalidateSocialContent(client: QueryClient): void {
+  client.invalidateQueries({ queryKey: [SOCIAL_KEY] }).catch(() => undefined);
+  invalidateFeed();
+}
+
 // Wraps the service so each write refreshes what the screens show: friend
 // requests, removing a friend, unblocking and revoking a link update the cache
 // at once (and go back if the request fails), and every write invalidates the
 // social cache when it ends.
-function withInvalidation(
+export function withInvalidation(
   service: SocialService,
   client: QueryClient,
 ): SocialService {
@@ -84,6 +107,9 @@ function withInvalidation(
             return await runOptimistic(client, action, execute);
           } finally {
             client.invalidateQueries({ queryKey: [SOCIAL_KEY] });
+            if (FEED_WRITES.includes(name)) {
+              invalidateFeed();
+            }
           }
         }
       : method.bind(service);
@@ -209,6 +235,52 @@ export function useNotificationList() {
   };
 }
 
+// ── Posts of a profile (get_user_posts) ────────────────────────────────────
+export const USER_POSTS_PAGE_SIZE = 20;
+
+// My profile or a friend's: 20 per page, `_before` = created_at of the last
+// one. Part of the social cache, so publishing, editing or deleting a post
+// refreshes it.
+export function useUserPosts(userId: string | null, enabled = true) {
+  ensureFocusManager();
+  const { session } = useAuth();
+  const me = session?.user.id ?? 'anon';
+  const query = useInfiniteQuery({
+    queryKey: [SOCIAL_KEY, me, 'getUserPosts', userId],
+    enabled: Boolean(userId) && enabled,
+    queryFn: ({ pageParam }) =>
+      getSocialService().getUserPosts(userId as string, pageParam, USER_POSTS_PAGE_SIZE),
+    initialPageParam: null as string | null,
+    getNextPageParam: last => last.nextCursor ?? undefined,
+    staleTime: 30_000,
+    retry: 1,
+  });
+  const posts = useMemo(
+    () =>
+      (query.data?.pages ?? []).reduce<FeedPost[]>(
+        (all, page) => mergeFeedPages(all, page.posts),
+        [],
+      ),
+    [query.data],
+  );
+  const status: SocialLoadState =
+    query.data !== undefined ? 'ready' : query.isError ? 'error' : 'loading';
+  return {
+    status,
+    posts,
+    hasMore: Boolean(query.hasNextPage),
+    loadingMore: query.isFetchingNextPage,
+    loadMore: () => {
+      if (query.hasNextPage && !query.isFetchingNextPage) {
+        query.fetchNextPage().catch(() => undefined);
+      }
+    },
+    reload: () => {
+      query.refetch().catch(() => undefined);
+    },
+  };
+}
+
 // Source of a post photo: a signed URL of `social-photos`.
 // TODO(social-wire): cache signed URLs for the session, like profile-photo.ts.
 export function usePostPhotoSource(path: string | null): ImageSourcePropType | null {
@@ -315,6 +387,15 @@ export function useFeed() {
       busy.current = false;
     }
   }, []);
+
+  // A publication (or an edit / deletion) elsewhere: reload in place.
+  useEffect(
+    () =>
+      onFeedInvalidated(() => {
+        refresh(true).catch(() => undefined);
+      }),
+    [refresh],
+  );
 
   const retry = useCallback(() => {
     refresh();

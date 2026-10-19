@@ -37,6 +37,9 @@ export function createFakeLocationApi(overrides: Partial<FakeLocationApi> = {}):
     async getLastKnown() {
       return api.lastKnown;
     },
+    async watchForeground() {
+      return () => undefined;
+    },
     async startUpdates() {
       api.startCalls += 1;
       api.updating = true;

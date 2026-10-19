@@ -23,8 +23,9 @@ import {
   capitalize,
   zoneLabel,
 } from '@app/features/workouts/workoutsModel';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExercise } from '@app/hooks/useCatalog';
 import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
+import { useLatchedMediaUrl, useMediaUrl } from '@app/lib/media/mediaUrls';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import {
@@ -54,9 +55,11 @@ const ESSENTIAL_STEPS = 3;
 export function ExerciseDetailScreen({ navigation, route }: Props) {
   const { colors, layout, mode } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const exercisesQuery = useExerciseLibrary();
   const favorites = useFavoriteExercises();
   const exerciseId = route.params.exerciseId;
+  // get_exercise (kept on the phone per catalog version). The poster and the
+  // video are signed only here.
+  const exercisesQuery = useExercise(exerciseId);
   const recordsQuery = usePersonalRecords(exerciseId);
   const [fullscreen, setFullscreen] = useState(Boolean(route.params.fullscreen));
   const [techOpen, setTechOpen] = useState(false);
@@ -68,10 +71,10 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
     }
   }, [route.params.fullscreen]);
 
-  const exercise = useMemo(
-    () => (exercisesQuery.data ?? []).find(item => item.id === exerciseId) ?? null,
-    [exerciseId, exercisesQuery.data],
-  );
+  const exercise = exercisesQuery.data ?? null;
+  const posterUrl = useMediaUrl(exercise?.posterKey);
+  // The video keeps its first URL while the screen is open (no reload).
+  const videoUrl = useLatchedMediaUrl(exercise?.videoKey);
 
   const bestMark = useMemo(() => {
     const records = recordsQuery.records ?? [];
@@ -176,8 +179,8 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
       >
         <MoveKitPlayer
           title={exercise.name}
-          posterUrl={exercise.thumbnailUrl}
-          videoUrl={exercise.videoUrl}
+          posterUrl={posterUrl}
+          videoUrl={videoUrl}
           variant={lightbox ? 'lightbox' : 'bleed'}
           fullscreen={fullscreen}
           onFullscreenChange={setFullscreen}

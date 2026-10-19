@@ -31,6 +31,8 @@ import {
   restoreTracker,
   trackerActiveSec,
   trackerElevation,
+  trackerCurrentPace,
+  trackerCurrentSpeed,
   trackerPace,
   trackerPausedSec,
   trackerPlanRemainingM,
@@ -71,7 +73,7 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
   const resumed = useRef(session.resume).current;
   const clientId = useRef(resumed?.clientId ?? createUuid()).current;
   const initial = useMemo(
-    () => (resumed ? restoreTracker(resumed.state) : initialTracker(sport, planPoints, session.autoPause)),
+    () => (resumed ? restoreTracker(resumed.state) : initialTracker(sport, planPoints)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -251,8 +253,13 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
     navigation.popToTop();
   };
 
+  // While moving: the CURRENT pace / speed of the last ~30 s or ~150 m (B-08);
+  // in the pause view, the average of the whole activity without pauses.
+  const currentPace = running
+    ? formatPace(trackerCurrentPace(state))
+    : formatSpeed(trackerCurrentSpeed(state));
   const pace = running ? formatPace(trackerPace(state)) : formatSpeed(trackerSpeed(state));
-  const paceLabel = running ? 'Ritmo /km' : 'Velocidad km/h';
+  const paceLabel = running ? 'Ritmo actual /km' : 'Velocidad actual'
 
   return (
     <View style={[styles.screen, { backgroundColor: DARK.bg }]}>
@@ -346,7 +353,7 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
             <View style={styles.headRow}>
               <View style={[styles.dotSmall, { borderColor: DARK.text }]} />
               <TextV2 variant="eyebrow" color={DARK.text}>
-                {state.autoPaused ? 'PAUSA AUTOMÁTICA' : 'ACTIVIDAD EN PAUSA'}
+                ACTIVIDAD EN PAUSA
               </TextV2>
             </View>
             <TextV2 style={styles.pausedTime}>{formatDuration(trackerActiveSec(state))}</TextV2>
@@ -376,7 +383,7 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
             <BigFigure value={distance} unit="km" size={112} color={DARK.text} unitColor={DARK.muted} />
             <View style={styles.statsRow}>
               <Metric dark value={formatDuration(trackerActiveSec(state))} label="Tiempo" size={40} />
-              <Metric dark value={pace} unit={running ? undefined : 'km/h'} label={paceLabel} size={40} divider />
+              <Metric dark value={currentPace} unit={running ? undefined : 'km/h'} label={paceLabel} size={40} divider />
             </View>
             <View style={[styles.extra, { borderTopColor: DARK.hairline }]}>
               <View style={styles.extraItem}>

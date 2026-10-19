@@ -3,6 +3,7 @@ import type {
   EllieGeneratedWorkout,
 } from '@app/services/supabase/ellie-actions';
 import { parseEllieTool, type EllieTool } from '@app/services/ellie/ellieService';
+import type { RoutineInput } from '@app/services/routines/routinesService';
 import type { EllieStoredMessage } from '@app/services/ellie/ellieHistory';
 import { parseMealAnalysis } from '@app/services/vision/visionService';
 import type { CardMessage, ChatMessage } from '@app/features/ellie/chatModel';
@@ -70,6 +71,35 @@ export function parseWorkout(data: any): EllieGeneratedWorkout {
   };
 }
 
+// save_user_routine payload of an ELLIE plan: its exercises are the tool's
+// (tool_data.exercises); the server names them from the catalog.
+export function ellieRoutineInput(workout: EllieGeneratedWorkout): RoutineInput {
+  return {
+    title: workout.title,
+    description: workout.description ?? null,
+    type: workout.type,
+    difficulty: workout.difficulty,
+    duration: workout.duration,
+    calories: workout.calories,
+    targetMuscles: workout.targetMuscles,
+    exercises: workout.exercises.flatMap(exercise =>
+      exercise.exerciseId
+        ? [
+            {
+              exerciseId: exercise.exerciseId,
+              block: 'main' as const,
+              sets: exercise.sets ?? null,
+              reps: exercise.reps ?? null,
+              duration: exercise.duration ?? null,
+              restTime: exercise.restTime ?? null,
+              notes: exercise.notes ?? null,
+            },
+          ]
+        : [],
+    ),
+  };
+}
+
 export function parseNutrition(data: any): EllieGeneratedNutritionPlan {
   const num = (a: unknown, b: unknown, fallback: number) =>
     typeof a === 'number' ? a : typeof b === 'number' ? b : fallback;
@@ -99,7 +129,14 @@ export function parseTool(tool: EllieTool, id: string, content: string): ParsedT
   if (tool.type === 'generate_workout_plan') {
     return {
       intro,
-      card: { id, role: 'assistant', kind: 'workout', workout: parseWorkout(tool.data), stage: 'proposed' },
+      card: {
+        id,
+        messageId: id,
+        role: 'assistant',
+        kind: 'workout',
+        workout: parseWorkout(tool.data),
+        stage: 'proposed',
+      },
     };
   }
   return {

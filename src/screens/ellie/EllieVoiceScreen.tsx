@@ -26,6 +26,7 @@ import {
 import { useAuth } from '@app/hooks/useAuth';
 import { safeGoBack, tabFallback } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
+import { plainMarkdown } from '@app/features/ellie/markdown';
 
 const MUTED = '#A8A6A1';
 
@@ -66,7 +67,7 @@ export function EllieVoiceScreen({
       case 'thinking':
         return { text: state.transcript, dim: true };
       case 'speaking':
-        return { text: state.reply, dim: false };
+        return { text: plainMarkdown(state.reply), dim: false };
       case 'error':
         if (!state.error) {
           return { text: '', dim: true };
@@ -82,7 +83,7 @@ export function EllieVoiceScreen({
         };
       default:
         return state.reply
-          ? { text: state.reply, dim: true }
+          ? { text: plainMarkdown(state.reply), dim: true }
           : { text: VOICE_HINT[language], dim: true };
     }
   })();

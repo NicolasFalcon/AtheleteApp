@@ -13,7 +13,7 @@ import {
   RegisterRecordSheet,
   type RecordExercise,
 } from '@app/features/progress/v2/RegisterRecordSheet';
-import { useExerciseLibrary } from '@app/hooks/useExerciseLibrary';
+import { useExercise } from '@app/hooks/useCatalog';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { PRInsert } from '@app/shared';
@@ -28,7 +28,9 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 export function RegisterPrScreen({ navigation, route }: Props) {
   const { colors } = useThemeV2();
   const toast = useToast();
-  const exercisesQuery = useExerciseLibrary();
+  const exerciseQuery = useExercise(
+    route.params?.exerciseName ? null : route.params?.exerciseId,
+  );
   const recordsQuery = usePersonalRecords();
   const [open, setOpen] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +49,11 @@ export function RegisterPrScreen({ navigation, route }: Props) {
       id,
       name:
         route.params?.exerciseName ??
-        exercisesQuery.data?.find(item => item.id === id)?.name ??
+        exerciseQuery.data?.name ??
         'Ejercicio',
     };
   }, [
-    exercisesQuery.data,
+    exerciseQuery.data,
     route.params?.exerciseId,
     route.params?.exerciseName,
     route.params?.showExercisePicker,
@@ -106,7 +108,6 @@ export function RegisterPrScreen({ navigation, route }: Props) {
         open={open}
         onClose={() => setOpen(false)}
         exercise={exercise}
-        exercises={exercisesQuery.data ?? []}
         records={recordsQuery.records}
         saving={recordsQuery.isAddingRecord}
         error={error}

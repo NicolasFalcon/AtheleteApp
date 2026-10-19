@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { dayTotalsFromDay, DEFAULT_WATER_GOAL_GLASSES } from '@app/features/nutrition/nutritionModel';
+import { dayTotalsFromDay, waterGoalGlasses } from '@app/features/nutrition/nutritionModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { mealKeys, useNutritionDayMeals } from '@app/hooks/useMeals';
 import { getLocalDateKey } from '@app/lib/date';
@@ -18,7 +18,8 @@ export function useNutritionDay(date: string | null = null) {
     queryFn: () => fetchTodayWaterMl(profile!.id),
   });
 
-  const goalGlasses = profile?.dailyWaterGoal || DEFAULT_WATER_GOAL_GLASSES;
+  // profiles.daily_water_goal, the same goal ELLIE reads (null: none).
+  const goalGlasses = waterGoalGlasses(profile?.dailyWaterGoal);
   const totals = useMemo(
     () => (meals.data ? dayTotalsFromDay(meals.data, water.data ?? 0, goalGlasses) : null),
     [goalGlasses, meals.data, water.data],

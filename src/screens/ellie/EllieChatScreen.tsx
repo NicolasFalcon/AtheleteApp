@@ -231,7 +231,19 @@ export function EllieChatScreen({ navigation, route }: Props) {
               workoutId: message.workoutId,
             })
           }
-          onSave={() => chat.saveRoutine(message.id)}
+          onSave={() => {
+            chat
+              .saveRoutine(message.id)
+              .then(saved => {
+                // Already saved from this message: open that routine.
+                if (saved?.replayed) {
+                  navigation.navigate(APP_ROUTES.WorkoutDetail, {
+                    workoutId: saved.routineId,
+                  });
+                }
+              })
+              .catch(() => undefined);
+          }}
           onAnother={() => chat.anotherVersion(message.id)}
         />
       );

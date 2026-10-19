@@ -30,9 +30,15 @@ export type LibraryExercise = {
   trackingMetrics: string[];
   isUnilateral: boolean;
   prEligible: boolean;
+  // Media keys of the catalog (signed through exercise-media-url): the thumb
+  // in lists and cards, the poster and the video only in the detail.
+  thumbKey?: string | null;
+  posterKey?: string | null;
+  videoKey?: string | null;
+  aliases?: string[];
 };
 
-const muscleGroupToBodyPart: Record<string, string> = {
+export const muscleGroupToBodyPart: Record<string, string> = {
   chest: 'chest',
   back: 'back',
   legs: 'legs',
@@ -57,7 +63,7 @@ const muscleGroupToBodyPart: Record<string, string> = {
   neck: 'shoulders',
 };
 
-const equipmentToFilter: Record<string, string> = {
+export const equipmentToFilter: Record<string, string> = {
   bodyweight: 'bodyweight',
   dumbbells: 'dumbbells',
   barbell: 'barbell',
@@ -143,17 +149,4 @@ export function mapDbExerciseRow(row: any): LibraryExercise {
     isUnilateral: Boolean(row.is_unilateral),
     prEligible: Boolean(row.pr_eligible),
   };
-}
-
-export function findExerciseByName(
-  exercises: LibraryExercise[],
-  name: string,
-): LibraryExercise | undefined {
-  const normalizedName = name.toLowerCase();
-
-  return exercises.find(
-    exercise =>
-      exercise.name.toLowerCase().includes(normalizedName) ||
-      normalizedName.includes(exercise.name.toLowerCase()),
-  );
 }

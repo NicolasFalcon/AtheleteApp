@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Image, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { ArrowLeft, Lock, Pencil } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button, PressableScale, Skeleton, StatusBarV2, TextV2, useThemeV2, useToast } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { clockLabel, draftFromMeal, mealTypeLabel } from '@app/features/nutrition/mealDraft';
+import { clockLabel, draftFromMeal, mealTypeLabel, perUnitLine, unitLine } from '@app/features/nutrition/mealDraft';
 import { formatThousands } from '@app/features/nutrition/nutritionModel';
+import { MealPhoto } from '@app/features/nutrition/v2/MealPhoto';
 import { ConfirmDialog } from '@app/features/nutrition/v2/ConfirmDialog';
 import { useMealMutations, useNutritionDayMeals } from '@app/hooks/useMeals';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
@@ -75,8 +76,12 @@ export function MealDetailScreen({ navigation, route }: AppScreenProps<'MealDeta
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 style="light" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
-        <View style={[styles.hero, { backgroundColor: mode === 'dark' ? '#2A2622' : '#E6E1D8' }]}>
-          {photo ? <Image source={{ uri: photo }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
+        <MealPhoto
+          uri={photo}
+          height={HERO}
+          label={es ? 'Ver la foto' : 'See the photo'}
+          closeLabel={es ? 'Cerrar' : 'Close'}
+        >
           <View style={[styles.heroTop, { paddingTop: insets.top + 8 }]}>
             <PressableScale accessibilityRole="button" accessibilityLabel={es ? 'Volver' : 'Back'} onPress={() => navigation.goBack()} style={styles.round44}>
               <ArrowLeft size={20} color="#FFFFFF" strokeWidth={2} />
@@ -100,7 +105,7 @@ export function MealDetailScreen({ navigation, route }: AppScreenProps<'MealDeta
               </TextV2>
             </View>
           ) : null}
-        </View>
+        </MealPhoto>
 
         <View style={styles.body}>
           <TextV2 variant="eyebrow" tone="secondary">
@@ -141,7 +146,14 @@ export function MealDetailScreen({ navigation, route }: AppScreenProps<'MealDeta
                     <TextV2 variant="bodyStrong" numberOfLines={2}>
                       {item.name}
                     </TextV2>
-                    <TextV2 variant="meta" tone="secondary">{`${item.grams} g`}</TextV2>
+                    <TextV2 variant="meta" tone="secondary">
+                      {unitLine(item, language)}
+                    </TextV2>
+                    {item.unit ? (
+                      <TextV2 variant="meta" tone="tertiary">
+                        {perUnitLine(item.unit, language)}
+                      </TextV2>
+                    ) : null}
                   </View>
                   <TextV2 variant="bodyStrong">{`${formatThousands(item.kcal)} kcal`}</TextV2>
                 </View>
@@ -188,7 +200,6 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   flex: { flex: 1 },
   back: { width: 44, height: 44, justifyContent: 'center', marginBottom: 12 },
-  hero: { height: HERO, overflow: 'hidden' },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 },
   round44: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(14,13,12,.45)', alignItems: 'center', justifyContent: 'center' },
   chip: { position: 'absolute', left: 16, bottom: 14, flexDirection: 'row', alignItems: 'center', gap: 6, height: 28, paddingHorizontal: 12, borderRadius: 14, backgroundColor: 'rgba(14,13,12,.55)' },

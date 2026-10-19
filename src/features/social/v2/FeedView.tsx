@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { Plus } from 'lucide-react-native';
@@ -35,8 +35,12 @@ import type { SocialProfileRow } from '@app/features/social/socialTypes';
 // Feed (SOCIAL_01): "Comparte tu último entreno", posts by type, activity
 // lines and paginated loading. States: loading (STATE_01), error (STATE_07),
 // empty with friends, loading more, error loading more and end of the list.
+// Without friends (B-26) it is still the feed: publishing works and the own
+// posts show; `invite` (search / invite friends) sits under the composer and
+// replaces the empty state.
 export function FeedView({
   me,
+  invite = null,
   nearEnd,
   refreshSignal,
   onRefreshed,
@@ -46,6 +50,8 @@ export function FeedView({
   onOpenProfile,
 }: {
   me: SocialProfileRow;
+  // No friends yet: the invitation, never a block.
+  invite?: ReactNode;
   // The hub scroll is near the bottom: ask for the next page.
   nearEnd: boolean;
   // Pull to refresh: a new value reloads the feed; `onRefreshed` says when it ended.
@@ -133,6 +139,8 @@ export function FeedView({
         </View>
       </PressableScale>
 
+      {invite}
+
       <View style={styles.posts}>
       {feed.status === 'loading' ? (
         <SkeletonGroup>
@@ -165,7 +173,7 @@ export function FeedView({
         </View>
       ) : null}
 
-      {feed.status === 'ready' && entries.length === 0 ? (
+      {feed.status === 'ready' && entries.length === 0 && !invite ? (
         <SegmentPlaceholder
           title="Aún no hay publicaciones"
           body="Cuando tus amigos compartan un entreno, un récord o una rutina, lo verás aquí. Tú decides qué compartes."

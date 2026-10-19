@@ -223,24 +223,29 @@ export function CommunityScreen({
               </View>
               <Skeleton height={220} radius={20} />
             </SkeletonGroup>
-          ) : noFriends ? (
-            <NoFriendsState
-              title="Tu feed empieza con un amigo"
-              body="Cuando tus amigos entrenen, lo verás aquí. Tú decides qué compartes."
-              onSearch={() => setSegment('amigos')}
-              onInvite={openInvite}
-              meanwhile={
-                challenges.data?.official
-                  ? {
-                      title: challenges.data.official.challenge.title,
-                      onPress: () => setSegment('retos'),
-                    }
-                  : null
-              }
-            />
           ) : (
+            // B-26: without friends it is still the feed (publish and see the
+            // own posts); the invitation to add friends sits on top.
             <FeedView
               me={meProfile}
+              invite={
+                noFriends ? (
+                  <NoFriendsState
+                    title="Tu feed empieza con un amigo"
+                    body="Puedes publicar ya: tus publicaciones salen aquí y en tu perfil. Cuando tengas amigos, también verás lo suyo."
+                    onSearch={() => setSegment('amigos')}
+                    onInvite={openInvite}
+                    meanwhile={
+                      challenges.data?.official
+                        ? {
+                            title: challenges.data.official.challenge.title,
+                            onPress: () => setSegment('retos'),
+                          }
+                        : null
+                    }
+                  />
+                ) : null
+              }
               nearEnd={nearEnd}
               refreshSignal={refreshSignal}
               onRefreshed={() => setRefreshing(false)}

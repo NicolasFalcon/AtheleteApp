@@ -7,7 +7,7 @@ import {
   type EllieMode as PlanMode,
 } from '@app/features/ellie/chatModel';
 import { ellieErrorLine, failureEffect, type EllieLanguage } from '@app/features/ellie/ellieCopy';
-import { historyToMessages, parseTool } from '@app/features/ellie/resultParsing';
+import { ellieRoutineInput, historyToMessages, parseTool } from '@app/features/ellie/resultParsing';
 import { useAuth } from '@app/hooks/useAuth';
 import {
   cacheEllieUsage,
@@ -17,8 +17,10 @@ import {
   useEllieUsage,
 } from '@app/hooks/useEllieConversations';
 import { createUuid } from '@app/lib/uuid';
-import { saveEllieNutritionPlan, saveEllieWorkout } from '@app/services/supabase/ellie-actions';
+import { saveEllieNutritionPlan } from '@app/services/supabase/ellie-actions';
 import { invalidateNutritionPlanQueries } from '@app/lib/queryInvalidation';
+import { invalidateRoutineLists, routineKeys } from '@app/hooks/useRoutines';
+import { routinesService } from '@app/services/routines/routinesService';
 import {
   EllieError,
   sendEllieMessage,
@@ -227,24 +229,34 @@ export function useEllieConversation({
     [queryClient, settle, userId],
   );
 
+  // save_user_routine with origin ellie: the message that carries the plan
+  // and its exercises (tool_data.exercises). One message = one routine: saving
+  // it again answers the same one (replayed) and nothing is duplicated.
   const saveRoutine = useCallback(
-    async (id: string) => {
+    async (id: string): Promise<{ routineId: string; replayed: boolean } | null> => {
       const card = stateRef.current.messages.find(item => item.id === id);
       if (!card || card.kind !== 'workout' || !userId) {
-        return;
+        return null;
       }
       dispatch({ type: 'stage', id, stage: 'saving' });
-      const result = await saveEllieWorkout(userId, card.workout);
-      if (!result.success) {
+      try {
+        const { routine, replayed } = await routinesService.saveRoutine(
+          ellieRoutineInput(card.workout),
+          { origin: 'ellie', chatMessageId: card.messageId ?? card.id },
+        );
+        settle(id, 'saved', routine.id);
+        queryClient.setQueryData(routineKeys.detail(routine.id), routine);
+        await Promise.allSettled([
+          invalidateRoutineLists(queryClient),
+          queryClient.invalidateQueries({ queryKey: ['ellie', 'overview', userId] }),
+          queryClient.invalidateQueries({ queryKey: ['home', 'overview', userId] }),
+        ]);
+        return { routineId: routine.id, replayed };
+      } catch (error) {
+        console.warn('[ellie] No se pudo guardar la rutina.', error);
         settle(id, 'error');
-        return;
+        return null;
       }
-      settle(id, 'saved', result.workoutId);
-      await Promise.allSettled([
-        queryClient.invalidateQueries({ queryKey: ['workouts', 'library', userId] }),
-        queryClient.invalidateQueries({ queryKey: ['ellie', 'overview', userId] }),
-        queryClient.invalidateQueries({ queryKey: ['home', 'overview', userId] }),
-      ]);
     },
     [queryClient, settle, userId],
   );
@@ -267,7 +279,13 @@ export function useEllieConversation({
           clientContext,
         });
         afterReply(reply);
-        const parsed = reply.message.tool ? parseTool(reply.message.tool, id, reply.message.content) : null;
+        // The card keeps its place (id); the plan is the new message's.
+        const parsed = reply.message.tool
+          ? parseTool(reply.message.tool, id, reply.message.content)
+          : null;
+        if (parsed?.card.kind === 'workout' && reply.message.id) {
+          parsed.card.messageId = reply.message.id;
+        }
         if (parsed && parsed.card.kind !== 'meal') {
           dispatch({ type: 'replace', id, card: parsed.card, intro: parsed.intro });
         } else {
