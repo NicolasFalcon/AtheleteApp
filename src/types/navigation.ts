@@ -230,7 +230,8 @@ export type AppStackParamList = {
   RouteSaved: undefined;
   RouteActive: undefined;
   RouteResult: { activityId?: string; viewer?: boolean } | undefined;
-  RouteShare: { activityId?: string } | undefined;
+  // Compartir en Instagram (v2.16 §26): a finished workout or route.
+  Share: { kind: 'workout'; sessionId: string } | { kind: 'route'; activityId: string };
   Wear: undefined;
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;

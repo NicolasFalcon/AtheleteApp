@@ -101,7 +101,8 @@ function prPrevious(record: DetectedPR): string | null {
 // figures (duration without pauses, volume from the server, sets), the badge
 // unlocked by workout_completed, ELLIE and "Registrar récord" when
 // detect_session_prs finds new marks. Without Apple Health (SESSION_08) and
-// "Compartir" (opens the composer with the session).
+// "Compartir" (Compartir en Instagram, v2.16 §26; Comunidad is one of its
+// actions).
 export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -327,7 +328,7 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel="Compartir entreno"
-            onPress={() => navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'workout', sourceId: sessionId })}
+            onPress={() => navigation.navigate(APP_ROUTES.Share, { kind: 'workout', sessionId })}
             style={[styles.prButton, styles.secondaryHalf, { boxShadow: `inset 0 0 0 1px ${colors.outline.strong}` }]}
           >
             <TextV2 variant="bodyStrong">Compartir</TextV2>

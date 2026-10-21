@@ -66,7 +66,7 @@ export const APP_ROUTES = {
   RouteSaved: 'RouteSaved',
   RouteActive: 'RouteActive',
   RouteResult: 'RouteResult',
-  RouteShare: 'RouteShare',
+  Share: 'Share',
   Wear: 'Wear',
   CreateRoutine: 'CreateRoutine',
   EditRoutine: 'EditRoutine',

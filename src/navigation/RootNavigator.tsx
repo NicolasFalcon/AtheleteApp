@@ -19,7 +19,7 @@ import { RoutePrepScreen } from '@app/screens/route/RoutePrepScreen';
 import { RoutePreviewScreen } from '@app/screens/route/RoutePreviewScreen';
 import { RouteResultScreen } from '@app/screens/route/RouteResultScreen';
 import { RouteSavedScreen } from '@app/screens/route/RouteSavedScreen';
-import { RouteShareScreen } from '@app/screens/route/RouteShareScreen';
+import { ShareScreen } from '@app/screens/share/ShareScreen';
 import { WearScreen } from '@app/screens/wear/WearScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -193,7 +193,7 @@ export function RootNavigator() {
             options={{ gestureEnabled: false }}
           />
           <Stack.Screen name={APP_ROUTES.RouteResult} component={RouteResultScreen} />
-          <Stack.Screen name={APP_ROUTES.RouteShare} component={RouteShareScreen} />
+          <Stack.Screen name={APP_ROUTES.Share} component={ShareScreen} />
           <Stack.Screen name={APP_ROUTES.Wear} component={WearScreen} />
           <Stack.Screen
             name={APP_ROUTES.EditProfile}

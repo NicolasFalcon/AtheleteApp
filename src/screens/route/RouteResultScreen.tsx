@@ -386,7 +386,7 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
               iconPosition="start"
               variant="secondary"
               style={styles.flex}
-              onPress={() => navigation.navigate(APP_ROUTES.RouteShare, { activityId: activity.id })}
+              onPress={() => navigation.navigate(APP_ROUTES.Share, { kind: 'route', activityId: activity.id })}
             />
             <Button label="Listo" variant="outline" style={styles.flex} onPress={done} />
           </View>
@@ -398,7 +398,7 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
           <RoundButton
             icon={Share2}
             label="Compartir"
-            onPress={() => navigation.navigate(APP_ROUTES.RouteShare, { activityId: activity.id })}
+            onPress={() => navigation.navigate(APP_ROUTES.Share, { kind: 'route', activityId: activity.id })}
           />
         ) : null}
       </View>
