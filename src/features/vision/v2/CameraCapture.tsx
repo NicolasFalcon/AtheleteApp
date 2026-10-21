@@ -1,3 +1,4 @@
+import { GuideAnchor, useGuide } from '@app/features/guides/GuideAnchor';
 import { useRef, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -42,6 +43,10 @@ export function CameraCapture({
   const [torch, setTorch] = useState(false);
   const [busy, setBusy] = useState(false);
   const camera = useRef<CameraView>(null);
+  // Guías (25.4): Escanear (machine) and Cámara de Calorías (meal), once the
+  // camera is live.
+  const tour = kind === 'meal' ? 'calories' : 'scan';
+  useGuide(tour, { enabled: permission?.granted === true });
 
   const shoot = async () => {
     if (busy || !camera.current) {
@@ -195,12 +200,14 @@ export function CameraCapture({
       ) : null}
 
       <View style={styles.frameWrap} pointerEvents="none">
-        <View style={styles.frame}>
-          {(['tl', 'tr', 'bl', 'br'] as const).map(corner => (
-            <View key={corner} style={[styles.corner, styles[corner]]} />
-          ))}
-          {kind === 'meal' ? <View style={styles.plate} /> : null}
-        </View>
+        <GuideAnchor id={`${tour}.frame`} pointerEvents="none">
+          <View style={styles.frame}>
+            {(['tl', 'tr', 'bl', 'br'] as const).map(corner => (
+              <View key={corner} style={[styles.corner, styles[corner]]} />
+            ))}
+            {kind === 'meal' ? <View style={styles.plate} /> : null}
+          </View>
+        </GuideAnchor>
         <View style={styles.hint}>
           <TextV2 variant="meta" color="#FFFFFF">
             {hint}
@@ -210,15 +217,18 @@ export function CameraCapture({
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
         <View style={styles.sideStart}>
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={es ? 'Galería' : 'Gallery'}
-            onPress={onGallery}
-            style={styles.round52}
-          >
-            <ImageIcon size={22} color="#FFFFFF" strokeWidth={2} />
-          </PressableScale>
+          <GuideAnchor id={`${tour}.gallery`}>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={es ? 'Galería' : 'Gallery'}
+              onPress={onGallery}
+              style={styles.round52}
+            >
+              <ImageIcon size={22} color="#FFFFFF" strokeWidth={2} />
+            </PressableScale>
+          </GuideAnchor>
         </View>
+        <GuideAnchor id={`${tour}.shutter`}>
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={es ? 'Hacer la foto' : 'Take the photo'}
@@ -230,13 +240,16 @@ export function CameraCapture({
         >
           <View style={[styles.shutter, busy ? styles.shutterBusy : null]} />
         </PressableScale>
+        </GuideAnchor>
         <View style={styles.side}>
           {onNoPhoto ? (
-            <PressableScale accessibilityRole="button" onPress={onNoPhoto} style={styles.noPhoto}>
-              <TextV2 variant="bodyStrong" color="#FFFFFF">
-                {es ? 'Sin foto' : 'No photo'}
-              </TextV2>
-            </PressableScale>
+            <GuideAnchor id={`${tour}.noPhoto`}>
+              <PressableScale accessibilityRole="button" onPress={onNoPhoto} style={styles.noPhoto}>
+                <TextV2 variant="bodyStrong" color="#FFFFFF">
+                  {es ? 'Sin foto' : 'No photo'}
+                </TextV2>
+              </PressableScale>
+            </GuideAnchor>
           ) : null}
         </View>
       </View>

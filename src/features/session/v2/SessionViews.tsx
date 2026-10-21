@@ -16,11 +16,12 @@ import {
   Bookmark,
   Check,
   CircleCheck,
+  CirclePlay,
   Ellipsis,
   Pause,
   Play,
   RefreshCw,
-  Rotate3d,
+  Repeat2,
   X,
 } from 'lucide-react-native';
 import {
@@ -308,6 +309,8 @@ export function ActiveView({
   onPause,
   onLogSet,
   onTechnique,
+  onVariant,
+  variantTag,
 }: {
   topPadding: number;
   bottomPadding: number;
@@ -324,6 +327,9 @@ export function ActiveView({
   onPause: () => void;
   onLogSet: () => void;
   onTechnique?: () => void;
+  // Variants (25.6): opens the sheet; the tag of the current exercise.
+  onVariant?: () => void;
+  variantTag?: string | null;
 }) {
   const doneExercises = plan.filter(exercise => progress[exercise.position] >= 1);
   const next = current
@@ -395,6 +401,8 @@ export function ActiveView({
           image={cardImage}
           onLogSet={onLogSet}
           onTechnique={onTechnique}
+          onVariant={onVariant}
+          variantTag={variantTag}
         />
       ) : (
         <View style={styles.allDone}>
@@ -481,6 +489,8 @@ function CurrentCard({
   image,
   onLogSet,
   onTechnique,
+  onVariant,
+  variantTag,
 }: {
   exercise: PlannedExercise;
   setIndex: number;
@@ -490,6 +500,8 @@ function CurrentCard({
   image: ExerciseImage | null;
   onLogSet: () => void;
   onTechnique?: () => void;
+  onVariant?: () => void;
+  variantTag?: string | null;
 }) {
   // Seconds and metres are the planned amount (not typed); reps and "máx"
   // are typed.
@@ -511,21 +523,43 @@ function CurrentCard({
               {`AHORA · ${exercise.position + 1} DE ${total}`}
             </TextV2>
           </View>
-          {onTechnique ? (
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityLabel="Ver técnica"
-              onPress={onTechnique}
-              style={styles.techButton}
-            >
-              <Rotate3d size={14} color={C.white} strokeWidth={2} />
-              <TextV2 variant="captionStrong" color={C.white}>
-                Técnica
-              </TextV2>
-            </PressableScale>
-          ) : null}
+          <View style={styles.cardActions}>
+            {onVariant ? (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Cambiar por una variante"
+                onPress={onVariant}
+                style={styles.techButton}
+              >
+                <Repeat2 size={14} color={C.white} strokeWidth={2} />
+                <TextV2 variant="captionStrong" color={C.white}>
+                  Variante
+                </TextV2>
+              </PressableScale>
+            ) : null}
+            {onTechnique ? (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel="Ver técnica"
+                onPress={onTechnique}
+                style={styles.techButton}
+              >
+                <CirclePlay size={14} color={C.white} strokeWidth={2} />
+                <TextV2 variant="captionStrong" color={C.white}>
+                  Técnica
+                </TextV2>
+              </PressableScale>
+            ) : null}
+          </View>
         </View>
         <View style={styles.cardTitle}>
+          {variantTag ? (
+            <View style={styles.variantTag}>
+              <TextV2 variant="captionStrong" color={C.emberText} style={styles.variantTagText}>
+                {variantTag}
+              </TextV2>
+            </View>
+          ) : null}
           <TextV2 variant="title22" color={C.white} style={styles.cardName}>
             {exercise.name}
           </TextV2>
@@ -553,7 +587,7 @@ function CurrentCard({
           <View style={styles.metricDivider} />
           <EditableMetric
             value={draft.weightKg}
-            label="kg"
+            label={variantTag ? 'kg · ajusta el peso' : 'kg'}
             accessibilityLabel="Peso de la serie en kilos"
             keyboardType="decimal-pad"
             onChange={weightKg => onDraft({ ...draft, weightKg })}
@@ -1178,6 +1212,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  cardActions: { flexDirection: 'row', gap: 8 },
+  variantTag: {
+    alignSelf: 'flex-start',
+    height: 22,
+    paddingHorizontal: 8,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,91,31,.2)',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  variantTagText: { fontSize: 11, letterSpacing: 0.66 },
   cardTitle: { position: 'absolute', left: 18, right: 18, bottom: 10, gap: 3 },
   cardName: { lineHeight: 26 },
   cardBottom: {

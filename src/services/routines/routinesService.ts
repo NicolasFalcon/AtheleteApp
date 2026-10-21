@@ -19,6 +19,12 @@ export type RoutineErrorCode =
   | 'exercise_not_found'
   | 'routine_not_found'
   | 'chat_message_not_found'
+  // v2.15 · Tu semana (V2_15_SHAPES.md §2)
+  | 'past_day'
+  | 'no_candidates'
+  | 'not_missed'
+  | 'no_free_day'
+  | 'plan_not_found'
   | 'offline'
   | 'unknown';
 
@@ -61,6 +67,9 @@ export type RoutineSuggestion = {
 export type TodaySuggestion = {
   source: 'rules' | 'weekly_plan' | 'none';
   suggestion: RoutineSuggestion | null;
+  // The active week plan says today is a rest day or not available
+  // (reason_code 'rest_day'): no routine, and not "no candidate" either.
+  restDay: { kind: 'rest' | 'unavailable'; date: string | null } | null;
 };
 
 // What the builder (or ELLIE) sends. The exercise name is set by the server
@@ -269,10 +278,21 @@ export function parseTodaySuggestion(body: Record<string, unknown>): TodaySugges
   const raw = asRecord(body.suggestion);
   const routineId = str(raw?.routine_id);
   if (!raw || !routineId) {
-    return { source: 'none', suggestion: null };
+    if (source === 'weekly_plan' && body.reason_code === 'rest_day') {
+      return {
+        source,
+        suggestion: null,
+        restDay: {
+          kind: body.kind === 'unavailable' ? 'unavailable' : 'rest',
+          date: str(body.date),
+        },
+      };
+    }
+    return { source: 'none', suggestion: null, restDay: null };
   }
   return {
     source,
+    restDay: null,
     suggestion: {
       routineId,
       title: str(raw.title) ?? '',
@@ -289,9 +309,76 @@ export function parseTodaySuggestion(body: Record<string, unknown>): TodaySugges
   };
 }
 
+// ── Variants (V2_15_SHAPES.md §3) ─────────────────────────────────────────
+export type VariantReason = 'machine_busy' | 'no_dumbbells' | 'discomfort';
+export type EquipmentGroup = 'machine' | 'cable' | 'barbell' | 'dumbbell' | 'bodyweight';
+
+export type ExerciseVariant = {
+  id: string;
+  name: string;
+  equipment: string[];
+  equipmentGroup: EquipmentGroup;
+  note: string | null;
+  thumbKey: string | null;
+  recommended: boolean;
+};
+
+export type ExerciseVariants = {
+  original: {
+    id: string;
+    name: string;
+    primaryMuscle: string | null;
+    pattern: string | null;
+    equipmentGroup: EquipmentGroup | null;
+  };
+  items: ExerciseVariant[];
+};
+
+const GROUPS: readonly EquipmentGroup[] = ['machine', 'cable', 'barbell', 'dumbbell', 'bodyweight'];
+const groupOf = (value: unknown): EquipmentGroup | null =>
+  GROUPS.find(item => item === value) ?? null;
+
+export function parseVariants(body: Record<string, unknown>): ExerciseVariants {
+  const original = asRecord(body.original) ?? {};
+  const items = Array.isArray(body.items) ? body.items : [];
+  return {
+    original: {
+      id: str(original.id) ?? '',
+      name: str(original.name) ?? '',
+      primaryMuscle: str(original.primary_muscle),
+      pattern: str(original.pattern),
+      equipmentGroup: groupOf(original.equipment_group),
+    },
+    items: items
+      .map(raw => {
+        const row = asRecord(raw) ?? {};
+        return {
+          id: str(row.id) ?? '',
+          name: str(row.name) ?? '',
+          equipment: strings(row.equipment),
+          equipmentGroup: groupOf(row.equipment_group) ?? 'bodyweight',
+          note: str(row.note),
+          thumbKey: str(row.thumb_key),
+          recommended: row.recommended === true,
+        };
+      })
+      .filter(item => item.id)
+      .slice(0, 3),
+  };
+}
+
+export type ReplacedRoutine = {
+  // true: the routine was official or someone else's, and the server saved a
+  // private copy of the user's own with the change. From then on the app uses
+  // `routine.id`.
+  copied: boolean;
+  sourceRoutineId: string | null;
+  routine: Workout;
+};
+
 export type RoutineRpc = (name: string, args: Record<string, unknown>) => Promise<unknown>;
 
-async function supabaseRpc(name: string, args: Record<string, unknown>): Promise<unknown> {
+export async function supabaseRpc(name: string, args: Record<string, unknown>): Promise<unknown> {
   const client = getSupabaseClient() as unknown as {
     rpc: (rpc: string, params: object) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>;
   } | null;
@@ -314,6 +401,11 @@ const ERROR_CODES: readonly RoutineErrorCode[] = [
   'exercise_not_found',
   'routine_not_found',
   'chat_message_not_found',
+  'past_day',
+  'no_candidates',
+  'not_missed',
+  'no_free_day',
+  'plan_not_found',
 ];
 
 export function expectOk(body: unknown): Record<string, unknown> {
@@ -376,6 +468,44 @@ export function createRoutinesService(rpc: RoutineRpc = supabaseRpc) {
     async deleteRoutine(id: string): Promise<{ archived: boolean }> {
       const record = expectOk(await rpc('delete_user_routine', { _id: id }));
       return { archived: record.archived === true };
+    },
+
+    // Up to 3 exercises with the same primary muscle and pattern. `reason`
+    // filters or orders them; `excludeExerciseId` is the variant in use.
+    async listExerciseVariants(params: {
+      exerciseId: string;
+      reason?: VariantReason | null;
+      excludeExerciseId?: string | null;
+      locale?: 'es' | 'en' | null;
+    }): Promise<ExerciseVariants> {
+      const record = expectOk(
+        await rpc('list_exercise_variants', {
+          _exercise_id: params.exerciseId,
+          _reason: params.reason ?? null,
+          _exclude_exercise_id: params.excludeExerciseId ?? null,
+          _locale: params.locale ?? null,
+        }),
+      );
+      return parseVariants(record);
+    },
+
+    async replaceRoutineExercise(params: {
+      routineId: string;
+      templateExerciseId: string;
+      newExerciseId: string;
+    }): Promise<ReplacedRoutine> {
+      const record = expectOk(
+        await rpc('replace_routine_exercise', {
+          _routine_id: params.routineId,
+          _template_exercise_id: params.templateExerciseId,
+          _new_exercise_id: params.newExerciseId,
+        }),
+      );
+      return {
+        copied: record.copied === true,
+        sourceRoutineId: str(record.source_routine_id),
+        routine: mapRoutine(record.routine),
+      };
     },
 
     async getTodaySuggestion(tz: string | null): Promise<TodaySuggestion> {

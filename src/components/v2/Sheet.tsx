@@ -25,6 +25,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 import { GlassSurface } from '@app/components/v2/GlassSurface';
+import { guideStore } from '@app/features/guides/guideStore';
 import { IconButton } from '@app/components/v2/IconButton';
 import { Eyebrow, TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -66,6 +67,15 @@ export function Sheet({
   const progress = useSharedValue(0); // 0 hidden → 1 shown
   const drag = useSharedValue(0);
   const isLight = mode === 'light';
+
+  // Guías (25.4): never on top of an open sheet.
+  useEffect(() => {
+    if (!open) {
+      return undefined;
+    }
+    guideStore.sheetOpened();
+    return () => guideStore.sheetClosed();
+  }, [open]);
 
   useEffect(() => {
     if (open) {

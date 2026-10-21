@@ -11,6 +11,7 @@ import {
   LogOut,
   Mail,
   KeyRound,
+  Lightbulb,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -53,6 +54,8 @@ import {
   type DeleteAccountOutcome,
 } from '@app/features/profile/deleteAccountModel';
 import { preloadSounds } from '@app/features/sound/soundService';
+import { HEALTH_STATUS_TEXT, useHealthState } from '@app/features/health/healthStore';
+import { guideStore } from '@app/features/guides/guideStore';
 import { setFeedbackPrefs, useFeedbackPrefs } from '@app/lib/feedbackPrefs';
 import { clearLocalUserData } from '@app/lib/localUserData';
 import {
@@ -73,9 +76,8 @@ const NOTIFICATIONS = [
   { key: 'updates', icon: Sparkles, title: 'Novedades de ELLIE', subtitle: 'Recomendaciones nuevas para ti' },
 ] as const;
 
-// Ajustes (PROFILE_03): flat rows by section. Community and Apple Health
-// depend on future modules: Comunidad rows open Amigos and Privacidad social and
-// Apple Health opens its placeholder screen.
+// Ajustes (PROFILE_03): flat rows by section. Comunidad rows open Amigos and
+// Privacidad social; Apple Health shows this device's connection.
 export function SettingsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   // The moderation row only exists for moderators (app_moderators); a normal
@@ -89,6 +91,7 @@ export function SettingsScreen({ navigation }: Props) {
   const overview = useProfileOverview();
   const preferences = useProfilePreferences();
   const feedback = useFeedbackPrefs();
+  const health = useHealthState();
   const openEllieChat = useOpenEllieChat();
   const openCore33 = useOpenCore33();
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -247,7 +250,7 @@ export function SettingsScreen({ navigation }: Props) {
           <Row
             leading={icon(Heart)}
             title="Apple Health"
-            value="Sin conectar"
+            value={HEALTH_STATUS_TEXT[health.status]}
             trailing="chevron"
             onPress={() => navigation.navigate(APP_ROUTES.HealthSettings)}
           />
@@ -310,7 +313,6 @@ export function SettingsScreen({ navigation }: Props) {
             leading={icon(Vibrate)}
             title="Vibración"
             subtitle="Respuesta táctil al tocar y al acertar"
-            divider={false}
             trailing={
               <SwitchV2
                 accessibilityLabel="Vibración"
@@ -318,6 +320,16 @@ export function SettingsScreen({ navigation }: Props) {
                 onValueChange={value => setFeedbackPrefs({ vibration: value })}
               />
             }
+          />
+          <Row
+            leading={icon(Lightbulb)}
+            title="Ver guías de nuevo"
+            subtitle="Las guías de cada pantalla vuelven a aparecer"
+            divider={false}
+            onPress={() => {
+              guideStore.resetAll();
+              toast.show('Las guías volverán a aparecer');
+            }}
           />
         </SettingsSection>
 

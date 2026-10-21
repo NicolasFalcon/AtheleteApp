@@ -1,7 +1,8 @@
 import { RoutineError } from '@app/services/routines/routinesService';
 
 // Texts (v2, es / en) for the errors of the routine RPCs
-// (docs/backend/ROUTINES_SHAPES.md · Errores).
+// (docs/backend/ROUTINES_SHAPES.md · Errores) and of Tu semana and the
+// variants (V2_15_SHAPES.md §2–3).
 
 export type RoutineLanguage = 'es' | 'en';
 
@@ -17,6 +18,19 @@ const FIELD_TEXT: Record<RoutineLanguage, Record<string, string>> = {
     chat_message_id: 'No encontramos el plan de ELLIE que querías guardar.',
     scope: 'No pudimos cargar esta lista.',
     cursor: 'No pudimos cargar más rutinas.',
+    days: 'Elige al menos un día desde hoy.',
+    focus: 'Elige un foco para la semana.',
+    minutes: 'Elige cuánto tiempo tienes por sesión.',
+    week_start: 'Esa semana no se puede planificar.',
+    answers: 'Revisa tus respuestas.',
+    reason: 'Ese motivo no es válido.',
+    template_exercise_id: 'Ese ejercicio ya no está en la rutina.',
+    night_date: 'Solo puedes registrar noches de los últimos 60 días.',
+    wake_at: 'Revisa las horas: la noche no puede durar más de 18 h.',
+    quality: 'Elige una calidad de 1 a 5.',
+    wake_feeling: 'Elige cómo te despertaste.',
+    nights: 'No pudimos leer tus noches de Apple Health.',
+    duration_s: 'La sesión de Respira dura al menos 60 s.',
   },
   en: {
     title: 'Give it a name of 1 to 80 characters.',
@@ -27,6 +41,19 @@ const FIELD_TEXT: Record<RoutineLanguage, Record<string, string>> = {
     chat_message_id: "We couldn't find the ELLIE plan you wanted to save.",
     scope: "We couldn't load this list.",
     cursor: "We couldn't load more routines.",
+    days: 'Choose at least one day from today.',
+    focus: 'Choose a focus for the week.',
+    minutes: 'Choose how much time you have per session.',
+    week_start: "That week can't be planned.",
+    answers: 'Check your answers.',
+    reason: "That reason isn't valid.",
+    template_exercise_id: 'That exercise is no longer in the routine.',
+    night_date: 'You can only log nights from the last 60 days.',
+    wake_at: 'Check the times: a night cannot last more than 18 h.',
+    quality: 'Choose a quality from 1 to 5.',
+    wake_feeling: 'Choose how you woke up.',
+    nights: "We couldn't read your nights from Apple Health.",
+    duration_s: 'A Respira session lasts at least 60 s.',
   },
 };
 
@@ -45,6 +72,26 @@ const TEXT: Record<RoutineLanguage, Record<string, Copy>> = {
       title: 'No pudimos guardar el plan',
       message: 'Este plan de ELLIE ya no está disponible para guardarlo.',
     },
+    past_day: {
+      title: 'Ese día ya pasó',
+      message: 'Solo puedes cambiar hoy y los días que vienen.',
+    },
+    no_candidates: {
+      title: 'No hay otra sesión',
+      message: 'ELLIE no encontró otra rutina que no repita la semana. Elige una tú.',
+    },
+    not_missed: {
+      title: 'Ya está resuelto',
+      message: 'Esa sesión ya no está pendiente.',
+    },
+    no_free_day: {
+      title: 'No queda un día libre',
+      message: 'Esta semana no hay un día libre para pasar la sesión.',
+    },
+    plan_not_found: {
+      title: 'Plan no encontrado',
+      message: 'Ese plan de la semana ya no existe. Vuelve a planificarla.',
+    },
     unauthorized: { title: 'Tu sesión terminó', message: 'Vuelve a iniciar sesión.' },
     offline: { title: 'Sin conexión', message: 'Revisa tu conexión e inténtalo otra vez.' },
     unknown: { title: 'Algo salió mal', message: 'Inténtalo otra vez.' },
@@ -62,6 +109,26 @@ const TEXT: Record<RoutineLanguage, Record<string, Copy>> = {
     chat_message_not_found: {
       title: "We couldn't save the plan",
       message: 'This ELLIE plan is no longer available to save.',
+    },
+    past_day: {
+      title: 'That day has passed',
+      message: 'You can only change today and the days ahead.',
+    },
+    no_candidates: {
+      title: 'No other session',
+      message: "ELLIE couldn't find another routine that doesn't repeat the week. Pick one yourself.",
+    },
+    not_missed: {
+      title: 'Already sorted',
+      message: 'That session is no longer pending.',
+    },
+    no_free_day: {
+      title: 'No free day left',
+      message: "There's no free day this week to move the session to.",
+    },
+    plan_not_found: {
+      title: 'Plan not found',
+      message: 'That week plan no longer exists. Plan it again.',
     },
     unauthorized: { title: 'Your session ended', message: 'Sign in again.' },
     offline: { title: 'No connection', message: 'Check your connection and try again.' },

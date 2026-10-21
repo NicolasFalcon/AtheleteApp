@@ -1,6 +1,7 @@
 import { inQuietHours } from '@app/features/push/pushPrefsModel';
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
 import type { QuietHours } from '@app/services/push/pushService';
+import type { WeekPlan } from '@app/features/week/weekModel';
 
 // Local reminders (PUSH_SHAPES: workouts and hydration never go through the
 // backend). Pure planner: from what the app knows now it says which
@@ -22,6 +23,10 @@ export type ReminderInput = {
   hydration: boolean;
   quiet: QuietHours;
   trainingDaysPerWeek: number | null;
+  // The active week plan (Tu semana): its 7 dates (YYYY-MM-DD) and its
+  // session days. Inside those dates it decides the days and the minutes;
+  // outside them (next week) the usual pattern applies. null: no active plan.
+  weekPlan: ReminderWeekPlan | null;
   trainedToday: boolean;
   waterMl: number;
   waterGoalMl: number | null;
@@ -30,8 +35,8 @@ export type ReminderInput = {
 // ISO weekdays (1 = Monday … 7 = Sunday) that count as training days for a
 // weekly frequency. The profile only stores HOW MANY days a week, not which:
 // this is the usual spread (rest days between sessions).
-// TODO(design): once the plan has real training days and the hour the person
-// usually trains, use those instead of this pattern and WORKOUT_HOUR.
+// With an active week plan its session days win (see `weekPlan`).
+// TODO(design): the hour the person usually trains instead of WORKOUT_HOUR.
 const TRAINING_DAYS: Record<number, number[]> = {
   1: [3],
   2: [2, 5],
@@ -41,6 +46,25 @@ const TRAINING_DAYS: Record<number, number[]> = {
   6: [1, 2, 3, 4, 5, 6],
   7: [1, 2, 3, 4, 5, 6, 7],
 };
+
+export type ReminderWeekPlan = {
+  dates: string[];
+  sessions: Record<string, { minutes: number | null; title: string | null }>;
+};
+
+// The active week plan as the reminders read it (null: no active plan).
+export function reminderWeekPlan(week: WeekPlan | null | undefined): ReminderWeekPlan | null {
+  if (!week?.plan?.active) {
+    return null;
+  }
+  const sessions: ReminderWeekPlan['sessions'] = {};
+  week.days.forEach(day => {
+    if (day.kind === 'session') {
+      sessions[day.date] = { minutes: day.minutes, title: day.routine?.title ?? null };
+    }
+  });
+  return { dates: week.days.map(day => day.date), sessions };
+}
 
 export const WORKOUT_HOUR = 18;
 // A hydration reminder fires only if, at that hour, the person is behind the
@@ -58,6 +82,10 @@ const at = (day: Date, hour: number): Date =>
 
 const dayKey = (date: Date): string =>
   `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+
+const pad = (value: number) => String(value).padStart(2, '0');
+const isoDate = (date: Date): string =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 
 // A reminder that would land inside the quiet hours waits for them to end
 // (only if that is still the same day; otherwise it is dropped).
@@ -78,12 +106,16 @@ const COPY = {
     hydrationBody: 'Vas un poco por detrás con el agua de hoy. Un vaso ahora te pone al día.',
     workoutTitle: 'Hoy toca entrenar',
     workoutBody: 'Tu sesión de hoy te espera. Aunque sea corta, cuenta.',
+    planBody: (title: string | null, minutes: number | null) =>
+      `${title ?? 'Tu sesión'}${minutes ? ` · ${minutes} min` : ''}. Está en tu plan de la semana.`,
   },
   en: {
     hydrationTitle: 'Hydration',
     hydrationBody: "You're a bit behind on today's water. A glass now catches you up.",
     workoutTitle: 'Training day',
     workoutBody: "Today's session is waiting. Even a short one counts.",
+    planBody: (title: string | null, minutes: number | null) =>
+      `${title ?? 'Your session'}${minutes ? ` · ${minutes} min` : ''}. It's in your week plan.`,
   },
 } as const;
 
@@ -112,11 +144,16 @@ export function planReminders(input: ReminderInput): PlannedReminder[] {
   }
 
   const perWeek = input.trainingDaysPerWeek ? Math.min(7, Math.max(1, input.trainingDaysPerWeek)) : null;
-  if (input.workouts && perWeek) {
-    const days = TRAINING_DAYS[perWeek];
+  const plan = input.weekPlan;
+  if (input.workouts && (perWeek || plan)) {
+    const days = perWeek ? TRAINING_DAYS[perWeek] : [];
     for (let offset = 0; offset < WORKOUT_DAYS_AHEAD; offset += 1) {
       const day = new Date(input.now.getFullYear(), input.now.getMonth(), input.now.getDate() + offset);
-      if (!days.includes(isoWeekday(day)) || (offset === 0 && input.trainedToday)) {
+      const date = isoDate(day);
+      const inPlan = Boolean(plan && plan.dates.includes(date));
+      const session = inPlan ? plan?.sessions[date] ?? null : null;
+      const trains = inPlan ? Boolean(session) : days.includes(isoWeekday(day));
+      if (!trains || (offset === 0 && input.trainedToday)) {
         continue;
       }
       const fireAt = outsideQuiet(at(day, WORKOUT_HOUR), input.quiet);
@@ -125,7 +162,7 @@ export function planReminders(input: ReminderInput): PlannedReminder[] {
           id: `${REMINDER_PREFIX}workout-${dayKey(day)}`,
           fireAt,
           title: copy.workoutTitle,
-          body: copy.workoutBody,
+          body: session ? copy.planBody(session.title, session.minutes) : copy.workoutBody,
         });
       }
     }

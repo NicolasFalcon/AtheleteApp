@@ -49,7 +49,7 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Athelete usa la cámara para analizar tus comidas y reconocer máquinas del gimnasio.</string>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Athelete lee tus entrenos de Apple Health para sumarlos a tu progreso.</string>
+	<string>Athelete lee de Apple Health tus entrenos, tu sueño (con sus fases), tu frecuencia cardíaca en reposo y tu VFC para mostrar tu descanso, estimar tu recuperación y ajustar tus entrenos.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Athelete guarda tus entrenos en Apple Health para que todo quede en un solo lugar.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

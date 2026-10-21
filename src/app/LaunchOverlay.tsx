@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { guideStore } from '@app/features/guides/guideStore';
 import {
   AccessibilityInfo,
   Animated,
@@ -95,6 +96,13 @@ export function LaunchOverlay() {
       useNativeDriver: true,
     }).start(() => setVisible(false));
   }, [opacity, ready, reduceMotion]);
+
+  // Guías: the tour of the first screen waits until this is gone.
+  useEffect(() => {
+    if (!visible) {
+      guideStore.launchDone();
+    }
+  }, [visible]);
 
   if (!visible) {
     return null;

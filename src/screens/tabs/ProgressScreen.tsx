@@ -1,3 +1,6 @@
+import { GuideAnchor, useGuide } from '@app/features/guides/GuideAnchor';
+import { SleepWeekCard } from '@app/features/sleep/v2/SleepWeekCard';
+import { useSleepOverview } from '@app/hooks/useSleep';
 import { ELLIE_ASKS } from '@app/features/ellie/chatModel';
 import { useOpenEllieChat } from '@app/features/ellie/useOpenEllieChat';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -85,6 +88,8 @@ export function ProgressScreen({ navigation, route }: Props) {
   const openCore33 = useOpenCore33();
   const openCore33Discovery = useOpenCore33Discovery();
   const summary = useProgressSummary();
+  // Sueño · 7 noches (only with Apple Health), the same read as Sueño.
+  const sleepQuery = useSleepOverview();
 
   const [section, setSection] = useState<Section>(
     route.params?.segment ?? 'summary',
@@ -94,6 +99,8 @@ export function ProgressScreen({ navigation, route }: Props) {
   );
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollRef = useRef<ScrollView>(null);
+  // Guía de Progreso (25.4), on the summary once it has loaded.
+  useGuide('progress', { scrollRef, enabled: section === 'summary' && !summary.isLoading && !summary.error });
   // Tab params (deep links).
   useEffect(() => {
     if (route.params?.segment) {
@@ -203,18 +210,19 @@ export function ProgressScreen({ navigation, route }: Props) {
         >
           Progreso
         </TextV2>
-        <Segmented
-          options={[
-            { key: 'summary', label: 'Resumen' },
-            { key: 'challenges', label: 'Retos' },
-          ]}
-          value={section}
-          onChange={key => {
-            setSection(key);
-            scrollY.setValue(0);
-          }}
-          style={styles.segmented}
-        />
+        <GuideAnchor id="progress.challenges" style={styles.segmented}>
+          <Segmented
+            options={[
+              { key: 'summary', label: 'Resumen' },
+              { key: 'challenges', label: 'Retos' },
+            ]}
+            value={section}
+            onChange={key => {
+              setSection(key);
+              scrollY.setValue(0);
+            }}
+          />
+        </GuideAnchor>
       </View>
     </SceneScope>
   );
@@ -253,7 +261,11 @@ export function ProgressScreen({ navigation, route }: Props) {
       />
     );
   } else {
-    hero = <ProgressHeroView hero={model.hero} top={copyTop} width={width} />;
+    hero = (
+      <GuideAnchor id="progress.curve">
+        <ProgressHeroView hero={model.hero} top={copyTop} width={width} />
+      </GuideAnchor>
+    );
     sheet = (
       <>
         <View style={styles.between}>
@@ -314,7 +326,9 @@ export function ProgressScreen({ navigation, route }: Props) {
 
         {isWeek ? (
           <>
-            <TrainingWeekBlock week={week} empty={!hasData} />
+            <GuideAnchor id="progress.capsules">
+              <TrainingWeekBlock week={week} empty={!hasData} />
+            </GuideAnchor>
             <NutritionHydrationRow
               nutrition={model.nutrition}
               hydration={model.hydration}
@@ -325,6 +339,10 @@ export function ProgressScreen({ navigation, route }: Props) {
         ) : (
           <MonthBlock month={month} now={now} />
         )}
+
+        {sleepQuery.data?.source === 'apple_health' ? (
+          <SleepWeekCard overview={sleepQuery.data} onOpen={() => navigation.navigate(APP_ROUTES.Sleep)} />
+        ) : null}
 
         <EllieSurface
           eyebrow=""

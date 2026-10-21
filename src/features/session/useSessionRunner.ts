@@ -36,11 +36,13 @@ import {
   ensureSessionExercises,
   fetchLastWeights,
   fetchSessionDetail,
+  fetchSessionVariants,
   flushSessionOutbox,
   hasPendingSetsForSession,
   markSessionExercise,
   reopenSession,
   saveSessionForLater,
+  saveSessionVariant,
   recordSessionActivity,
   setSessionPaused,
   syncCompletedExercises,
@@ -50,6 +52,12 @@ import {
   type SaveForLaterParams,
   type SetWrite,
 } from '@app/services/supabase/session';
+import {
+  applyVariants,
+  type SessionVariant,
+  type SessionVariantReason,
+  type SessionVariants,
+} from '@app/features/session/variantModel';
 import type { Workout } from '@app/shared';
 
 export type SessionDraft = { reps: number | null; weightKg: number | null };
@@ -74,10 +82,15 @@ export function useSessionRunner({
   onCompleted,
   onLeave,
 }: Params) {
-  const plan = useMemo(
+  // The routine's plan, and the plan of this session: the same with the
+  // variants applied (another exercise in the same position; sets, reps and
+  // rest unchanged). Loading depends only on the routine's plan.
+  const basePlan = useMemo(
     () => buildPlan(workout?.exercises ?? [], recommendedFor),
     [recommendedFor, workout],
   );
+  const [variants, setVariants] = useState<SessionVariants>({});
+  const plan = useMemo(() => applyVariants(basePlan, variants), [basePlan, variants]);
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [sets, setSets] = useState<LoggedSet[]>([]);
@@ -114,7 +127,7 @@ export function useSessionRunner({
       try {
         // The planned exercises must exist before any set is replayed: the
         // sets reference them (workout_session_sets_exercise_fk).
-        await ensureSessionExercises(sessionId, plan).catch(error =>
+        await ensureSessionExercises(sessionId, basePlan).catch(error =>
           console.warn(
             '[session] Ejercicios planificados sin guardar:',
             describeError(error),
@@ -139,7 +152,32 @@ export function useSessionRunner({
         setSets(detail.sets);
         setClock(detail.clock);
         setLoadState('ready');
-        const ids = plan
+        // Variants saved in this session (resuming keeps them).
+        fetchSessionVariants(sessionId)
+          .then(stored => {
+            if (cancelled || stored.length === 0) {
+              return;
+            }
+            const restored: SessionVariants = {};
+            stored.forEach(item => {
+              const planned = basePlan[item.position];
+              if (planned) {
+                restored[item.position] = {
+                  position: item.position,
+                  exerciseId: item.exerciseId,
+                  name: item.name,
+                  note: null,
+                  originalExerciseId: item.originalExerciseId,
+                  originalName: planned.name,
+                  reason: (item.reason as SessionVariantReason | null) ?? 'other',
+                  scope: 'today',
+                };
+              }
+            });
+            setVariants(restored);
+          })
+          .catch(() => undefined);
+        const ids = basePlan
           .map(exercise => exercise.exerciseId)
           .filter((id): id is string => Boolean(id));
         if (userId && ids.length > 0) {
@@ -159,7 +197,7 @@ export function useSessionRunner({
     };
     // onCompleted is a navigation callback; the load runs once per session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadAttempt, plan, sessionId, userId, workout]);
+  }, [loadAttempt, basePlan, sessionId, userId, workout]);
 
   // ── Ticker: 4 Hz while a countdown is on screen, 1 Hz otherwise ───────────
   const fast = Boolean(rest || yourTurnUntil);
@@ -511,10 +549,73 @@ export function useSessionRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveError, saveErrorKind, userId]);
 
+  // ── Variants ──────────────────────────────────────────────────────────────
+  // Applies a variant for the rest of this session. The planned row is
+  // ensured first, then updated (exercise_id = the variant,
+  // original_exercise_id, variant_reason). A failed write keeps the variant
+  // on screen: the sets of the variant are saved with its exercise id anyway.
+  const applyVariant = useCallback(
+    async (variant: SessionVariant) => {
+      setVariants(map => ({ ...map, [variant.position]: variant }));
+      if (!sessionId) {
+        return;
+      }
+      try {
+        await ensureSessionExercises(sessionId, basePlan);
+        await saveSessionVariant(sessionId, variant.position, {
+          exerciseId: variant.exerciseId,
+          name: variant.name,
+          originalExerciseId: variant.originalExerciseId,
+          reason: variant.reason,
+        });
+      } catch (error) {
+        console.warn('[session] Variante sin guardar:', describeError(error));
+      }
+    },
+    [basePlan, sessionId],
+  );
+
+  // Back to the planned exercise.
+  const revertVariant = useCallback(
+    async (position: number) => {
+      const planned = basePlan[position];
+      setVariants(map => {
+        const next = { ...map };
+        delete next[position];
+        return next;
+      });
+      if (!sessionId || !planned?.exerciseId) {
+        return;
+      }
+      try {
+        await saveSessionVariant(sessionId, position, {
+          exerciseId: planned.exerciseId,
+          name: planned.name,
+          originalExerciseId: null,
+          reason: null,
+        });
+      } catch (error) {
+        console.warn('[session] No se pudo deshacer la variante:', describeError(error));
+      }
+    },
+    [basePlan, sessionId],
+  );
+
+  const markVariantInRoutine = useCallback((position: number) => {
+    setVariants(map =>
+      map[position] ? { ...map, [position]: { ...map[position], scope: 'routine' } } : map,
+    );
+  }, []);
+
   return {
     loadState,
     retryLoad: () => setLoadAttempt(attempt => attempt + 1),
+    basePlan,
     plan,
+    variants,
+    applyVariant,
+    revertVariant,
+    markVariantInRoutine,
     sets,
     cursor,
     current,

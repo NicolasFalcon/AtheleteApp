@@ -1,3 +1,8 @@
+import { GuideAnchor, useGuide } from '@app/features/guides/GuideAnchor';
+import { RecoveryTiles } from '@app/features/home/v2/RecoveryTiles';
+import { RouteCard } from '@app/features/home/v2/RouteCard';
+import { useBreathingWeek, useSleepOverview } from '@app/hooks/useSleep';
+import { WeekStrip } from '@app/features/home/v2/WeekStrip';
 import { useCallback, useMemo, useRef } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -26,18 +31,15 @@ import {
   type DayRingKind,
   type HomeChallengeState,
 } from '@app/features/home/homePriority';
-import { RouteDoneCard } from '@app/features/home/v2/RouteDoneCard';
-import { agoLabel } from '@app/features/route/routeFormat';
 import { routeStore } from '@app/features/route/routeStore';
 import type { RouteActivity } from '@app/features/route/routeTypes';
-import { useTodayRouteActivity } from '@app/features/route/useRouteData';
+import { useRecentActivities, useTodayRouteActivity } from '@app/features/route/useRouteData';
 import {
   homeChallengeCard,
 } from '@app/features/home/homeChallengeSection';
 import { useSocialResource } from '@app/features/social/useSocial';
 import { EllieBand } from '@app/features/home/v2/EllieBand';
 import { OfficialChallengeSection } from '@app/features/home/v2/OfficialChallengeSection';
-import { RouteInviteCard } from '@app/features/home/v2/RouteInviteCard';
 import { Core33InviteCard } from '@app/features/home/v2/Core33InviteCard';
 import { DayRingsCard } from '@app/features/home/v2/DayRingsCard';
 import {
@@ -65,6 +67,7 @@ import {
   useRoutineList,
   useTodaySuggestion,
 } from '@app/hooks/useRoutines';
+import { useWeekPlan } from '@app/hooks/useWeekPlan';
 import { getGreeting, getLocalDateKey } from '@app/lib/date';
 import { isRouteSession } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
@@ -100,9 +103,16 @@ export function HomeScreen({ navigation }: Props) {
   const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const homeQuery = useHomeFeed();
-  // Hero: today's suggestion (get_today_suggestion, one per local day).
+  // Guía de Inicio (25.4): 4 steps, once per user.
+  const scrollRef = useRef<ScrollView>(null);
+  useGuide('home', { scrollRef });
+  // Hero: today's suggestion (get_today_suggestion, one per local day). With
+  // an active week plan it is that day's routine, or a rest day.
   const suggestionQuery = useTodaySuggestion();
   const suggestion = suggestionQuery.data?.suggestion ?? null;
+  const restDay = suggestionQuery.data?.restDay ?? null;
+  // "Tu semana" strip (get_week_plan).
+  const weekQuery = useWeekPlan();
   // "Para entrenar esta semana": the first page of list_routines.
   const workoutsQuery = useRoutineList('all');
   const ellieData = useEllieData();
@@ -122,6 +132,11 @@ export function HomeScreen({ navigation }: Props) {
   // "Tu ruta real": today's activity from the server (get_today_route_activity).
   const todayRouteQuery = useTodayRouteActivity();
   const todayRoute: RouteActivity | null = todayRouteQuery.data ?? null;
+  // The latest outdoor activity, for the card's "Última · N km".
+  const latestRouteQuery = useRecentActivities(1);
+  // Sueño + Respira tiles: the same reads as their screens.
+  const sleepQuery = useSleepOverview();
+  const breathingQuery = useBreathingWeek();
   const challengeCard = useMemo(
     () => homeChallengeCard(challenges.data),
     [challenges.data],
@@ -139,6 +154,9 @@ export function HomeScreen({ navigation }: Props) {
       ellieData.overviewQuery.refetch().catch(() => {});
       quizQuery.refetch().catch(() => {});
       workoutsQuery.refetch().catch(() => {});
+      weekQuery.refetch().catch(() => {});
+      sleepQuery.refetch().catch(() => {});
+      breathingQuery.refetch().catch(() => {});
       // Today's suggestion is not asked again: one per local day (a new day
       // is a new key; a saved session drops it).
       challenges.reload();
@@ -341,11 +359,13 @@ export function HomeScreen({ navigation }: Props) {
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 style="light" />
       <ScrollView
+        ref={scrollRef}
         onScroll={tabBarMotion.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomClearance }}
       >
+        <GuideAnchor id="home.priority">
         <HomeHero
           slides={homeQuery.error ? null : slides}
           error={Boolean(homeQuery.error)}
@@ -374,6 +394,7 @@ export function HomeScreen({ navigation }: Props) {
                 }
               : null,
             workout: toHeroWorkout(heroWorkoutSource),
+            restDay: restDay ? { kind: restDay.kind } : null,
             resume: resumable
               ? {
                   title: resumable.workoutTitle,
@@ -405,9 +426,11 @@ export function HomeScreen({ navigation }: Props) {
           }
           onOpenCore33={openCore33}
           onStartWorkout={startHeroWorkout}
+          onOpenWeek={() => navigation.navigate(APP_ROUTES.Week)}
           onResume={resumeSession}
           onOpenProgress={() => navigation.navigate(TAB_ROUTES.Progress)}
         />
+        </GuideAnchor>
 
         <View
           style={[
@@ -422,10 +445,24 @@ export function HomeScreen({ navigation }: Props) {
         >
           {sections.map(key => {
             switch (key) {
+              case 'week':
+                return (
+                  <GuideAnchor key={key} id="home.week">
+                  <WeekStrip
+                    week={weekQuery.data ?? null}
+                    loading={weekQuery.isLoading}
+                    error={weekQuery.isError}
+                    onRetry={() => {
+                      weekQuery.refetch().catch(() => {});
+                    }}
+                    onPress={() => navigation.navigate(APP_ROUTES.Week)}
+                  />
+                  </GuideAnchor>
+                );
               case 'rings':
                 return (
+                  <GuideAnchor key={key} id="home.rings">
                   <DayRingsCard
-                    key={key}
                     loading={homeQuery.isLoading}
                     error={Boolean(homeQuery.error)}
                     onRetry={() => {
@@ -438,32 +475,34 @@ export function HomeScreen({ navigation }: Props) {
                     onAddWater={addWater}
                     onOpenRing={openRing}
                   />
+                  </GuideAnchor>
+                );
+              case 'recovery':
+                return (
+                  <RecoveryTiles
+                    key={key}
+                    sleep={sleepQuery.data ?? null}
+                    breathingCount={breathingQuery.data?.weekCount ?? null}
+                    onSleep={() => navigation.navigate(APP_ROUTES.Sleep)}
+                    onBreathe={() => navigation.navigate(APP_ROUTES.Breathe)}
+                  />
                 );
               case 'route':
-                if (todayRoute) {
-                  return (
-                    <RouteDoneCard
-                      key={key}
-                      activity={todayRoute}
-                      ago={agoLabel(todayRoute.startedAt, Date.now())}
-                      onOpen={() => {
+                return (
+                  <RouteCard
+                    key={key}
+                    today={todayRoute}
+                    latest={latestRouteQuery.data?.[0] ?? null}
+                    onPress={() => {
+                      if (todayRoute) {
                         routeStore.reset({ finished: todayRoute });
                         navigation.navigate(APP_ROUTES.RouteResult, { activityId: todayRoute.id });
-                      }}
-                      onOther={() => {
-                        routeStore.reset();
-                        navigation.navigate(APP_ROUTES.RoutePrep);
-                      }}
-                    />
-                  );
-                }
-                return (
-                  <RouteInviteCard
-                    key={key}
-                    onPress={() => {
+                        return;
+                      }
                       routeStore.reset();
                       navigation.navigate(APP_ROUTES.RoutePrep);
                     }}
+                    onSeeAll={() => navigation.navigate(APP_ROUTES.Profile)}
                   />
                 );
               case 'core33Invite':

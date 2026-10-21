@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBarV2, TextV2 } from '@app/components/v2';
+import { StatusBarV2, TextV2, useToast } from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { planScheme } from '@app/features/session/sessionModel';
@@ -10,6 +10,20 @@ import {
   useSessionRunner,
 } from '@app/features/session/useSessionRunner';
 import { ExitDialog } from '@app/features/session/v2/ExitDialog';
+import { VariantSheet, type VariantSheetStep } from '@app/features/session/v2/VariantSheet';
+import {
+  variantTag,
+  variantToastText,
+  type SessionVariantReason,
+} from '@app/features/session/variantModel';
+import { routineErrorCopy } from '@app/features/workouts/routineErrors';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
+import { invalidateRoutineLists, routineKeys } from '@app/hooks/useRoutines';
+import { invalidateWeek, weekKeys } from '@app/hooks/useWeekPlan';
+import { routinesService, type ExerciseVariant } from '@app/services/routines/routinesService';
+import { weekPlanService } from '@app/services/routines/weekPlanService';
+import type { WeekPlan } from '@app/features/week/weekModel';
+import type { Workout } from '@app/shared';
 import {
   ActiveView,
   doneLabel,
@@ -55,7 +69,23 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   // "Comenzar" always reads get_routine(id) (B-03): any routine the user can
   // see, also their own and ELLIE's.
   const routineQuery = useRoutine(route.params.workoutId);
-  const workout = routineQuery.data ?? null;
+  // The routine is read once: saving a variant in it (or in a copy) must not
+  // rebuild the session that is running.
+  const [workout, setWorkout] = useState<Workout | null>(null);
+  useEffect(() => {
+    if (!workout && routineQuery.data) {
+      setWorkout(routineQuery.data);
+    }
+  }, [routineQuery.data, workout]);
+  const toast = useToast();
+  const language = useProfileLanguage();
+  // Variants (25.6): the sheet, the reason and where "Guardar en la rutina"
+  // writes (the routine, or the user's copy once the server made one).
+  const [variantOpen, setVariantOpen] = useState(false);
+  const [variantStep, setVariantStep] = useState<VariantSheetStep>({ kind: 'list' });
+  const [variantReason, setVariantReason] = useState<SessionVariantReason | null>(null);
+  const [savingVariant, setSavingVariant] = useState(false);
+  const [saveTarget, setSaveTarget] = useState<Workout | null>(null);
   const {
     workoutSession,
     isLoading: sessionLoading,
@@ -181,6 +211,86 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   if (runner.rest) {
     lastRestKind.current = runner.rest.kind;
   }
+
+  // ── Variants ──────────────────────────────────────────────────────────────
+  const variantPosition = runner.current?.position ?? null;
+  const planned = variantPosition !== null ? runner.basePlan[variantPosition] ?? null : null;
+  const applied = variantPosition !== null ? runner.variants[variantPosition] ?? null : null;
+  const routineForSave = saveTarget ?? workout;
+
+  const closeVariants = () => {
+    setVariantOpen(false);
+    setVariantStep({ kind: 'list' });
+  };
+
+  const chooseVariant = (variant: ExerciseVariant, scope: 'today' | 'routine') => {
+    if (variantPosition === null || !planned?.exerciseId) {
+      return;
+    }
+    runner.applyVariant({
+      position: variantPosition,
+      exerciseId: variant.id,
+      name: variant.name,
+      note: variant.note,
+      originalExerciseId: planned.exerciseId,
+      originalName: planned.name,
+      reason: variantReason ?? 'other',
+      scope,
+    });
+  };
+
+  // After a copy, the days of this week that had the original routine move
+  // to the copy (best effort; today and ahead).
+  const moveWeekToCopy = async (sourceId: string, copyId: string) => {
+    const weeks = queryClient.getQueriesData<WeekPlan>({ queryKey: weekKeys.all });
+    const week = weeks.map(([, data]) => data).find(Boolean);
+    if (!week?.plan?.active) {
+      return;
+    }
+    const days = week.days.filter(
+      day => day.date >= week.today && day.kind === 'session' && day.routine?.id === sourceId,
+    );
+    await Promise.allSettled(
+      days.map(day =>
+        weekPlanService.setWeekDay(day.date, { kind: 'session', routineId: copyId, minutes: day.minutes }),
+      ),
+    );
+    await invalidateWeek(queryClient);
+  };
+
+  const saveVariantInRoutine = async (variant: ExerciseVariant) => {
+    const target = routineForSave;
+    const templateExerciseId =
+      variantPosition !== null ? target?.exercises[variantPosition]?.id ?? null : null;
+    if (!target || !templateExerciseId) {
+      toast.show(routineErrorCopy(null, language).message, { tone: 'error' });
+      return;
+    }
+    setSavingVariant(true);
+    try {
+      const result = await routinesService.replaceRoutineExercise({
+        routineId: target.id,
+        templateExerciseId,
+        newExerciseId: variant.id,
+      });
+      // From here on "Guardar en la rutina" writes in the copy.
+      setSaveTarget(result.routine);
+      chooseVariant(variant, 'routine');
+      queryClient.setQueryData(routineKeys.detail(result.routine.id), result.routine);
+      invalidateRoutineLists(queryClient).catch(() => undefined);
+      if (result.copied && result.sourceRoutineId) {
+        moveWeekToCopy(result.sourceRoutineId, result.routine.id).catch(() => undefined);
+      }
+      toast.show(
+        variantToastText({ kind: 'routine', routineTitle: target.title, copied: result.copied }),
+      );
+      closeVariants();
+    } catch (error) {
+      toast.show(routineErrorCopy(error, language).message, { tone: 'error' });
+    } finally {
+      setSavingVariant(false);
+    }
+  };
 
   const title = workout?.title ?? 'Sesión';
   const topPadding = insets.top + HEADER_HEIGHT;
@@ -327,6 +437,16 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           cardImage={cardImage}
           onPause={runner.pause}
           onLogSet={runner.logSet}
+          variantTag={variantTag(applied)}
+          onVariant={
+            planned?.exerciseId
+              ? () => {
+                  setVariantReason(null);
+                  setVariantStep({ kind: 'list' });
+                  setVariantOpen(true);
+                }
+              : undefined
+          }
           onTechnique={
             current?.exerciseId
               ? () =>
@@ -410,6 +530,43 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           />
         ) : null}
       </SceneScope>
+      {planned?.exerciseId && variantPosition !== null ? (
+        <SceneScope>
+          <VariantSheet
+            open={variantOpen}
+            step={variantStep}
+            exerciseName={runner.current?.name ?? planned.name}
+            originalExerciseId={planned.exerciseId}
+            originalName={planned.name}
+            appliedExerciseId={applied?.exerciseId ?? null}
+            routineTitle={routineForSave?.title ?? title}
+            reason={variantReason}
+            language={language}
+            saving={savingVariant}
+            onReason={setVariantReason}
+            onChoose={variant => setVariantStep({ kind: 'save', variant })}
+            onToday={() => {
+              if (variantStep.kind === 'save') {
+                chooseVariant(variantStep.variant, 'today');
+                toast.show(variantToastText({ kind: 'today' }));
+              }
+              closeVariants();
+            }}
+            onSaveInRoutine={() => {
+              if (variantStep.kind === 'save') {
+                saveVariantInRoutine(variantStep.variant).catch(() => undefined);
+              }
+            }}
+            onChooseAnother={() => setVariantStep({ kind: 'list' })}
+            onRevert={() => {
+              runner.revertVariant(variantPosition).catch(() => undefined);
+              toast.show(variantToastText({ kind: 'reverted' }));
+              closeVariants();
+            }}
+            onClose={closeVariants}
+          />
+        </SceneScope>
+      ) : null}
       {exitOpen ? (
         <ExitDialog
           busy={

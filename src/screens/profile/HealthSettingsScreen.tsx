@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Activity, Flame, Footprints, Heart, Scale, Dumbbell, type LucideIcon } from 'lucide-react-native';
+import { Activity, Heart, HeartPulse, Moon, type LucideIcon } from 'lucide-react-native';
 import {
   BackButton,
   Button,
@@ -12,6 +14,14 @@ import {
   useToast,
 } from '@app/components/v2';
 import { ROOT_ROUTES } from '@app/constants/routes';
+import { HealthInviteSheet } from '@app/features/health/HealthInviteSheet';
+import {
+  HEALTH_STATUS_TEXT,
+  connectHealth,
+  openHealthSettings,
+  syncHealthSleep,
+  useHealthState,
+} from '@app/features/health/healthStore';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -19,29 +29,54 @@ type Props = AppScreenProps<'HealthSettings'>;
 
 const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 
+// What the app reads today (read only).
 const TYPES: { icon: LucideIcon; title: string; subtitle: string }[] = [
-  { icon: Dumbbell, title: 'Entrenamientos', subtitle: 'Se suman a tu semana en Progreso' },
-  { icon: Flame, title: 'Energía activa', subtitle: 'Tu día y el resumen de cada sesión' },
-  { icon: Footprints, title: 'Pasos', subtitle: 'Tu día y retos de movimiento' },
-  { icon: Activity, title: 'Frecuencia cardíaca', subtitle: 'Resumen de cada sesión' },
-  { icon: Scale, title: 'Peso', subtitle: 'Progreso · métricas corporales' },
+  { icon: Moon, title: 'Sueño', subtitle: 'Duración, fases y horario · Sueño y Progreso' },
+  { icon: HeartPulse, title: 'Frecuencia cardíaca en reposo', subtitle: 'Tu recuperación del día' },
+  { icon: Activity, title: 'VFC', subtitle: 'Tu recuperación del día' },
 ];
 
-// Apple Health (HEALTH_02 / 03): the integration is a future module (no
-// HealthKit yet), so this is the reference screen as a placeholder: always
-// "Sin conectar" and the connect action only explains it is coming.
+// Apple Health (HEALTH_02 / 03): the connection of this device, read only.
+// Connecting shows the invitation and then the system sheet; permissions are
+// managed in Salud (iOS never tells the app what was denied).
 export function HealthSettingsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const queryClient = useQueryClient();
+  const health = useHealthState();
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const connected = health.status === 'connected' || health.status === 'noData';
+
+  const connect = async () => {
+    setBusy(true);
+    try {
+      const status = await connectHealth(queryClient);
+      setInviteOpen(false);
+      toast.show(
+        status === 'connected' ? 'Apple Health conectado' : 'Salud no compartió noches. Revisa los permisos.',
+        status === 'connected' ? undefined : { tone: 'error' },
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const syncNow = async () => {
+    setBusy(true);
+    try {
+      const status = await syncHealthSleep(queryClient, { minIntervalMs: 0 });
+      toast.show(status === 'connected' ? 'Sueño actualizado' : 'Salud no compartió noches', status === 'connected' ? undefined : { tone: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 />
-      <GlassHeader
-        title="Apple Health"
-        left={<BackButton onPress={() => safeGoBack(navigation, BACK_FALLBACKS)} />}
-      />
+      <GlassHeader title="Apple Health" left={<BackButton onPress={() => safeGoBack(navigation, BACK_FALLBACKS)} />} />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: layout.gutter, paddingBottom: insets.bottom + 40, gap: 24, paddingTop: 12 }}
@@ -52,17 +87,17 @@ export function HealthSettingsScreen({ navigation }: Props) {
           </View>
           <View style={styles.identityText}>
             <TextV2 variant="title22">Apple Health</TextV2>
-            <TextV2 variant="meta" tone="secondary">
-              ○ Sin conectar
+            <TextV2 variant="meta" color={connected ? colors.recovery.base : colors.text.secondary}>
+              {`${connected ? '●' : '○'} ${HEALTH_STATUS_TEXT[health.status]}`}
             </TextV2>
           </View>
         </View>
         <TextV2 variant="bodyL" tone="secondary">
-          ATHELETE usa solo lo que tú autorizas en Salud para completar tu día, tus sesiones y tu progreso.
+          ATHELETE solo lee lo que tú autorizas en Salud para mostrar tu descanso, estimar tu recuperación y ajustar tus entrenos.
         </TextV2>
         <View>
           <TextV2 variant="eyebrow" color={colors.text.secondary} style={styles.eyebrow}>
-            Lo que ATHELETE puede usar
+            Lo que ATHELETE lee
           </TextV2>
           {TYPES.map(item => (
             <Row
@@ -73,17 +108,37 @@ export function HealthSettingsScreen({ navigation }: Props) {
             />
           ))}
         </View>
-        <View style={styles.cta}>
-          <Button
-            label="Conectar con Apple Health"
-            onPress={() => toast.show('Apple Health llegará pronto')}
-            fullWidth
-          />
+        {health.status === 'unavailable' ? (
           <TextV2 variant="meta" tone="secondary" align="center">
-            Salud te preguntará qué compartir. Puedes cambiarlo cuando quieras.
+            Apple Health no está disponible en este dispositivo. Puedes registrar tu sueño a mano en Sueño.
           </TextV2>
-        </View>
+        ) : connected ? (
+          <View style={styles.cta}>
+            {health.status === 'noData' ? (
+              <TextV2 variant="meta" tone="secondary">
+                Salud no está compartiendo tu sueño. Actívalo en Ajustes › Salud › Acceso a datos y dispositivos › Athelete.
+              </TextV2>
+            ) : null}
+            <Button label="Gestionar permisos en Salud" onPress={() => openHealthSettings()} fullWidth />
+            <Button label="Sincronizar ahora" variant="secondary" loading={busy} onPress={syncNow} fullWidth />
+          </View>
+        ) : (
+          <View style={styles.cta}>
+            <Button label="Conectar con Apple Health" onPress={() => setInviteOpen(true)} fullWidth />
+            <TextV2 variant="meta" tone="secondary" align="center">
+              Salud te preguntará qué compartir. Puedes cambiarlo cuando quieras.
+            </TextV2>
+          </View>
+        )}
       </ScrollView>
+      <HealthInviteSheet
+        open={inviteOpen}
+        busy={busy}
+        onConnect={() => {
+          connect().catch(() => undefined);
+        }}
+        onClose={() => setInviteOpen(false)}
+      />
     </View>
   );
 }

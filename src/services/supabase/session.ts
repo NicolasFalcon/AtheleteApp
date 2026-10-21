@@ -7,8 +7,10 @@ import {
 } from '@app/features/session/sessionModel';
 import {
   buildExerciseRows,
+  buildVariantPatch,
   buildSetRow,
   mapSetRows,
+  fromDbPosition,
   toDbPosition,
 } from '@app/features/session/sessionDbMapping';
 import {
@@ -158,6 +160,52 @@ export async function ensureSessionExercises(
   if (error) {
     throw error;
   }
+}
+
+// A variant applied (or undone) in this session: the row of the exercise
+// gets the variant's exercise id and name, and the original id and reason.
+export async function saveSessionVariant(
+  sessionId: string,
+  position: number,
+  change: Parameters<typeof buildVariantPatch>[0],
+): Promise<void> {
+  const client = getClient();
+  const { error } = await (client.from('workout_session_exercises') as any)
+    .update(buildVariantPatch(change))
+    .eq('session_id', sessionId)
+    .eq('position', toDbPosition(position));
+  if (error) {
+    throw error;
+  }
+}
+
+export type StoredVariant = {
+  position: number;
+  exerciseId: string;
+  name: string;
+  originalExerciseId: string;
+  reason: string | null;
+};
+
+// The variants already saved in a session (resuming it keeps them).
+export async function fetchSessionVariants(sessionId: string): Promise<StoredVariant[]> {
+  const client = getClient();
+  const { data, error } = await (client.from('workout_session_exercises') as any)
+    .select('position, exercise_id, name, original_exercise_id, variant_reason')
+    .eq('session_id', sessionId)
+    .not('original_exercise_id', 'is', null);
+  if (error) {
+    throw error;
+  }
+  return ((data ?? []) as Array<Record<string, unknown>>)
+    .filter(row => typeof row.exercise_id === 'string' && typeof row.original_exercise_id === 'string')
+    .map(row => ({
+      position: fromDbPosition(row.position as number),
+      exerciseId: row.exercise_id as string,
+      name: (row.name as string) ?? '',
+      originalExerciseId: row.original_exercise_id as string,
+      reason: typeof row.variant_reason === 'string' ? row.variant_reason : null,
+    }));
 }
 
 export type SetWrite = {

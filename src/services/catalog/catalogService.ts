@@ -65,6 +65,14 @@ const MUSCLE_NAMES: Record<string, { es: string; en: string }> = {
   chest: { es: 'Pecho', en: 'Chest' },
 };
 
+// Name of a muscles.slug (the slug itself when it is not one of the 16).
+export function muscleLabel(slug: string | null, locale: CatalogLocale = 'es'): string | null {
+  if (!slug) {
+    return null;
+  }
+  return MUSCLE_NAMES[slug]?.[locale] ?? slug;
+}
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value)
     ? (value as Record<string, unknown>)

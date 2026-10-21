@@ -31,7 +31,31 @@ export function buildExerciseRows(
       planned_duration_sec: exercise.durationSec,
       planned_rest_sec: exercise.restSec,
       planned_weight_kg: exercise.plannedWeightKg,
+      // Only for a variant: sessions without one never send the columns.
+      ...(exercise.originalExerciseId
+        ? {
+            original_exercise_id: exercise.originalExerciseId,
+            variant_reason: exercise.variantReason ?? 'other',
+          }
+        : {}),
     }));
+}
+
+// The update of an existing `workout_session_exercises` row when a variant
+// is applied (exercise_id = the variant, original_exercise_id = the planned
+// one) or undone (back to the planned exercise, both columns null).
+export function buildVariantPatch(change: {
+  exerciseId: string;
+  name: string;
+  originalExerciseId: string | null;
+  reason: string | null;
+}) {
+  return {
+    exercise_id: change.exerciseId,
+    name: change.name,
+    original_exercise_id: change.originalExerciseId,
+    variant_reason: change.originalExerciseId ? change.reason ?? 'other' : null,
+  };
 }
 
 export type SetPayloadInput = {

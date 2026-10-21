@@ -14,6 +14,12 @@
 // so the loudest event peaks at -1 dBFS: the hierarchy between events (a quiet
 // tick under a loud "complete") stays as designed.
 //
+// Plus `breathe-ambient` (Respira, handoff §25.8): the prototype's brown
+// noise (Breathe.dc.html: the same generator, low-pass 420 Hz, level .16)
+// rendered offline as a 4 s loop whose end is crossfaded into its start, so
+// it repeats without a click. Its fade in (2.5 s) and out (0.6 s) are done by
+// the app. It keeps its own level (not the shared gain) and is not trimmed.
+//
 // Usage: node scripts/render-sounds.js [--chrome <path>] [--source <ath-sound.js>]
 // Needs macOS (afconvert) and Google Chrome.
 
@@ -66,6 +72,48 @@ const EVENTS = [
 // Runs in the page: renders one event and returns its channels as base64.
 const HARNESS = `
 window.__athSource = ${JSON.stringify(fs.readFileSync(SOURCE, 'utf8'))};
+// Breathe.dc.html startAudio(): brown noise → low-pass 420 Hz → gain .16.
+window.__renderAmbient = async (sampleRate, loopSeconds, fadeSeconds) => {
+  let seed = 4242;
+  const random = () => {
+    seed = (seed + 0x6d2b79f5) >>> 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const total = Math.round(sampleRate * (loopSeconds + fadeSeconds));
+  const ctx = new OfflineAudioContext(2, total, sampleRate);
+  const buf = ctx.createBuffer(1, total, sampleRate);
+  const d = buf.getChannelData(0);
+  let last = 0;
+  for (let i = 0; i < total; i++) { last = (last + 0.02 * (random() * 2 - 1)) / 1.02; d[i] = last * 3.2; }
+  const src = ctx.createBufferSource(); src.buffer = buf;
+  const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+  const g = ctx.createGain(); g.gain.value = 0.16;
+  src.connect(lp); lp.connect(g); g.connect(ctx.destination); src.start();
+  const out = await ctx.startRendering();
+  // Equal-power crossfade of the extra tail into the head: a seamless loop.
+  const loop = Math.round(sampleRate * loopSeconds);
+  const fade = total - loop;
+  const channels = [0, 1].map(ch => {
+    const src = out.getChannelData(ch);
+    const dst = new Float32Array(loop);
+    for (let i = 0; i < loop; i++) dst[i] = src[i];
+    for (let i = 0; i < fade; i++) {
+      const x = i / fade;
+      dst[i] = src[i] * Math.sin(x * Math.PI / 2) + src[loop + i] * Math.cos(x * Math.PI / 2);
+    }
+    return dst;
+  });
+  const b64 = arr => {
+    const bytes = new Uint8Array(arr.buffer);
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
+  return { l: b64(channels[0]), r: b64(channels[1]) };
+};
 window.__render = async (name, call, sampleRate, seconds) => {
   let seed = 0;
   for (const ch of name) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
@@ -223,8 +271,11 @@ function wav({ L, R }, gain) {
 async function main() {
   const chrome = await launchChrome();
   const rendered = [];
+  let ambient = null;
   try {
     await chrome.evaluate(HARNESS);
+    const loop = await chrome.evaluate(`__renderAmbient(${SAMPLE_RATE}, 4, 0.5)`);
+    ambient = { L: fromBase64(loop.l), R: fromBase64(loop.r) };
     for (const [name, call] of EVENTS) {
       const { l, r } = await chrome.evaluate(
         `__render(${JSON.stringify(name)}, ${JSON.stringify(call)}, ${SAMPLE_RATE}, ${RENDER_SECONDS})`,
@@ -253,7 +304,20 @@ async function main() {
       cafKb: Math.round(fs.statSync(cafPath).size / 1024),
     });
   }
-  console.log(`gain ${(20 * Math.log10(gain)).toFixed(1)} dB · ${rows.length} events`);
+  if (ambient) {
+    const wavPath = path.join(OUT_DIR, 'breathe-ambient.wav');
+    const cafPath = path.join(OUT_DIR, 'breathe-ambient.caf');
+    fs.writeFileSync(wavPath, wav(ambient, 1));
+    execFileSync('afconvert', ['-f', 'caff', '-d', 'LEI16', wavPath, cafPath]);
+    rows.push({
+      file: 'breathe-ambient (loop)',
+      seconds: (ambient.L.length / SAMPLE_RATE).toFixed(2),
+      peakDb: (20 * Math.log10(peakOf(ambient))).toFixed(1),
+      wavKb: Math.round(fs.statSync(wavPath).size / 1024),
+      cafKb: Math.round(fs.statSync(cafPath).size / 1024),
+    });
+  }
+  console.log(`gain ${(20 * Math.log10(gain)).toFixed(1)} dB · ${rows.length} files`);
   console.table(rows);
 }
 

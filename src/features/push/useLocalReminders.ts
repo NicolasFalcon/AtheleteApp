@@ -1,12 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { AppState } from 'react-native';
-import { applyReminders, planReminders, type ReminderScheduler } from '@app/features/push/localReminders';
+import {
+  applyReminders,
+  planReminders,
+  reminderWeekPlan,
+  type ReminderScheduler,
+} from '@app/features/push/localReminders';
 import { notificationsModule } from '@app/features/push/notificationsNative';
 import { LOCAL_FLAG } from '@app/features/push/usePushEvents';
 import { readPermission } from '@app/features/push/pushRuntime';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
 import { useAuth } from '@app/hooks/useAuth';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
+import { useWeekPlan } from '@app/hooks/useWeekPlan';
+
 
 function nativeScheduler(): ReminderScheduler {
   const Notifications = notificationsModule();
@@ -38,6 +45,8 @@ export function useLocalReminders(): void {
   const waterMl = overview?.hydration.todayMl ?? 0;
   const waterGoalMl = overview?.hydration.goalMl ?? null;
   const active = flow === 'app' && Boolean(profile);
+  const weekQuery = useWeekPlan(active);
+  const weekPlan = useMemo(() => reminderWeekPlan(weekQuery.data), [weekQuery.data]);
 
   useEffect(() => {
     if (!active || !prefs || !quiet) {
@@ -56,6 +65,7 @@ export function useLocalReminders(): void {
           hydration: prefs.hydration,
           quiet,
           trainingDaysPerWeek: perWeek,
+          weekPlan,
           trainedToday,
           waterMl,
           waterGoalMl,
@@ -69,7 +79,7 @@ export function useLocalReminders(): void {
       }
     });
     return () => state.remove();
-  }, [active, language, perWeek, prefs, quiet, trainedToday, waterGoalMl, waterMl]);
+  }, [active, language, perWeek, prefs, quiet, trainedToday, waterGoalMl, waterMl, weekPlan]);
 
   // Signing out clears what was scheduled for that person.
   useEffect(() => {

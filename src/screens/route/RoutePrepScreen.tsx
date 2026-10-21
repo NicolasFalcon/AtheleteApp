@@ -1,3 +1,4 @@
+import { GuideAnchor, useGuide } from '@app/features/guides/GuideAnchor';
 import { useCallback, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -71,6 +72,8 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
   useRouteDefaults();
   const { sport, mode, config, plan } = session;
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  // Guía de Ruta (25.4): before recording, never during it.
+  useGuide('route', { enabled: mode === 'now' });
   const [otherOpen, setOtherOpen] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
   const [mapKey, setMapKey] = useState(0);
@@ -132,8 +135,12 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
 
       <View style={[styles.top, { top: insets.top + 8 }]}>
         <RoundButton icon={X} label="Cerrar" onPress={close} />
-        <SportSegment sport={sport} onChange={routeStore.setSport} />
-        <RoundButton icon={Lock} label="Privacidad" onPress={() => setPrivacyOpen(true)} />
+        <GuideAnchor id="route.sport">
+          <SportSegment sport={sport} onChange={routeStore.setSport} />
+        </GuideAnchor>
+        <GuideAnchor id="route.privacy">
+          <RoundButton icon={Lock} label="Privacidad" onPress={() => setPrivacyOpen(true)} />
+        </GuideAnchor>
       </View>
 
       {mapFailed ? (
@@ -305,6 +312,7 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
                     onPress={() => setPrivacyOpen(true)}
                   />
                 </View>
+                <GuideAnchor id="route.start">
                 <Button
                   label={
                     !searching
@@ -322,6 +330,7 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
                     start().catch(() => {});
                   }}
                 />
+                </GuideAnchor>
               </>
             )}
           </View>

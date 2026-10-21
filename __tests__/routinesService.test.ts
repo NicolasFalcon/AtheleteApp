@@ -220,7 +220,29 @@ describe('list_routines and get_today_suggestion', () => {
     expect(rpc).toHaveBeenCalledWith('get_today_suggestion', { _tz: 'America/Santiago' });
     expect(today).toMatchObject({ source: 'rules', suggestion: { routineId: 'r1', duration: 45, reason: 'Ayer hiciste tren superior' } });
     const none = await createRoutinesService(async () => ({ ok: true, source: 'none', suggestion: null })).getTodaySuggestion(null);
-    expect(none).toEqual({ source: 'none', suggestion: null });
+    expect(none).toEqual({ source: 'none', suggestion: null, restDay: null });
+  });
+
+  it('a rest day of the week plan is a rest state, not "no suggestion"', async () => {
+    const rest = await createRoutinesService(async () => ({
+      ok: true,
+      source: 'weekly_plan',
+      suggestion: null,
+      reason_code: 'rest_day',
+      kind: 'unavailable',
+      date: '2026-10-21',
+    })).getTodaySuggestion(null);
+    expect(rest).toEqual({
+      source: 'weekly_plan',
+      suggestion: null,
+      restDay: { kind: 'unavailable', date: '2026-10-21' },
+    });
+    const planned = await createRoutinesService(async () => ({
+      ok: true,
+      source: 'weekly_plan',
+      suggestion: { routine_id: 'r9', title: 'Empuje', duration: 40, reason: 'De tu plan de la semana', reason_code: 'weekly_plan', origin: 'official' },
+    })).getTodaySuggestion(null);
+    expect(planned).toMatchObject({ source: 'weekly_plan', restDay: null, suggestion: { routineId: 'r9', duration: 40, reasonCode: 'weekly_plan' } });
   });
 });
 

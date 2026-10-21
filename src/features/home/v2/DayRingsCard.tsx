@@ -1,3 +1,4 @@
+import { GuideAnchor } from '@app/features/guides/GuideAnchor';
 import { StyleSheet, View } from 'react-native';
 import {
   PressableScale,
@@ -110,6 +111,7 @@ export function DayRingsCard({
                     </View>
                   </PressableScale>
                   {ring.kind === 'hydration' && !ring.done && !isNewUser ? (
+                    <GuideAnchor id="home.water">
                     <PressableScale
                       accessibilityRole="button"
                       accessibilityLabel="Sumar un vaso"
@@ -129,6 +131,7 @@ export function DayRingsCard({
                         +1
                       </TextV2>
                     </PressableScale>
+                    </GuideAnchor>
                   ) : null}
                 </View>
               ))}

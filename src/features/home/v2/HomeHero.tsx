@@ -12,7 +12,7 @@ import {
 import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { ArrowRight, Bell, Check, Play } from 'lucide-react-native';
+import { ArrowRight, Bell, Check, Moon, Play } from 'lucide-react-native';
 import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import {
   Button,
@@ -57,6 +57,9 @@ export type HomeHeroData = {
   } | null;
   // Hero routine for `workout` (recommended #1) and `new` (shortest beginner).
   workout: HeroWorkout | null;
+  // The active week plan makes today a rest day (or a day without
+  // availability): the rest state instead of "Elige tu entreno de hoy".
+  restDay: { kind: 'rest' | 'unavailable' } | null;
   // Pending session for `resume` (saved, or in progress / paused).
   resume: {
     title: string;
@@ -85,6 +88,7 @@ export type HomeHeroProps = {
   onOpenNotifications: () => void;
   onOpenCore33: () => void;
   onStartWorkout: () => void;
+  onOpenWeek: () => void;
   onResume: () => void;
   onOpenProgress: () => void;
 };
@@ -513,10 +517,50 @@ function Stat({ value, label }: { value: number; label: string }) {
   );
 }
 
+// Rest day of the week plan (the rest card of Tu semana: Recovery Blue, moon).
+function RestContent({
+  kind,
+  onOpenWeek,
+}: {
+  kind: 'rest' | 'unavailable';
+  onOpenWeek: () => void;
+}) {
+  const rest = kind === 'rest';
+  return (
+    <View style={styles.content}>
+      <Moon size={22} color="#FFFFFF" strokeWidth={1.8} style={styles.restIcon} />
+      <TextV2 variant="eyebrow" color="#9DB5CF">
+        {rest ? 'Hoy · Recuperación' : 'Hoy · Sin entreno'}
+      </TextV2>
+      <TextV2 variant="title22" numberOfLines={2} style={styles.tight}>
+        {rest ? 'Día de descanso' : 'Hoy no entrenas'}
+      </TextV2>
+      <TextV2 variant="meta" color="#C9D3DE" numberOfLines={2}>
+        {rest
+          ? 'Caminar o 10 min de movilidad, si te apetece.'
+          : 'Marcaste este día como no disponible en tu semana.'}
+      </TextV2>
+      <Button
+        label="Ver tu semana"
+        variant="onScene"
+        icon={ArrowRight}
+        iconPosition="end"
+        fullWidth
+        onPress={onOpenWeek}
+      />
+    </View>
+  );
+}
+
 function WorkoutContent({
   workout,
   onStartWorkout,
+  onOpenWeek,
+  data,
 }: HomeHeroProps & { workout: HeroWorkout | null }) {
+  if (!workout && data.restDay) {
+    return <RestContent kind={data.restDay.kind} onOpenWeek={onOpenWeek} />;
+  }
   return (
     <View style={styles.content}>
       <Eyebrow tone="tertiary">
@@ -706,6 +750,7 @@ function AllDoneContent({
 }
 
 const styles = StyleSheet.create({
+  restIcon: { opacity: 0.75, marginBottom: 2 },
   frame: {
     height: HERO_HEIGHT,
     overflow: 'hidden',

@@ -354,9 +354,11 @@ describe('hasCompletedEver', () => {
 });
 
 describe('homeSectionOrder', () => {
-  it('follows v2.12: Tu día → Tu ruta → ELLIE → Para entrenar → Quiz → Wear', () => {
+  it('follows v2.15: Tu semana → Tu día → Tu ruta → ELLIE → Para entrenar → Quiz → Wear', () => {
     expect(homeSectionOrder({ core33Invite: false, challenge: false })).toEqual([
+      'week',
       'rings',
+      'recovery',
       'route',
       'ellie',
       'routines',
@@ -367,7 +369,9 @@ describe('homeSectionOrder', () => {
 
   it('puts the Core 33 invitation after the route and the challenge after ELLIE', () => {
     expect(homeSectionOrder({ core33Invite: true, challenge: true })).toEqual([
+      'week',
       'rings',
+      'recovery',
       'route',
       'core33Invite',
       'ellie',

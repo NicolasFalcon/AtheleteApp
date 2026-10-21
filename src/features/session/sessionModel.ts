@@ -62,6 +62,10 @@ export type PlannedExercise = {
   reps: number | null;
   durationSec: number | null;
   distanceM: number | null;
+  // A variant of this session (variantModel): the planned exercise it
+  // replaces and why.
+  originalExerciseId?: string | null;
+  variantReason?: string | null;
 };
 
 // `recommendedFor` gives the library's recommended_sets_reps of an exercise:

@@ -218,6 +218,10 @@ export type AppStackParamList = {
   QuizQuestion: QuizQuestionRouteParams;
   QuizResult: QuizResultRouteParams;
   EllieChat: EllieChatRouteParams | undefined;
+  Week: undefined;
+  Sleep: undefined;
+  Breathe: undefined;
+  WeekEllie: undefined;
   RouteSoon: undefined;
   RoutePrep: undefined;
   RouteGen: undefined;

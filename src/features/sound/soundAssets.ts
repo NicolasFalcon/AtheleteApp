@@ -26,3 +26,6 @@ export const SOUND_ASSETS: Record<SoundFile, number> = {
   'complete-perfect': require('../../assets/sounds/complete-perfect.wav'),
   'day-close': require('../../assets/sounds/day-close.wav'),
 };
+
+// Respira's ambient loop (4 s, played in a loop with fades in the app).
+export const AMBIENT_ASSET: number = require('../../assets/sounds/breathe-ambient.wav');

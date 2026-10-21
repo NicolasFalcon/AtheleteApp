@@ -537,7 +537,9 @@ export function bestMarkParts(
 // Tu día → Tu ruta → [Core 33] → banda de ELLIE → [reto oficial] → Para
 // entrenar esta semana → Quiz → Wear. "Tu mejor marca" no longer exists.
 export type HomeSectionKey =
+  | 'week'
   | 'rings'
+  | 'recovery'
   | 'route'
   | 'core33Invite'
   | 'ellie'
@@ -550,8 +552,12 @@ export function homeSectionOrder(options: {
   core33Invite: boolean;
   challenge: boolean;
 }): HomeSectionKey[] {
+  // v2.15 (HOME_18): "Tu semana" is the first block of the linen surface.
   const order: (HomeSectionKey | null)[] = [
+    'week',
     'rings',
+    // v2.15 (HOME_19–20): Sueño + Respira, between Tu día and Tu ruta.
+    'recovery',
     'route',
     options.core33Invite ? 'core33Invite' : null,
     'ellie',

@@ -1,3 +1,4 @@
+import { useGuide } from '@app/features/guides/GuideAnchor';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -70,6 +71,8 @@ export function Core33Screen({ navigation }: Props) {
   const loading = day.stateQuery.isLoading;
   const failed = Boolean(day.stateQuery.error);
   const none = !loading && !failed && !challenge;
+  // Guía de Core 33 (25.4): 3 steps, no highlighted element.
+  useGuide('core33', { enabled: Boolean(challenge) });
 
   const leave = async () => {
     setLeaving(true);
