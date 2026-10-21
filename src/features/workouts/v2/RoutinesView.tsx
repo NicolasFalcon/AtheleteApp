@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Image,
   StyleSheet,
@@ -23,24 +24,22 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { TYPE_IMAGES } from '@app/features/workouts/workoutAssets';
 import {
   COLLECTION_LABELS,
   COLLECTION_TILES,
   countByCollection,
-  countByGroup,
-  GROUP_TILES,
   LEVEL_LABELS,
-  TYPE_LABELS,
   groupOf,
   plural,
   type RoutineCollection,
 } from '@app/features/workouts/workoutsModel';
-import type { RoutineSuggestion } from '@app/services/routines/routinesService';
-import type { Workout, WorkoutType } from '@app/shared';
+import type { RoutineLibraryCategory, RoutineSuggestion } from '@app/services/routines/routinesService';
+import type { Workout } from '@app/shared';
 
 export type RoutinesViewProps = {
   workouts: Workout[];
+  categories: RoutineLibraryCategory[];
+  imageToken?: string;
   // get_today_suggestion (null: none today → no hero).
   suggestion: RoutineSuggestion | null;
   loading: boolean;
@@ -49,7 +48,7 @@ export type RoutinesViewProps = {
   userId?: string;
   favoriteIds: string[];
   onOpenWorkout: (id: string) => void;
-  onOpenType: (type: WorkoutType) => void;
+  onOpenCategory: (category: string) => void;
   onOpenCollection: (collection: RoutineCollection) => void;
   onSearch: () => void;
 };
@@ -62,9 +61,11 @@ const COLLECTION_ICONS: Record<RoutineCollection, LucideIcon> = {
 
 // Entrenos · Rutinas (WORKOUTS_01, D-46): the root explores, like
 // Ejercicios. Recommended hero, search (opens the full list) and cards for
-// the 5 type cards plus Favoritas / Tus rutinas / Todas; lists live in RoutineList.
+// API category cards plus Favoritas / Tus rutinas / Todas; lists live in RoutineList.
 export function RoutinesView({
   workouts,
+  categories,
+  imageToken,
   suggestion,
   loading,
   error,
@@ -72,7 +73,7 @@ export function RoutinesView({
   userId,
   favoriteIds,
   onOpenWorkout,
-  onOpenType,
+  onOpenCategory,
   onOpenCollection,
   onSearch,
 }: RoutinesViewProps) {
@@ -88,7 +89,6 @@ export function RoutinesView({
     return <RoutinesSkeleton />;
   }
 
-  const counts = countByGroup(workouts);
   const collections = countByCollection(workouts, { favoriteIds, userId });
 
   return (
@@ -119,13 +119,15 @@ export function RoutinesView({
       <View style={styles.section}>
         <TextV2 variant="section">Por tipo</TextV2>
         <View style={styles.typeGrid}>
-          {GROUP_TILES.map(type => (
+          {categories.map(category => (
             <Tile
-              key={type}
-              label={TYPE_LABELS[type]}
-              count={counts[type]}
-              image={TYPE_IMAGES[type]}
-              onPress={() => onOpenType(type)}
+              key={`${category.slug}:${category.imageUrl ?? ''}`}
+              label={category.name}
+              count={category.routineCount}
+              image={category.imageUrl && imageToken
+                ? { uri: category.imageUrl, headers: { Authorization: `Bearer ${imageToken}` } }
+                : undefined}
+              onPress={() => onOpenCategory(category.slug)}
             />
           ))}
           {COLLECTION_TILES.map(collection => (
@@ -188,6 +190,8 @@ function Tile({
   onPress: () => void;
 }) {
   const { scene, mode } = useThemeV2();
+  const [brokenImage, setBrokenImage] = useState(false);
+  const visibleImage = image && !brokenImage ? image : undefined;
 
   return (
     <PressableScale
@@ -196,12 +200,12 @@ function Tile({
       onPress={onPress}
       // Dark: the scene card sits on a near-black background; an inner
       // border separates it (D-15 criterion instead of a glow).
-      style={[styles.typeTile, !image && mode === 'dark' && styles.tileBorder]}
+      style={[styles.typeTile, !visibleImage && mode === 'dark' && styles.tileBorder]}
     >
       <View style={styles.typeClip}>
-        {image ? (
+        {visibleImage ? (
           <>
-            <Image source={image} resizeMode="cover" style={styles.fill} />
+            <Image source={visibleImage} resizeMode="cover" style={styles.fill} onError={() => setBrokenImage(true)} />
             <LinearGradient
               colors={['rgba(20,19,18,.8)', 'rgba(20,19,18,.1)']}
               start={{ x: 0, y: 0.5 }}

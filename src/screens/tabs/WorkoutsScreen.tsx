@@ -24,7 +24,7 @@ import { RoutinesView } from '@app/features/workouts/v2/RoutinesView';
 import { useAuth } from '@app/hooks/useAuth';
 import { useCatalogTotal } from '@app/hooks/useCatalog';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
-import { useRoutineList, useTodaySuggestion } from '@app/hooks/useRoutines';
+import { useRoutineCategories, useRoutineList, useTodaySuggestion } from '@app/hooks/useRoutines';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import type { TabScreenProps } from '@app/types/navigation';
@@ -34,7 +34,8 @@ type Segment = 'routines' | 'exercises';
 
 // Entrenos v2 (Workouts.dc.html · WORKOUTS_01–03): root header with "+",
 // segmented Rutinas / Ejercicios. Rutinas: every visible routine through
-// list_routines (paginated; the counts per type need them all) and today's
+// list_routines (paginated; collection counts need them all), the category
+// catalog and today's
 // suggestion as the hero. Ejercicios: the catalog total only; each zone,
 // equipment or search opens its server list.
 export function WorkoutsScreen({ navigation, route }: Props) {
@@ -42,8 +43,9 @@ export function WorkoutsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const tabBarMotion = useTabBarMotion();
   const { bottomClearance } = useTabBarMetrics();
-  const { profile } = useAuth();
+  const { profile, session } = useAuth();
   const routinesQuery = useRoutineList('all', { exhaust: true });
+  const categoriesQuery = useRoutineCategories();
   const suggestionQuery = useTodaySuggestion();
   const catalogTotal = useCatalogTotal();
   const favorites = useFavoriteWorkouts();
@@ -75,6 +77,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
         return;
       }
       routinesQuery.refetch().catch(() => {});
+      categoriesQuery.refetch().catch(() => {});
       // refetch is stable.
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
@@ -129,19 +132,22 @@ export function WorkoutsScreen({ navigation, route }: Props) {
         {segment === 'routines' ? (
           <RoutinesView
             workouts={workouts}
+            categories={categoriesQuery.data ?? []}
+            imageToken={session?.access_token}
             suggestion={suggestionQuery.data?.suggestion ?? null}
-            loading={routinesQuery.isLoading || !favorites.loaded}
-            error={Boolean(routinesQuery.error)}
+            loading={routinesQuery.isLoading || categoriesQuery.isLoading || !favorites.loaded}
+            error={Boolean(routinesQuery.error || categoriesQuery.error)}
             onRetry={() => {
               routinesQuery.refetch().catch(() => {});
+              categoriesQuery.refetch().catch(() => {});
             }}
             userId={profile?.id}
             favoriteIds={favorites.favoriteWorkoutIds}
             onOpenWorkout={workoutId =>
               navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId })
             }
-            onOpenType={type =>
-              navigation.navigate(APP_ROUTES.RoutineList, { type })
+            onOpenCategory={category =>
+              navigation.navigate(APP_ROUTES.RoutineList, { category })
             }
             onOpenCollection={collection =>
               navigation.navigate(APP_ROUTES.RoutineList, { collection })

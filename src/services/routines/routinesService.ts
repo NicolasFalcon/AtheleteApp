@@ -50,6 +50,17 @@ export type RoutineScopeParam = 'all' | 'official' | 'mine';
 
 export type RoutinePage = { items: Workout[]; nextCursor: string | null };
 
+export type RoutineLibraryCategory = {
+  slug: string;
+  name: string;
+  nameEs: string;
+  nameEn: string;
+  imagePath: string | null;
+  imageUrl: string | null;
+  sortOrder: number;
+  routineCount: number;
+};
+
 export type RoutineSuggestion = {
   routineId: string;
   title: string;
@@ -422,6 +433,26 @@ export function expectOk(body: unknown): Record<string, unknown> {
 
 export function createRoutinesService(rpc: RoutineRpc = supabaseRpc) {
   return {
+    async listRoutineCategories(): Promise<RoutineLibraryCategory[]> {
+      const record = expectOk(await rpc('list_routine_categories', { _locale: null }));
+      return (Array.isArray(record.items) ? record.items : [])
+        .map(raw => {
+          const row = asRecord(raw) ?? {};
+          return {
+            slug: str(row.slug) ?? '',
+            name: str(row.name) ?? '',
+            nameEs: str(row.name_es) ?? '',
+            nameEn: str(row.name_en) ?? '',
+            imagePath: str(row.image_path),
+            imageUrl: str(row.image_url),
+            sortOrder: num(row.sort_order) ?? 0,
+            routineCount: num(row.routine_count) ?? 0,
+          };
+        })
+        .filter(category => category.slug && category.name)
+        .sort((a, b) => a.sortOrder - b.sortOrder);
+    },
+
     async getRoutine(id: string): Promise<Workout> {
       const record = expectOk(await rpc('get_routine', { _id: id }));
       return mapRoutine(record.routine);
@@ -431,12 +462,14 @@ export function createRoutinesService(rpc: RoutineRpc = supabaseRpc) {
       scope: RoutineScopeParam;
       limit?: number;
       cursor?: string | null;
+      category?: string | null;
     }): Promise<RoutinePage> {
       const record = expectOk(
         await rpc('list_routines', {
           _scope: params.scope,
           _limit: Math.min(50, params.limit ?? 20),
           _cursor: params.cursor ?? null,
+          ...(params.category ? { _category: params.category } : {}),
         }),
       );
       return {

@@ -72,6 +72,7 @@ export type ExerciseListRouteParams = {
 // Entrenos · lista de rutinas (D-46): a card (type) or a collection.
 export type RoutineListRouteParams = {
   type?: WorkoutType;
+  category?: string;
   collection?: 'favorites' | 'mine' | 'all';
   focusSearch?: boolean;
 };

@@ -194,6 +194,32 @@ describe('ELLIE: one message = one routine', () => {
 });
 
 describe('list_routines and get_today_suggestion', () => {
+  it('reads active category cards from the RPC and preserves both translated names', async () => {
+    const rpc = jest.fn(async () => ({
+      ok: true,
+      locale: 'es',
+      items: [
+        { slug: 'en_casa', name: 'En casa', name_es: 'En casa', name_en: 'At home', image_path: 'categories/home.webp', image_url: 'https://example.test/home.webp', sort_order: 20, routine_count: 3 },
+        { slug: 'fuerza', name: 'Fuerza', name_es: 'Fuerza', name_en: 'Strength', image_path: null, image_url: null, sort_order: 10, routine_count: 0 },
+      ],
+    }));
+    const categories = await createRoutinesService(rpc).listRoutineCategories();
+    expect(rpc).toHaveBeenCalledWith('list_routine_categories', { _locale: null });
+    expect(categories).toEqual([
+      { slug: 'fuerza', name: 'Fuerza', nameEs: 'Fuerza', nameEn: 'Strength', imagePath: null, imageUrl: null, sortOrder: 10, routineCount: 0 },
+      { slug: 'en_casa', name: 'En casa', nameEs: 'En casa', nameEn: 'At home', imagePath: 'categories/home.webp', imageUrl: 'https://example.test/home.webp', sortOrder: 20, routineCount: 3 },
+    ]);
+  });
+
+  it('passes the category slug on every requested routine page', async () => {
+    const rpc = jest.fn(async () => ({ ok: true, items: [], next_cursor: null }));
+    const service = createRoutinesService(rpc);
+    await service.listRoutines({ scope: 'all', category: 'en_casa' });
+    await service.listRoutines({ scope: 'all', category: 'en_casa', cursor: 'next' });
+    expect(rpc).toHaveBeenNthCalledWith(1, 'list_routines', { _scope: 'all', _limit: 20, _cursor: null, _category: 'en_casa' });
+    expect(rpc).toHaveBeenNthCalledWith(2, 'list_routines', { _scope: 'all', _limit: 20, _cursor: 'next', _category: 'en_casa' });
+  });
+
   it('passes the cursor and reads next_cursor', async () => {
     const rpc = jest.fn(async (_name: string, args: Record<string, unknown>) => ({
       ok: true,

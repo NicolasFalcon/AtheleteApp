@@ -38,6 +38,9 @@ export async function invalidateWorkoutQueries(
       queryKey: ['routines', 'list'],
     }),
     queryClient.invalidateQueries({
+      queryKey: ['routines', 'categories'],
+    }),
+    queryClient.invalidateQueries({
       queryKey: ['routines', 'today'],
     }),
     queryClient.invalidateQueries({

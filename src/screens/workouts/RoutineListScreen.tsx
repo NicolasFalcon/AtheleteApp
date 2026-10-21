@@ -29,18 +29,18 @@ import {
 } from '@app/features/workouts/workoutsModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
-import { useRoutineList } from '@app/hooks/useRoutines';
+import { useRoutineCategories, useRoutineList } from '@app/hooks/useRoutines';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { Workout } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'RoutineList'>;
 
-// Entrenos · lista de rutinas (D-46): a type ("Fuerza") or a collection
+// Entrenos · lista de rutinas (D-46): a category or a collection
 // ("Favoritas", "Tus rutinas", "Todas las rutinas"), like ExerciseList.
 // list_routines page by page (cursor): "Tus rutinas" reads scope mine; the
-// rest read scope all (the same pages as the root) and filter the type,
-// favourites or search on the device, asking for every page then.
+// rest read scope all; category cards pass the server's _category slug.
+// Favourites and search filter the retrieved pages on the device.
 export function RoutineListScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -49,12 +49,17 @@ export function RoutineListScreen({ navigation, route }: Props) {
   const { imageFor, markBroken } = useRoutineImages();
   const [query, setQuery] = useState('');
   const scope = useMemo(() => routineScopeFrom(route.params), [route.params]);
+  const category = route.params?.category;
+  const categoriesQuery = useRoutineCategories();
   const mineOnly = scope.collection === 'mine';
-  const filtered = Boolean(scope.group) || scope.collection === 'favorites' || query.trim() !== '';
+  const filtered = Boolean(category || scope.group) || scope.collection === 'favorites' || query.trim() !== '';
   const workoutsQuery = useRoutineList(mineOnly ? 'mine' : 'all', {
     exhaust: filtered,
+    category,
   });
-  const title = routineScopeTitle(scope);
+  const title = category
+    ? categoriesQuery.data?.find(item => item.slug === category)?.name ?? 'Rutinas'
+    : routineScopeTitle(scope);
   const userId = profile?.id;
 
   // Back from a detail: a favourite or a new routine may have changed.
@@ -175,7 +180,7 @@ export function RoutineListScreen({ navigation, route }: Props) {
             <TextV2 variant="body" tone="secondary" align="center">
               {query.trim()
                 ? `No encontramos “${query.trim()}” en ${title}.`
-                : routineEmptyText(scope)}
+                : category ? `Sin rutinas de ${title.toLowerCase()} todavía.` : routineEmptyText(scope)}
             </TextV2>
             {query.trim() ? (
               <Button

@@ -29,10 +29,23 @@ export const routineKeys = {
   lists: ['routines', 'list'] as const,
   list: (userId: string | undefined, scope: RoutineScopeParam) =>
     ['routines', 'list', userId ?? 'guest', scope] as const,
+  categoryList: (userId: string | undefined, scope: RoutineScopeParam, category: string) =>
+    ['routines', 'list', userId ?? 'guest', scope, category] as const,
+  categories: (userId: string | undefined) =>
+    ['routines', 'categories', userId ?? 'guest'] as const,
   today: ['routines', 'today'] as const,
 };
 
 const LIST_PAGE_SIZE = 50;
+
+export function useRoutineCategories() {
+  const { profile } = useAuth();
+  return useQuery({
+    queryKey: routineKeys.categories(profile?.id),
+    enabled: Boolean(profile?.id),
+    queryFn: () => routinesService.listRoutineCategories(),
+  });
+}
 
 // get_routine. routine_not_found is an answer (null), not an error to retry.
 export function useRoutine(
@@ -64,16 +77,18 @@ export function useRoutine(
 }
 
 // list_routines (newest first, archived ones never come). `exhaust` keeps
-// asking for the next page until the end: the root of Entrenos counts by
-// type over every routine.
+// asking for the next page until the end: the root of Entrenos counts
+// collections over every routine, and category lists read all matches.
 export function useRoutineList(
   scope: RoutineScopeParam,
-  options: { exhaust?: boolean; enabled?: boolean } = {},
+  options: { exhaust?: boolean; enabled?: boolean; category?: string } = {},
 ) {
   const { profile } = useAuth();
   const userId = profile?.id;
   const query = useInfiniteQuery({
-    queryKey: routineKeys.list(userId, scope),
+    queryKey: options.category
+      ? routineKeys.categoryList(userId, scope, options.category)
+      : routineKeys.list(userId, scope),
     enabled: Boolean(userId) && options.enabled !== false,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
@@ -81,6 +96,7 @@ export function useRoutineList(
         scope,
         limit: LIST_PAGE_SIZE,
         cursor: pageParam,
+        ...(options.category ? { category: options.category } : {}),
       });
       // One signing call per page, before the rows ask for their thumbs.
       prefetchMediaKeys(page.items.map(item => item.thumbKey)).catch(() => undefined);
@@ -127,6 +143,7 @@ export function useTodaySuggestion(enabled = true) {
 export async function invalidateRoutineLists(queryClient: QueryClient) {
   await Promise.allSettled([
     queryClient.invalidateQueries({ queryKey: routineKeys.lists }),
+    queryClient.invalidateQueries({ queryKey: ['routines', 'categories'] }),
     queryClient.invalidateQueries({ queryKey: routineKeys.today }),
   ]);
 }
