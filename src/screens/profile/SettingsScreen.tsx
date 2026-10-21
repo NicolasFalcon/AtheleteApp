@@ -19,6 +19,8 @@ import {
   Trash2,
   Users,
   Utensils,
+  Vibrate,
+  Volume2,
 } from 'lucide-react-native';
 import {
   BackButton,
@@ -50,6 +52,8 @@ import {
   mapDeleteAccountResponse,
   type DeleteAccountOutcome,
 } from '@app/features/profile/deleteAccountModel';
+import { preloadSounds } from '@app/features/sound/soundService';
+import { setFeedbackPrefs, useFeedbackPrefs } from '@app/lib/feedbackPrefs';
 import { clearLocalUserData } from '@app/lib/localUserData';
 import {
   requestAccountDeletion,
@@ -84,6 +88,7 @@ export function SettingsScreen({ navigation }: Props) {
   const { profile: realProfile, signOut } = useAuth();
   const overview = useProfileOverview();
   const preferences = useProfilePreferences();
+  const feedback = useFeedbackPrefs();
   const openEllieChat = useOpenEllieChat();
   const openCore33 = useOpenCore33();
   const [confirm, setConfirm] = useState<Confirm>(null);
@@ -281,6 +286,39 @@ export function SettingsScreen({ navigation }: Props) {
               }
             />
           ))}
+        </SettingsSection>
+
+        <SettingsSection title="Sonidos y vibración">
+          <Row
+            leading={icon(Volume2)}
+            title="Sonidos"
+            subtitle="En el Quiz. Respetan el modo silencio"
+            trailing={
+              <SwitchV2
+                accessibilityLabel="Sonidos"
+                value={feedback.sound}
+                onValueChange={value => {
+                  setFeedbackPrefs({ sound: value });
+                  if (value) {
+                    preloadSounds();
+                  }
+                }}
+              />
+            }
+          />
+          <Row
+            leading={icon(Vibrate)}
+            title="Vibración"
+            subtitle="Respuesta táctil al tocar y al acertar"
+            divider={false}
+            trailing={
+              <SwitchV2
+                accessibilityLabel="Vibración"
+                value={feedback.vibration}
+                onValueChange={value => setFeedbackPrefs({ vibration: value })}
+              />
+            }
+          />
         </SettingsSection>
 
         <SettingsSection title="Notificaciones">

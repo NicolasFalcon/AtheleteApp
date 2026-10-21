@@ -6,7 +6,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { ArrowUp, ImagePlus, Mic } from 'lucide-react-native';
+import { ArrowUp, ImagePlus } from 'lucide-react-native';
 import { LivingHalo, type LivingHaloState } from '@app/components/v2/LivingHalo';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
@@ -22,9 +22,7 @@ export type EllieComposerProps = {
   onSend?: () => void;
   onPress?: () => void;
   canSend?: boolean;
-  // Voice mode entry (neutral mic chip, left of send). Hidden when absent.
-  onVoice?: () => void;
-  // Photo button (image-plus), left of the mic: opens the Cámara / Galería menu.
+  // Photo button (image-plus), left of send: opens the Cámara / Galería menu.
   onPhoto?: () => void;
   haloState?: LivingHaloState;
   // Inactive field (no connection, limit): dimmed and not editable.
@@ -45,7 +43,6 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
       onSend,
       onPress,
       canSend = false,
-      onVoice,
       onPhoto,
       haloState = 'idle',
       disabled = false,
@@ -67,18 +64,6 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
         style={[styles.send, { backgroundColor: colors.ellie.chip }]}
       >
         <ImagePlus size={20} strokeWidth={2} color={colors.text.primary} />
-      </PressableScale>
-    ) : null;
-
-    const mic = onVoice ? (
-      <PressableScale
-        accessibilityRole="button"
-        accessibilityLabel="Modo voz"
-        disabled={disabled}
-        onPress={onVoice}
-        style={[styles.send, { backgroundColor: colors.ellie.chip }]}
-      >
-        <Mic size={19} strokeWidth={2} color={colors.text.primary} />
       </PressableScale>
     ) : null;
 
@@ -134,7 +119,6 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
           />
         )}
         {photo}
-        {mic}
         {send}
       </>
     );

@@ -56,3 +56,14 @@ jest.mock('expo-image', () => {
     React.createElement(Image, {...props, source});
   return {Image: ExpoImage};
 });
+
+// expo-audio (native): silent players in tests.
+jest.mock('expo-audio', () => ({
+  createAudioPlayer: () => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn(() => Promise.resolve()),
+    remove: jest.fn(),
+  }),
+  setAudioModeAsync: jest.fn(() => Promise.resolve()),
+}));

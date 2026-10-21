@@ -12,9 +12,9 @@ describe('ELLIE cover entry (prototype values)', () => {
     expect(ELLIE_ENTRY.block).toMatchObject({ duration: 500, delay: 100, rise: 10 });
   });
 
-  it('the halo starts at the tab (24 pt, 90 %) and ends in place (128 pt)', () => {
+  it('the halo starts at the tab (24 pt, 90 %) and ends in place (168 pt)', () => {
     const start = haloFrame(0, 780, 200);
-    expect(start.scale).toBeCloseTo(24 / 128);
+    expect(start.scale).toBeCloseTo(24 / 168);
     expect(start.opacity).toBeCloseTo(0.9);
     expect(start.translateY).toBe(580);
     expect(haloFrame(1, 780, 200)).toEqual({ translateY: 0, scale: 1, opacity: 1 });

@@ -1,8 +1,13 @@
 import { trigger } from 'react-native-haptic-feedback';
+import { getFeedbackPrefs } from '@app/lib/feedbackPrefs';
 
 // Thin wrapper so primitives never crash if haptics are unavailable
-// (simulator, Android devices without a vibrator, tests).
+// (simulator, Android devices without a vibrator, tests). Ajustes ·
+// "Vibración" off silences every haptic of the app here.
 function safeTrigger(type: Parameters<typeof trigger>[0]) {
+  if (!getFeedbackPrefs().vibration) {
+    return;
+  }
   try {
     trigger(type, { enableVibrateFallback: false });
   } catch {

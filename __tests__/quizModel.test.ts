@@ -8,6 +8,7 @@ import {
   historyRows,
   INITIAL_ROUND,
   isNewRecord,
+  isUrgent,
   nextChallenge,
   nextQuestion,
   pickDailyChallenge,
@@ -18,7 +19,10 @@ import {
   resultTier,
   selectQuizRound,
   streakMultiplier,
+  secondsLeft,
   summarizeRound,
+  TIMED_OUT_ANSWER,
+  timeOutQuestion,
   weekPlay,
   type RoundState,
 } from '../src/features/quiz/quizModel';
@@ -456,5 +460,42 @@ describe('portada', () => {
     expect(categoryPhotoKey({ name: 'Entrenamiento' }, 0)).toBe('training');
     expect(categoryPhotoKey({ name: 'Recuperación' }, 0)).toBe('recovery');
     expect(categoryPhotoKey({ name: 'Suplementos' }, 4)).toBe('training');
+  });
+});
+
+describe('Quiz · temporizador de 15 s', () => {
+  it('shows whole seconds and turns urgent in the last 5 s', () => {
+    expect(secondsLeft(15000)).toBe(15);
+    expect(secondsLeft(14001)).toBe(15);
+    expect(secondsLeft(14000)).toBe(14);
+    expect(secondsLeft(0)).toBe(0);
+    expect(isUrgent(5001)).toBe(false);
+    expect(isUrgent(5000)).toBe(true);
+  });
+
+  it('a timeout is a miss with 0 points that breaks the streak', () => {
+    let round: RoundState = INITIAL_ROUND;
+    round = nextQuestion(answerQuestion(round, question(1), 1));
+    round = nextQuestion(answerQuestion(round, question(2), 1));
+    expect(round.streak).toBe(2);
+
+    const timedOut = timeOutQuestion(round, question(3));
+    const last = timedOut.answers[timedOut.answers.length - 1];
+    expect(timedOut.selected).toBe(TIMED_OUT_ANSWER);
+    expect(timedOut.streak).toBe(0);
+    expect(timedOut.bestStreak).toBe(2);
+    expect(last).toMatchObject({
+      questionId: 'q3',
+      selectedAnswer: TIMED_OUT_ANSWER,
+      isCorrect: false,
+      pointsEarned: 0,
+      timedOut: true,
+    });
+    expect(feedbackTitle(false, 0, 2, true)).toBe('Se acabó el tiempo');
+  });
+
+  it('a timeout after answering changes nothing', () => {
+    const answered = answerQuestion(INITIAL_ROUND, question(1), 0);
+    expect(timeOutQuestion(answered, question(1))).toBe(answered);
   });
 });

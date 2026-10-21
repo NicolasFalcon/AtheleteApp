@@ -147,6 +147,8 @@ export type EllieChatRouteParams = {
   conversationId?: string;
   // Screen of origin, sent as client_context.
   source?: string;
+  // Open with the "Conversaciones" list (ELLIE cover · history button).
+  showConversations?: boolean;
 };
 
 export type CommunitySegment = 'feed' | 'retos' | 'amigos';
@@ -216,7 +218,6 @@ export type AppStackParamList = {
   QuizQuestion: QuizQuestionRouteParams;
   QuizResult: QuizResultRouteParams;
   EllieChat: EllieChatRouteParams | undefined;
-  EllieVoice: undefined;
   RouteSoon: undefined;
   RoutePrep: undefined;
   RouteGen: undefined;

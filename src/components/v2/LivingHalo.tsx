@@ -6,11 +6,9 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
-  withDelay,
   withRepeat,
   withSequence,
   withTiming,
-  type SharedValue,
 } from 'react-native-reanimated';
 import Svg, {
   Circle,
@@ -34,20 +32,18 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
 // ELLIE · Living Halo (handoff v2.12 §6): smoked-graphite core, living Ember
 // contour. Ember is energy, never skin. One component for every size (tab 24,
-// chat 24–28, bands 36–56, cover 128, voice mode 176) and every state.
+// chat 24–28, bands 36–56, cover 168) and its three states: idle,
+// thinking and offline (the voice states left with the voice mode, B-27).
 // All motion is Reanimated on the UI thread (transform/opacity only); the
-// SVG layers are static. "Reducir movimiento": no scale, deformation, ripples
-// or drift — states read through light, Ember and halo only.
+// SVG layers are static. "Reducir movimiento": no scale, deformation or
+// drift — states read through light, Ember and halo only.
 export type { LivingHaloState } from '@app/components/v2/livingHaloModel';
 
 export type LivingHaloProps = {
   // pt, or a named size (mini 20, tab 24, chat 28, input 32, band 56,
-  // cover 128, voice 176).
+  // cover 168).
   size?: number | LivingHaloSize;
   state?: LivingHaloState;
-  // Voice energy 0–1 (mic or speech). Drives listening/speaking reactivity
-  // and the ripples; without it those states show a steady level.
-  level?: SharedValue<number>;
   // Tab bar icon: no loops. Inactive = still sphere, no glow; active = soft
   // Ember halo and contour, still.
   tab?: boolean;
@@ -66,7 +62,6 @@ const ARC_SWEEP = 0.3; // fraction of the contour the arc covers
 export function LivingHalo({
   size: sizeProp = 64,
   state = 'idle',
-  level,
   tab = false,
   active = false,
   lit = false,
@@ -92,9 +87,6 @@ export function LivingHalo({
   const phase = useSharedValue(0); // 0 → 1 every 2.2 s (thinking deformation)
   const angle = useSharedValue(ARC_REST_DEG);
   const pulse = useSharedValue(1); // arc pulse under reduced motion + thinking
-  const rip0 = useSharedValue(0);
-  const rip1 = useSharedValue(0);
-  const lv = useSharedValue(0);
 
   // Smooth state targets (exponential-like: ease-out timing).
   useEffect(() => {
@@ -108,8 +100,7 @@ export function LivingHalo({
     arc.value = withTiming(target.arc, cfg);
     halo.value = withTiming(target.halo, cfg);
     inner.value = withTiming(target.inner, cfg);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `target` is a
-    // fresh object each render; its fields are listed instead.
+    // `target` is a fresh object each render; its fields are listed instead.
   }, [
     arc,
     breathAmp,
@@ -184,80 +175,22 @@ export function LivingHalo({
     };
   }, [angle, key, offline, phase, pulse, reduceMotion]);
 
-  // Voice energy: the given level, or a steady one in listening/speaking.
-  useEffect(() => {
-    if (level || offline || (key !== 'listening' && key !== 'speaking')) {
-      lv.value = withTiming(0, { duration: 140 });
-      return;
-    }
-    lv.value = withTiming(0.55, { duration: 300 });
-  }, [key, level, lv, offline]);
-
-  // Ripples: listening with voice only, max 2, never under reduced motion.
-  useEffect(() => {
-    const ripple = (v: SharedValue<number>, delay: number) => {
-      v.value = withDelay(
-        delay,
-        withRepeat(
-          withTiming(1, { duration: 1450, easing: Easing.out(Easing.quad) }),
-          -1,
-          false,
-        ),
-      );
-    };
-    if (key === 'listening' && !reduceMotion && !offline && level) {
-      ripple(rip0, 0);
-      ripple(rip1, 760);
-    } else {
-      cancelAnimation(rip0);
-      cancelAnimation(rip1);
-      rip0.value = 0;
-      rip1.value = 0;
-    }
-    return () => {
-      cancelAnimation(rip0);
-      cancelAnimation(rip1);
-    };
-  }, [key, level, offline, reduceMotion, rip0, rip1]);
-
-  const energy = () => {
-    'worklet';
-    return level ? level.value : lv.value;
-  };
-
   const wrapStyle = useAnimatedStyle(() => {
     if (reduceMotion || offline) {
       return { transform: [{ scaleX: 1 }, { scaleY: 1 }] };
     }
-    const e = energy();
-    const react = key === 'speaking' ? 0.015 : key === 'listening' ? 0.02 : 0;
-    const s = Math.min(
-      1.035,
-      scale.value + 0.012 * br.value * breathAmp.value + react * e,
-    );
-    let dx = 0;
-    let dy = 0;
-    if (key === 'thinking') {
-      const d = 0.012 * Math.sin(phase.value * 2 * Math.PI);
-      dx = d;
-      dy = -d;
-    } else if (key === 'speaking') {
-      const d = Math.min(0.02, e * 0.02) * Math.sin(br.value * 2 * Math.PI);
-      dx = d;
-      dy = -d * 0.8;
-    }
-    return { transform: [{ scaleX: s * (1 + dx) }, { scaleY: s * (1 + dy) }] };
+    const s = Math.min(1.035, scale.value + 0.012 * br.value * breathAmp.value);
+    const d = key === 'thinking' ? 0.012 * Math.sin(phase.value * 2 * Math.PI) : 0;
+    return { transform: [{ scaleX: s * (1 + d) }, { scaleY: s * (1 - d) }] };
   });
 
   const ringStyle = useAnimatedStyle(() => {
-    const e = energy();
-    const react = key === 'speaking' ? 0.45 : key === 'listening' ? 0.18 : 0;
     const idleBreath = key === 'idle' && !reduceMotion && !tab ? 0.04 * br.value : 0;
-    return { opacity: Math.min(1, ring.value + react * e + idleBreath) };
+    return { opacity: Math.min(1, ring.value + idleBreath) };
   });
 
   const arcStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, arc.value + (key === 'speaking' ? energy() * 0.3 : 0)) * pulse.value,
+    opacity: Math.min(1, arc.value) * pulse.value,
     transform: [{ rotate: `${angle.value % 360}deg` }],
   }));
   const arcGlowStyle = useAnimatedStyle(() => ({
@@ -266,32 +199,15 @@ export function LivingHalo({
   }));
 
   const innerStyle = useAnimatedStyle(() => ({
-    opacity: Math.min(1, inner.value + energy() * (key === 'speaking' ? 0.5 : 0.3)),
+    opacity: Math.min(1, inner.value),
   }));
 
-  const haloStyle = useAnimatedStyle(() => {
-    const e = energy();
-    let h = halo.value + (key === 'listening' ? e * 0.12 : key === 'speaking' ? e * 0.11 : 0);
-    if (key === 'speaking') {
-      h = Math.min(h, 0.17);
-    }
-    return {
-      opacity: Math.min(0.25, h * 2.2),
-      transform: [{ scale: 1 + (reduceMotion ? 0 : e * 0.05) }],
-    };
-  });
-
-  const rip0Style = useAnimatedStyle(() => ({
-    opacity: rip0.value > 0 ? 0.12 * (1 - rip0.value) : 0,
-    transform: [{ scale: 1.02 + 0.16 * rip0.value }],
-  }));
-  const rip1Style = useAnimatedStyle(() => ({
-    opacity: rip1.value > 0 ? 0.12 * (1 - rip1.value) : 0,
-    transform: [{ scale: 1.02 + 0.16 * rip1.value }],
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: Math.min(0.25, halo.value * 2.2),
   }));
 
   const h = colors.ellie.halo;
-  // The voice-scene Halo keeps a narrower outer glow (reference ELLIE_05).
+  // Large Halos (cover) keep a narrower outer glow.
   const haloSize = size * (size >= 120 ? 1.45 : 1.6);
   const stroke = Math.max(1.4, size * 0.03);
   const ringStroke = Math.max(1.2, size * 0.02);
@@ -336,19 +252,6 @@ export function LivingHalo({
           </Svg>
         </Animated.View>
       ) : null}
-
-      {[rip0Style, rip1Style].map((rs, i) => (
-        <Animated.View
-          key={i}
-          pointerEvents="none"
-          style={[
-            styles.abs,
-            styles.fill,
-            { borderRadius: size / 2, borderWidth: 1.25, borderColor: h.ember },
-            rs,
-          ]}
-        />
-      ))}
 
       {shadow && !offline ? (
         <Svg

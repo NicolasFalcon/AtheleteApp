@@ -1,13 +1,14 @@
 // Entry animation of the ELLIE cover (Ellie.dc.html + ellie-orb.js `flipFromTab`
 // + `athUp`). Pure numbers so they can be tested.
 export const ELLIE_ENTRY = {
-  // The halo leaves the tab icon (24 pt, bottom centre) and grows to 128 pt:
+  // The halo leaves the tab icon (24 pt, bottom centre) and grows to 168 pt
+  // (v2.15 cover, ELLIE_08):
   // 520 ms, cubic-bezier(.22,.9,.24,1), opacity .9 → 1, no bounce.
   halo: {
     duration: 520,
     bezier: [0.22, 0.9, 0.24, 1] as const,
     fromSize: 24,
-    toSize: 128,
+    toSize: 168,
     fromOpacity: 0.9,
   },
   // Label + voice + answers rise as ONE block: `athUp .5s .1s ease both`

@@ -1,22 +1,17 @@
 // Pure state logic of the Living Halo (handoff v2.12 §6 · ELLIE Orb). Kept
 // apart from the component so it can be tested without rendering.
-export type LivingHaloState =
-  | 'idle'
-  | 'listening'
-  | 'thinking'
-  | 'speaking'
-  | 'offline';
+// The voice states (listening, speaking) left with the voice mode (B-27).
+export type LivingHaloState = 'idle' | 'thinking' | 'offline';
 
 // Named sizes (pt) from the handoff: mini for AI buttons, tab bar, chat
-// header/messages, input, Home band, cover and voice scene.
+// header/messages, input, Home band and cover (168 since v2.15, ELLIE_08).
 export const HALO_SIZES = {
   mini: 20,
   tab: 24,
   chat: 28,
   input: 32,
   band: 56,
-  cover: 128,
-  voice: 176,
+  cover: 168,
 } as const;
 export type LivingHaloSize = keyof typeof HALO_SIZES;
 
@@ -41,18 +36,13 @@ export const HALO_TARGETS: Record<
   HaloTargets
 > = {
   idle: { scale: 1, breath: 1, ring: 0.5, arc: 0, halo: 0, inner: 0 },
-  listening: { scale: 1.015, breath: 0.25, ring: 0.82, arc: 0, halo: 0.12, inner: 0.45 },
   thinking: { scale: 1.01, breath: 0.3, ring: 0.22, arc: 1, halo: 0.04, inner: 0.14 },
-  speaking: { scale: 1.01, breath: 0.2, ring: 0.5, arc: 0, halo: 0.06, inner: 0.28 },
 };
 
-// Settling time per destination state (ms): →idle ~550, →listening/thinking
-// 300, →speaking 250.
+// Settling time per destination state (ms): →idle ~550, →thinking 300.
 export const HALO_SETTLE_MS = {
   idle: 550,
-  listening: 300,
   thinking: 300,
-  speaking: 250,
 } as const;
 
 export type HaloKey = keyof typeof HALO_SETTLE_MS;
@@ -89,21 +79,9 @@ export function haloLabel(state: LivingHaloState): string {
   switch (state) {
     case 'offline':
       return 'ELLIE sin conexión';
-    case 'listening':
-      return 'ELLIE escuchando';
     case 'thinking':
       return 'ELLIE pensando';
-    case 'speaking':
-      return 'ELLIE respondiendo';
     default:
       return 'ELLIE';
   }
 }
-
-// Voice scene: status line under the Halo.
-export const VOICE_LABELS: Record<Exclude<LivingHaloState, 'offline'>, string> = {
-  idle: 'Toca para hablar',
-  listening: 'Escuchando…',
-  thinking: 'Procesando…',
-  speaking: 'Respondiendo…',
-};

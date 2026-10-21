@@ -146,6 +146,16 @@ export function EllieChatScreen({ navigation, route }: Props) {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const sentPrompt = useRef(false);
 
+  // The cover's history button: the list opens once the push has settled
+  // (iOS does not present a sheet during the transition).
+  useEffect(() => {
+    if (!params?.showConversations) {
+      return;
+    }
+    const id = setTimeout(() => setListOpen(true), 350);
+    return () => clearTimeout(id);
+  }, [params?.showConversations]);
+
   // The prompt of another screen: once, when the thread has loaded.
   useEffect(() => {
     if (!params?.prompt || sentPrompt.current || !chat.ready) {
@@ -390,7 +400,6 @@ export function EllieChatScreen({ navigation, route }: Props) {
             disabled={chat.composer.disabled}
             autoFocus={autoFocus}
             haloState={state.thinking ? 'thinking' : 'idle'}
-            onVoice={() => navigation.navigate(APP_ROUTES.EllieVoice)}
             onPhoto={() => setPhotoMenu(true)}
           />
         </View>

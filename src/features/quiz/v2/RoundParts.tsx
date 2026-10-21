@@ -17,7 +17,50 @@ import {
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
-import { streakMultiplier } from '@app/features/quiz/quizModel';
+import {
+  isUrgent,
+  QUESTION_MS,
+  secondsLeft,
+  streakMultiplier,
+} from '@app/features/quiz/quizModel';
+
+// Ronda · timer (§7): a 4 pt bar that empties under the counter with the
+// seconds on the right; in the last 5 s bar and figure turn Ember with a glow
+// (no glow once answered).
+export function QuestionTimer({
+  remainingMs,
+  answered,
+}: {
+  remainingMs: number;
+  answered: boolean;
+}) {
+  const { colors } = useThemeV2();
+  const urgent = isUrgent(remainingMs);
+  const tone = urgent ? colors.ember.base : 'rgba(255,255,255,.85)';
+  const seconds = secondsLeft(remainingMs);
+
+  return (
+    <View
+      style={styles.timer}
+      accessibilityRole="progressbar"
+      accessibilityLabel={`Quedan ${seconds} segundos`}
+      accessibilityValue={{ min: 0, max: QUESTION_MS / 1000, now: seconds }}
+    >
+      <View style={styles.timerTrack}>
+        <View
+          style={[
+            styles.timerFill,
+            urgent && !answered ? styles.timerGlow : null,
+            { width: `${(remainingMs / QUESTION_MS) * 100}%`, backgroundColor: tone },
+          ]}
+        />
+      </View>
+      <TextV2 variant="captionStrong" color={tone} style={styles.timerSeconds}>
+        {`${seconds} s`}
+      </TextV2>
+    </View>
+  );
+}
 
 // Streak chip: the count while it builds, "×2" / "×3" in Ember once it is on.
 export function StreakChip({ streak }: { streak: number }) {
@@ -237,6 +280,23 @@ export function RoundMessage({
 }
 
 const styles = StyleSheet.create({
+  timer: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingTop: 12 },
+  timerTrack: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,.1)',
+    overflow: 'hidden',
+  },
+  timerFill: { height: '100%', borderRadius: 2 },
+  timerGlow: { boxShadow: '0 0 12px rgba(255,91,31,.6)' },
+  timerSeconds: {
+    minWidth: 30,
+    textAlign: 'right',
+    fontSize: 13,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
   chip: {
     height: 36,
     minWidth: 58,

@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from 'react';
+import { useEffect, type PropsWithChildren } from 'react';
 import { StyleSheet } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -11,6 +11,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { queryClient } from '@app/app/queryClient';
 import { ToastProvider } from '@app/components/v2/Toast';
 import { useSessionOutboxSync } from '@app/features/session/useSessionOutboxSync';
+import { preloadSounds } from '@app/features/sound/soundService';
+import { loadFeedbackPrefs } from '@app/lib/feedbackPrefs';
 import { navigationRef } from '@app/navigation/navigationRef';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import { AuthProvider } from '@app/providers/AuthProvider';
@@ -19,6 +21,11 @@ import { ThemeProvider } from '@app/providers/ThemeProvider';
 function AppNavigation({ children }: PropsWithChildren) {
   const { isDark, theme } = useAppTheme();
   useSessionOutboxSync();
+
+  // Ajustes · Sonidos y vibración, then the sounds, once per launch.
+  useEffect(() => {
+    loadFeedbackPrefs().then(preloadSounds).catch(() => undefined);
+  }, []);
 
   const navigationTheme = {
     ...(isDark ? NavigationDarkTheme : NavigationDefaultTheme),

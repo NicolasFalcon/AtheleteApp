@@ -27,6 +27,7 @@ import {
   SaveStatus,
 } from '@app/features/quiz/v2/ResultParts';
 import { formatThousands } from '@app/features/nutrition/nutritionModel';
+import { useResultCount } from '@app/features/quiz/useResultCount';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useQuizOverview, useQuizSubmit } from '@app/hooks/useQuiz';
 import { SceneScope } from '@app/providers/ThemeProvider';
@@ -52,8 +53,8 @@ type SaveView = {
 };
 
 // Quiz · resultado (QUIZ_07 … QUIZ_09): the score ring, a message that scales
-// with the result, points, best streak and total, the topics to review and
-// "Otra ronda" first. The score comes from the round itself; saving it in
+// with the result, points (counting up with their sounds), best streak and
+// total, the topics to review and "Otra ronda" first. The score comes from the round itself; saving it in
 // `quiz_attempts` (and the points, the new record and the medals) happens
 // here, with "guardando" and an error with retry. The same attempt id makes a
 // retry safe: it never creates a second row or a second event. The medal
@@ -73,6 +74,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
   const { correctCount, totalQuestions, categoryName } = params;
   const tier = resultTier(correctCount, totalQuestions);
   const copy = resultCopy(tier, correctCount, totalQuestions, categoryName);
+  const counting = useResultCount(params.pointsEarned, tier);
 
   const save = useCallback(() => {
     submit.mutate({
@@ -113,6 +115,9 @@ export function QuizResultScreen({ navigation, route }: Props) {
   }, [submit.data, submit.isError]);
 
   const saved = view.status === 'saved';
+  // While counting, the round's figure; then the server's once saved (the
+  // round's until it answers).
+  const shownPoints = counting ?? view.points ?? params.pointsEarned;
   const totalPoints = view.total ?? (saved ? profileQuery.data?.points ?? null : null);
   const pendingBadge = saved
     ? view.badges.find(id => !celebrated.includes(id))
@@ -221,7 +226,7 @@ export function QuizResultScreen({ navigation, route }: Props) {
             </Animated.View>
             <Animated.View entering={FadeInDown.delay(550).duration(400)} style={styles.trio}>
               <ResultStat
-                value={view.points === null ? '—' : `+${view.points}`}
+                value={view.status === 'error' && counting === null ? '—' : `+${shownPoints}`}
                 label="puntos"
               />
               <View style={styles.rule} />

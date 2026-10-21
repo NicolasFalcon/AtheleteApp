@@ -117,3 +117,9 @@ Columna `text` nullable. La app la envía y actualiza con la zona IANA del dispo
 | HTTP | error | notas |
 |---|---|---|
 | 504 | ai_timeout | solo con imagen; cupo devuelto; reintentable con el mismo `client_message_id` |
+
+## Cambios v2.15
+- **Contexto**: se añaden `sleep` (última noche, promedio de 7 noches, `nights_7`, `wake_feeling`, `recovery_today` como estimación o `null` sin Apple Health, `yesterday_load`), `week_plan` (estado de los 7 días, resumen y día perdido) y `breathing_week_count`.
+- **Regla 25.2.4**: si `wake_feeling` es `exhausted` o `tired` (`lower_volume_hint: true`), ELLIE propone bajar el volumen o la intensidad de hoy.
+- ELLIE respeta el plan semanal al sugerir el entreno del día y nunca inventa la recuperación.
+- La entrada, la salida y los errores no cambian.

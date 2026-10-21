@@ -134,3 +134,9 @@ La app todavía puede escribir directamente en `workout_templates` y `template_e
 
 ### list_exercises(..., _muscles text[] = null, _equipments text[] = null)
 - `_equipments`: lista de slugs de equipo (máx. 10); el ejercicio entra si usa **cualquiera** de ellos. Se combina con `_equipment` (que sigue funcionando igual). Más de 10 → `invalid_input` con `field: "equipments"`.
+
+## Cambios v2.15
+- `get_today_suggestion`: con plan semanal activo, si hoy es `session` → `source:'weekly_plan'`, `reason_code:'weekly_plan'` y `duration` = minutos del día. Si hoy es `rest` o `unavailable` → `{ ok, source:'weekly_plan', suggestion:null, reason_code:'rest_day', kind, date }`. Ver `V2_15_SHAPES.md` §2.
+- Nuevo `replace_routine_exercise(_routine_id, _template_exercise_id, _new_exercise_id)`: si la rutina es propia, se edita en el sitio; si es oficial o ajena, se duplica como `user` y se devuelve la copia (`copied:true`).
+- Nuevo `list_exercise_variants(...)`: máximo 3 variantes con el mismo músculo primario y patrón. Ver `V2_15_SHAPES.md` §3.
+- `workout_session_exercises`: `original_exercise_id` y `variant_reason` (`machine_busy|no_dumbbells|discomfort|other`).

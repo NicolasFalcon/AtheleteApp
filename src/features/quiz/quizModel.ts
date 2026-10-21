@@ -35,7 +35,24 @@ export type RoundAnswer = QuizAttemptAnswer & {
   multiplier: number;
   // Text of the question, for "Repasemos esto".
   questionText: string;
+  // The 15 s ran out before an answer.
+  timedOut?: boolean;
 };
+
+// Handoff §7 · Ronda: 15 s per question; the last 5 s are urgent (Ember).
+export const QUESTION_MS = 15000;
+export const URGENT_SECONDS = 5;
+// selectedAnswer stored when the time ran out (no option chosen).
+export const TIMED_OUT_ANSWER = -1;
+
+// Whole seconds shown next to the bar (15 … 1, 0 at the end).
+export function secondsLeft(remainingMs: number): number {
+  return Math.max(0, Math.ceil(remainingMs / 1000));
+}
+
+export function isUrgent(remainingMs: number): boolean {
+  return remainingMs <= URGENT_SECONDS * 1000;
+}
 
 export type RoundState = {
   index: number;
@@ -90,6 +107,35 @@ export function answerQuestion(
     ],
     streak,
     bestStreak: Math.max(state.bestStreak, streak),
+  };
+}
+
+// Time ran out: counts as a miss with 0 points, the streak breaks and the
+// right answer is shown. `selected` becomes -1 (no option chosen).
+export function timeOutQuestion(
+  state: RoundState,
+  question: AttemptQuizQuestion,
+): RoundState {
+  if (isAnswered(state)) {
+    return state;
+  }
+  const answer: RoundAnswer = {
+    questionId: question.id,
+    selectedAnswer: TIMED_OUT_ANSWER,
+    isCorrect: false,
+    pointsEarned: 0,
+    multiplier: 1,
+    questionText: question.question,
+    timedOut: true,
+  };
+  return {
+    ...state,
+    selected: TIMED_OUT_ANSWER,
+    answers: [
+      ...state.answers.filter(item => item.questionId !== question.id),
+      answer,
+    ],
+    streak: 0,
   };
 }
 
@@ -189,7 +235,11 @@ export function feedbackTitle(
   isCorrect: boolean,
   streak: number,
   questionIndex: number,
+  timedOut = false,
 ): string {
+  if (timedOut) {
+    return 'Se acabó el tiempo';
+  }
   if (!isCorrect) {
     return KO_TITLES[questionIndex % KO_TITLES.length];
   }

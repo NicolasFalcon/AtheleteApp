@@ -1,22 +1,14 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  EllieComposer,
-  PressableScale,
-  Skeleton,
-  SkeletonGroup,
-  StatusBarV2,
-  TextV2,
-  useThemeV2,
-} from '@app/components/v2';
+import { StatusBarV2, useThemeV2 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { lastLine } from '@app/features/ellie/chatModel';
 import {
-  AlsoCanList,
-  EllieOpening,
-  ReadWithEllie,
-  ResumeRow,
+  EllieAskField,
+  EllieHeader,
+  EllieHelpGrid,
+  EllieMessage,
+  EllieOrbStage,
   type EllieAsk,
 } from '@app/features/ellie/v2/EllieHome';
 import { useEllieEntry } from '@app/features/ellie/v2/useEllieEntry';
@@ -25,17 +17,21 @@ import { useEllieData } from '@app/hooks/useEllieData';
 import { useEllieLatest } from '@app/hooks/useEllieConversations';
 import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
-import { ScanCard } from '@app/features/ellie/v2/EllieHome';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Ellie'>;
 
-// ELLIE (ELLIE_01_HOME): the orb and her voice, two quick asks, what else she
-// can do, the machine scanner and the readings. Every ask opens the chat
-// (EllieChat) and sends the prompt there; the floating field opens it with
-// the keyboard up. "Retomar" continues the latest conversation.
+const SUBTITLE =
+  'Puedo ajustar tu entreno, tu comida o tu descanso según tu energía y el tiempo que tengas.';
+
+// ELLIE · portada v2.15 (ELLIE_08, handoff 25.9): wordmark and history,
+// the Halo in its ring with "EN LÍNEA", her message and two answers, what
+// else she can help with (2 × 2 + Escanear máquina) and the field to talk to
+// her, in the flow. Every ask opens the chat (EllieChat) and sends the
+// prompt there; the clock opens the chat with its conversation list. No
+// voice mode (B-27).
 export function EllieScreen({ navigation }: Props) {
-  const { colors, layout } = useThemeV2();
+  const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
   const tabBarMotion = useTabBarMotion();
   const { bottomClearance } = useTabBarMetrics();
@@ -43,24 +39,16 @@ export function EllieScreen({ navigation }: Props) {
   const ellieData = useEllieData();
   const history = useEllieLatest();
   const scrollRef = useRef<ScrollView>(null);
-  const contentPaddingTop = insets.top;
   const entry = useEllieEntry(navigation, () =>
     scrollRef.current?.scrollTo({ y: 0, animated: false }),
   );
-  entry.setContentTop(contentPaddingTop);
+  // The stage is measured inside the scroll content, padding included.
+  entry.setContentTop(0);
 
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? '';
-  const voice =
+  const headline =
     ellieData.heroInsight?.text ??
     `Hola${firstName ? `, ${firstName}` : ''}. ¿En qué te ayudo hoy?`;
-
-  const resume = useMemo(
-    () => lastLine(history.data?.last ? [history.data.last] : [], new Date()),
-    [history.data],
-  );
-
-  const loading = history.isLoading;
-  const failed = history.isError;
 
   const open = useCallback(
     (ask: EllieAsk) =>
@@ -80,79 +68,37 @@ export function EllieScreen({ navigation }: Props) {
         onScroll={tabBarMotion.onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{
-          paddingTop: contentPaddingTop,
-          paddingHorizontal: layout.gutter + 4,
-          // Clear of the tab bar AND of the floating field (56 pt + its 8 pt
-          // gap + 40 pt of air), so nothing ends up underneath.
-          paddingBottom: bottomClearance + 104,
-          gap: 30,
-        }}
-      >
-        <EllieOpening
-          eyebrow="ELLIE · TU COACH"
-          voice={voice}
-          orbState={failed ? 'offline' : 'idle'}
-          onAsk={open}
-          showAnswers
-          haloStyle={entry.haloStyle}
-          onHaloLayout={entry.onHaloLayout}
-          blockStyle={entry.blockStyle}
-        />
-
-        <AlsoCanList onAsk={open} />
-        <ScanCard onPress={() => navigation.navigate(APP_ROUTES.MachineScan)} />
-        <ReadWithEllie onAsk={open} />
-
-        {loading ? (
-          <SkeletonGroup>
-            <Skeleton height={20} width="60%" />
-          </SkeletonGroup>
-        ) : failed ? (
-          <PressableScale
-            accessibilityRole="button"
-            onPress={() => history.refetch()}
-            style={styles.retry}
-          >
-            <TextV2 variant="meta" color={colors.text.secondary}>
-              No pudimos cargar tu conversación ·{' '}
-              <TextV2 variant="metaStrong">Reintentar</TextV2>
-            </TextV2>
-          </PressableScale>
-        ) : resume ? (
-          <ResumeRow
-            text={resume.text}
-            when={resume.when}
-            onPress={() => navigation.navigate(APP_ROUTES.EllieChat, {})}
-          />
-        ) : null}
-      </ScrollView>
-
-      <View
-        style={[
-          styles.composer,
-          {
-            bottom: bottomClearance + 8,
-            left: layout.gutter,
-            right: layout.gutter,
-          },
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top, paddingBottom: bottomClearance + 32 },
         ]}
       >
-        <EllieComposer
-          variant="button"
-          placeholder="Pregúntale algo a ELLIE"
-          onPress={() =>
-            navigation.navigate(APP_ROUTES.EllieChat, { focusInput: true })
+        <EllieHeader
+          onHistory={() =>
+            navigation.navigate(APP_ROUTES.EllieChat, { showConversations: true })
           }
-          onVoice={() => navigation.navigate(APP_ROUTES.EllieVoice)}
         />
-      </View>
+        <EllieOrbStage
+          orbState={history.isError ? 'offline' : 'idle'}
+          haloStyle={entry.haloStyle}
+          onLayout={entry.onHaloLayout}
+        />
+        <EllieMessage
+          headline={headline}
+          subtitle={SUBTITLE}
+          onAsk={open}
+          blockStyle={entry.blockStyle}
+        />
+        <EllieHelpGrid onAsk={open} onScan={() => navigation.navigate(APP_ROUTES.MachineScan)} />
+        <EllieAskField
+          onPress={() => navigation.navigate(APP_ROUTES.EllieChat, { focusInput: true })}
+        />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  retry: { alignItems: 'center' },
-  composer: { position: 'absolute' },
+  content: { paddingHorizontal: 20 },
 });

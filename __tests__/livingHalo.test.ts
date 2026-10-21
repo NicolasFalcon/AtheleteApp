@@ -12,28 +12,21 @@ import {
 describe('Living Halo · states', () => {
   it('resolves named sizes and passes numbers through', () => {
     expect(resolveHaloSize('mini')).toBe(HALO_SIZES.mini);
-    expect(resolveHaloSize('voice')).toBe(176);
+    expect(resolveHaloSize('cover')).toBe(HALO_SIZES.cover);
     expect(resolveHaloSize(40)).toBe(40);
   });
 
-  it('settles with the handoff times', () => {
-    expect(HALO_SETTLE_MS).toEqual({
-      idle: 550,
-      listening: 300,
-      thinking: 300,
-      speaking: 250,
-    });
+  it('keeps only idle, thinking and offline (no voice states, B-27)', () => {
+    expect(Object.keys(HALO_TARGETS)).toEqual(['idle', 'thinking']);
+    expect(Object.keys(HALO_SIZES)).not.toContain('voice');
+    expect(HALO_SETTLE_MS).toEqual({ idle: 550, thinking: 300 });
   });
 
-  it('keeps speaking halo under 17 % and the arc fully lit only when thinking', () => {
-    expect(HALO_TARGETS.speaking.halo).toBeLessThanOrEqual(0.17);
+  it('lights the arc only when thinking', () => {
     expect(HALO_TARGETS.thinking.arc).toBe(1);
     // The arc of light only shows while thinking; at rest it is an even rim.
     expect(HALO_TARGETS.idle.arc).toBe(0);
-    expect(HALO_TARGETS.listening.arc).toBe(0);
-    expect(HALO_TARGETS.speaking.arc).toBe(0);
     expect(HALO_TARGETS.idle.halo).toBe(0);
-    expect(HALO_TARGETS.listening.ring).toBeGreaterThan(HALO_TARGETS.idle.ring);
   });
 
   it('renders offline as the still idle sphere', () => {

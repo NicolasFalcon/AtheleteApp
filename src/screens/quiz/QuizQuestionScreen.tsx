@@ -6,7 +6,6 @@ import { X } from 'lucide-react-native';
 import {
   AnswerTile,
   Button,
-  haptics,
   IconButton,
   SegmentMeter,
   Sheet,
@@ -26,15 +25,19 @@ import {
   roundPoints,
   streakGlow,
   summarizeRound,
+  timeOutQuestion,
   type RoundState,
 } from '@app/features/quiz/quizModel';
 import { randomizeQuizOptions } from '@app/features/quiz/randomizeQuizOptions';
 import {
   FeedbackPanel,
   FloatingPoints,
+  QuestionTimer,
   RoundMessage,
   StreakChip,
 } from '@app/features/quiz/v2/RoundParts';
+import { useQuestionTimer } from '@app/features/quiz/useQuestionTimer';
+import { playSound } from '@app/features/sound/soundService';
 import { useQuizQuestions } from '@app/hooks/useQuiz';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import { createQuizAttemptId } from '@app/services/supabase/quiz';
@@ -42,17 +45,28 @@ import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'QuizQuestion'>;
 
-type RoundAction = { type: 'answer'; question: Parameters<typeof answerQuestion>[1]; option: number } | { type: 'next' };
+type RoundQuestion = Parameters<typeof answerQuestion>[1];
+type RoundAction =
+  | { type: 'answer'; question: RoundQuestion; option: number }
+  | { type: 'timeout'; question: RoundQuestion }
+  | { type: 'next' };
 
 function roundReducer(state: RoundState, action: RoundAction): RoundState {
-  return action.type === 'answer'
-    ? answerQuestion(state, action.question, action.option)
-    : nextQuestion(state);
+  switch (action.type) {
+    case 'answer':
+      return answerQuestion(state, action.question, action.option);
+    case 'timeout':
+      return timeOutQuestion(state, action.question);
+    default:
+      return nextQuestion(state);
+  }
 }
 
 // Quiz · ronda (QUIZ_03 … QUIZ_06): one question at a time, answered with a
-// single touch. Right = Ember, "+N" rises and the streak lights the bar and
-// the glow; wrong = shake and the right answer is revealed. The last
+// single touch within 15 s (the bar empties and turns Ember in the last 5 s;
+// at 0 it counts as a miss). Right = Ember, "+N" rises and the streak lights
+// the bar and the glow; wrong = shake and the right answer is revealed. Each
+// second, answer and miss has its sound (§25.7). The last
 // "Ver resultado" hands the round to the result screen, which saves it. The
 // round lives in one reducer and the questions never refetch, so going to
 // the background changes nothing. A scene: dark in both modes.
@@ -77,19 +91,29 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
   const answer = answered ? lastAnswer(round) : null;
   const isLast = round.index === total - 1;
 
-  // Haptics once per answer.
-  const hapticIndex = useRef(-1);
+  // Sound (and its haptic) once per answer; a timeout sounds as a miss.
+  const soundIndex = useRef(-1);
   useEffect(() => {
-    if (!answered || hapticIndex.current === round.index) {
+    if (!answered || soundIndex.current === round.index) {
       return;
     }
-    hapticIndex.current = round.index;
-    if (answer?.isCorrect) {
-      haptics.light();
-    } else {
-      haptics.error();
-    }
-  }, [answer?.isCorrect, answered, round.index]);
+    soundIndex.current = round.index;
+    playSound(
+      answer?.isCorrect ? { type: 'correct', streak: round.streak } : { type: 'wrong' },
+    );
+  }, [answer?.isCorrect, answered, round.index, round.streak]);
+
+  // 15 s per question; paused while the exit sheet is open.
+  const remainingMs = useQuestionTimer({
+    questionKey: round.index,
+    running: Boolean(question) && !answered && !confirmExit,
+    onSecond: secondsLeft => playSound({ type: 'tick', secondsLeft }),
+    onExpire: () => {
+      if (question) {
+        dispatch({ type: 'timeout', question });
+      }
+    },
+  });
 
   const exit = () => {
     leavingRef.current = true;
@@ -221,6 +245,7 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
                 {`${roundPoints(round.answers)} pts`}
               </TextV2>
             </View>
+            <QuestionTimer remainingMs={remainingMs} answered={answered} />
 
             <ScrollView
               key={round.index}
@@ -255,7 +280,7 @@ export function QuizQuestionScreen({ navigation, route }: Props) {
             {answered && answer ? (
               <FeedbackPanel
                 isCorrect={answer.isCorrect}
-                title={feedbackTitle(answer.isCorrect, round.streak, round.index)}
+                title={feedbackTitle(answer.isCorrect, round.streak, round.index, answer.timedOut)}
                 points={answer.pointsEarned}
                 multiplier={answer.multiplier}
                 correctText={question.options[question.correctAnswer]}

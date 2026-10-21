@@ -7,7 +7,6 @@ import { SettingsScreen } from '@app/screens/profile/SettingsScreen';
 import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen';
 import { NotificationSettingsScreen } from '@app/screens/profile/NotificationSettingsScreen';
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
-import { EllieVoiceScreen } from '@app/screens/ellie/EllieVoiceScreen';
 import { RouteSoonScreen } from '@app/screens/home/RouteSoonScreen';
 import { RouteActiveScreen } from '@app/screens/route/RouteActiveScreen';
 import { RouteGenScreen } from '@app/screens/route/RouteGenScreen';
@@ -169,11 +168,6 @@ export function RootNavigator() {
             name={APP_ROUTES.EllieChat}
             component={EllieChatScreen}
             options={{ gestureEnabled: false }}
-          />
-          <Stack.Screen
-            name={APP_ROUTES.EllieVoice}
-            component={EllieVoiceScreen}
-            options={{ animation: 'fade', gestureEnabled: false }}
           />
           <Stack.Screen name={APP_ROUTES.RouteSoon} component={RouteSoonScreen} />
           <Stack.Screen name={APP_ROUTES.RoutePrep} component={RoutePrepScreen} />
