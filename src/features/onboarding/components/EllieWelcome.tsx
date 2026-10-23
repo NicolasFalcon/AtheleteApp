@@ -1,23 +1,38 @@
-import { Image, StyleSheet, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { useLayoutEffect } from 'react';
+import {
+  ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import Animated, { FadeInDown, ReduceMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 import { ArrowRight } from 'lucide-react-native';
 import {
+  BrandLockup,
   Button,
-  LivingHalo,
-  Eyebrow,
+  MonoPhoto,
+  PosterTitle,
   PressableScale,
+  Scrim,
   StatusBarV2,
   TextV2,
+  TopSafeBar,
+  displayLineBox,
   useThemeV2,
 } from '@app/components/v2';
+import { difficultyLabel } from '@app/features/home/v2/homeLabels';
+import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
 import {
   DURATIONS,
   GOALS,
-  LEVELS,
   type OnboardingAnswers,
 } from '@app/features/onboarding/onboardingModel';
+import { useTodaySuggestion } from '@app/hooks/useRoutines';
+import { STACK_SCREEN_OPTIONS } from '@app/navigation/stackScreenOptions';
+import { SceneScope } from '@app/providers/ThemeProvider';
+import { em } from '@app/theme/v2/typography';
 
 export type WelcomeSaveStatus = 'saving' | 'saved' | 'error';
 
@@ -28,168 +43,223 @@ export type EllieWelcomeProps = {
   onRetrySave: () => void;
   // Navigation only (after a successful save).
   onGoHome: () => void;
-  onTalkToEllie: () => void;
   continuing?: boolean;
   error?: string;
 };
 
-const FIRST_SESSION_PHOTO = require('@app/assets/v2/photos/movilidad.jpg');
+// TODO(onboarding-assets): placeholder until
+// assets/images/onboarding/plan-ready.jpg exists.
+const BACKGROUND_PHOTO = require('@app/assets/v2/photos/hero-entreno.jpg');
+// iPhone SE and other short phones: the headline goes one step down.
+const COMPACT_HEIGHT = 700;
+const STAGGER = 120;
 
-// ONB_03 · Bienvenida de ELLIE (Auth.dc.html · bienvenida): ELLIE's neutral Ember wash,
-// the breathing orb, her voice at 26/400, the starting point in three
-// figures and the first session. Two ways out: Inicio or a conversation.
-// The profile is saved in the background while this is shown; both ways out
-// stay inactive until it is saved, and a failure offers "Reintentar".
-export function EllieWelcome({
+function renderSceneTopSafeBar() {
+  return <TopSafeBar variant="scene" />;
+}
+
+const enter = (index: number) =>
+  FadeInDown.duration(250)
+    .delay(index * STAGGER)
+    .reduceMotion(ReduceMotion.System);
+
+// ONB_03 · "Plan listo", the end of the onboarding: always dark, black and
+// white photo, the user's name and the plan in Anton, the starting point in
+// three figures and today's first session. The profile is saved in the
+// background while this is shown; "Entrar a ATHELETE" stays busy until it is
+// saved, and a failure offers "Reintentar".
+export function EllieWelcome(props: EllieWelcomeProps) {
+  const navigation = useNavigation();
+
+  // The bar takes the dark plate of this screen (the wizard keeps the theme
+  // bar).
+  useLayoutEffect(() => {
+    navigation.setOptions({ header: renderSceneTopSafeBar });
+    return () => navigation.setOptions({ header: STACK_SCREEN_OPTIONS.header });
+  }, [navigation]);
+
+  return (
+    <SceneScope>
+      <PlanReady {...props} />
+    </SceneScope>
+  );
+}
+
+function PlanReady({
   answers,
   saveStatus,
   onRetrySave,
   onGoHome,
-  onTalkToEllie,
   continuing = false,
   error,
 }: EllieWelcomeProps) {
+  const { colors, display, scene, type } = useThemeV2();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const saved = saveStatus === 'saved';
   const failed = saveStatus === 'error';
   const busy = saveStatus === 'saving' || continuing;
-  const { colors, mode } = useThemeV2();
-  const insets = useSafeAreaInsets();
-  const isLight = mode === 'light';
-  const background = [colors.ellie.wash[0], colors.ellie.wash[1], colors.bg];
-  const hairline = isLight ? 'rgba(18,18,18,.08)' : colors.border.onDarkStrong;
-  const name = answers.name.trim() || 'hola';
+  const compact = height < COMPACT_HEIGHT;
+
+  // Today's suggestion once the profile exists (the same query as the Inicio
+  // hero, so both show the same session).
+  const suggestionQuery = useTodaySuggestion(saved);
+  const firstSession = suggestionQuery.data?.suggestion ?? null;
+
+  const firstName = answers.name.trim().split(/\s+/)[0] ?? '';
   const duration =
     answers.duration !== null ? DURATIONS[answers.duration] : null;
   const goal = answers.goal !== null ? GOALS[answers.goal] : null;
-  const level = answers.level !== null ? LEVELS[answers.level] : null;
-  const errorColor = isLight ? colors.ember.deep : colors.ember.textOnDark;
 
-  const summary = [
-    { value: String(answers.days), label: 'días/sem' },
-    { value: duration ? duration.minutes.replace('+', '') : '—', label: 'min' },
-    { value: goal ? goal.short[0] : '—', label: goal ? goal.short[1] : '' },
+  const stats = [
+    { value: String(answers.days), label: 'DÍAS / SEM' },
+    { value: duration ? duration.minutes : '—', label: 'MIN / SESIÓN' },
+    {
+      value: goal ? goal.short[0].toUpperCase() : '—',
+      label: goal ? goal.short[1].toUpperCase() : '',
+    },
   ];
+  const statValue = display.displayS;
+  const caps = { letterSpacing: em(0.2, type.micro.fontSize) };
 
   return (
-    // Edge-to-edge (also behind the status bar); the content keeps the safe
-    // area. The gradient is a background layer: on Fabric a padded
-    // LinearGradient used as a container offsets itself by its padding.
-    <View
-      style={[
-        styles.fill,
-        {
-          backgroundColor: colors.bg,
-          paddingTop: insets.top,
-          paddingBottom: Math.max(insets.bottom, 16) + 18,
-        },
-      ]}
-    >
-      <LinearGradient
-        colors={background}
-        locations={[0, 0.48, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={[styles.fill, { backgroundColor: scene.plate }]}>
       <StatusBarV2 />
-      <View style={styles.center}>
-        <Animated.View entering={FadeInDown.duration(600)}>
-          <LivingHalo size={128} />
-        </Animated.View>
-        <Animated.View
-          entering={FadeInDown.duration(500).delay(200)}
-          style={styles.voice}
-        >
-          <Eyebrow>ELLIE · Tu coach</Eyebrow>
-          <TextV2
-            accessibilityRole="header"
-            align="center"
-            style={styles.greeting}
-          >
-            {`Hola, ${name}. Ya tengo tu punto de partida.`}
+      <MonoPhoto source={BACKGROUND_PHOTO} style={StyleSheet.absoluteFill}>
+        <Scrim variant="intro" />
+      </MonoPhoto>
+      <ScrollView
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom, 16) + 8 },
+        ]}
+      >
+        <View style={styles.header}>
+          <BrandLockup />
+        </View>
+        <View style={styles.spacer} />
+
+        <Animated.View entering={enter(0)} style={styles.gap16}>
+          <PosterTitle
+            display="displayL"
+            size={compact ? 'compact' : 'regular'}
+            eyebrow="ATHELETE INTELLIGENCE"
+            headline={[firstName ? `${firstName.toUpperCase()},` : 'HOLA,']}
+            accent={['TU PLAN ESTÁ', 'LISTO.']}
+          />
+          <TextV2 variant="body" color={colors.text.bodySoft}>
+            Partimos de tu objetivo, tu nivel y tu semana. El plan se afina con
+            cada sesión, cada noche y cada registro.
           </TextV2>
-          <TextV2
-            variant="body"
-            tone="secondary"
-            align="center"
-            style={styles.sub}
-          >
-            Empezamos con algo corto para conocernos. Después ajusto el plan con
-            lo que vea.
-          </TextV2>
         </Animated.View>
-        <Animated.View
-          entering={FadeInDown.duration(500).delay(350)}
-          style={styles.summary}
-        >
-          {summary.map((item, index) => (
-            <View key={item.label + index} style={styles.summaryRow}>
-              {index > 0 ? (
-                <View
-                  style={[styles.summaryDivider, { backgroundColor: hairline }]}
-                />
-              ) : null}
-              <View style={styles.summaryCell}>
-                <TextV2 variant="section">{item.value}</TextV2>
-                <TextV2 variant="meta" tone="secondary">
-                  {item.label}
-                </TextV2>
-              </View>
+
+        <Animated.View entering={enter(1)} style={styles.stats}>
+          {stats.map((stat, index) => (
+            <View
+              key={stat.label || index}
+              accessible
+              accessibilityLabel={`${stat.value} ${stat.label}`}
+              style={[
+                styles.stat,
+                index > 0
+                  ? {
+                      borderLeftWidth: StyleSheet.hairlineWidth,
+                      borderLeftColor: colors.border.onDarkStrong,
+                      paddingLeft: 16,
+                    }
+                  : null,
+              ]}
+            >
+              <TextV2
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                color={colors.text.primary}
+                style={[statValue, displayLineBox(statValue), styles.statValue]}
+              >
+                {stat.value}
+              </TextV2>
+              <TextV2
+                variant="micro"
+                color={colors.text.tertiary}
+                numberOfLines={2}
+                style={[styles.statLabel, caps]}
+              >
+                {stat.label}
+              </TextV2>
             </View>
           ))}
         </Animated.View>
-      </View>
 
-      <Animated.View entering={FadeInDown.duration(500).delay(500)}>
-        <PressableScale
-          accessibilityRole="button"
-          accessibilityLabel="Tu primera sesión. Ver en Inicio"
-          disabled={!saved || continuing}
-          onPress={onGoHome}
-          style={[styles.session, { borderTopColor: hairline }]}
-        >
-          <Image source={FIRST_SESSION_PHOTO} style={styles.sessionPhoto} />
-          <View style={styles.sessionTexts}>
-            <Eyebrow>Tu primera sesión</Eyebrow>
-            <TextV2 variant="cta">Sesión de inicio</TextV2>
-            <TextV2 variant="meta" tone="secondary">
-              {[duration ? `${duration.minutes} min` : null, level?.label]
-                .filter(Boolean)
-                .join(' · ')}
-            </TextV2>
-          </View>
-          <ArrowRight color={colors.text.primary} size={18} strokeWidth={2} />
-        </PressableScale>
+        {firstSession ? (
+          <Animated.View entering={enter(2)}>
+            {/* No route to a routine exists yet during the onboarding
+                (the app stack mounts after it): same way out as the CTA. */}
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel={`Tu primera sesión: ${firstSession.title}`}
+              disabled={!saved || continuing}
+              onPress={onGoHome}
+              style={[
+                styles.session,
+                {
+                  backgroundColor: colors.border.onDark,
+                  boxShadow: `inset 0 0 0 1px ${colors.border.onDarkStrong}`,
+                },
+              ]}
+            >
+              <MonoPhoto source={HOME_PHOTOS.mobility} style={styles.thumb} />
+              <View style={styles.sessionTexts}>
+                <TextV2
+                  variant="micro"
+                  color={colors.ember.base}
+                  style={[styles.eyebrow, caps]}
+                >
+                  TU PRIMERA SESIÓN
+                </TextV2>
+                <TextV2 variant="cta" numberOfLines={1}>
+                  {firstSession.title}
+                </TextV2>
+                <TextV2 variant="meta" tone="secondary">
+                  {`${firstSession.duration} min · ${difficultyLabel(
+                    firstSession.difficulty,
+                  )}`}
+                </TextV2>
+              </View>
+              <ArrowRight
+                color={colors.text.primary}
+                size={18}
+                strokeWidth={2}
+              />
+            </PressableScale>
+          </Animated.View>
+        ) : null}
+
         {error ? (
           <TextV2
             variant="meta"
-            color={errorColor}
+            color={colors.ember.textOnDark}
             align="center"
-            style={styles.error}
+            accessibilityLiveRegion="polite"
           >
             {error}
           </TextV2>
         ) : null}
-        <View style={styles.actions}>
-          {failed ? (
-            <Button label="Reintentar" onPress={onRetrySave} />
-          ) : (
-            <Button
-              label="Ir a Inicio"
-              loading={busy}
-              loadingLabel={
-                continuing ? 'Abriendo tu inicio…' : 'Guardando tu perfil…'
-              }
-              onPress={onGoHome}
-            />
-          )}
+        {failed ? (
+          <Button variant="commit" label="Reintentar" onPress={onRetrySave} />
+        ) : (
           <Button
-            variant="text"
-            label="Hablar con ELLIE"
-            disabled={!saved || continuing}
-            onPress={onTalkToEllie}
-            style={styles.talk}
+            variant="commit"
+            label="Entrar a ATHELETE"
+            loading={busy}
+            loadingLabel={
+              continuing ? 'Abriendo tu inicio…' : 'Guardando tu perfil…'
+            }
+            onPress={onGoHome}
           />
-        </View>
-      </Animated.View>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -197,71 +267,55 @@ export function EllieWelcome({
 const styles = StyleSheet.create({
   fill: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
     paddingHorizontal: 24,
+    gap: 20,
   },
-  center: {
+  header: {
+    paddingTop: 16,
+  },
+  spacer: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 30,
-    paddingTop: 40,
+    minHeight: 24,
   },
-  voice: {
-    alignItems: 'center',
-    gap: 14,
+  gap16: {
+    gap: 16,
   },
-  greeting: {
-    fontSize: 26,
-    fontWeight: '400',
-    lineHeight: 34,
-    letterSpacing: -0.26,
-    maxWidth: 320,
-  },
-  sub: {
-    maxWidth: 300,
-  },
-  summary: {
-    flexDirection: 'row',
-    width: '100%',
-    maxWidth: 320,
-  },
-  summaryRow: {
-    flex: 1,
+  stats: {
     flexDirection: 'row',
   },
-  summaryDivider: {
-    width: 1,
-    marginRight: 16,
-  },
-  summaryCell: {
+  stat: {
     flex: 1,
-    gap: 2,
+    gap: 6,
+    paddingRight: 8,
+  },
+  statValue: {
+    includeFontPadding: false,
+    fontVariant: [],
+  },
+  statLabel: {
+    fontWeight: '700',
   },
   session: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    paddingVertical: 16,
-    borderTopWidth: 1,
+    padding: 12,
+    paddingRight: 18,
+    borderRadius: 20,
   },
-  sessionPhoto: {
+  thumb: {
     width: 56,
     height: 56,
-    borderRadius: 16,
+    borderRadius: 14,
   },
   sessionTexts: {
     flex: 1,
     gap: 2,
   },
-  error: {
-    marginBottom: 6,
-  },
-  actions: {
-    gap: 6,
-    marginTop: 10,
-  },
-  talk: {
-    alignSelf: 'center',
-    height: 44,
+  eyebrow: {
+    fontWeight: '700',
   },
 });

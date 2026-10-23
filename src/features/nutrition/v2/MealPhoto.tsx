@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableScale, StatusBarV2 } from '@app/components/v2';
+import { PressableScale, StatusBarV2, WindowSafeArea } from '@app/components/v2';
 
 const SCENE = '#0E0D0C';
 
@@ -51,28 +51,47 @@ export function MealPhoto({
         statusBarTranslucent
         onRequestClose={() => setOpen(false)}
       >
-        <View style={styles.full}>
-          <StatusBarV2 style="light" />
-          {uri ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={closeLabel}
-              onPress={() => setOpen(false)}
-              style={[styles.fullPhoto, { top: insets.top, bottom: insets.bottom }]}
-            >
-              <Image source={{ uri }} style={styles.fill} resizeMode="contain" />
-            </Pressable>
-          ) : null}
-          <PressableScale
-            accessibilityRole="button"
-            accessibilityLabel={closeLabel}
-            onPress={() => setOpen(false)}
-            style={[styles.close, { top: insets.top + 8 }]}
-          >
-            <X size={20} color="#FFFFFF" strokeWidth={2} />
-          </PressableScale>
-        </View>
+        {/* The modal covers the whole window: its own insets, no TopSafeBar. */}
+        <WindowSafeArea>
+          <FullPhoto uri={uri} closeLabel={closeLabel} onClose={() => setOpen(false)} />
+        </WindowSafeArea>
       </Modal>
+    </View>
+  );
+}
+
+function FullPhoto({
+  uri,
+  closeLabel,
+  onClose,
+}: {
+  uri: string | null;
+  closeLabel: string;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={styles.full}>
+      <StatusBarV2 style="light" />
+      {uri ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={closeLabel}
+          onPress={onClose}
+          style={[styles.fullPhoto, { top: insets.top, bottom: insets.bottom }]}
+        >
+          <Image source={{ uri }} style={styles.fill} resizeMode="contain" />
+        </Pressable>
+      ) : null}
+      <PressableScale
+        accessibilityRole="button"
+        accessibilityLabel={closeLabel}
+        onPress={onClose}
+        style={[styles.close, { top: insets.top + 8 }]}
+      >
+        <X size={20} color="#FFFFFF" strokeWidth={2} />
+      </PressableScale>
     </View>
   );
 }

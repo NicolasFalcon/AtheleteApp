@@ -26,6 +26,11 @@ export type TextFieldProps = Omit<TextInputProps, 'style'> & {
   // Overrides the ring: true without a sentence, false for a neutral note.
   invalid?: boolean;
   secure?: boolean;
+  // 'glass': translucent dark field over a scene (Login).
+  variant?: 'filled' | 'glass';
+  // The label stays as the accessibility label only (Auth v2: placeholder
+  // fields).
+  hideLabel?: boolean;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -34,7 +39,17 @@ export type TextFieldProps = Omit<TextInputProps, 'style'> & {
 // (Ember light on dark), short shake and one sentence (handoff §5, §13).
 export const TextField = forwardRef<TextInput, TextFieldProps>(
   function TextField(
-    { label, icon: Icon, error, invalid, secure = false, style, ...inputProps },
+    {
+      label,
+      icon: Icon,
+      error,
+      invalid,
+      secure = false,
+      variant = 'filled',
+      hideLabel = false,
+      style,
+      ...inputProps
+    },
     ref,
   ) {
     const { colors, mode, motion, type } = useThemeV2();
@@ -65,16 +80,23 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
 
     return (
       <View style={[styles.wrapper, style]}>
-        <TextV2 variant="meta" tone="secondary">
-          {label}
-        </TextV2>
+        {hideLabel ? null : (
+          <TextV2 variant="meta" tone="secondary">
+            {label}
+          </TextV2>
+        )}
         <Animated.View
           style={[
             styles.box,
             {
-              backgroundColor: colors.surface.field,
+              backgroundColor:
+                variant === 'glass'
+                  ? colors.border.onDark
+                  : colors.surface.field,
               boxShadow: hasError
                 ? `inset 0 0 0 1.5px ${errorColor}`
+                : variant === 'glass'
+                ? `inset 0 0 0 1px ${colors.border.onDarkStrong}`
                 : undefined,
               paddingRight: secure ? 8 : 16,
             },

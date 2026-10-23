@@ -14,6 +14,7 @@ import {
   TextV2,
   useThemeV2,
   useToast,
+  useTopSafeBarHeight,
 } from '@app/components/v2';
 import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import { LEVELS } from '@app/features/onboarding/onboardingModel';
@@ -53,6 +54,9 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // out, the units visible. Guardar is active only with changes and valid
 // values; the writes respect the CHECKs of `profiles` (see profileModel).
 export function EditProfileScreen({ navigation }: Props) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -179,7 +183,7 @@ export function EditProfileScreen({ navigation }: Props) {
           </PressableScale>
         }
       />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView keyboardVerticalOffset={topSafeBarHeight} style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}

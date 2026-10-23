@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackIcon } from '@app/assets/icons';
 import { Button } from '@app/components/ui';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useTopSafeBarHeight } from '@app/components/v2/TopSafeBar';
 
 type ProfileSetupLayoutProps = PropsWithChildren<{
   step: number;
@@ -40,6 +41,9 @@ export function ProfileSetupLayout({
   continueLoading = false,
   footerAbove,
 }: ProfileSetupLayoutProps) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { mode, theme } = useAppTheme();
   const styles = createStyles(theme);
   const progress = Math.min(1, Math.max(0, step / TOTAL_STEPS));
@@ -51,6 +55,7 @@ export function ProfileSetupLayout({
         barStyle={mode === 'dark' ? 'light-content' : 'dark-content'}
       />
       <KeyboardAvoidingView
+        keyboardVerticalOffset={topSafeBarHeight}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboard}
       >

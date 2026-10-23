@@ -12,6 +12,7 @@
 		1D3D3FA430801C4B00A69C23 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = 52CEB72016FE35E6BE452BEF /* MapLibre */; };
 		3946AC63E42CD2D11FEE037A /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DD9EDCBA99F45998014CB3 /* ExpoModulesProvider.swift */; };
 		70E275AFA20F4C83B96C8A01 /* Inter.ttc in Resources */ = {isa = PBXBuildFile; fileRef = 70E275AFA20F4C83B96C8A00 /* Inter.ttc */; };
+		70E275AFA20F4C83B96C8A11 /* Anton-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70E275AFA20F4C83B96C8A10 /* Anton-Regular.ttf */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		FBD3CDFADD36EE2EED0A21A8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
@@ -28,6 +29,7 @@
 		5709B34CF0A7D63546082F79 /* Pods-Athelete.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Athelete.release.xcconfig"; path = "Target Support Files/Pods-Athelete/Pods-Athelete.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-Athelete.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Athelete.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		70E275AFA20F4C83B96C8A00 /* Inter.ttc */ = {isa = PBXFileReference; lastKnownFileType = file; name = Inter.ttc; path = ../src/assets/fonts/Inter.ttc; sourceTree = "<group>"; };
+		70E275AFA20F4C83B96C8A10 /* Anton-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; name = "Anton-Regular.ttf"; path = "../src/assets/fonts/Anton-Regular.ttf"; sourceTree = "<group>"; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Athelete/AppDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = Athelete/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
@@ -52,6 +54,7 @@
 				1D3D3FA630801CF400A69C23 /* Athelete.entitlements */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				70E275AFA20F4C83B96C8A00 /* Inter.ttc */,
+				70E275AFA20F4C83B96C8A10 /* Anton-Regular.ttf */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
@@ -195,6 +198,7 @@
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				70E275AFA20F4C83B96C8A01 /* Inter.ttc in Resources */,
+				70E275AFA20F4C83B96C8A11 /* Anton-Regular.ttf in Resources */,
 				FBD3CDFADD36EE2EED0A21A8 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

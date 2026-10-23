@@ -1,19 +1,35 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
-  Image,
   StyleSheet,
   View,
   useWindowDimensions,
   type ImageSourcePropType,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  interpolateColor,
+  runOnJS,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, StatusBarV2, TextV2, useThemeV2 } from '@app/components/v2';
+import {
+  BrandLockup,
+  Button,
+  MonoPhoto,
+  PosterTitle,
+  PressableScale,
+  Scrim,
+  StatusBarV2,
+  TextV2,
+  TopSafeBar,
+  TopSafeBarContent,
+  useThemeV2,
+} from '@app/components/v2';
 import { SceneScope } from '@app/providers/ThemeProvider';
+import { em } from '@app/theme/v2/typography';
 
 type VisualOnboardingScreenProps = {
   onComplete: () => Promise<void> | void;
@@ -21,55 +37,109 @@ type VisualOnboardingScreenProps = {
 
 type IntroSlide = {
   key: string;
-  title: string;
-  subtitle: string;
+  eyebrow: string;
+  headline: string[];
+  accent: string[];
+  subtitle?: string[];
   photo: ImageSourcePropType;
 };
 
-// Copy from Auth.dc.html (SLIDES). Slide 1 says "técnica en video" instead of
-// "técnica en 3D": the 3D model was discarded in favour of MoveKit (D-37).
+// TODO(intro-assets): placeholders from the existing photos until
+// assets/images/intro/intro-1…5.jpg exist.
 const SLIDES: IntroSlide[] = [
   {
-    key: 'intencion',
-    title: 'Entrena con intención.',
-    subtitle:
-      'Rutinas claras, técnica en video y una sesión que se lee de un vistazo.',
-    photo: require('@app/assets/v2/photos/overhead.jpg'),
+    key: 'ellie',
+    eyebrow: 'ATHELETE INTELLIGENCE',
+    headline: ['UN COACH QUE'],
+    accent: ['TE CONOCE.'],
+    subtitle: ['ELLIE LEE TUS DATOS REALES.', 'Y AJUSTA TU DÍA.'],
+    photo: require('@app/assets/v2/photos/home/reto-overhead.jpg'),
   },
   {
-    key: 'coach',
-    title: 'Un coach que te conoce.',
-    subtitle: 'ELLIE ajusta tu día con tus datos reales, sin ruido.',
-    photo: require('@app/assets/v2/photos/movilidad.jpg'),
+    key: 'core33',
+    eyebrow: 'CORE 33 · RETO',
+    headline: ['33 DÍAS.'],
+    accent: ['SIN EXCUSAS.'],
+    subtitle: ['UN BLOQUE CORTO CADA DÍA.', 'UN CAMBIO QUE SE NOTA.'],
+    photo: require('@app/assets/v2/photos/home/athlete-2.jpg'),
   },
   {
-    key: 'progreso',
-    title: 'Progreso que se nota.',
-    subtitle: 'Cada serie, vaso y hábito cuenta. Y se ve.',
-    photo: require('@app/assets/v2/photos/esfuerzo.jpg'),
+    key: 'ruta',
+    eyebrow: 'RUTA',
+    headline: ['SAL A'],
+    accent: ['LA CALLE.'],
+    subtitle: ['CORRE O PEDALEA.', 'CADA KILÓMETRO CUENTA.'],
+    photo: require('@app/assets/v2/photos/barra-mujer.jpg'),
+  },
+  {
+    key: 'comunidad',
+    eyebrow: 'COMUNIDAD · RETOS',
+    headline: ['NUNCA', 'ENTRENAS'],
+    accent: ['SOLO.'],
+    subtitle: ['RETA A TUS AMIGOS.', 'SUPERA TU MARCA.'],
+    photo: require('@app/assets/v2/photos/home/hero-entreno.jpg'),
+  },
+  {
+    key: 'descubre',
+    eyebrow: 'DESCUBRE',
+    headline: ['ALIVE'],
+    accent: ['PERFORMANCE.'],
+    photo: require('@app/assets/v2/photos/cuerdas.jpg'),
   },
 ];
 
-// ONB_01 · Intro deslizable. The only place where photography dominates full
-// bleed: a dark scene in both modes. Swipe or "Siguiente"; "Empezar" ends it.
+// Slide 5: informative only, no actions.
+const DISCOVER = [
+  { title: 'Respira', detail: 'Un minuto para ti' },
+  { title: 'Quiz', detail: 'Aprende jugando' },
+  { title: 'Wear', detail: 'Ropa para el trabajo real' },
+  { title: 'Y más', detail: 'Descúbrelo dentro' },
+];
+
+const LAST = SLIDES.length - 1;
+const GUTTER = 24;
+const PROGRESS_ROW = 16;
+const CONTROLS_GAP = 24;
+const CTA_HEIGHT = 56;
+const COPY_GAP = 28;
+// iPhone SE and other short phones: the headline goes one step down.
+const COMPACT_HEIGHT = 700;
+
+const pad = (value: number) => String(value).padStart(2, '0');
+
+// ONB_01 · Intro (5 slides) before the login, always dark: black-and-white
+// photo under the TopSafeBar, brand, Ember eyebrow + caps headline, progress
+// and the CTA. Swipe or "Siguiente"; "Saltar" and "Empezar" end it
+// (onComplete marks it as seen); on the last slide "Atrás" returns to the 4th.
 export function VisualOnboardingScreen({
   onComplete,
 }: VisualOnboardingScreenProps) {
+  const { scene } = useThemeV2();
+
+  // Rendered outside the stacks: the bar and the inset scope are set here.
   return (
     <SceneScope>
-      <IntroSlides onComplete={onComplete} />
+      <View style={[styles.fill, { backgroundColor: scene.plate }]}>
+        <TopSafeBar variant="scene" />
+        <TopSafeBarContent barShown>
+          <IntroSlides onComplete={onComplete} />
+        </TopSafeBarContent>
+      </View>
     </SceneScope>
   );
 }
 
 function IntroSlides({ onComplete }: VisualOnboardingScreenProps) {
-  const { scene } = useThemeV2();
-  const { width } = useWindowDimensions();
+  const { colors, scene, radius, type } = useThemeV2();
+  const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<IntroSlide>>(null);
   const [index, setIndex] = useState(0);
   const [finishing, setFinishing] = useState(false);
-  const isLast = index === SLIDES.length - 1;
+  const scrollX = useSharedValue(0);
+  const shownIndex = useSharedValue(0);
+  const isLast = index === LAST;
+  const compact = height < COMPACT_HEIGHT;
 
   const finish = useCallback(async () => {
     if (finishing) {
@@ -83,26 +153,36 @@ function IntroSlides({ onComplete }: VisualOnboardingScreenProps) {
     }
   }, [finishing, onComplete]);
 
+  const goTo = (target: number) => {
+    listRef.current?.scrollToIndex({ index: target, animated: true });
+  };
+
   const handleNext = () => {
     if (isLast) {
       finish();
       return;
     }
-    listRef.current?.scrollToIndex({ index: index + 1, animated: true });
+    goTo(index + 1);
   };
 
-  const handleMomentumEnd = (
-    event: NativeSyntheticEvent<NativeScrollEvent>,
-  ) => {
-    setIndex(Math.round(event.nativeEvent.contentOffset.x / width));
-  };
+  // The page follows the scroll (swipe or button), so the counter and the
+  // header pill change as soon as the next slide takes over.
+  const onScroll = useAnimatedScrollHandler(event => {
+    scrollX.value = event.contentOffset.x;
+    const next = Math.min(Math.max(Math.round(event.contentOffset.x / width), 0), LAST);
+    if (next !== shownIndex.value) {
+      shownIndex.value = next;
+      runOnJS(setIndex)(next);
+    }
+  });
 
-  const bottom = Math.max(48, insets.bottom + 24);
+  const bottom = Math.max(24, insets.bottom + 8);
+  const copyBottom = bottom + CTA_HEIGHT + CONTROLS_GAP + PROGRESS_ROW + COPY_GAP;
 
   return (
-    <View style={[styles.fill, { backgroundColor: scene.celebration }]}>
+    <View style={styles.fill}>
       <StatusBarV2 />
-      <FlatList
+      <Animated.FlatList
         ref={listRef}
         data={SLIDES}
         keyExtractor={slide => slide.key}
@@ -110,82 +190,161 @@ function IntroSlides({ onComplete }: VisualOnboardingScreenProps) {
         pagingEnabled
         bounces={false}
         showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={handleMomentumEnd}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
         getItemLayout={(_, itemIndex) => ({
           length: width,
           offset: width * itemIndex,
           index: itemIndex,
         })}
-        renderItem={({ item }) => (
+        renderItem={({ item, index: slideIndex }) => (
           <View style={[styles.slide, { width }]}>
-            <Image
+            <MonoPhoto
               source={item.photo}
-              resizeMode="cover"
-              style={styles.photo}
-              accessibilityIgnoresInvertColors
-            />
-            {/* #161616 from 35 % (transparent) to 75 % (.92), as the HTML */}
-            <LinearGradient
-              pointerEvents="none"
-              colors={['rgba(22,22,22,0)', 'rgba(22,22,22,.92)']}
-              locations={[0.35, 0.75]}
-              style={StyleSheet.absoluteFill}
-            />
-            <View
-              style={[
-                styles.copy,
-                // Leaves room for the fixed dots (6) + CTA (56) + gaps.
-                { bottom: bottom + 56 + 22 + 6 + 22 },
-              ]}
+              style={[StyleSheet.absoluteFill, { backgroundColor: scene.plate }]}
             >
-              <TextV2
-                accessibilityRole="header"
-                variant="title28"
-                color={scene.onDark.primary}
-                style={styles.title}
-              >
-                {item.title}
-              </TextV2>
-              <TextV2 variant="voice" color={scene.onDark.secondary}>
-                {item.subtitle}
-              </TextV2>
+              <Scrim variant="intro" />
+            </MonoPhoto>
+            <View style={[styles.copy, { bottom: copyBottom }]}>
+              <PosterTitle
+                display="displayL"
+                eyebrow={item.eyebrow}
+                headline={item.headline}
+                accent={item.accent}
+                subtitle={item.subtitle}
+                size={compact ? 'compact' : 'regular'}
+              />
+              {slideIndex === LAST ? (
+                <View style={styles.discover}>
+                  {DISCOVER.map((row, rowIndex) => (
+                    <View
+                      key={row.title}
+                      accessible
+                      style={[
+                        styles.discoverRow,
+                        {
+                          borderBottomColor: colors.divider,
+                          paddingVertical: compact ? 8 : 10,
+                        },
+                      ]}
+                    >
+                      <TextV2
+                        variant="micro"
+                        color={colors.text.tertiary}
+                        style={[
+                          styles.discoverNumber,
+                          { letterSpacing: em(0.2, type.micro.fontSize) },
+                        ]}
+                      >
+                        {pad(rowIndex + 1)}
+                      </TextV2>
+                      <TextV2
+                        variant="bodyL"
+                        color={colors.text.primary}
+                        style={styles.discoverTitle}
+                      >
+                        {row.title}
+                      </TextV2>
+                      <TextV2
+                        variant="meta"
+                        tone="secondary"
+                        numberOfLines={1}
+                        style={styles.discoverDetail}
+                      >
+                        {row.detail}
+                      </TextV2>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
           </View>
         )}
       />
+
+      <View style={styles.header} pointerEvents="box-none">
+        <BrandLockup />
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={isLast ? 'Atrás' : 'Saltar la intro'}
+          hitSlop={8}
+          onPress={() => (isLast ? goTo(LAST - 1) : finish())}
+          style={[
+            styles.pill,
+            { backgroundColor: scene.glass.onPhoto, borderRadius: radius.pill },
+          ]}
+        >
+          <TextV2 variant="label" color={scene.onDark.primary}>
+            {isLast ? 'Atrás' : 'Saltar'}
+          </TextV2>
+        </PressableScale>
+      </View>
+
       <View style={[styles.controls, { bottom }]} pointerEvents="box-none">
         <View
-          style={styles.dots}
+          style={styles.progressRow}
           accessible
           accessibilityLabel={`Página ${index + 1} de ${SLIDES.length}`}
         >
-          {SLIDES.map((slide, dotIndex) => (
-            <View
-              key={slide.key}
-              style={[
-                styles.dot,
-                {
-                  width: dotIndex === index ? 22 : 6,
-                  backgroundColor:
-                    dotIndex === index
-                      ? scene.onDark.primary
-                      : 'rgba(255,255,255,.35)',
-                },
-              ]}
-            />
-          ))}
+          <View style={styles.segments}>
+            {SLIDES.map((slide, segment) => (
+              <ProgressSegment
+                key={slide.key}
+                segment={segment}
+                scrollX={scrollX}
+                width={width}
+                colors={{
+                  done: scene.onDark.secondary,
+                  current: colors.ember.base,
+                  pending: scene.glass.onPhoto,
+                }}
+              />
+            ))}
+          </View>
+          <TextV2
+            variant="micro"
+            color={colors.text.secondary}
+            style={{ letterSpacing: em(0.2, type.micro.fontSize) }}
+          >
+            {`${pad(index + 1)} / ${pad(SLIDES.length)}`}
+          </TextV2>
         </View>
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <Button
-            variant="onScene"
-            label={isLast ? 'Empezar' : 'Siguiente'}
-            loading={finishing}
-            onPress={handleNext}
-          />
-        </Animated.View>
+        <Button
+          variant={isLast ? 'commit' : 'onScene'}
+          label={isLast ? 'Empezar' : 'Siguiente'}
+          loading={finishing}
+          onPress={handleNext}
+        />
       </View>
     </View>
   );
+}
+
+// Pending (dark) → current (Ember) → done (light grey), following the scroll
+// so the change is gradual while swiping.
+function ProgressSegment({
+  segment,
+  scrollX,
+  width,
+  colors,
+}: {
+  segment: number;
+  scrollX: SharedValue<number>;
+  width: number;
+  colors: { done: string; current: string; pending: string };
+}) {
+  const style = useAnimatedStyle(() => {
+    const page = scrollX.value / width;
+    return {
+      backgroundColor: interpolateColor(
+        Math.min(Math.max(page, segment - 1), segment + 1),
+        [segment - 1, segment, segment + 1],
+        [colors.pending, colors.current, colors.done],
+      ),
+    };
+  });
+
+  return <Animated.View style={[styles.segment, style]} />;
 }
 
 const styles = StyleSheet.create({
@@ -195,31 +354,67 @@ const styles = StyleSheet.create({
   slide: {
     flex: 1,
   },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
   copy: {
     position: 'absolute',
-    left: 24,
-    right: 24,
-    gap: 10,
+    left: GUTTER,
+    right: GUTTER,
   },
-  title: {
-    letterSpacing: -0.28,
+  discover: {
+    marginTop: 16,
+  },
+  discoverRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  discoverNumber: {
+    width: 34,
+  },
+  discoverTitle: {
+    fontWeight: '500',
+  },
+  discoverDetail: {
+    flex: 1,
+    textAlign: 'right',
+    marginLeft: 12,
+  },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: GUTTER,
+    paddingTop: 16,
+  },
+  pill: {
+    height: 34,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   controls: {
     position: 'absolute',
-    left: 24,
-    right: 24,
-    gap: 22,
+    left: GUTTER,
+    right: GUTTER,
+    gap: CONTROLS_GAP,
   },
-  dots: {
+  progressRow: {
+    height: PROGRESS_ROW,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  segments: {
+    flex: 1,
     flexDirection: 'row',
     gap: 6,
   },
-  dot: {
-    height: 6,
-    borderRadius: 3,
+  segment: {
+    flex: 1,
+    height: 3,
+    borderRadius: 1.5,
   },
 });

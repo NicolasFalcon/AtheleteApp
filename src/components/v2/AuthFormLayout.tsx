@@ -13,6 +13,7 @@ import { BackButton } from '@app/components/v2/IconButton';
 import { StatusBarV2 } from '@app/components/v2/StatusBarV2';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
+import { useTopSafeBarHeight } from '@app/components/v2/TopSafeBar';
 
 export type AuthFormLayoutProps = PropsWithChildren<{
   // Small centred title of the top bar ("Recuperar contraseña").
@@ -33,6 +34,9 @@ export function AuthFormLayout({
   centered = false,
   children,
 }: AuthFormLayoutProps) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
@@ -48,6 +52,7 @@ export function AuthFormLayout({
 
   return (
     <KeyboardAvoidingView
+      keyboardVerticalOffset={topSafeBarHeight}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.fill, { backgroundColor: colors.bg }]}
     >

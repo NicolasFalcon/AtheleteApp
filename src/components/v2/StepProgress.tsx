@@ -9,9 +9,9 @@ export type StepProgressProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-// Segmented bar of a guided flow (onboarding · 9 steps in 3 blocks): one
-// 4 pt segment per step, an extra 8 pt gap between blocks, filled up to the
-// current step.
+// Segmented bar of a guided flow (onboarding · 9 steps in 3 blocks · 4·2·3):
+// one 3 pt segment per step and a wider gap between blocks. Done steps in
+// the text colour, the current one in Ember, pending ones in the divider.
 export function StepProgress({ blocks, current, style }: StepProgressProps) {
   const { colors } = useThemeV2();
 
@@ -32,7 +32,11 @@ export function StepProgress({ blocks, current, style }: StepProgressProps) {
               styles.segment,
               {
                 backgroundColor:
-                  index <= current ? colors.text.primary : colors.divider,
+                  index === current
+                    ? colors.ember.base
+                    : index < current
+                    ? colors.text.primary
+                    : colors.divider,
               },
             ]}
           />
@@ -46,14 +50,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 4,
-    paddingHorizontal: 8,
   },
   segment: {
     flex: 1,
-    height: 4,
-    borderRadius: 2,
+    height: 3,
+    borderRadius: 1.5,
   },
   blockGap: {
-    width: 4,
+    width: 8,
   },
 });

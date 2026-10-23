@@ -20,6 +20,7 @@ import {
   TextV2,
   useThemeV2,
   useToast,
+  useTopSafeBarHeight,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { ROOT_ROUTES, APP_ROUTES } from '@app/constants/routes';
@@ -55,6 +56,9 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // (no threads) and the fixed comment field. Removed or hidden content shows
 // its placeholder; a post that is no longer available says so.
 export function SocialPostScreen({ navigation, route }: Props) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -93,6 +97,7 @@ export function SocialPostScreen({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView
+      keyboardVerticalOffset={topSafeBarHeight}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.screen, { backgroundColor: colors.bg }]}
     >

@@ -27,7 +27,14 @@ import {
   type LayoutV2,
   type SpaceV2,
 } from '@app/theme/v2/spacing';
-import { typeV2, type TypeV2 } from '@app/theme/v2/typography';
+import {
+  displayV2,
+  fontsV2,
+  typeV2,
+  type DisplayV2,
+  type FontsV2,
+  type TypeV2,
+} from '@app/theme/v2/typography';
 
 export type ThemeModeV2 = 'light' | 'dark';
 
@@ -37,6 +44,9 @@ export type ThemeV2 = {
   colors: ColorsV2;
   scene: SceneTokens;
   type: TypeV2;
+  // Anton (campaign headlines): font name + display scale.
+  fonts: FontsV2;
+  display: DisplayV2;
   space: SpaceV2;
   layout: LayoutV2;
   radius: RadiusV2;
@@ -52,6 +62,8 @@ export function createThemeV2(mode: ThemeModeV2): ThemeV2 {
     colors: mode === 'dark' ? darkColorsV2 : lightColorsV2,
     scene: sceneTokens,
     type: typeV2,
+    fonts: fontsV2,
+    display: displayV2,
     space: spaceV2,
     layout: layoutV2,
     radius: radiusV2,
@@ -76,6 +88,10 @@ export { layoutV2, radiusV2, spaceV2, typeV2 };
 export { blurV2, darkShadowsV2, easingV2, lightShadowsV2, motionV2 };
 export { ringV2 } from '@app/theme/v2/shadows';
 export type { ColorsV2, SceneTokens, ShadowsV2 };
-export type { TextStyleV2 } from '@app/theme/v2/typography';
+export type {
+  DisplaySize,
+  DisplayStyleV2,
+  TextStyleV2,
+} from '@app/theme/v2/typography';
 export { em, tightLine } from '@app/theme/v2/typography';
 export { alpha, gradients, palette } from '@app/theme/v2/palette';

@@ -44,7 +44,8 @@ describe('onboarding v2 model', () => {
     expect(weekPattern(3).filter(Boolean)).toHaveLength(3);
     expect(weekPattern(9).every(Boolean)).toBe(true);
     expect(daysLine(6)).toMatch(/descanso activo/);
-    expect(daysLine(2)).toMatch(/Poco a poco/);
+    expect(daysLine(2)).toMatch(/5 días de descanso/);
+    expect(daysLine(7)).toMatch(/Sin días de descanso/);
   });
 
   it('toggles equipment', () => {

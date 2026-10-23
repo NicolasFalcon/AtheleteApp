@@ -127,7 +127,6 @@ export function OnboardingFlow({
         error={error}
         onRetrySave={save}
         onGoHome={() => finish('home')}
-        onTalkToEllie={() => finish('ellie')}
       />
     );
   }

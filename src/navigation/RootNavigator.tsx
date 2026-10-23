@@ -23,7 +23,11 @@ import { ShareScreen } from '@app/screens/share/ShareScreen';
 import { WearScreen } from '@app/screens/wear/WearScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { STACK_SCREEN_OPTIONS } from '@app/navigation/stackScreenOptions';
+import {
+  FULL_SCREEN_OPTIONS,
+  STACK_SCREEN_OPTIONS,
+  stackScreenLayout,
+} from '@app/navigation/stackScreenOptions';
 import { StyleSheet } from 'react-native';
 import { enableScreens } from 'react-native-screens';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
@@ -147,17 +151,24 @@ export function RootNavigator() {
   }
 
   return (
-    <Stack.Navigator key={flow} screenOptions={STACK_SCREEN_OPTIONS}>
+    <Stack.Navigator
+      key={flow}
+      screenOptions={STACK_SCREEN_OPTIONS}
+      screenLayout={stackScreenLayout}
+    >
       {flow === 'auth' ? (
         <Stack.Screen
           name={ROOT_ROUTES.AuthFlow}
           component={AuthStackNavigator}
+          // The nested stack draws the bar of its own screens.
+          options={FULL_SCREEN_OPTIONS}
         />
       ) : null}
       {flow === 'onboarding' ? (
         <Stack.Screen
           name={ROOT_ROUTES.OnboardingFlow}
           component={OnboardingStackNavigator}
+          options={FULL_SCREEN_OPTIONS}
         />
       ) : null}
       {flow === 'app' ? (
@@ -190,7 +201,8 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.RouteActive}
             component={RouteActiveScreen}
-            options={{ gestureEnabled: false }}
+            // Full screen (B-01): live route.
+            options={{ ...FULL_SCREEN_OPTIONS, gestureEnabled: false }}
           />
           <Stack.Screen name={APP_ROUTES.RouteResult} component={RouteResultScreen} />
           <Stack.Screen name={APP_ROUTES.Share} component={ShareScreen} />
@@ -236,7 +248,8 @@ export function RootNavigator() {
             name={APP_ROUTES.WorkoutSession}
             component={WorkoutSessionScreen}
             // Leaving goes through "Salir del entreno" (no swipe back).
-            options={{ gestureEnabled: false }}
+            // Full screen (B-01): active session.
+            options={{ ...FULL_SCREEN_OPTIONS, gestureEnabled: false }}
           />
           <Stack.Screen
             name={APP_ROUTES.WorkoutSummary}
@@ -341,7 +354,8 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.SocialCompose}
             component={SocialComposeScreen}
-            options={{ presentation: 'modal' }}
+            // A sheet below the status bar: no bar (B-01).
+            options={{ ...FULL_SCREEN_OPTIONS, presentation: 'modal' }}
           />
           <Stack.Screen
             name={APP_ROUTES.SocialUsername}
@@ -363,7 +377,12 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.CaloriesCamera}
             component={CaloriesCameraScreen}
-            options={{ animation: 'fade', gestureEnabled: false }}
+            // Full screen (B-01): camera.
+            options={{
+              ...FULL_SCREEN_OPTIONS,
+              animation: 'fade',
+              gestureEnabled: false,
+            }}
           />
           <Stack.Screen
             name={APP_ROUTES.MealReview}
@@ -372,7 +391,12 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.MachineScan}
             component={MachineScanScreen}
-            options={{ animation: 'fade', gestureEnabled: false }}
+            // Full screen (B-01): camera.
+            options={{
+              ...FULL_SCREEN_OPTIONS,
+              animation: 'fade',
+              gestureEnabled: false,
+            }}
           />
           <Stack.Screen
             name={APP_ROUTES.MealDetail}

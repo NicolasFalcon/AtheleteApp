@@ -24,6 +24,7 @@ import {
   TextV2,
   useThemeV2,
   useToast,
+  useTopSafeBarHeight,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
 import { CANNED_PROMPTS, showSuggestions } from '@app/features/ellie/chatModel';
@@ -116,6 +117,9 @@ function MealCard({
 // pills, ELLIE speaks without a bubble. A prompt that comes from another
 // screen (route params) is sent once when the thread is ready.
 export function EllieChatScreen({ navigation, route }: Props) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -307,6 +311,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
       </View>
 
       <KeyboardAvoidingView
+        keyboardVerticalOffset={topSafeBarHeight}
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >

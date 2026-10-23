@@ -29,24 +29,81 @@ export type StepDefinition = {
   kind: StepKind;
   block: 0 | 1 | 2;
   question: string;
+  // Display headline (Anton, caps), one entry per line as in the design.
+  title: string[];
+  subtitle: string;
 };
 
 export const STEPS: StepDefinition[] = [
-  { kind: 'name', block: 0, question: '¿Cómo te llamas?' },
-  { kind: 'birthDate', block: 0, question: '¿Cuándo naciste?' },
-  { kind: 'gender', block: 0, question: '¿Cuál es tu sexo?' },
-  { kind: 'body', block: 0, question: 'Tu peso y altura' },
-  { kind: 'goal', block: 1, question: '¿Qué quieres conseguir?' },
-  { kind: 'level', block: 1, question: '¿Cuál es tu nivel?' },
-  { kind: 'days', block: 2, question: '¿Cuántos días quieres entrenar?' },
-  { kind: 'equipment', block: 2, question: '¿Con qué equipamiento cuentas?' },
-  { kind: 'duration', block: 2, question: '¿Cuánto dura tu sesión ideal?' },
+  {
+    kind: 'name',
+    block: 0,
+    question: '¿Cómo te llamas?',
+    title: ['¿CÓMO TE LLAMAS?'],
+    subtitle: 'Empecemos por lo básico.',
+  },
+  {
+    kind: 'birthDate',
+    block: 0,
+    question: '¿Cuándo naciste?',
+    title: ['¿CUÁNDO NACISTE?'],
+    subtitle: 'Ajustamos intensidad y recuperación a tu edad.',
+  },
+  {
+    kind: 'gender',
+    block: 0,
+    question: '¿Cuál es tu sexo?',
+    title: ['¿CUÁL ES TU SEXO?'],
+    subtitle: 'Lo usamos para afinar tus estimaciones.',
+  },
+  {
+    kind: 'body',
+    block: 0,
+    question: 'Tu peso y altura',
+    title: ['TU PESO Y ALTURA'],
+    subtitle: 'Para calcular cargas y calorías con precisión.',
+  },
+  {
+    kind: 'goal',
+    block: 1,
+    question: '¿Qué quieres conseguir?',
+    title: ['¿QUÉ QUIERES', 'CONSEGUIR?'],
+    subtitle: 'Elige uno. Podrás cambiarlo cuando quieras.',
+  },
+  {
+    kind: 'level',
+    block: 1,
+    question: '¿Cuál es tu nivel?',
+    title: ['¿CUÁL ES TU NIVEL?'],
+    subtitle: 'Sé honesto: ELLIE ajusta el plan desde aquí.',
+  },
+  {
+    kind: 'days',
+    block: 2,
+    question: '¿Cuántos días quieres entrenar?',
+    title: ['¿CUÁNTOS DÍAS', 'QUIERES ENTRENAR?'],
+    subtitle: 'La constancia gana a la intensidad.',
+  },
+  {
+    kind: 'equipment',
+    block: 2,
+    question: '¿Con qué equipamiento cuentas?',
+    title: ['¿CON QUÉ', 'EQUIPAMIENTO', 'CUENTAS?'],
+    subtitle: 'Tus rutinas se arman con lo que tienes.',
+  },
+  {
+    kind: 'duration',
+    block: 2,
+    question: '¿Cuánto dura tu sesión ideal?',
+    title: ['¿CUÁNTO DURA', 'TU SESIÓN IDEAL?'],
+    subtitle: 'Elige lo que de verdad puedes sostener.',
+  },
 ];
 
 export type GoalOption = {
   label: string;
   subtitle: string;
-  // Short pair for the ELLIE welcome summary ("Ganar" / "músculo").
+  // Value / label pair of the "Plan listo" stat (GANAR / MÚSCULO).
   short: [string, string];
   value: OnboardingGoal;
 };
@@ -73,7 +130,7 @@ export const GOALS: GoalOption[] = [
   {
     label: 'Rendimiento',
     subtitle: 'Correr, saltar, competir',
-    short: ['Rendir', 'más'],
+    short: ['Rendir', 'al máximo'],
     value: 'performance',
   },
 ];
@@ -150,6 +207,10 @@ export type OnboardingAnswers = {
   goal: number | null;
   level: number | null;
   days: number;
+  // L…D chosen on the "días" step. TODO(onboarding-weekdays): local only,
+  // there is no profiles column for the concrete days yet; only `days`
+  // (training_days_per_week) is saved.
+  weekDays: boolean[];
   equipment: string[];
   duration: number | null;
 };
@@ -164,6 +225,7 @@ export function initialAnswers(name = ''): OnboardingAnswers {
     goal: null,
     level: null,
     days: 3,
+    weekDays: weekPattern(3),
     equipment: [],
     duration: null,
   };
@@ -212,14 +274,27 @@ export function weekPattern(days: number): boolean[] {
   return Array.from({ length: 7 }, (_, index) => active.includes(index));
 }
 
+// The stepper sets the suggested pattern; a chip toggles one day and the
+// count follows (never below one day).
+export function toggleWeekDay(week: boolean[], index: number): boolean[] {
+  const next = week.map((active, day) => (day === index ? !active : active));
+  return next.some(Boolean) ? next : week;
+}
+
+export function countWeekDays(week: boolean[]): number {
+  return week.filter(Boolean).length;
+}
+
+// Note under the week, by rest days (7 − training days).
 export function daysLine(days: number): string {
-  if (days >= 6) {
+  const rest = 7 - Math.min(DAYS_RANGE.max, Math.max(DAYS_RANGE.min, days));
+  if (rest === 0) {
+    return 'Sin días de descanso. ELLIE ajusta la carga.';
+  }
+  if (rest === 1) {
     return 'Con un día de descanso activo. ELLIE ajusta la carga.';
   }
-  if (days <= 2) {
-    return 'Poco a poco. Podrás subirlo cuando quieras.';
-  }
-  return 'Un buen ritmo para progresar sin sobrecarga.';
+  return `Con ${rest} días de descanso. ELLIE ajusta la carga.`;
 }
 
 export function toggleEquipment(current: string[], item: string): string[] {

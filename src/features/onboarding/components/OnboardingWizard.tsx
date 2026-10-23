@@ -12,13 +12,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BackButton,
   Button,
-  Eyebrow,
-  GlassSurface,
+  PosterTitle,
   StatusBarV2,
   StepProgress,
   TextV2,
   useThemeV2,
+  useTopSafeBarHeight,
 } from '@app/components/v2';
+import { Isologo } from '@app/components/v2/Isologo';
 import {
   BLOCKS,
   STEPS,
@@ -36,6 +37,7 @@ import {
   LevelStep,
   NameStep,
 } from '@app/features/onboarding/components/OnboardingSteps';
+import { em } from '@app/theme/v2/typography';
 
 export type OnboardingWizardProps = {
   step: number;
@@ -50,8 +52,11 @@ export type OnboardingWizardProps = {
 
 const BLOCK_OF_STEP = STEPS.map(step => step.block);
 
-// ONB_02 · Onboarding (9 steps): one question per screen at 32 pt, grouped in
-// Tú · Tu objetivo · Tu semana, segmented progress and a fixed "Siguiente".
+const pad = (value: number) => String(value).padStart(2, '0');
+
+// ONB_02 · Onboarding (9 steps): back · isotipo · "0N / 09", segmented
+// progress (4·2·3), Ember eyebrow of the block, the question in Anton and a
+// fixed "Siguiente" ("Terminar" in Ember on the last step).
 export function OnboardingWizard({
   step,
   direction,
@@ -61,7 +66,10 @@ export function OnboardingWizard({
   onBack,
   canExit = false,
 }: OnboardingWizardProps) {
-  const { colors, layout } = useThemeV2();
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
+  const { colors, layout, type } = useThemeV2();
   const insets = useSafeAreaInsets();
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
@@ -107,24 +115,37 @@ export function OnboardingWizard({
 
   return (
     <KeyboardAvoidingView
+      keyboardVerticalOffset={topSafeBarHeight}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.fill, { backgroundColor: colors.bg }]}
     >
       <StatusBarV2 />
-      <View style={[styles.header, { paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.header,
+          { paddingTop: insets.top + 8, paddingHorizontal: layout.gutter },
+        ]}
+      >
         <View style={styles.bar}>
           <View style={styles.side}>
             {showBack ? <BackButton onPress={onBack} /> : null}
           </View>
-          <TextV2
-            variant="metaStrong"
-            tone="secondary"
-            align="center"
-            style={styles.flex1}
-          >
-            {`${BLOCKS[current.block]} · ${step + 1} de ${STEPS.length}`}
-          </TextV2>
-          <View style={styles.side} />
+          <View style={styles.center} accessibilityElementsHidden>
+            <Isologo size={28} color={colors.text.primary} />
+          </View>
+          <View style={[styles.side, styles.sideEnd]}>
+            <TextV2
+              variant="micro"
+              tone="secondary"
+              accessibilityLabel={`Paso ${step + 1} de ${STEPS.length}`}
+              style={[
+                styles.counter,
+                { letterSpacing: em(0.2, type.micro.fontSize) },
+              ]}
+            >
+              {`${pad(step + 1)} / ${pad(STEPS.length)}`}
+            </TextV2>
+          </View>
         </View>
         <StepProgress blocks={BLOCK_OF_STEP} current={step} />
       </View>
@@ -137,34 +158,40 @@ export function OnboardingWizard({
           { paddingHorizontal: layout.gutter },
         ]}
       >
-        <Animated.View key={step} entering={entering} style={styles.gap32}>
-          <View style={styles.gap10}>
-            <Eyebrow>{`0${current.block + 1} · ${
-              BLOCKS[current.block]
-            }`}</Eyebrow>
-            <TextV2 accessibilityRole="header" style={styles.question}>
-              {current.question}
+        <Animated.View key={step} entering={entering} style={styles.gap28}>
+          <View style={styles.gap8}>
+            <PosterTitle
+              display="displayS"
+              eyebrow={`${pad(current.block + 1)} · ${BLOCKS[
+                current.block
+              ].toUpperCase()}`}
+              headline={current.title}
+              accent={[]}
+            />
+            <TextV2 variant="body" tone="secondary">
+              {current.subtitle}
             </TextV2>
           </View>
           {body[current.kind]}
         </Animated.View>
       </ScrollView>
-      <GlassSurface
-        kind="nav"
+      <View
         style={[
           styles.footer,
           {
+            backgroundColor: colors.bg,
             paddingHorizontal: layout.gutter,
             paddingBottom: Math.max(insets.bottom, 16) + 8,
           },
         ]}
       >
         <Button
+          variant={isLast ? 'commit' : 'primary'}
           label={isLast ? 'Terminar' : 'Siguiente'}
           disabled={!ready}
           onPress={onNext}
         />
-      </GlassSurface>
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -173,36 +200,37 @@ const styles = StyleSheet.create({
   fill: {
     flex: 1,
   },
-  flex1: {
-    flex: 1,
-  },
   header: {
-    paddingHorizontal: 12,
-    gap: 12,
+    gap: 14,
   },
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   side: {
-    width: 44,
+    width: 64,
     height: 44,
+    justifyContent: 'center',
+  },
+  sideEnd: {
+    alignItems: 'flex-end',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  counter: {
+    fontWeight: '700',
   },
   content: {
-    paddingTop: 36,
+    paddingTop: 24,
     paddingBottom: 24,
   },
-  gap10: {
-    gap: 10,
+  gap8: {
+    gap: 8,
   },
-  gap32: {
-    gap: 32,
-  },
-  question: {
-    fontSize: 32,
-    fontWeight: '600',
-    letterSpacing: -0.8,
-    lineHeight: 35,
+  gap28: {
+    gap: 28,
   },
   footer: {
     paddingTop: 12,

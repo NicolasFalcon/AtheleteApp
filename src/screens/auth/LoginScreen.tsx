@@ -8,8 +8,8 @@ import {
   PressableScale,
   TextField,
   TextV2,
-  ThemeToggleButton,
 } from '@app/components/v2';
+import { SocialSignIn } from '@app/components/auth/SocialSignIn';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import {
   toLoginError,
@@ -26,7 +26,8 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-// AUTH_01 / AUTH_02 · Iniciar sesión (Auth.dc.html).
+// AUTH_01 / AUTH_02 · Iniciar sesión (Auth v2): always dark, Apple first,
+// then the email form.
 export function LoginScreen({ navigation }: Props) {
   const { signIn, isSupabaseConfigured } = useAuth();
   const passwordRef = useRef<TextInput>(null);
@@ -92,9 +93,12 @@ export function LoginScreen({ navigation }: Props) {
 
   return (
     <AuthHeroLayout
+      look="scene"
       photo={HERO_PHOTO}
-      title="Qué bueno verte de nuevo."
-      topRight={<ThemeToggleButton />}
+      tagline={['ENTRENA', 'RECUPERA', 'EVOLUCIONA']}
+      headline={['QUÉ BUENO']}
+      accent={['VERTE.']}
+      subtitle={['TU PROGRESO SIGUE AQUÍ.', 'RETOMA DONDE LO DEJASTE.']}
       footer={
         <View style={styles.footer}>
           <TextV2 variant="body" tone="secondary">
@@ -116,8 +120,13 @@ export function LoginScreen({ navigation }: Props) {
           SUPABASE_ANON_KEY en .env para habilitar este flujo.
         </TextV2>
       ) : null}
+      {/* Iniciar sesión con Apple (iOS): the white official button, then
+          "O CON TU CORREO". */}
+      <SocialSignIn mode="signIn" appleStyle="white" disabled={submitting} />
       <TextField
         label="Correo electrónico"
+        variant="glass"
+        hideLabel
         icon={Mail}
         value={email}
         onChangeText={value => {
@@ -136,6 +145,8 @@ export function LoginScreen({ navigation }: Props) {
       <TextField
         ref={passwordRef}
         label="Contraseña"
+        variant="glass"
+        hideLabel
         icon={Lock}
         secure
         value={password}
@@ -164,6 +175,7 @@ export function LoginScreen({ navigation }: Props) {
       </PressableScale>
       <Button
         label="Iniciar sesión"
+        variant="commit"
         loading={submitting}
         loadingLabel="Entrando…"
         onPress={handleSubmit}
@@ -179,7 +191,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   cta: {
-    marginTop: 6,
+    marginTop: 4,
   },
   footer: {
     flexDirection: 'row',

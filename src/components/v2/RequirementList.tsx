@@ -11,16 +11,26 @@ export type Requirement = {
 
 export type RequirementListProps = {
   requirements: Requirement[];
+  // 'inline': the checks wrap in a row under the field (Crear cuenta v2).
+  layout?: 'list' | 'inline';
   style?: StyleProp<ViewStyle>;
 };
 
 // Live checklist (passwords): an empty 18 pt ring that turns into an Ember
 // check with a pop when the requirement is met (handoff §5 Input, §13).
-export function RequirementList({ requirements, style }: RequirementListProps) {
+export function RequirementList({
+  requirements,
+  layout = 'list',
+  style,
+}: RequirementListProps) {
   const { colors } = useThemeV2();
+  const inline = layout === 'inline';
 
   return (
-    <View accessibilityRole="summary" style={[styles.list, style]}>
+    <View
+      accessibilityRole="summary"
+      style={[styles.list, inline ? styles.inline : null, style]}
+    >
       {requirements.map(requirement => (
         <View
           key={requirement.label}
@@ -28,7 +38,7 @@ export function RequirementList({ requirements, style }: RequirementListProps) {
           accessibilityLabel={`${requirement.label}: ${
             requirement.met ? 'cumplido' : 'pendiente'
           }`}
-          style={styles.row}
+          style={[styles.row, inline ? styles.rowInline : null]}
         >
           {requirement.met ? (
             <Animated.View
@@ -46,7 +56,7 @@ export function RequirementList({ requirements, style }: RequirementListProps) {
             />
           )}
           <TextV2
-            variant="meta"
+            variant={inline ? 'caption' : 'meta'}
             tone={requirement.met ? 'primary' : 'secondary'}
           >
             {requirement.label}
@@ -62,10 +72,19 @@ const styles = StyleSheet.create({
     gap: 8,
     padding: 2,
   },
+  inline: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: 14,
+    rowGap: 6,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+  },
+  rowInline: {
+    gap: 6,
   },
   dot: {
     width: 18,

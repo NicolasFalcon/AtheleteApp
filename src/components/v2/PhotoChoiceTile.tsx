@@ -1,5 +1,4 @@
 import {
-  Image,
   StyleSheet,
   View,
   type ImageSourcePropType,
@@ -10,6 +9,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import Animated, { ZoomIn } from 'react-native-reanimated';
 import { Check } from 'lucide-react-native';
 import { haptics } from '@app/components/v2/haptics';
+import { MonoPhoto } from '@app/components/v2/Poster';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -24,9 +24,9 @@ export type PhotoChoiceTileProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-// Answer tile with a photo (onboarding goal): 196 pt, radius 22, scrim from
-// 38 % to .9, title 17/600 + subtitle 13 on the photo. Selected: 3 pt ring in
-// the primary ink and an Ember check that pops in.
+// Answer tile with a photo (onboarding goal): 196 pt, radius 22, the photo
+// in black and white, scrim from 38 % to .9, title 17/600 + subtitle 13 on
+// it. Selected: 3 pt ring in the primary ink and an Ember check that pops in.
 export function PhotoChoiceTile({
   title,
   subtitle,
@@ -58,7 +58,7 @@ export function PhotoChoiceTile({
       ]}
     >
       <View style={styles.clip}>
-        <Image source={photo} resizeMode="cover" style={styles.photo} />
+        <MonoPhoto source={photo} style={StyleSheet.absoluteFill} />
         <LinearGradient
           pointerEvents="none"
           colors={['rgba(20,19,18,0)', 'rgba(20,19,18,.9)']}
@@ -96,10 +96,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 22,
     overflow: 'hidden',
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
   },
   check: {
     position: 'absolute',

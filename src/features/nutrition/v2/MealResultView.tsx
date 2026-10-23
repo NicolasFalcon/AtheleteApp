@@ -11,6 +11,7 @@ import {
   StatusBarV2,
   TextV2,
   useThemeV2,
+  useTopSafeBarHeight,
 } from '@app/components/v2';
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
 import { MEAL_ORDER } from '@app/features/nutrition/mealCache';
@@ -71,6 +72,9 @@ export function MealResultView({
   hinting?: boolean;
   hintNote?: string | null;
 }) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
   const es = language === 'es';
@@ -98,7 +102,7 @@ export function MealResultView({
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 style="light" />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView keyboardVerticalOffset={topSafeBarHeight} style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"

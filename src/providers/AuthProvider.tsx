@@ -27,6 +27,7 @@ import {
   fetchProfile,
   updateOnboardingProfile,
 } from '@app/services/supabase/profile';
+import { signInWithApple } from '@app/services/supabase/appleAuth';
 import { parsePasswordRecoveryUrl } from '@app/lib/auth/passwordRecoveryUrl';
 import type { AppFlow, OnboardingData, ProfileRecord } from '@app/types/auth';
 
@@ -39,6 +40,8 @@ type AuthContextValue = {
   isSupabaseConfigured: boolean;
   refreshProfile: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  // Sign in with Apple (AUTH_SHAPES): the session then routes like email.
+  signInWithApple: () => Promise<'signedIn' | 'cancelled'>;
   signUp: (name: string, email: string, password: string) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   recoverPasswordSessionFromUrl: (url: string) => Promise<boolean>;
@@ -367,6 +370,19 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
+  const signInWithAppleAction = useCallback(async () => {
+    const result = await signInWithApple();
+    if (result.status === 'cancelled') {
+      return 'cancelled' as const;
+    }
+    // The name was saved after the session started: read the profile again
+    // so onboarding and the app see it.
+    if (result.nameSaved) {
+      await hydrateProfile(result.session).catch(() => undefined);
+    }
+    return 'signedIn' as const;
+  }, [hydrateProfile]);
+
   const signUp = useCallback(
     async (name: string, email: string, password: string) => {
       const { error } = await registerWithEmail(name, email, password);
@@ -474,6 +490,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       isSupabaseConfigured,
       refreshProfile,
       signIn,
+      signInWithApple: signInWithAppleAction,
       signUp,
       requestPasswordReset,
       recoverPasswordSessionFromUrl,
@@ -500,6 +517,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       resetOnboardingDraft,
       session,
       signIn,
+      signInWithAppleAction,
       signOut,
       signUp,
       finishPasswordRecovery,

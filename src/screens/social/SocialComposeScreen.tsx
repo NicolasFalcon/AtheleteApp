@@ -25,6 +25,7 @@ import {
   haptics,
   useThemeV2,
   useToast,
+  useTopSafeBarHeight,
 } from '@app/components/v2';
 import { LEGAL_IS_PLACEHOLDER, TERMS_URL } from '@app/constants/legal';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
@@ -82,6 +83,9 @@ function titleFor(attach: AttachmentKind | undefined, shared: boolean): string {
 // user cannot edit. Never only text. Before the first publication the Terms
 // are accepted (BT-43, placeholder URL).
 export function SocialComposeScreen({ navigation, route }: Props) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -216,6 +220,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView
+      keyboardVerticalOffset={topSafeBarHeight}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.screen, { backgroundColor: colors.bg }]}
     >

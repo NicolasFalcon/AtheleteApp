@@ -1,4 +1,4 @@
-import type { TextStyle } from 'react-native';
+import { Platform, type TextStyle } from 'react-native';
 
 // v2 text styles. No fontFamily on purpose: React Native then uses the
 // system font (SF Pro on iOS, Roboto on Android). Tabular figures everywhere,
@@ -88,3 +88,50 @@ export const typeV2 = {
 } as const;
 
 export type TypeV2 = typeof typeV2;
+
+// Display face of the campaign headlines (Login, Crear cuenta, Intro):
+// Anton Regular, Google Fonts, SIL OFL 1.1 (docs/licenses/Anton-OFL.txt).
+// PostScript name, which is also the asset file name on Android.
+export const fontsV2 = {
+  display: 'Anton-Regular',
+} as const;
+
+export type FontsV2 = typeof fontsV2;
+
+export type DisplayStyleV2 = Required<
+  Pick<
+    TextStyle,
+    | 'fontFamily'
+    | 'fontSize'
+    | 'fontWeight'
+    | 'lineHeight'
+    | 'letterSpacing'
+    | 'textTransform'
+  >
+>;
+
+// Always caps, line height 0.94 × size, tracking −0.005 em. Anton has one
+// weight: on iOS '700' only matters if the font is missing (system bold
+// fallback); on Android it would synthesise a fake bold, so it stays '400'.
+function display(fontSize: number): DisplayStyleV2 {
+  return {
+    fontFamily: fontsV2.display,
+    fontSize,
+    fontWeight: Platform.OS === 'ios' ? '700' : '400',
+    lineHeight: Math.round(fontSize * 0.94),
+    letterSpacing: em(-0.005, fontSize),
+    textTransform: 'uppercase',
+  };
+}
+
+// Login 62 · Intro 60 · Crear cuenta 58 · Onboarding questions 46. Not to
+// be confused with typeV2.displayS…displayXL (system-font figures).
+export const displayV2 = {
+  displayXL: display(62),
+  displayL: display(60),
+  displayM: display(58),
+  displayS: display(46),
+} as const;
+
+export type DisplayV2 = typeof displayV2;
+export type DisplaySize = keyof DisplayV2;

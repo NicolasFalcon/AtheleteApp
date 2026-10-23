@@ -13,6 +13,27 @@ const RECIPES = {
     colors: ['rgba(20,19,18,.55)', 'rgba(20,19,18,.12)', 'rgba(20,19,18,.88)'],
     locations: [0, 0.32, 1],
   },
+  // Login v2: dark top for the brand, then the photo melts into the plate
+  // where the form starts.
+  authPoster: {
+    colors: [
+      'rgba(20,19,18,.55)',
+      'rgba(20,19,18,.12)',
+      'rgba(20,19,18,.55)',
+      'rgba(20,19,18,1)',
+    ],
+    locations: [0, 0.3, 0.7, 1],
+  },
+  // Intro: soft top for the brand, darker towards the copy at the bottom.
+  intro: {
+    colors: [
+      'rgba(20,19,18,.55)',
+      'rgba(20,19,18,.12)',
+      'rgba(20,19,18,.8)',
+      'rgba(20,19,18,.96)',
+    ],
+    locations: [0, 0.3, 0.68, 1],
+  },
   // Crear cuenta: lower hero, softer middle.
   authShort: {
     colors: ['rgba(20,19,18,.5)', 'rgba(20,19,18,.2)', 'rgba(20,19,18,.8)'],

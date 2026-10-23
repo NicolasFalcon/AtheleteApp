@@ -26,6 +26,7 @@ import {
   leftUnit,
 } from '@app/features/core33/core33Model';
 import { useCore33Day } from '@app/features/core33/useCore33Day';
+import { DayClosedSheet } from '@app/features/core33/v2/DayClosedSheet';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import {
   ChallengeArt,
@@ -239,6 +240,10 @@ export function Core33Screen({ navigation }: Props) {
         subtitle={view.missed === 0 ? 'Core 33 cerrado sin fallar un día' : 'Core 33 completado'}
         onClose={() => setCelebrate(false)}
       />
+
+      {/* Día cerrado (§27): opened by useCore33Day 650 ms after the tap that
+          closes the day, once per day. */}
+      <DayClosedSheet day={day.dayClosed} onClose={day.dismissDayClosed} />
 
       <Sheet open={menu} onClose={() => setMenu(false)} title="Core 33">
         <PressableScale

@@ -19,6 +19,7 @@ import {
   TextV2,
   useThemeV2,
   useToast,
+  useTopSafeBarHeight,
 } from '@app/components/v2';
 import { ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import {
@@ -45,6 +46,9 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // "Siguiente" fijo). El backend lo exige antes de usar Comunidad
 // (`ensure_social_settings`); desde Privacidad social se edita (`set_username`).
 export function SocialUsernameScreen({ navigation, route }: Props) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -117,6 +121,7 @@ export function SocialUsernameScreen({ navigation, route }: Props) {
 
   return (
     <KeyboardAvoidingView
+      keyboardVerticalOffset={topSafeBarHeight}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.fill, { backgroundColor: colors.bg }]}
     >

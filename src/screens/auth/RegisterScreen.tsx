@@ -5,7 +5,6 @@ import { Lock, Mail, User } from 'lucide-react-native';
 import {
   AuthFormLayout,
   AuthHeroLayout,
-  BackButton,
   Button,
   PressableScale,
   RequirementList,
@@ -13,6 +12,7 @@ import {
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
+import { SocialSignIn } from '@app/components/auth/SocialSignIn';
 import { AUTH_ROUTES } from '@app/constants/routes';
 import {
   allRequirementsMet,
@@ -30,9 +30,10 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-// AUTH_03 · Crear cuenta (Auth.dc.html). Requirements are checked live with
-// an Ember check; the CTA stays inactive until name, email and password are
-// valid. After sign-up Supabase asks to verify the email (kept from v1).
+// AUTH_03 · Crear cuenta (Auth v2). Apple first, then the email form.
+// Requirements are checked live with an Ember check; the CTA stays inactive
+// until name, email and password are valid. After sign-up Supabase asks to
+// verify the email (kept from v1).
 export function RegisterScreen({ navigation }: Props) {
   const { signUp, isSupabaseConfigured } = useAuth();
   const emailRef = useRef<TextInput>(null);
@@ -87,17 +88,13 @@ export function RegisterScreen({ navigation }: Props) {
 
   return (
     <AuthHeroLayout
+      look="theme"
       photo={HERO_PHOTO}
-      heroHeight={230}
-      brand="eyebrow"
-      scrim="authShort"
-      title="Crea tu cuenta"
-      topLeft={<BackButton variant="glass" onPress={goToLogin} />}
+      headline={['TU MEJOR', 'VERSIÓN']}
+      accent={['EMPIEZA HOY.']}
+      subtitle={['DISCIPLINA HOY.', 'UN MEJOR MAÑANA.']}
       footer={
         <View style={styles.footer}>
-          <TextV2 variant="caption" tone="tertiary" align="center">
-            Al continuar aceptas los Términos y la Política de privacidad.
-          </TextV2>
           <View style={styles.loginRow}>
             <TextV2 variant="body" tone="secondary">
               ¿Ya tienes cuenta?
@@ -110,6 +107,10 @@ export function RegisterScreen({ navigation }: Props) {
               <TextV2 variant="bodyStrong">Iniciar sesión</TextV2>
             </PressableScale>
           </View>
+          {/* No Terms / Privacy pages yet (constants/legal: placeholder). */}
+          <TextV2 variant="caption" tone="tertiary" align="center">
+            Al continuar aceptas los Términos y la Política de privacidad.
+          </TextV2>
         </View>
       }
     >
@@ -119,15 +120,19 @@ export function RegisterScreen({ navigation }: Props) {
           SUPABASE_ANON_KEY en .env para habilitar este flujo.
         </TextV2>
       ) : null}
+      {/* Crear cuenta con Apple (iOS): official button, then "O CON TU
+          CORREO". */}
+      <SocialSignIn mode="signUp" disabled={submitting} />
       <TextField
         label="Nombre"
+        hideLabel
         icon={User}
         value={name}
         onChangeText={value => {
           setName(value);
           setFormError('');
         }}
-        placeholder="Tu nombre"
+        placeholder="Nombre"
         autoCapitalize="words"
         autoComplete="name"
         textContentType="name"
@@ -137,6 +142,7 @@ export function RegisterScreen({ navigation }: Props) {
       <TextField
         ref={emailRef}
         label="Correo electrónico"
+        hideLabel
         icon={Mail}
         value={email}
         onChangeText={value => {
@@ -145,7 +151,7 @@ export function RegisterScreen({ navigation }: Props) {
           setFormError('');
         }}
         error={emailError || undefined}
-        placeholder="tu@ejemplo.com"
+        placeholder="Correo electrónico"
         autoCapitalize="none"
         autoComplete="email"
         keyboardType="email-address"
@@ -156,6 +162,7 @@ export function RegisterScreen({ navigation }: Props) {
       <TextField
         ref={passwordRef}
         label="Contraseña"
+        hideLabel
         icon={Lock}
         secure
         value={password}
@@ -172,9 +179,10 @@ export function RegisterScreen({ navigation }: Props) {
         returnKeyType="done"
         onSubmitEditing={handleSubmit}
       />
-      <RequirementList requirements={requirements} />
+      <RequirementList requirements={requirements} layout="inline" />
       <Button
         label="Crear cuenta"
+        variant="commit"
         disabled={!canSubmit}
         loading={submitting}
         loadingLabel="Creando cuenta…"
@@ -228,10 +236,10 @@ function VerifyEmailState({
 
 const styles = StyleSheet.create({
   cta: {
-    marginTop: 6,
+    marginTop: 4,
   },
   footer: {
-    gap: 14,
+    gap: 12,
   },
   loginRow: {
     flexDirection: 'row',

@@ -183,3 +183,39 @@ export function flipHabit(
   next[index] = !next[index];
   return next;
 }
+
+// ── Día cerrado (handoff v2.17 §27) ─────────────────────────────────────────
+// The sheet after closing a day: days 1–32 (day 33 goes to the celebration).
+// `day` = closed days including the one just closed (the big number).
+const DAY_CLOSED_MILESTONES: Record<number, string> = {
+  7: 'Primera semana completa',
+  14: 'Dos semanas seguidas',
+  21: 'Tres semanas: ya es hábito',
+  28: 'Cuatro semanas. Queda la recta final',
+};
+
+export type DayClosedCopy = { line: string; milestone: string | null };
+
+export function dayClosedCopy(day: number): DayClosedCopy {
+  return {
+    line:
+      day >= CORE33_TOTAL_DAYS - 1
+        ? 'Mañana cierras el reto.'
+        : `Quedan ${CORE33_TOTAL_DAYS - day} días. Mañana, los mismos tres hábitos.`,
+    milestone: DAY_CLOSED_MILESTONES[day] ?? null,
+  };
+}
+
+// The sheet is shown for days 1–32 only.
+export function showsDayClosedSheet(day: number): boolean {
+  return day >= 1 && day < CORE33_TOTAL_DAYS;
+}
+
+// All the habits of a day are done.
+export function isDayDone(logs: boolean[] | undefined, total: number): boolean {
+  return (
+    logs !== undefined &&
+    logs.length >= total &&
+    logs.slice(0, total).every(Boolean)
+  );
+}

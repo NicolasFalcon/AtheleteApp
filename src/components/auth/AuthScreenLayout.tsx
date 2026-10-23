@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BackIcon } from '@app/assets/icons';
 import { useAppTheme } from '@app/hooks/useAppTheme';
+import { useTopSafeBarHeight } from '@app/components/v2/TopSafeBar';
 
 type AuthScreenLayoutProps = PropsWithChildren<{
   header: ReactNode;
@@ -30,6 +31,9 @@ export function AuthScreenLayout({
   centered = false,
   topActions,
 }: AuthScreenLayoutProps) {
+  // KeyboardAvoidingView measures itself from its parent, which starts
+  // below the TopSafeBar (B-01).
+  const topSafeBarHeight = useTopSafeBarHeight();
   const { theme, mode } = useAppTheme();
   const styles = createStyles(theme);
 
@@ -40,6 +44,7 @@ export function AuthScreenLayout({
         barStyle={mode === 'dark' ? 'light-content' : 'dark-content'}
       />
       <KeyboardAvoidingView
+        keyboardVerticalOffset={topSafeBarHeight}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboard}
       >

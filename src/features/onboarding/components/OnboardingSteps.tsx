@@ -39,13 +39,14 @@ import {
   LEVELS,
   RECOMMENDED_DURATION,
   WEIGHT_RANGE,
+  countWeekDays,
   daysLine,
   toggleEquipment,
+  toggleWeekDay,
   weekPattern,
   type OnboardingAnswers,
 } from '@app/features/onboarding/onboardingModel';
 import { GENDER_OPTIONS } from '@app/features/profile/genderModel';
-import { tightLine } from '@app/theme/v2';
 
 type StepProps = {
   answers: OnboardingAnswers;
@@ -58,8 +59,11 @@ export function NameStep({ answers, update, onSubmit }: StepProps) {
   const { colors } = useThemeV2();
 
   return (
-    <View style={styles.gap10}>
+    <View>
       <TextInput
+        // The keyboard opens with the step; the KeyboardAvoidingView keeps
+        // "Siguiente" above it.
+        autoFocus
         value={answers.name}
         onChangeText={name => update({ name })}
         placeholder="Tu nombre"
@@ -79,9 +83,6 @@ export function NameStep({ answers, update, onSubmit }: StepProps) {
           },
         ]}
       />
-      <TextV2 variant="meta" tone="secondary">
-        Así te llamará ELLIE.
-      </TextV2>
     </View>
   );
 }
@@ -226,7 +227,8 @@ export function GenderStep({ answers, update }: StepProps) {
           <ChoiceTile
             key={option.value}
             selected={answers.gender === option.value}
-            height={132}
+            showCheck
+            height={164}
             accessibilityLabel={option.label}
             onPress={() => update({ gender: option.value })}
             style={styles.capsule}
@@ -242,8 +244,8 @@ export function GenderStep({ answers, update }: StepProps) {
         ))}
       </View>
       <TextV2 variant="meta" tone="secondary">
-        Lo usamos para afinar tus estimaciones. Con "Otro" usamos una
-        estimación neutra. Puedes cambiarlo en Editar perfil.
+        Con “Otro” usamos una estimación neutra. Puedes cambiarlo en Editar
+        perfil.
       </TextV2>
     </View>
   );
@@ -274,10 +276,12 @@ export function BodyStep({ answers, update }: StepProps) {
 }
 
 // ── 5 · Objetivo ───────────────────────────────────────────────────────────
-// Package photos with the prototype treatment baked in (PLACEHOLDER).
+// TODO(onboarding-assets): placeholders until
+// assets/images/onboarding/goal-muscle|fat|maintain|performance.jpg exist.
+// Shown in black and white by PhotoChoiceTile.
 const GOAL_PHOTOS = [
   require('@app/assets/v2/photos/hero-entreno.jpg'),
-  require('@app/assets/v2/photos/hiit.jpg'),
+  require('@app/assets/v2/photos/home/athlete-3.jpg'),
   require('@app/assets/v2/photos/movilidad.jpg'),
   require('@app/assets/v2/photos/cuerdas.jpg'),
 ];
@@ -367,10 +371,22 @@ export function LevelStep({ answers, update }: StepProps) {
 
 // ── 7 · Días por semana ────────────────────────────────────────────────────
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const WEEKDAY_NAMES = [
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+  'Domingo',
+];
+// The count in Anton, like the headlines.
+const DAYS_NUMBER = 112;
 
 export function DaysStep({ answers, update }: StepProps) {
-  const { colors } = useThemeV2();
-  const pattern = weekPattern(answers.days);
+  const { colors, display } = useThemeV2();
+  const week = answers.weekDays;
+  // The stepper applies the suggested days for the new count.
   const change = (delta: number) => {
     const days = Math.min(
       DAYS_RANGE.max,
@@ -378,9 +394,18 @@ export function DaysStep({ answers, update }: StepProps) {
     );
     if (days !== answers.days) {
       haptics.selection();
-      update({ days });
+      update({ days, weekDays: weekPattern(days) });
     }
   };
+  // A chip toggles its day and the count follows (at least one day).
+  const toggle = (index: number) => {
+    const next = toggleWeekDay(week, index);
+    if (next !== week) {
+      haptics.selection();
+      update({ weekDays: next, days: countWeekDays(next) });
+    }
+  };
+  const numberBox = Math.ceil(DAYS_NUMBER * 1.51);
 
   return (
     <View style={styles.gap26}>
@@ -397,7 +422,20 @@ export function DaysStep({ answers, update }: StepProps) {
           accessibilityLabel={`${answers.days} días por semana`}
           style={styles.stepperValue}
         >
-          <TextV2 style={styles.daysNumber}>{answers.days}</TextV2>
+          <TextV2
+            style={[
+              styles.daysNumber,
+              {
+                fontFamily: display.displayS.fontFamily,
+                fontWeight: display.displayS.fontWeight,
+                lineHeight: numberBox,
+                marginVertical:
+                  (Math.round(DAYS_NUMBER * 0.94) - numberBox) / 2,
+              },
+            ]}
+          >
+            {answers.days}
+          </TextV2>
           <TextV2 variant="body" tone="secondary">
             días por semana
           </TextV2>
@@ -410,13 +448,17 @@ export function DaysStep({ answers, update }: StepProps) {
           style={styles.stepperButton}
         />
       </View>
-      <View style={styles.week} accessibilityElementsHidden>
+      <View style={styles.week}>
         {WEEKDAYS.map((day, index) => (
-          <View
+          <PressableScale
             key={day}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: week[index] }}
+            accessibilityLabel={WEEKDAY_NAMES[index]}
+            onPress={() => toggle(index)}
             style={[
               styles.weekDay,
-              pattern[index]
+              week[index]
                 ? { backgroundColor: colors.cta.primary }
                 : { borderWidth: 1, borderColor: colors.divider },
             ]}
@@ -424,12 +466,12 @@ export function DaysStep({ answers, update }: StepProps) {
             <TextV2
               variant="metaStrong"
               color={
-                pattern[index] ? colors.cta.primaryText : colors.text.secondary
+                week[index] ? colors.cta.primaryText : colors.text.secondary
               }
             >
               {day}
             </TextV2>
-          </View>
+          </PressableScale>
         ))}
       </View>
       <TextV2 variant="meta" tone="secondary" align="center">
@@ -508,7 +550,7 @@ export function DurationStep({ answers, update }: StepProps) {
           >
             {color => (
               <View style={styles.capsuleContent}>
-                {index === RECOMMENDED_DURATION ? (
+                {answers.duration === index ? (
                   <View
                     style={[
                       styles.recommended,
@@ -530,15 +572,13 @@ export function DurationStep({ answers, update }: StepProps) {
       {current ? (
         <View style={styles.gap2}>
           <TextV2 variant="cta">{current.label}</TextV2>
-          <TextV2 variant="meta" tone="secondary">
-            {current.subtitle}
-          </TextV2>
+          {answers.duration === RECOMMENDED_DURATION ? (
+            <TextV2 variant="meta" tone="secondary">
+              Recomendada para tu objetivo
+            </TextV2>
+          ) : null}
         </View>
-      ) : (
-        <TextV2 variant="meta" tone="secondary">
-          El punto marca la duración recomendada para tu objetivo.
-        </TextV2>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -628,10 +668,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   daysNumber: {
-    fontSize: 112,
-    fontWeight: '600',
-    letterSpacing: -6.72,
-    ...tightLine(112, 0.9),
+    fontSize: DAYS_NUMBER,
+    includeFontPadding: false,
+    fontVariant: [],
   },
   week: {
     flexDirection: 'row',
