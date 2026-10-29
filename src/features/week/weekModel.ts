@@ -211,7 +211,8 @@ export function parseWeekPreview(body: Record<string, unknown>): WeekPreview {
 
 // ── Dates ───────────────────────────────────────────────────────────────────
 export const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
-export const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+// Wednesday is "M" too (not "X", which confuses); the order says which.
+export const DAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 
 function parts(date: string): { y: number; m: number; d: number } {

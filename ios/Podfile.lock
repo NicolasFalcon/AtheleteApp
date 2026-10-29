@@ -153,6 +153,8 @@ PODS:
   - libwebp/sharpyuv (1.6.0)
   - libwebp/webp (1.6.0):
     - libwebp/sharpyuv
+  - LiveActivity (1.0.0):
+    - ExpoModulesCore
   - MapLibreReactNative (11.5.0):
     - hermes-engine
     - RCTRequired
@@ -2594,6 +2596,7 @@ DEPENDENCIES:
   - ExpoTaskManager (from `../node_modules/expo-task-manager/ios`)
   - FBLazyVector (from `../node_modules/react-native/Libraries/FBLazyVector`)
   - hermes-engine (from `../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec`)
+  - LiveActivity (from `../modules/live-activity/ios`)
   - "MapLibreReactNative (from `../node_modules/@maplibre/maplibre-react-native`)"
   - NitroModules (from `../node_modules/react-native-nitro-modules`)
   - RCTDeprecation (from `../node_modules/react-native/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
@@ -2755,6 +2758,8 @@ EXTERNAL SOURCES:
   hermes-engine:
     :podspec: "../node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     :tag: hermes-v250829098.0.10
+  LiveActivity:
+    :path: "../modules/live-activity/ios"
   MapLibreReactNative:
     :path: "../node_modules/@maplibre/maplibre-react-native"
   NitroModules:
@@ -2968,6 +2973,7 @@ SPEC CHECKSUMS:
   libavif: 5f8e715bea24debec477006f21ef9e95432e254d
   libdav1d: 23581a4d8ec811ff171ed5e2e05cd27bad64c39f
   libwebp: af5937a13536ef73f3784d69cc342b98961acf33
+  LiveActivity: 96eb78561dd9411777a8ffbee0eb4721f6962fef
   MapLibreReactNative: b72741173e12f854cbe320f79224b77a0b2a7629
   NitroModules: 38f8754287858ff1294e43fd43f614a664e54050
   RCTDeprecation: c7a2768f905d76ca6d2cfefb26e4349eacbdfca3

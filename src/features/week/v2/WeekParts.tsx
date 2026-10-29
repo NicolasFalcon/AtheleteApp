@@ -18,7 +18,7 @@ import {
 } from 'lucide-react-native';
 import {
   AppImage,
-  LivingHalo,
+  AuraMark,
   PressableScale,
   TextV2,
   useThemeV2,
@@ -77,6 +77,7 @@ export function DayPill({
   height = 74,
   radius = 18,
   dotSize = 6,
+  fill,
   onPress,
 }: {
   day: WeekDay;
@@ -87,6 +88,8 @@ export function DayPill({
   height?: number;
   radius?: number;
   dotSize?: number;
+  // Background of a regular day (inside a white card: the muted grey).
+  fill?: string;
   onPress?: () => void;
 }) {
   const { colors } = useThemeV2();
@@ -99,7 +102,7 @@ export function DayPill({
       ? 'rgba(255,91,31,.1)'
       : blocked
         ? 'transparent'
-        : colors.surface.raised;
+        : fill ?? colors.surface.raised;
   const ring = moveFrom
     ? `inset 0 0 0 2px ${colors.ember.base}`
     : selected && !today
@@ -154,6 +157,7 @@ export function WeekPills({
   moveFrom,
   onPressDay,
   compact = false,
+  fill,
 }: {
   days: WeekDay[];
   today: string;
@@ -162,6 +166,7 @@ export function WeekPills({
   onPressDay?: (day: WeekDay, index: number) => void;
   // Inicio · tira (64 pt, radius 16, 5 pt dot).
   compact?: boolean;
+  fill?: string;
 }) {
   return (
     <View style={styles.pills}>
@@ -176,6 +181,7 @@ export function WeekPills({
           height={compact ? 64 : 74}
           radius={compact ? 16 : 18}
           dotSize={compact ? 5 : 6}
+          fill={fill}
           onPress={onPressDay ? () => onPressDay(day, index) : undefined}
         />
       ))}
@@ -215,7 +221,7 @@ export function MissedBand({
   const { colors } = useThemeV2();
   return (
     <EllieWash style={styles.missed}>
-      <LivingHalo size={40} state={busy ? 'thinking' : 'idle'} />
+      <AuraMark size={40} state={busy ? 'processing' : 'rest'} />
       <View style={styles.missedBody}>
         <View style={styles.gap6}>
           <TextV2 color={colors.text.secondary} style={styles.ellieLabel}>
@@ -466,7 +472,7 @@ function DayHeader({
         </View>
         {regenerating ? (
           <View style={styles.regen}>
-            <LivingHalo size={56} state="thinking" />
+            <AuraMark size={56} state="processing" tone="dark" />
             <TextV2 variant="meta" color={DARK.meta}>
               ELLIE está buscando otra sesión
             </TextV2>
@@ -640,7 +646,7 @@ function ActionTile({
   label: string;
   ink?: boolean;
   full?: boolean;
-  // AI action (22.2): Ember 10 % tint with the mini Living Halo.
+  // AI action (22.2): Ember 10 % tint with AURA small.
   ellie?: boolean;
   busy?: boolean;
   onPress: () => void;
@@ -658,7 +664,7 @@ function ActionTile({
       style={[styles.tile, anchorId ? styles.tileFull : size, { backgroundColor: background }]}
     >
       {ellie ? (
-        <LivingHalo size={18} state={busy ? 'thinking' : 'idle'} />
+        <AuraMark size={18} state={busy ? 'processing' : 'rest'} />
       ) : Icon ? (
         <Icon size={15} color={fg} strokeWidth={2} style={ink ? null : styles.dim} />
       ) : null}
@@ -690,7 +696,7 @@ export function PlanSection({
       <TextV2 style={styles.sectionTitle}>Planificar la semana</TextV2>
       <PressableScale accessibilityRole="button" accessibilityLabel="Planificar con ELLIE" onPress={onEllie}>
         <EllieWash style={styles.planBand}>
-          <LivingHalo size={52} lit />
+          <AuraMark size={52} />
           <View style={[styles.flex1, styles.gap6]}>
             <TextV2 color={colors.text.secondary} style={styles.ellieLabel}>
               ELLIE

@@ -18,6 +18,9 @@ function safeTrigger(type: Parameters<typeof trigger>[0]) {
 export const haptics = {
   selection: () => safeTrigger('selection'),
   light: () => safeTrigger('impactLight'),
+  medium: () => safeTrigger('impactMedium'),
+  heavy: () => safeTrigger('impactHeavy'),
   success: () => safeTrigger('notificationSuccess'),
+  warning: () => safeTrigger('notificationWarning'),
   error: () => safeTrigger('notificationError'),
 };

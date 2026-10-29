@@ -25,8 +25,6 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useCatalogTotal } from '@app/hooks/useCatalog';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
 import { useRoutineCategories, useRoutineList, useTodaySuggestion } from '@app/hooks/useRoutines';
-import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
-import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Workouts'>;
@@ -41,8 +39,6 @@ type Segment = 'routines' | 'exercises';
 export function WorkoutsScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const tabBarMotion = useTabBarMotion();
-  const { bottomClearance } = useTabBarMetrics();
   const { profile, session } = useAuth();
   const routinesQuery = useRoutineList('all', { exhaust: true });
   const categoriesQuery = useRoutineCategories();
@@ -57,9 +53,8 @@ export function WorkoutsScreen({ navigation, route }: Props) {
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       scrollY.setValue(event.nativeEvent.contentOffset.y);
-      tabBarMotion.onScroll(event);
     },
-    [scrollY, tabBarMotion],
+    [scrollY],
   );
 
   // Tab params (deep links).
@@ -99,7 +94,8 @@ export function WorkoutsScreen({ navigation, route }: Props) {
           {
             paddingTop: insets.top + 8,
             paddingHorizontal: layout.gutter,
-            paddingBottom: bottomClearance,
+            // The tab's own safe area includes the system tab bar.
+            paddingBottom: insets.bottom + 16,
           },
         ]}
       >

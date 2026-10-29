@@ -1,77 +1,94 @@
 import {
-  pointFile,
-  resultCountSteps,
+  SOUND_EVENTS,
+  SOUND_EVENT_IDS,
   SOUND_FILES,
-  soundFile,
-  soundHaptic,
-  tickFile,
+  allowed,
+  answerCue,
+  eventFile,
+  hydrationCue,
+  playTickCue,
+  pointsCue,
+  restCue,
+  resultCountSteps,
+  resultSequence,
 } from '../src/features/sound/soundModel';
 import { DEFAULT_FEEDBACK_PREFS, parseFeedbackPrefs } from '../src/lib/feedbackPrefs';
 
-describe('Sonidos · eventos (handoff 25.7–25.8)', () => {
-  it('countdown: calm tick 15–6, urgent rising 5–2, final at 1', () => {
-    expect(tickFile(15)).toBe('tick');
-    expect(tickFile(6)).toBe('tick');
-    expect(tickFile(5)).toBe('tick-urgent-5');
-    expect(tickFile(4)).toBe('tick-urgent-4');
-    expect(tickFile(3)).toBe('tick-urgent-3');
-    expect(tickFile(2)).toBe('tick-urgent-2');
-    expect(tickFile(1)).toBe('tick-final');
-    expect(tickFile(0)).toBeNull();
+describe('Sonido v2.18 · tabla de eventos (§28.7)', () => {
+  it('every event of the table resolves to a bundled file', () => {
+    SOUND_EVENT_IDS.forEach(id => {
+      const event = SOUND_EVENTS[id];
+      expect(event).toBeDefined();
+      event.files.forEach(item => expect(SOUND_FILES).toContain(item.file));
+    });
   });
 
-  it('answers: brighter from 3 in a row; a miss sounds "wrong"', () => {
-    expect(soundFile({ type: 'correct', streak: 2 })).toBe('correct');
-    expect(soundFile({ type: 'correct', streak: 3 })).toBe('correct-streak');
-    expect(soundFile({ type: 'wrong' })).toBe('wrong');
+  it('allowed: Todo, Solo logros (medio y grande), Silencio and the session switch', () => {
+    expect(allowed(SOUND_EVENTS['play-tick'], 'todo', true)).toBe(true);
+    expect(allowed(SOUND_EVENTS['play-tick'], 'logros', true)).toBe(false);
+    expect(allowed(SOUND_EVENTS['play-wrong'], 'logros', true)).toBe(false);
+    expect(allowed(SOUND_EVENTS['pr'], 'logros', true)).toBe(true);
+    expect(allowed(SOUND_EVENTS['pr'], 'silencio', true)).toBe(false);
+    expect(allowed(SOUND_EVENTS['rest-go'], 'todo', false)).toBe(false);
+    expect(allowed(SOUND_EVENTS['set-complete'], 'todo', true)).toBe(false);
   });
 
-  it('points climb the 8-note scale with the counter', () => {
-    expect(pointFile(0, 12)).toBe('point-0');
-    expect(pointFile(10, 12)).toBe('point-6');
-    expect(pointFile(1, 2)).toBe('point-7');
-    expect(pointFile(0, 1)).toBe('point-0');
+  it('Play: correct with streak 0–1, combo N = streak − 1 (max 5)', () => {
+    expect(answerCue(true, 1)).toEqual({ id: 'play-correct' });
+    expect(answerCue(true, 2)).toEqual({ id: 'play-combo', variant: 1 });
+    expect(answerCue(true, 9)).toEqual({ id: 'play-combo', variant: 5 });
+    expect(answerCue(false, 0)).toEqual({ id: 'play-wrong' });
+    expect(playTickCue(6)).toBeNull();
+    expect(playTickCue(5)).toEqual({ id: 'play-tick' });
   });
 
-  it('every event resolves to a rendered file', () => {
-    const files = [
-      soundFile({ type: 'impact' }),
-      soundFile({ type: 'complete', tier: 'low' }),
-      soundFile({ type: 'complete', tier: 'mid' }),
-      soundFile({ type: 'complete', tier: 'perfect' }),
-      soundFile({ type: 'day-close' }),
-      ...[15, 5, 4, 3, 2, 1].map(s => soundFile({ type: 'tick', secondsLeft: s })),
-    ];
-    files.forEach(file => expect(SOUND_FILES).toContain(file));
+  it('Play: points every 2 steps, notes 1·2·3; result chain', () => {
+    expect([0, 1, 2, 3, 4, 5, 6].map(pointsCue).map(c => c?.variant ?? null)).toEqual([
+      1, null, 2, null, 3, null, 1,
+    ]);
+    const flags = { unlocked: false, levelUp: false, record: false };
+    expect(resultSequence({ ...flags, score: 8 })).toEqual(['play-level-complete']);
+    expect(resultSequence({ ...flags, score: 10, record: true, levelUp: true })).toEqual([
+      'play-record',
+      'play-unlock',
+    ]);
+    expect(resultSequence({ ...flags, score: 5 })).toEqual([]);
   });
 
-  it('keeps the haptics the Quiz already had', () => {
-    expect(soundHaptic({ type: 'correct', streak: 0 })).toBe('light');
-    expect(soundHaptic({ type: 'wrong' })).toBe('error');
-    expect(soundHaptic({ type: 'tick', secondsLeft: 3 })).toBeNull();
-    expect(soundHaptic({ type: 'impact' })).toBeNull();
+  it('hydration: glass n, goal on the glass that reaches it, last file above', () => {
+    expect(hydrationCue(3, 8)).toEqual({ id: 'hydration-glass', variant: 3 });
+    expect(hydrationCue(8, 8)).toEqual({ id: 'hydration-goal' });
+    expect(hydrationCue(10, 8)).toEqual({ id: 'hydration-glass', variant: 8 });
+    expect(eventFile(SOUND_EVENTS['hydration-glass'], 12).file).toBe('hydration-glass-8');
+  });
+
+  it('rest: warn at 10, tick at 5–4–3–2, strong at 1', () => {
+    expect(restCue(11, 10)).toEqual({ id: 'rest-warn' });
+    expect(restCue(6, 5)).toEqual({ id: 'rest-tick' });
+    expect(restCue(5, 4)).toEqual({ id: 'rest-tick' });
+    expect(restCue(4, 3)).toEqual({ id: 'rest-tick' });
+    expect(restCue(3, 2)).toEqual({ id: 'rest-tick' });
+    expect(restCue(2, 1)).toEqual({ id: 'rest-tick-strong' });
+    expect(restCue(7, 6)).toBeNull();
   });
 
   it('result counter: up to 12 steps of 75 ms from 700 ms, ending on the total', () => {
     expect(resultCountSteps(0)).toEqual([]);
-    const small = resultCountSteps(30);
-    expect(small.map(s => s.value)).toEqual([10, 20, 30]);
-    expect(small.map(s => s.at)).toEqual([700, 775, 850]);
-    const big = resultCountSteps(325);
-    expect(big).toHaveLength(12);
-    expect(big[11]).toEqual({ at: 700 + 11 * 75, value: 325, last: true });
-    expect(big.filter(s => s.last)).toHaveLength(1);
+    expect(resultCountSteps(30).map(s => s.value)).toEqual([10, 20, 30]);
+    expect(resultCountSteps(325)).toHaveLength(12);
   });
 });
 
-describe('Ajustes · Sonidos y vibración', () => {
-  it('defaults to on and survives bad data', () => {
+describe('Ajustes · Sonido y Vibración', () => {
+  it('defaults to Todo and migrates the old on/off switch', () => {
     expect(parseFeedbackPrefs(null)).toEqual(DEFAULT_FEEDBACK_PREFS);
     expect(parseFeedbackPrefs('nope')).toEqual(DEFAULT_FEEDBACK_PREFS);
-    expect(parseFeedbackPrefs('{"sound":false}')).toEqual({ sound: false, vibration: true });
-    expect(parseFeedbackPrefs('{"sound":true,"vibration":false}')).toEqual({
-      sound: true,
+    expect(parseFeedbackPrefs('{"sound":false}').soundMode).toBe('silencio');
+    expect(parseFeedbackPrefs('{"soundMode":"logros","vibration":false}')).toEqual({
+      soundMode: 'logros',
+      sessionSound: true,
       vibration: false,
+      sessionMessages: 'todos',
     });
   });
 });

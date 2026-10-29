@@ -1,10 +1,10 @@
 import { StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { ArrowRight } from 'lucide-react-native';
-import { LivingHalo, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
+import { AuraMark, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 
 // Inicio · ELLIE band (v2.12 §22.3): integrated, full width, 28/20 padding,
-// no border or dividers, a very soft Ember wash, lit Halo of 56 pt. The copy
+// no border or dividers, a very soft Ember wash, AURA of 56 pt at rest. The copy
 // is fixed. It opens the chat without sending anything.
 export const ELLIE_BAND_COPY = {
   eyebrow: 'ELLIE',
@@ -31,7 +31,7 @@ export function EllieBand({ onPress }: { onPress: () => void }) {
         end={{ x: 1, y: 0 }}
         style={StyleSheet.absoluteFill}
       />
-      <LivingHalo size="band" state="idle" lit />
+      <AuraMark size={56} />
       <View style={styles.texts}>
         <TextV2 variant="eyebrow" color={colors.ellie.textSecondary} style={styles.eyebrow}>
           {ELLIE_BAND_COPY.eyebrow}

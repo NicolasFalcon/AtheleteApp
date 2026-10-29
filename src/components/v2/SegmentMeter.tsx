@@ -3,9 +3,11 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { useThemeV2 } from '@app/components/v2/useThemeV2';
+import { Check, X } from 'lucide-react-native';
+import { ANSWER_GREEN, ANSWER_RED } from '@app/components/v2/AnswerTile';
 
 // done = answered right · missed = answered wrong · current = the one being
 // played · idle = still to come.
@@ -20,43 +22,46 @@ export type SegmentMeterProps = {
 };
 
 function Segment({ state }: { state: SegmentState }) {
-  const { colors } = useThemeV2();
-  const scale = useSharedValue(state === 'done' || state === 'missed' ? 1 : 0.6);
+  const scale = useSharedValue(1);
   const lit = state === 'done' || state === 'missed';
 
   useEffect(() => {
-    scale.value = withTiming(lit ? 1 : 0.6, { duration: 300 });
+    if (lit) {
+      scale.value = withSequence(withTiming(1.18, { duration: 140 }), withTiming(1, { duration: 220 }));
+    }
   }, [lit, scale]);
 
-  const animated = useAnimatedStyle(() => ({
-    transform: [{ scaleY: scale.value }],
-  }));
+  const animated = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const backgroundColor =
-    state === 'done'
-      ? colors.ember.base
-      : state === 'missed'
-      ? 'rgba(255,255,255,.35)'
-      : state === 'current'
-      ? 'rgba(255,255,255,.7)'
-      : 'rgba(255,255,255,.1)';
-
-  return <Animated.View style={[styles.segment, { backgroundColor }, animated]} />;
+  return (
+    <Animated.View
+      style={[
+        styles.segment,
+        {
+          backgroundColor:
+            state === 'done'
+              ? ANSWER_GREEN
+              : state === 'missed'
+              ? ANSWER_RED
+              : state === 'current'
+              ? 'rgba(255,255,255,.14)'
+              : 'rgba(255,255,255,.08)',
+          boxShadow: state === 'current' ? 'inset 0 0 0 1.5px rgba(255,255,255,.85)' : undefined,
+        },
+        animated,
+      ]}
+    >
+      {state === 'done' ? <Check size={10} color="#0B1A11" strokeWidth={3} /> : null}
+      {state === 'missed' ? <X size={10} color="#FFFFFF" strokeWidth={3} /> : null}
+    </Animated.View>
+  );
 }
 
-// Segmented bar of a round (Quiz · ronda): one 10 pt segment per question on
-// a faint track, Ember for the hits, and a halo while the streak is on
-// (handoff · "barra y fondo se encienden").
-export function SegmentMeter({
-  segments,
-  hot = false,
-  accessibilityLabel,
-  style,
-}: SegmentMeterProps) {
-  const { colors } = useThemeV2();
-  const answered = segments.filter(
-    state => state === 'done' || state === 'missed',
-  ).length;
+// Segmented bar of a Play round (Quiz.dc.html): one 16 pt cell per question,
+// green with a check for a hit, red with a cross for a miss, outlined for the
+// current one, and an Ember halo while the streak is on.
+export function SegmentMeter({ segments, hot = false, accessibilityLabel, style }: SegmentMeterProps) {
+  const answered = segments.filter(state => state === 'done' || state === 'missed').length;
 
   return (
     <View
@@ -64,13 +69,7 @@ export function SegmentMeter({
       accessibilityRole="progressbar"
       accessibilityLabel={accessibilityLabel}
       accessibilityValue={{ min: 0, max: segments.length, now: answered }}
-      style={[
-        styles.track,
-        hot && {
-          boxShadow: `0 0 0 1px rgba(255,91,31,.5), 0 0 24px ${colors.ember.glow[4]}`,
-        },
-        style,
-      ]}
+      style={[styles.track, hot && styles.hot, style]}
     >
       {segments.map((state, index) => (
         <Segment key={index} state={state} />
@@ -80,12 +79,13 @@ export function SegmentMeter({
 }
 
 const styles = StyleSheet.create({
-  track: {
-    flexDirection: 'row',
-    gap: 3,
-    padding: 3,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,.06)',
+  track: { flexDirection: 'row', gap: 4, borderRadius: 7 },
+  hot: { boxShadow: '0 0 22px rgba(255,91,31,.35)' },
+  segment: {
+    flex: 1,
+    height: 16,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  segment: { flex: 1, height: 10, borderRadius: 5 },
 });

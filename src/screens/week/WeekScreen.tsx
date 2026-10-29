@@ -14,7 +14,7 @@ import {
   BackButton,
   Button,
   GlassHeader,
-  LivingHalo,
+  AuraMark,
   PressableScale,
   Sheet,
   Skeleton,
@@ -64,7 +64,7 @@ type Props = AppScreenProps<'Week'>;
 
 const GAP = 12;
 const SIDE = 20;
-// "Otra con ELLIE" shows the thinking Halo at least this long (~1.1 s).
+// "Otra con ELLIE" shows AURA processing at least this long (~1.1 s).
 const REGEN_MIN_MS = 1100;
 const MINUTES_COMMIT_MS = 600;
 const DEFAULT_HABITS = ['Movimiento', 'Hidratación', 'Mente'];
@@ -329,7 +329,7 @@ export function WeekScreen({ navigation }: Props) {
           onPress={() => navigation.navigate(APP_ROUTES.WeekEllie)}
           style={[styles.headerOrb, { backgroundColor: colors.surface.muted }]}
         >
-          <LivingHalo size={24} />
+          <AuraMark size={24} />
         </PressableScale>
       }
     />

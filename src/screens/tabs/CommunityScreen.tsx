@@ -25,7 +25,6 @@ import { FeedView } from '@app/features/social/v2/FeedView';
 import { FriendsView } from '@app/features/social/v2/FriendsView';
 import { NoFriendsState } from '@app/features/social/v2/SocialParts';
 import { useAuth } from '@app/hooks/useAuth';
-import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
 import type { CommunitySegment, TabScreenProps } from '@app/types/navigation';
 
 // Comunidad hub (v2.12 · feed / retos / amigos): "Comunidad" at 34/800 with
@@ -39,7 +38,6 @@ export function CommunityScreen({
 }: TabScreenProps<'Community'>) {
   const { colors, layout, space } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const [segment, setSegment] = useState<CommunitySegment>(
     route.params?.segment ?? 'feed',
@@ -198,7 +196,7 @@ export function CommunityScreen({
         contentContainerStyle={{
           paddingHorizontal: layout.gutter,
           paddingTop: 18,
-          paddingBottom: bottomClearance,
+          paddingBottom: insets.bottom + 16,
         }}
       >
         {segment === 'amigos' ? (

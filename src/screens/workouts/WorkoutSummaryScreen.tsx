@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +22,9 @@ import { ROOT_ROUTES, TAB_ROUTES, APP_ROUTES } from '@app/constants/routes';
 import { badgeIcon } from '@app/features/gamification/badgeIcons';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
+import { enqueueFeedback } from '@app/features/session/feedbackQueue';
 import { formatDuration, formatKg } from '@app/features/session/sessionModel';
+import { SessionRating } from '@app/features/session/v2/SessionRating';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useExerciseNames } from '@app/hooks/useCatalog';
@@ -132,8 +134,39 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
     queryFn: () => detectSessionPRs(sessionId),
   });
 
-  const done = () =>
+  // "¿Cómo estuvo la sesión?" (§28.13 · rate_session): sent through the
+  // feedback queue on every choice and when the note is done; it can be
+  // changed (the server keeps the last one). Not needed for "Listo".
+  const [rating, setRating] = useState<number | null>(null);
+  const [ratingNote, setRatingNote] = useState('');
+  const sentRating = useRef<{ rating: number; note: string } | null>(null);
+  const sendRating = useCallback(
+    (value: number, note: string) => {
+      const clean = note.trim();
+      if (
+        !userId ||
+        (sentRating.current?.rating === value && sentRating.current.note === clean)
+      ) {
+        return;
+      }
+      sentRating.current = { rating: value, note: clean };
+      enqueueFeedback(userId, {
+        type: 'rating',
+        queuedAt: new Date().toISOString(),
+        sessionId,
+        rating: value,
+        note: clean || null,
+      }).catch(() => undefined);
+    },
+    [sessionId, userId],
+  );
+
+  const done = () => {
+    if (rating !== null) {
+      sendRating(rating, ratingNote);
+    }
     navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
+  };
 
   const records = useMemo(() => prsQuery.data ?? [], [prsQuery.data]);
   // Names of the exercises with a new record (get_exercise, on the phone).
@@ -260,6 +293,19 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
           </View>
         ) : null}
 
+        <View style={[styles.ratingRow, { borderColor: colors.divider }]}>
+          <SessionRating
+            rating={rating}
+            note={ratingNote}
+            onRate={value => {
+              setRating(value);
+              sendRating(value, ratingNote);
+            }}
+            onNote={setRatingNote}
+            onNoteDone={() => rating !== null && sendRating(rating, ratingNote)}
+          />
+        </View>
+
         {ellie.heroInsight?.text ? (
           <EllieSurface
             message={ellie.heroInsight.text}
@@ -282,6 +328,8 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
       <StatusBarV2 style="light" />
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingBottom: footerHeight + 24 }}
       >
         <View style={[styles.hero, { height: HERO_HEIGHT }]}>
@@ -452,6 +500,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   badgeTexts: { flex: 1, gap: 2 },
+  ratingRow: { borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 20 },
   prIcon: {
     width: 58,
     height: 58,

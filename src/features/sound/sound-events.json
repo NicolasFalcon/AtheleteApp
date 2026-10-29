@@ -1,0 +1,411 @@
+{
+  "version": "2.18",
+  "format": "WAV PCM 48 kHz 16-bit mono, normalizado −1 dBFS, sin silencio inicial",
+  "events": [
+    {
+      "id": "play-correct",
+      "files": [
+        {
+          "file": "play-correct.wav",
+          "ms": 835
+        }
+      ],
+      "engine": "play",
+      "when": "Play · respuesta correcta (racha 0–1)",
+      "intensity": "medio",
+      "sw": "general",
+      "haptic": "medium"
+    },
+    {
+      "id": "play-combo",
+      "files": [
+        {
+          "file": "play-combo-1.wav",
+          "ms": 854
+        },
+        {
+          "file": "play-combo-2.wav",
+          "ms": 818
+        },
+        {
+          "file": "play-combo-3.wav",
+          "ms": 773
+        },
+        {
+          "file": "play-combo-4.wav",
+          "ms": 906
+        },
+        {
+          "file": "play-combo-5.wav",
+          "ms": 913
+        }
+      ],
+      "param": "step 1–5 (racha − 1); sube 1 semitono por paso hasta 3; desde 5 añade brillo",
+      "engine": "play",
+      "when": "Play · respuesta correcta con racha ≥ 2",
+      "intensity": "medio",
+      "sw": "general",
+      "haptic": "medium"
+    },
+    {
+      "id": "play-wrong",
+      "files": [
+        {
+          "file": "play-wrong.wav",
+          "ms": 381
+        }
+      ],
+      "engine": "play",
+      "when": "Play · respuesta incorrecta",
+      "intensity": "error",
+      "sw": "general",
+      "haptic": "warning"
+    },
+    {
+      "id": "play-tick",
+      "files": [
+        {
+          "file": "play-tick.wav",
+          "ms": 120
+        }
+      ],
+      "engine": "play",
+      "when": "Play · temporizador, un tick por segundo",
+      "intensity": "pequeño",
+      "sw": "general",
+      "haptic": "light"
+    },
+    {
+      "id": "play-timeup",
+      "files": [
+        {
+          "file": "play-timeup.wav",
+          "ms": 543
+        }
+      ],
+      "engine": "play",
+      "when": "Play · se agota el tiempo",
+      "intensity": "error",
+      "sw": "general",
+      "haptic": "warning"
+    },
+    {
+      "id": "play-points",
+      "files": [
+        {
+          "file": "play-points-1.wav",
+          "ms": 804
+        },
+        {
+          "file": "play-points-2.wav",
+          "ms": 748
+        },
+        {
+          "file": "play-points-3.wav",
+          "ms": 798
+        }
+      ],
+      "param": "contador de puntos: suena 1 de cada 2 pasos; nota = floor(i/2) % 3 → archivo 1·2·3",
+      "engine": "play",
+      "when": "Play · resultado, contador de puntos",
+      "intensity": "pequeño",
+      "sw": "general",
+      "haptic": "light"
+    },
+    {
+      "id": "play-level-complete",
+      "files": [
+        {
+          "file": "play-level-complete.wav",
+          "ms": 1190
+        }
+      ],
+      "engine": "play",
+      "when": "Play · resultado, nivel completado",
+      "intensity": "grande",
+      "sw": "general",
+      "haptic": "success"
+    },
+    {
+      "id": "play-level-up",
+      "files": [
+        {
+          "file": "play-level-up.wav",
+          "ms": 1531
+        }
+      ],
+      "engine": "play",
+      "when": "Play · subida de nivel",
+      "intensity": "grande",
+      "sw": "general",
+      "haptic": "success"
+    },
+    {
+      "id": "play-record",
+      "files": [
+        {
+          "file": "play-record.wav",
+          "ms": 1263
+        }
+      ],
+      "engine": "play",
+      "when": "Play · nueva mejor puntuación",
+      "intensity": "grande",
+      "sw": "general",
+      "haptic": "success"
+    },
+    {
+      "id": "play-unlock",
+      "files": [
+        {
+          "file": "play-unlock.wav",
+          "ms": 980
+        }
+      ],
+      "engine": "play",
+      "when": "Play · ronda perfecta / desbloqueo",
+      "intensity": "medio",
+      "sw": "general",
+      "haptic": "medium"
+    },
+    {
+      "id": "play-locked",
+      "files": [
+        {
+          "file": "play-locked.wav",
+          "ms": 531
+        }
+      ],
+      "engine": "play",
+      "when": "Play · tocar un nivel bloqueado",
+      "intensity": "error",
+      "sw": "general",
+      "haptic": "warning"
+    },
+    {
+      "id": "hydration-glass",
+      "files": [
+        {
+          "file": "hydration-glass-1.wav",
+          "ms": 1400
+        },
+        {
+          "file": "hydration-glass-2.wav",
+          "ms": 1345
+        },
+        {
+          "file": "hydration-glass-3.wav",
+          "ms": 1363
+        },
+        {
+          "file": "hydration-glass-4.wav",
+          "ms": 1332
+        },
+        {
+          "file": "hydration-glass-5.wav",
+          "ms": 1374
+        },
+        {
+          "file": "hydration-glass-6.wav",
+          "ms": 1355
+        },
+        {
+          "file": "hydration-glass-7.wav",
+          "ms": 1402
+        },
+        {
+          "file": "hydration-glass-8.wav",
+          "ms": 1353
+        }
+      ],
+      "param": "n = vaso del día; el tono sube al llenarse. Vasos por encima de la meta usan el último archivo",
+      "engine": "app",
+      "when": "+1 vaso de agua",
+      "intensity": "pequeño",
+      "sw": "general",
+      "haptic": "light"
+    },
+    {
+      "id": "hydration-goal",
+      "files": [
+        {
+          "file": "hydration-goal.wav",
+          "ms": 1685
+        }
+      ],
+      "engine": "app",
+      "when": "El vaso que alcanza la meta diaria (sustituye a hydration-glass)",
+      "intensity": "medio",
+      "sw": "general",
+      "haptic": "success"
+    },
+    {
+      "id": "habit-check",
+      "files": [
+        {
+          "file": "habit-check.wav",
+          "ms": 1290
+        }
+      ],
+      "engine": "app",
+      "when": "Marcar un hábito (no suena si ese toque cierra el día de Core 33)",
+      "intensity": "pequeño",
+      "sw": "general",
+      "haptic": "light"
+    },
+    {
+      "id": "core33-day-close",
+      "files": [
+        {
+          "file": "core33-day-close.wav",
+          "ms": 1605
+        }
+      ],
+      "engine": "app",
+      "when": "Core 33 · se cierra un día (días 1–32)",
+      "intensity": "medio",
+      "sw": "general",
+      "haptic": "success"
+    },
+    {
+      "id": "exercise-complete",
+      "files": [
+        {
+          "file": "exercise-complete.wav",
+          "ms": 1375
+        }
+      ],
+      "engine": "app",
+      "when": "Sesión · marcar un ejercicio como hecho",
+      "intensity": "medio",
+      "sw": "sesion",
+      "haptic": "medium"
+    },
+    {
+      "id": "session-complete",
+      "files": [
+        {
+          "file": "session-complete.wav",
+          "ms": 2650
+        }
+      ],
+      "engine": "app",
+      "when": "Sesión · finalizar el entreno",
+      "intensity": "grande",
+      "sw": "sesion",
+      "haptic": "success"
+    },
+    {
+      "id": "set-complete",
+      "files": [
+        {
+          "file": "set-complete.wav",
+          "ms": 1053
+        }
+      ],
+      "engine": "app",
+      "when": "RESERVADO · no se usa en v2.18 (la sesión se marca por ejercicio)",
+      "intensity": "reservado",
+      "sw": "sesion",
+      "haptic": "light"
+    },
+    {
+      "id": "pr",
+      "files": [
+        {
+          "file": "pr.wav",
+          "ms": 2031
+        }
+      ],
+      "engine": "app",
+      "when": "Registrar un peso mayor que el récord personal",
+      "intensity": "grande",
+      "sw": "general",
+      "haptic": "success"
+    },
+    {
+      "id": "scan-success",
+      "files": [
+        {
+          "file": "scan-success.wav",
+          "ms": 1399
+        }
+      ],
+      "engine": "app",
+      "when": "Escaneo reconocido (máquina o plato)",
+      "intensity": "medio",
+      "sw": "general",
+      "haptic": "medium"
+    },
+    {
+      "id": "scan-fail",
+      "files": [
+        {
+          "file": "scan-fail.wav",
+          "ms": 1075
+        }
+      ],
+      "engine": "app",
+      "when": "Escaneo fallido (máquina o plato: no reconocido, no es comida, error)",
+      "intensity": "error",
+      "sw": "general",
+      "haptic": "warning"
+    },
+    {
+      "id": "rest-warn",
+      "files": [
+        {
+          "file": "rest-warn.wav",
+          "ms": 1378
+        }
+      ],
+      "engine": "app",
+      "when": "Descanso · aviso a 10 s del final",
+      "intensity": "pequeño",
+      "sw": "sesion",
+      "haptic": "light"
+    },
+    {
+      "id": "rest-tick",
+      "files": [
+        {
+          "file": "rest-tick.wav",
+          "ms": 1273
+        }
+      ],
+      "engine": "app",
+      "when": "Descanso · cuenta 3 y 2",
+      "intensity": "pequeño",
+      "sw": "sesion",
+      "haptic": "light"
+    },
+    {
+      "id": "rest-tick-strong",
+      "files": [
+        {
+          "file": "rest-tick-strong.wav",
+          "ms": 1069
+        }
+      ],
+      "engine": "app",
+      "when": "Descanso · cuenta 1",
+      "intensity": "pequeño",
+      "sw": "sesion",
+      "haptic": "light"
+    },
+    {
+      "id": "rest-go",
+      "files": [
+        {
+          "file": "rest-go.wav",
+          "ms": 1526
+        }
+      ],
+      "engine": "app",
+      "when": "Descanso · llega a 0 (“Tu turno”)",
+      "intensity": "medio",
+      "sw": "sesion",
+      "haptic": "heavy"
+    }
+  ]
+}

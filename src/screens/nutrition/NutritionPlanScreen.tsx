@@ -9,7 +9,7 @@ import {
   EllieSurface,
   GlassHeader,
   GlassSurface,
-  LivingHalo,
+  AuraMark,
   MacroColumn,
   PressableScale,
   Skeleton,
@@ -250,7 +250,7 @@ export function NutritionPlanScreen({ navigation }: Props) {
                 ) : (
                   <View style={styles.first}>
                     <View style={styles.firstVoice}>
-                      <LivingHalo size={28} state="idle" />
+                      <AuraMark size={28} />
                       <TextV2 variant="body" style={styles.flex}>
                         {es
                           ? 'Hazle una foto al plato y yo calculo las kcal y los macros.'

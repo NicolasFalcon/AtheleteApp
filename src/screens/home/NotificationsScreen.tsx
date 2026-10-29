@@ -122,7 +122,7 @@ export function NotificationsScreen({ navigation }: Props) {
         openTab(TAB_ROUTES.Progress);
         return;
       case 'quiz':
-        navigation.navigate(APP_ROUTES.QuizLanding);
+        navigation.navigate(APP_ROUTES.PlayHome);
         return;
       default:
         navigation.navigate(APP_ROUTES.PersonalRecords);

@@ -10,6 +10,16 @@ import {
   type StyleProp,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
+import Reanimated, {
+  Easing,
+  interpolateColor,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import {
   ArrowLeft,
@@ -22,6 +32,8 @@ import {
   Play,
   RefreshCw,
   Repeat2,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react-native';
 import {
@@ -46,6 +58,9 @@ import {
   type RestPhase,
 } from '@app/features/session/sessionModel';
 import type { SessionDraft } from '@app/features/session/useSessionRunner';
+import { createTheme } from '@app/theme/theme';
+import { useThemeV2 } from '@app/components/v2/useThemeV2';
+import type { SessionMessagesMode } from '@app/lib/feedbackPrefs';
 
 // Workout Session v2 (Session.dc.html, handoff §7 and Rest Timer / Session
 // Pause Layer). Always a dark scene; colours are the prototype's.
@@ -65,6 +80,9 @@ const C = {
   hairline: 'rgba(255,255,255,.07)',
   softButton: 'rgba(255,255,255,.1)',
 };
+
+// The focus scene is dark even when the app preference is light.
+const REST_WARNING_COLOR = createTheme('dark').colors.danger;
 
 const NUMBER_WORDS = [
   'Cero',
@@ -183,6 +201,10 @@ export function SessionMenu({
   onSave,
   onFinish,
   onDiscard,
+  soundOn,
+  onToggleSound,
+  messagesMode,
+  onMessagesMode,
 }: {
   top: number;
   doneText: string;
@@ -190,6 +212,12 @@ export function SessionMenu({
   onSave: () => void;
   onFinish: () => void;
   onDiscard: () => void;
+  // Session sound switch (§28.7): rest, exercise and session sounds.
+  soundOn: boolean;
+  onToggleSound: () => void;
+  // "Mensajes durante el entreno" (§28.13), saved on the device.
+  messagesMode: SessionMessagesMode;
+  onMessagesMode: (mode: SessionMessagesMode) => void;
 }) {
   return (
     <>
@@ -207,12 +235,49 @@ export function SessionMenu({
           onPress={onSave}
         />
         <MenuItem
+          title="Sonido de la sesión"
+          subtitle={soundOn ? 'Descanso y ejercicios' : 'Silenciado · la vibración se mantiene'}
+          icon={soundOn ? Volume2 : VolumeX}
+          onPress={onToggleSound}
+        />
+        <MenuItem
           title="Finalizar entrenamiento"
           subtitle={`${doneText} · se guarda así`}
           icon={CircleCheck}
           onPress={onFinish}
           divider
         />
+        <View style={[styles.menuMessages, styles.menuDivider]} accessibilityRole="radiogroup">
+          <TextV2 variant="caption" color={C.meta}>
+            Mensajes durante el entreno
+          </TextV2>
+          {MESSAGE_MODES.map(option => {
+            const on = messagesMode === option.value;
+            return (
+              <PressableScale
+                key={option.value}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: on }}
+                onPress={() => onMessagesMode(option.value)}
+                style={styles.menuRadio}
+              >
+                <View style={[styles.radio, on && styles.radioOn]}>
+                  {on ? <View style={styles.radioDot} /> : null}
+                </View>
+                <View style={styles.menuTexts}>
+                  <TextV2 variant="body" color={C.white} style={styles.medium}>
+                    {option.label}
+                  </TextV2>
+                  {option.hint ? (
+                    <TextV2 variant="caption" color={C.meta}>
+                      {option.hint}
+                    </TextV2>
+                  ) : null}
+                </View>
+              </PressableScale>
+            );
+          })}
+        </View>
         <PressableScale
           accessibilityRole="button"
           onPress={onDiscard}
@@ -227,6 +292,12 @@ export function SessionMenu({
     </>
   );
 }
+
+const MESSAGE_MODES: { value: SessionMessagesMode; label: string; hint?: string }[] = [
+  { value: 'todos', label: 'Todos' },
+  { value: 'esenciales', label: 'Solo esenciales', hint: 'Récords y molestias' },
+  { value: 'ninguno', label: 'Ninguno' },
+];
 
 function MenuItem({
   title,
@@ -767,6 +838,23 @@ export function PausedView({
 const RING = 236;
 const RADIUS = 110;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+const AnimatedCircle = Reanimated.createAnimatedComponent(Circle);
+
+// The rest glow, one static layer per colour: Reanimated cannot animate an
+// SVG <Stop>, so the layers cross-fade by opacity (as in the prototype).
+function RestGlow({ id, color }: { id: string; color: string }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <RadialGradient id={id} cx="50%" cy="36%" rx="60%" ry="34%">
+          <Stop offset="0" stopColor={color} stopOpacity={0.16} />
+          <Stop offset="0.7" stopColor={C.plate} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
 
 export function RestView({
   topPadding,
@@ -782,6 +870,7 @@ export function RestView({
   nextSetIndex,
   nextWeightKg,
   thumbFor,
+  message,
   onAdd,
   onSkip,
 }: {
@@ -798,32 +887,87 @@ export function RestView({
   nextSetIndex: number;
   nextWeightKg: number | null;
   thumbFor: ThumbFor;
+  // ELLIE's message (§28.13): takes the place of the next-exercise card while
+  // it is open; never over the countdown.
+  message?: React.ReactNode;
   onAdd: () => void;
   onSkip: () => void;
 }) {
+  const { type } = useThemeV2();
+  const reduceMotion = useReducedMotion();
   const go = phase === 'go';
-  const warm = phase !== 'counting';
+  const seconds = Math.ceil(Math.max(0, remainingMs) / 1000);
+  // Prototype colours: Recovery blue while counting, red (aviso) from 10 s,
+  // Ember for "¡Vamos!", which covers the whole screen.
+  const warning = !go && seconds <= 10;
   const fraction = go ? 1 : Math.min(1, remainingMs / (totalSec * 1000));
-  const ringColor = warm ? C.ember : C.recovery;
-  const glow = warm ? 'rgba(255,91,31,.16)' : 'rgba(110,143,179,.09)';
+  const warningProgress = useSharedValue(warning ? 1 : 0);
+  const pulse = useSharedValue(1);
+  const [showGo, setShowGo] = useState(true);
+
+  useEffect(() => {
+    warningProgress.value = reduceMotion
+      ? Number(warning)
+      : withTiming(Number(warning), { duration: 300, easing: Easing.out(Easing.cubic) });
+  }, [reduceMotion, warning, warningProgress]);
+
+  useEffect(() => {
+    pulse.value = 1;
+    if (!reduceMotion && !go && seconds > 0 && seconds <= 5) {
+      // Prototype: 320 ms, peak at 40 %.
+      pulse.value = withSequence(
+        withTiming(1.06, { duration: 128, easing: Easing.out(Easing.cubic) }),
+        withTiming(1, { duration: 192, easing: Easing.out(Easing.cubic) }),
+      );
+    }
+  }, [go, pulse, reduceMotion, seconds]);
+
+  useEffect(() => {
+    if (!go) {
+      setShowGo(true);
+      return;
+    }
+    const timeout = setTimeout(() => setShowGo(false), 600);
+    return () => clearTimeout(timeout);
+  }, [go]);
+
+  const ringColor = useAnimatedProps(() => ({
+    stroke: interpolateColor(warningProgress.value, [0, 1], [C.recovery, REST_WARNING_COLOR]),
+  }));
+  const countingGlow = useAnimatedStyle(() => ({ opacity: 1 - warningProgress.value }));
+  const warningGlow = useAnimatedStyle(() => ({ opacity: warningProgress.value }));
+  const countdownColor = useAnimatedStyle(() => ({
+    color: interpolateColor(warningProgress.value, [0, 1], [C.white, REST_WARNING_COLOR]),
+  }));
+  const labelColor = useAnimatedStyle(() => ({
+    color: interpolateColor(warningProgress.value, [0, 1], [C.meta, REST_WARNING_COLOR]),
+  }));
+  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+
+  // The runner keeps its existing turn window; the visual handoff is shorter.
+  if (go && !showGo) {
+    return null;
+  }
 
   return (
     <View
       style={[
         styles.layer,
         { paddingTop: topPadding, paddingBottom: bottomInset },
-        go && styles.goLayer,
       ]}
     >
-      <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Defs>
-          <RadialGradient id="restGlow" cx="50%" cy="36%" rx="60%" ry="34%">
-            <Stop offset="0" stopColor={glow} stopOpacity={1} />
-            <Stop offset="0.7" stopColor={C.plate} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#restGlow)" />
-      </Svg>
+      {go ? (
+        <RestGlow id="restGlowGo" color={C.ember} />
+      ) : (
+        <>
+          <Reanimated.View style={[StyleSheet.absoluteFill, countingGlow]} pointerEvents="none">
+            <RestGlow id="restGlowCounting" color={C.recovery} />
+          </Reanimated.View>
+          <Reanimated.View style={[StyleSheet.absoluteFill, warningGlow]} pointerEvents="none">
+            <RestGlow id="restGlowWarning" color={REST_WARNING_COLOR} />
+          </Reanimated.View>
+        </>
+      )}
       <View style={styles.restTop}>
         {/* Resting: only what is done is marked. */}
         <Segments progress={progress} currentIndex={null} />
@@ -842,17 +986,28 @@ export function RestView({
             strokeWidth={6}
             fill="none"
           />
-          <Circle
-            cx={RING / 2}
-            cy={RING / 2}
-            r={RADIUS}
-            stroke={ringColor}
-            strokeWidth={6}
-            strokeLinecap="round"
-            fill="none"
-            strokeDasharray={`${CIRCUMFERENCE * fraction} ${CIRCUMFERENCE}`}
-            transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
-          />
+          {go ? (
+            <Circle
+              cx={RING / 2}
+              cy={RING / 2}
+              r={RADIUS}
+              stroke={C.ember}
+              strokeWidth={6}
+              fill="none"
+            />
+          ) : (
+            <AnimatedCircle
+              cx={RING / 2}
+              cy={RING / 2}
+              r={RADIUS}
+              animatedProps={ringColor}
+              strokeWidth={6}
+              strokeLinecap="round"
+              fill="none"
+              strokeDasharray={`${CIRCUMFERENCE * fraction} ${CIRCUMFERENCE}`}
+              transform={`rotate(-90 ${RING / 2} ${RING / 2})`}
+            />
+          )}
         </Svg>
         <View style={styles.ringCenter}>
           {go ? (
@@ -861,7 +1016,7 @@ export function RestView({
                 <Play size={20} color={C.white} strokeWidth={2} />
               </View>
               <TextV2 variant="title28" color={C.white} style={styles.goTitle}>
-                Tu turno
+                ¡Vamos!
               </TextV2>
               <TextV2 variant="meta" color={C.meta} align="center" style={styles.goLine}>
                 {next
@@ -873,16 +1028,14 @@ export function RestView({
             </>
           ) : (
             <>
-              <TextV2
-                variant="displayS"
-                color={warm ? C.emberText : C.white}
-                style={styles.countdown}
-              >
-                {formatCountdown(remainingMs)}
-              </TextV2>
-              <TextV2 variant="meta" color={C.meta}>
-                descanso restante
-              </TextV2>
+              <Reanimated.View style={pulseStyle}>
+                <Reanimated.Text style={[type.displayS, styles.countdown, countdownColor]}>
+                  {formatCountdown(remainingMs)}
+                </Reanimated.Text>
+              </Reanimated.View>
+              <Reanimated.Text style={[type.meta, labelColor]}>
+                {warning ? 'Prepárate' : 'descanso restante'}
+              </Reanimated.Text>
             </>
           )}
         </View>
@@ -912,6 +1065,9 @@ export function RestView({
             </PressableScale>
           </View>
           <View style={styles.flex} />
+          {message ? (
+            message
+          ) : (
           <View style={styles.restCard}>
             <View style={styles.doneRow}>
               <CheckDot />
@@ -949,15 +1105,9 @@ export function RestView({
               </>
             ) : null}
           </View>
+          )}
         </>
       )}
-      {go ? (
-        <LinearGradient
-          pointerEvents="none"
-          colors={['rgba(20,19,18,0)', C.plate]}
-          style={styles.goFade}
-        />
-      ) : null}
     </View>
   );
 }
@@ -1155,6 +1305,19 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(0,0,0,.22)',
   },
   menuTexts: { gap: 1 },
+  menuMessages: { paddingHorizontal: 18, paddingTop: 12, paddingBottom: 6, gap: 2 },
+  menuRadio: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioOn: { borderColor: C.ember },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.ember },
   segments: { flexDirection: 'row', gap: 4 },
   segment: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
   segmentFill: { height: '100%', borderRadius: 2 },
@@ -1312,8 +1475,6 @@ const styles = StyleSheet.create({
   },
   compactThumb: { width: 72, height: 72, borderRadius: 16 },
   compactName: { lineHeight: 21 },
-  goLayer: { bottom: '36%' },
-  goFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 80 },
   restTop: { gap: 8 },
   ring: { alignSelf: 'center', width: RING, height: RING, marginTop: 26 },
   ringCenter: {

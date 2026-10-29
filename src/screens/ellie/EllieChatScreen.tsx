@@ -14,7 +14,7 @@ import {
   BackButton,
   Button,
   EllieComposer,
-  LivingHalo,
+  AuraMark,
   IconButton,
   PressableScale,
   Sheet,
@@ -294,7 +294,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
       >
         <BackButton variant="muted" onPress={() => navigation.goBack()} />
         <View style={styles.title} accessibilityRole="header">
-          <LivingHalo size={28} state={offline ? 'offline' : 'idle'} />
+          <AuraMark size={28} state={state.thinking ? 'processing' : 'rest'} offline={offline} />
           <View>
             <TextV2 variant="bodyStrong">ELLIE</TextV2>
             <TextV2 variant="caption" color={colors.ellie.textSecondary}>
@@ -404,7 +404,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
             canSend={chat.composer.canSend || (photo.attachment?.status === 'ready' && !chat.state.thinking && !chat.composer.disabled)}
             disabled={chat.composer.disabled}
             autoFocus={autoFocus}
-            haloState={state.thinking ? 'thinking' : 'idle'}
+            auraState={state.thinking ? 'processing' : 'rest'}
             onPhoto={() => setPhotoMenu(true)}
           />
         </View>

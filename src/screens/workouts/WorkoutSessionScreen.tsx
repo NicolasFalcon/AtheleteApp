@@ -9,7 +9,11 @@ import { planScheme } from '@app/features/session/sessionModel';
 import {
   useSessionRunner,
 } from '@app/features/session/useSessionRunner';
+import { purgeSessionFeedback } from '@app/features/session/feedbackQueue';
+import { useRestMessages } from '@app/features/session/useRestMessages';
+import { useSessionLiveActivity } from '@app/features/session/useSessionLiveActivity';
 import { ExitDialog } from '@app/features/session/v2/ExitDialog';
+import { RestMessageCard } from '@app/features/session/v2/RestMessageCard';
 import { VariantSheet, type VariantSheetStep } from '@app/features/session/v2/VariantSheet';
 import {
   variantTag,
@@ -22,6 +26,7 @@ import { invalidateRoutineLists, routineKeys } from '@app/hooks/useRoutines';
 import { invalidateWeek, weekKeys } from '@app/hooks/useWeekPlan';
 import { routinesService, type ExerciseVariant } from '@app/services/routines/routinesService';
 import { weekPlanService } from '@app/services/routines/weekPlanService';
+import { setFeedbackPrefs, useFeedbackPrefs } from '@app/lib/feedbackPrefs';
 import type { WeekPlan } from '@app/features/week/weekModel';
 import type { Workout } from '@app/shared';
 import {
@@ -57,6 +62,8 @@ import type { AppScreenProps } from '@app/types/navigation';
 type Props = AppScreenProps<'WorkoutSession'>;
 
 const HEADER_HEIGHT = 58;
+// Longest wait for the Live Activity to end before leaving the session.
+const TEARDOWN_MAX_MS = 1500;
 
 // Workout Session v2 (SESSION_01–06, STATE_09): modo foco oscuro con la
 // serie actual, pausa, descansos y el cierre. Sets are written one by one
@@ -96,6 +103,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   );
   const [startFailed, setStartFailed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const feedback = useFeedbackPrefs();
   const [exitOpen, setExitOpen] = useState(false);
   const starting = useRef(false);
   // Set right before an intentional exit (saved, discarded, summary).
@@ -104,6 +112,8 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   const exitOpenRef = useRef(exitOpen);
   exitOpenRef.current = exitOpen;
   const lastRestKind = useRef<RestKind>('exercise');
+  // teardownSession(), set below once the runner and the Live Activity exist.
+  const teardownRef = useRef<(reason: string) => Promise<void>>(() => Promise.resolve());
 
   // Session to run: the one in the route, today's for this routine, or new.
   useEffect(() => {
@@ -133,19 +143,26 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     }
   }, [queryClient, userId]);
 
+  // Saved for later, discarded or left offline. popTo goes back to the tabs
+  // already in the stack: navigate() would push new tabs on top and keep this
+  // screen (and its runner) alive underneath.
   const goHome = useCallback(() => {
     allowLeave.current = true;
     refreshSurfaces();
-    navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
+    teardownRef.current('leave').finally(() => {
+      navigation.popTo(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
+    });
   }, [navigation, refreshSurfaces]);
 
   const onCompleted = useCallback(
     (result: CompletionResult) => {
       allowLeave.current = true;
       refreshSurfaces();
-      navigation.replace(APP_ROUTES.WorkoutSummary, {
-        sessionId: result.session.id,
-        newBadges: result.award?.badgesUnlocked ?? [],
+      teardownRef.current('completed').finally(() => {
+        navigation.replace(APP_ROUTES.WorkoutSummary, {
+          sessionId: result.session.id,
+          newBadges: result.award?.badgesUnlocked ?? [],
+        });
       });
     },
     [navigation, refreshSurfaces],
@@ -158,6 +175,39 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     onCompleted,
     onLeave: goHome,
   });
+  // Live Activity (Dynamic Island + pantalla bloqueada) and the local
+  // notification at the end of a rest.
+  const liveActivity = useSessionLiveActivity({ runner, sessionId, workout });
+  // Every way out of the session (finished, saved for later, discarded,
+  // back, a failed load, the unmount): the runner stops ticking and sounding,
+  // and the Live Activity and the rest notification end before navigating.
+  // Idempotent; capped so a stuck native call never blocks the exit.
+  const haltRunner = runner.halt;
+  const endLiveActivity = liveActivity.teardown;
+  const teardownSession = useCallback(
+    (reason: string) => {
+      haltRunner();
+      return Promise.race([
+        endLiveActivity(reason),
+        new Promise<void>(resolve => setTimeout(resolve, TEARDOWN_MAX_MS)),
+      ]);
+    },
+    [endLiveActivity, haltRunner],
+  );
+  teardownRef.current = teardownSession;
+  // ELLIE's messages in the rest and their answers (§28.13 · sfb-1).
+  const restMessages = useRestMessages({
+    runner,
+    sessionId,
+    userId,
+    mode: feedback.sessionMessages,
+  });
+  // A session left without saving: its queued answers are dropped.
+  const dropFeedback = useCallback(() => {
+    if (userId && sessionId) {
+      purgeSessionFeedback(userId, sessionId).catch(() => undefined);
+    }
+  }, [sessionId, userId]);
 
   // Rows and rest cards: the thumb of each exercise (thumb_key of
   // get_routine). The hero card: the poster of the current exercise
@@ -312,6 +362,8 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     () =>
       navigation.addListener('beforeRemove', event => {
         if (allowLeave.current || !readyRef.current) {
+          // Leaving for real (or nothing started): nothing stays running.
+          teardownRef.current('removed').catch(() => undefined);
           return;
         }
         event.preventDefault();
@@ -332,9 +384,12 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           text: 'Salir sin guardar',
           style: 'destructive',
           onPress: () => {
-            runner.discard().catch(() =>
-              Alert.alert('No pudimos salir', 'Revisa tu conexión e inténtalo otra vez.'),
-            );
+            runner
+              .discard()
+              .then(dropFeedback)
+              .catch(() =>
+                Alert.alert('No pudimos salir', 'Revisa tu conexión e inténtalo otra vez.'),
+              );
           },
         },
       ],
@@ -480,6 +535,18 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
             nextSetIndex={runner.cursor?.setIndex ?? 0}
             nextWeightKg={runner.draft.weightKg}
             thumbFor={thumbFor}
+            message={
+              restMessages.message ? (
+                <RestMessageCard
+                  message={restMessages.message}
+                  onEffort={restMessages.onEffort}
+                  onDiscomfort={restMessages.onDiscomfort}
+                  onTrend={restMessages.onTrend}
+                  onWater={restMessages.onWater}
+                  onClose={restMessages.close}
+                />
+              ) : null
+            }
             onAdd={runner.addRest}
             onSkip={runner.skipRest}
           />
@@ -511,9 +578,15 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
         <SessionHeader
           title={title}
           topInset={insets.top}
-          onBack={() =>
-            notReady ? safeGoBack(navigation, [ROOT_ROUTES.MainTabs]) : setExitOpen(true)
-          }
+          onBack={() => {
+            if (notReady) {
+              teardownSession('back').finally(() =>
+                safeGoBack(navigation, [ROOT_ROUTES.MainTabs]),
+              );
+            } else {
+              setExitOpen(true);
+            }
+          }}
           onMenu={notReady ? undefined : () => setMenuOpen(open => !open)}
         />
         {menuOpen ? (
@@ -527,6 +600,10 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
               runner.finish().catch(() => {});
             }}
             onDiscard={askDiscard}
+            soundOn={feedback.sessionSound}
+            onToggleSound={() => setFeedbackPrefs({ sessionSound: !feedback.sessionSound })}
+            messagesMode={feedback.sessionMessages}
+            onMessagesMode={mode => setFeedbackPrefs({ sessionMessages: mode })}
           />
         ) : null}
       </SceneScope>
@@ -578,7 +655,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           onSaveForLater={saveAndExit}
           onDiscard={() => {
             // The dialog is the confirmation: discard right away.
-            runner.discard().catch(() => {
+            runner.discard().then(dropFeedback).catch(() => {
               setExitOpen(false);
               Alert.alert(
                 'No pudimos salir',

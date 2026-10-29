@@ -53,7 +53,6 @@ import {
   mapDeleteAccountResponse,
   type DeleteAccountOutcome,
 } from '@app/features/profile/deleteAccountModel';
-import { preloadSounds } from '@app/features/sound/soundService';
 import { HEALTH_STATUS_TEXT, useHealthState } from '@app/features/health/healthStore';
 import { guideStore } from '@app/features/guides/guideStore';
 import { setFeedbackPrefs, useFeedbackPrefs } from '@app/lib/feedbackPrefs';
@@ -78,6 +77,13 @@ const NOTIFICATIONS = [
 
 // Ajustes (PROFILE_03): flat rows by section. Comunidad rows open Amigos and
 // Privacidad social; Apple Health shows this device's connection.
+// Subtitle of Ajustes · Sonido for each option (§28.8).
+const SOUND_SUBTITLE = {
+  todo: 'Feedback, logros y avisos',
+  logros: 'Solo logros y momentos importantes',
+  silencio: 'Sin sonido. La vibración se mantiene',
+} as const;
+
 export function SettingsScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   // The moderation row only exists for moderators (app_moderators); a normal
@@ -272,6 +278,27 @@ export function SettingsScreen({ navigation }: Props) {
               onChange={setPreferredMode}
             />
           </View>
+          {/* Sonido (§28.8): same anatomy as Apariencia. */}
+          <View style={[styles.appearance, { borderBottomColor: colors.divider }]}>
+            <View style={styles.appearanceHead}>
+              {icon(Volume2)}
+              <View style={styles.flex}>
+                <TextV2 variant="body">Sonido</TextV2>
+                <TextV2 variant="meta" tone="secondary">
+                  {SOUND_SUBTITLE[feedback.soundMode]}
+                </TextV2>
+              </View>
+            </View>
+            <Segmented
+              options={[
+                { key: 'todo', label: 'Todo' },
+                { key: 'logros', label: 'Solo logros' },
+                { key: 'silencio', label: 'Silencio' },
+              ]}
+              value={feedback.soundMode}
+              onChange={soundMode => setFeedbackPrefs({ soundMode })}
+            />
+          </View>
           {NOTIFICATIONS.map(item => (
             <Row
               key={item.key}
@@ -292,23 +319,6 @@ export function SettingsScreen({ navigation }: Props) {
         </SettingsSection>
 
         <SettingsSection title="Sonidos y vibración">
-          <Row
-            leading={icon(Volume2)}
-            title="Sonidos"
-            subtitle="En el Quiz. Respetan el modo silencio"
-            trailing={
-              <SwitchV2
-                accessibilityLabel="Sonidos"
-                value={feedback.sound}
-                onValueChange={value => {
-                  setFeedbackPrefs({ sound: value });
-                  if (value) {
-                    preloadSounds();
-                  }
-                }}
-              />
-            }
-          />
           <Row
             leading={icon(Vibrate)}
             title="Vibración"

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LivingHalo, PressableScale, TextV2, useToast } from '@app/components/v2';
+import { AuraMark, PressableScale, TextV2, useToast } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
 import { draftFromAnalysis, toSaveInput, type MealDraft } from '@app/features/nutrition/mealDraft';
 import { formatThousands } from '@app/features/nutrition/nutritionModel';
@@ -25,6 +25,7 @@ import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { createUuid } from '@app/lib/uuid';
 import { analyzeMeal, VisionError } from '@app/services/vision/visionService';
 import type { AppScreenProps } from '@app/types/navigation';
+import { playSound, useSoundPreload } from '@app/features/sound/soundService';
 
 const SCENE = '#0E0D0C';
 const STEPS = {
@@ -41,6 +42,7 @@ type Phase =
 // tu plato…" → the result. A failure comes up as a sheet over the dimmed photo
 // and always offers Kcal rápidas.
 export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'CaloriesCamera'>) {
+  useSoundPreload(['scan-success', 'scan-fail']);
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const language = useProfileLanguage();
@@ -89,6 +91,7 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
         if (cancelled.current) {
           return;
         }
+        playSound('scan-success');
         navigation.replace(APP_ROUTES.MealReview, {
           draft: draftFromAnalysis(draft, new Date()),
           photoUri: uploaded.current.localUri,
@@ -101,6 +104,7 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
         if (error instanceof VisionError && error.usage) {
           quota.record(error.usage);
         }
+        playSound('scan-fail');
         setPhase({ kind: 'failed', uri, failure: visionFailureFrom(error) });
       }
     },
@@ -210,7 +214,7 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
           <View style={styles.shade} />
           {phase.kind === 'analyzing' ? (
             <View style={styles.analyzing}>
-              <LivingHalo size={88} state="thinking" />
+              <AuraMark size={88} state="processing" tone="dark" />
               <TextV2 variant="title22" color="#FFFFFF" align="center">
                 {es ? 'Analizando tu plato…' : 'Analysing your plate…'}
               </TextV2>

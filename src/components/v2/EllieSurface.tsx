@@ -1,7 +1,7 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { ArrowRight } from 'lucide-react-native';
-import { LivingHalo, type LivingHaloState } from '@app/components/v2/LivingHalo';
+import { AuraMark, type AuraState } from '@app/components/v2/AuraMark';
 import { EllieActionButton } from '@app/components/v2/EllieActionButton';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { Eyebrow, TextV2 } from '@app/components/v2/TextV2';
@@ -10,21 +10,21 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 export type EllieSurfaceProps = {
   message: string;
   eyebrow?: string;
-  // `ai`: the action calls the AI → compact Halo action (§22.2).
+  // `ai`: the action calls the AI → compact AURA action (§22.2).
   action?: { label: string; onPress: () => void; ai?: boolean };
   orbSize?: number;
-  orbState?: LivingHaloState;
+  orbState?: AuraState;
   style?: StyleProp<ViewStyle>;
 };
 
-// Full-bleed band with the Living Halo and ELLIE's voice (17/400, no bubble).
+// Full-bleed band with AURA and ELLIE's voice (17/400, no bubble).
 // No radius, border or dividers; only a very soft Ember wash behind it.
 export function EllieSurface({
   message,
   eyebrow = 'ELLIE',
   action,
   orbSize = 44,
-  orbState = 'idle',
+  orbState = 'rest',
   style,
 }: EllieSurfaceProps) {
   const { colors, layout } = useThemeV2();
@@ -39,7 +39,7 @@ export function EllieSurface({
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <LivingHalo size={orbSize} state={orbState} />
+      <AuraMark size={orbSize} state={orbState} />
       <View style={styles.texts}>
         {eyebrow ? (
           <Eyebrow color={colors.ellie.textSecondary}>{eyebrow}</Eyebrow>

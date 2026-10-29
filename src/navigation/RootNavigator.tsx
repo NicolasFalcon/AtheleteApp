@@ -45,7 +45,6 @@ import { OnboardingStackNavigator } from '@app/navigation/OnboardingStackNavigat
 import { VisualOnboardingScreen } from '@app/screens/onboarding/VisualOnboardingScreen';
 import { NotificationsScreen } from '@app/screens/home/NotificationsScreen';
 import { PersonalRecordsScreen } from '@app/screens/home/PersonalRecordsScreen';
-import { QuizLandingScreen } from '@app/screens/home/QuizLandingScreen';
 import { CaloriesCameraScreen } from '@app/screens/calories/CaloriesCameraScreen';
 import { MealDetailScreen } from '@app/screens/calories/MealDetailScreen';
 import { MachineScanScreen } from '@app/screens/vision/MachineScanScreen';
@@ -56,9 +55,10 @@ import { AchievementsScreen } from '@app/screens/profile/AchievementsScreen';
 import { EditProfileScreen } from '@app/screens/profile/EditProfileScreen';
 import { BodyScienceArticleDetailScreen } from '@app/screens/progress/BodyScienceArticleDetailScreen';
 import { BodyScienceScreen } from '@app/screens/progress/BodyScienceScreen';
-import { QuizChallengeScreen } from '@app/screens/quiz/QuizChallengeScreen';
-import { QuizQuestionScreen } from '@app/screens/quiz/QuizQuestionScreen';
-import { QuizResultScreen } from '@app/screens/quiz/QuizResultScreen';
+import { PlayHomeScreen } from '@app/screens/play/PlayHomeScreen';
+import { PlayLevelScreen } from '@app/screens/play/PlayLevelScreen';
+import { PlayResultScreen } from '@app/screens/play/PlayResultScreen';
+import { PlayRoundScreen } from '@app/screens/play/PlayRoundScreen';
 import { SocialOfficialListScreen } from '@app/screens/social/SocialOfficialListScreen';
 import { SocialChallengeDoneScreen } from '@app/screens/social/SocialChallengeDoneScreen';
 import { SocialChallengeScreen } from '@app/screens/social/SocialChallengeScreen';
@@ -281,21 +281,21 @@ export function RootNavigator() {
             component={AddExerciseToRoutineScreen}
           />
           <Stack.Screen
-            name={APP_ROUTES.QuizLanding}
-            component={QuizLandingScreen}
+            name={APP_ROUTES.PlayHome}
+            component={PlayHomeScreen}
           />
           <Stack.Screen
-            name={APP_ROUTES.QuizChallenge}
-            component={QuizChallengeScreen}
+            name={APP_ROUTES.PlayLevel}
+            component={PlayLevelScreen}
           />
           <Stack.Screen
-            name={APP_ROUTES.QuizQuestion}
-            component={QuizQuestionScreen}
+            name={APP_ROUTES.PlayRound}
+            component={PlayRoundScreen}
             options={{ gestureEnabled: false }}
           />
           <Stack.Screen
-            name={APP_ROUTES.QuizResult}
-            component={QuizResultScreen}
+            name={APP_ROUTES.PlayResult}
+            component={PlayResultScreen}
             options={{ gestureEnabled: false }}
           />
           <Stack.Screen

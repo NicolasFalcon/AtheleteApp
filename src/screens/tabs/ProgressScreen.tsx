@@ -63,8 +63,6 @@ import { waterGoalGlasses } from '@app/features/nutrition/nutritionModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useProgressSummary } from '@app/hooks/useProgressSummary';
-import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
-import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import { getLocalDateKey } from '@app/lib/date';
 import type { TabScreenProps } from '@app/types/navigation';
@@ -80,8 +78,6 @@ export function ProgressScreen({ navigation, route }: Props) {
   const { colors, layout, radius } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const tabBarMotion = useTabBarMotion();
-  const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const ellie = useEllieData();
   const openEllieChat = useOpenEllieChat();
@@ -127,9 +123,8 @@ export function ProgressScreen({ navigation, route }: Props) {
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       scrollY.setValue(event.nativeEvent.contentOffset.y);
-      tabBarMotion.onScroll(event);
     },
-    [scrollY, tabBarMotion],
+    [scrollY],
   );
 
   const now = useMemo(() => new Date(), []);
@@ -394,7 +389,7 @@ export function ProgressScreen({ navigation, route }: Props) {
               borderTopLeftRadius: radius.sheet,
               borderTopRightRadius: radius.sheet,
               paddingHorizontal: layout.gutter,
-              paddingBottom: bottomClearance,
+              paddingBottom: insets.bottom + 16,
             },
           ]}
         >

@@ -1,13 +1,31 @@
 import { useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SoundMode } from '@app/features/sound/soundModel';
 
-// Ajustes · "Sonidos y vibración": two switches saved on the device (not in
-// the account). Kept in memory so playSound and haptics read them without
-// waiting; both default to on until the saved value is read.
-export type FeedbackPrefs = { sound: boolean; vibration: boolean };
+// Ajustes · "Sonido" (Todo · Solo logros · Silencio, §28.8) and "Vibración",
+// plus the sound switch and "Mensajes durante el entreno" (Todos · Solo
+// esenciales · Ninguno, §28.13) of the session menu "···". Saved on the
+// device (not in the account) and kept in memory so playSound and haptics
+// read them without waiting; defaults until the saved value is read.
+export type SessionMessagesMode = 'todos' | 'esenciales' | 'ninguno';
+
+export type FeedbackPrefs = {
+  soundMode: SoundMode;
+  sessionSound: boolean;
+  vibration: boolean;
+  sessionMessages: SessionMessagesMode;
+};
 
 export const FEEDBACK_PREFS_KEY = '@athelete/feedback-prefs';
-export const DEFAULT_FEEDBACK_PREFS: FeedbackPrefs = { sound: true, vibration: true };
+export const DEFAULT_FEEDBACK_PREFS: FeedbackPrefs = {
+  soundMode: 'todo',
+  sessionSound: true,
+  vibration: true,
+  sessionMessages: 'todos',
+};
+
+const SOUND_MODES: readonly SoundMode[] = ['todo', 'logros', 'silencio'];
+const MESSAGE_MODES: readonly SessionMessagesMode[] = ['todos', 'esenciales', 'ninguno'];
 
 let current: FeedbackPrefs = DEFAULT_FEEDBACK_PREFS;
 let loading: Promise<FeedbackPrefs> | null = null;
@@ -18,11 +36,23 @@ export function parseFeedbackPrefs(raw: string | null): FeedbackPrefs {
     return DEFAULT_FEEDBACK_PREFS;
   }
   try {
-    const value = JSON.parse(raw) as Partial<FeedbackPrefs>;
+    const value = JSON.parse(raw) as Partial<FeedbackPrefs> & { sound?: unknown };
+    // Before v2.18 the sound was an on/off switch: off means Silencio.
+    const legacy: SoundMode | null =
+      typeof value.sound === 'boolean' ? (value.sound ? 'todo' : 'silencio') : null;
     return {
-      sound: typeof value.sound === 'boolean' ? value.sound : DEFAULT_FEEDBACK_PREFS.sound,
+      soundMode: SOUND_MODES.includes(value.soundMode as SoundMode)
+        ? (value.soundMode as SoundMode)
+        : legacy ?? DEFAULT_FEEDBACK_PREFS.soundMode,
+      sessionSound:
+        typeof value.sessionSound === 'boolean'
+          ? value.sessionSound
+          : DEFAULT_FEEDBACK_PREFS.sessionSound,
       vibration:
         typeof value.vibration === 'boolean' ? value.vibration : DEFAULT_FEEDBACK_PREFS.vibration,
+      sessionMessages: MESSAGE_MODES.includes(value.sessionMessages as SessionMessagesMode)
+        ? (value.sessionMessages as SessionMessagesMode)
+        : DEFAULT_FEEDBACK_PREFS.sessionMessages,
     };
   } catch {
     return DEFAULT_FEEDBACK_PREFS;

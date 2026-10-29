@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import { Button, LivingHalo, Sheet, TextV2 } from '@app/components/v2';
+import { Button, AuraMark, Sheet, TextV2 } from '@app/components/v2';
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
 import {
   visionFailureCopy,
@@ -30,8 +30,8 @@ const LABELS: Record<EllieLanguage, Record<VisionAction, { meal: string; machine
 };
 
 // The sheet that explains why a photo could not be analysed (design §23.5):
-// Halo 36, title 22/600, text 15, a primary 56 and a muted secondary 48. It
-// sits over the dimmed photo. Offline: the Halo is a still sphere.
+// AURA 36, title 22/600, text 15, a primary 56 and a muted secondary 48. It
+// sits over the dimmed photo. Offline: AURA at rest, 35 %.
 export function VisionFailureSheet({
   failure,
   context,
@@ -70,7 +70,7 @@ export function VisionFailureSheet({
     >
       {copy ? (
         <View style={styles.body}>
-          <LivingHalo size={36} state={failure?.code === 'offline' ? 'offline' : 'idle'} />
+          <AuraMark size={36} offline={failure?.code === 'offline'} />
           <TextV2 variant="title22">{copy.title}</TextV2>
           <TextV2 variant="body" tone="secondary">
             {copy.text}

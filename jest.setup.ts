@@ -67,3 +67,22 @@ jest.mock('expo-audio', () => ({
   }),
   setAudioModeAsync: jest.fn(() => Promise.resolve()),
 }));
+
+// expo-apple-authentication (native, ESM build): unavailable in tests.
+jest.mock('expo-apple-authentication', () => ({
+  isAvailableAsync: jest.fn(() => Promise.resolve(false)),
+  signInAsync: jest.fn(() => Promise.reject({code: 'ERR_REQUEST_CANCELED'})),
+  AppleAuthenticationScope: {FULL_NAME: 0, EMAIL: 1},
+  AppleAuthenticationButtonType: {SIGN_IN: 0, CONTINUE: 1, SIGN_UP: 2},
+  AppleAuthenticationButtonStyle: {WHITE: 0, WHITE_OUTLINE: 1, BLACK: 2},
+  AppleAuthenticationButton: () => null,
+}));
+
+// expo-crypto (native, ESM build): deterministic bytes and a fake digest.
+jest.mock('expo-crypto', () => ({
+  getRandomBytes: (length: number) => new Uint8Array(length),
+  digestStringAsync: jest.fn((_algorithm: string, value: string) =>
+    Promise.resolve(`digest:${value}`),
+  ),
+  CryptoDigestAlgorithm: {SHA256: 'SHA-256'},
+}));

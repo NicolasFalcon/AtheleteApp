@@ -17,6 +17,7 @@ import { useExercise } from '@app/hooks/useCatalog';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { PRInsert } from '@app/shared';
+import { playSound, useSoundPreload } from '@app/features/sound/soundService';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'RegisterPr'>;
@@ -26,6 +27,7 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // "Registrar récord" from Inicio or Progreso: the same sheet as the record
 // detail (RECORDS_02), over the screen it came from. Closing it goes back.
 export function RegisterPrScreen({ navigation, route }: Props) {
+  useSoundPreload(['pr']);
   const { colors } = useThemeV2();
   const toast = useToast();
   const exerciseQuery = useExercise(
@@ -86,6 +88,8 @@ export function RegisterPrScreen({ navigation, route }: Props) {
         valueDistanceM: insert.valueDistanceM ?? null,
       });
       if (beatsBest) {
+        // §28.7: pr just before the celebration (which fires the haptic).
+        playSound('pr', { haptic: false });
         setCelebration({
           value: shown.value,
           unit: shown.unit,

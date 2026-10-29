@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Share2, Trash2, Users, X } from 'lucide-react-native';
 import {
   Button,
-  LivingHalo,
+  AuraMark,
   PressableScale,
   Sheet,
   StatusBarV2,
@@ -332,7 +332,7 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
 
           {activity.ellieLine && !viewer ? (
             <View style={styles.ellie}>
-              <LivingHalo size={28} />
+              <AuraMark size={28} />
               <TextV2 variant="body" style={styles.flex}>
                 {activity.ellieLine}
               </TextV2>

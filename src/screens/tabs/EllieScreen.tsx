@@ -15,8 +15,6 @@ import { useEllieEntry } from '@app/features/ellie/v2/useEllieEntry';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useEllieLatest } from '@app/hooks/useEllieConversations';
-import { useTabBarMetrics } from '@app/hooks/useTabBarMetrics';
-import { useTabBarMotion } from '@app/hooks/useTabBarMotion';
 import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Ellie'>;
@@ -25,7 +23,7 @@ const SUBTITLE =
   'Puedo ajustar tu entreno, tu comida o tu descanso según tu energía y el tiempo que tengas.';
 
 // ELLIE · portada v2.15 (ELLIE_08, handoff 25.9): wordmark and history,
-// the Halo in its ring with "EN LÍNEA", her message and two answers, what
+// AURA in its ring with "EN LÍNEA", her message and two answers, what
 // else she can help with (2 × 2 + Escanear máquina) and the field to talk to
 // her, in the flow. Every ask opens the chat (EllieChat) and sends the
 // prompt there; the clock opens the chat with its conversation list. No
@@ -33,8 +31,6 @@ const SUBTITLE =
 export function EllieScreen({ navigation }: Props) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const tabBarMotion = useTabBarMotion();
-  const { bottomClearance } = useTabBarMetrics();
   const { profile } = useAuth();
   const ellieData = useEllieData();
   const history = useEllieLatest();
@@ -42,8 +38,6 @@ export function EllieScreen({ navigation }: Props) {
   const entry = useEllieEntry(navigation, () =>
     scrollRef.current?.scrollTo({ y: 0, animated: false }),
   );
-  // The stage is measured inside the scroll content, padding included.
-  entry.setContentTop(0);
 
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? '';
   const headline =
@@ -65,12 +59,10 @@ export function EllieScreen({ navigation }: Props) {
       <StatusBarV2 />
       <ScrollView
         ref={scrollRef}
-        onScroll={tabBarMotion.onScroll}
-        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.content,
-          { paddingTop: insets.top, paddingBottom: bottomClearance + 32 },
+          { paddingTop: insets.top, paddingBottom: insets.bottom + 48 },
         ]}
       >
         <EllieHeader
@@ -80,8 +72,6 @@ export function EllieScreen({ navigation }: Props) {
         />
         <EllieOrbStage
           orbState={history.isError ? 'offline' : 'idle'}
-          haloStyle={entry.haloStyle}
-          onLayout={entry.onHaloLayout}
         />
         <EllieMessage
           headline={headline}

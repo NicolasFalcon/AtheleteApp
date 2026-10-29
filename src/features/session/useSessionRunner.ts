@@ -58,7 +58,18 @@ import {
   type SessionVariantReason,
   type SessionVariants,
 } from '@app/features/session/variantModel';
+import { restCue } from '@app/features/sound/soundModel';
+import { playCue, playSound, useSoundPreload } from '@app/features/sound/soundService';
 import type { Workout } from '@app/shared';
+
+const SESSION_SOUNDS = [
+  'exercise-complete',
+  'session-complete',
+  'rest-warn',
+  'rest-tick',
+  'rest-tick-strong',
+  'rest-go',
+] as const;
 
 export type SessionDraft = { reps: number | null; weightKg: number | null };
 
@@ -112,6 +123,9 @@ export function useSessionRunner({
   const draftKey = useRef<string | null>(null);
   // Real rest taken before the next set that gets logged (null: none yet).
   const lastRestSec = useRef<number | null>(null);
+  // Whole seconds of the rest on screen at the last tick (rest cues).
+  const restSecond = useRef<number | null>(null);
+  useSoundPreload(SESSION_SOUNDS);
 
   // ── Load ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -199,25 +213,48 @@ export function useSessionRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadAttempt, basePlan, sessionId, userId, workout]);
 
+  // Set by halt() when the screen is leaving: the clock stops and no rest
+  // cue, sound or haptic fires any more.
+  const [halted, setHalted] = useState(false);
+  const halt = useCallback(() => setHalted(true), []);
+
   // ── Ticker: 4 Hz while a countdown is on screen, 1 Hz otherwise ───────────
   const fast = Boolean(rest || yourTurnUntil);
   useEffect(() => {
+    if (halted) {
+      return undefined;
+    }
     const id = setInterval(() => setNow(Date.now()), fast ? 250 : 1000);
     return () => clearInterval(id);
-  }, [fast]);
+  }, [fast, halted]);
 
   const paused = Boolean(clock?.pausedAt);
   const remainingMs = rest ? restRemainingMs(rest, now) : 0;
 
+  // Rest cues (§28.7): rest-warn at 10 s, rest-tick at 5–4–3–2,
+  // rest-tick-strong at 1, only while the countdown runs down.
+  useEffect(() => {
+    if (!rest) {
+      restSecond.current = null;
+      return;
+    }
+    const sec = Math.ceil(remainingMs / 1000);
+    const previous = restSecond.current;
+    restSecond.current = sec;
+    if (!halted && !paused && previous !== null && sec < previous) {
+      playCue(restCue(previous, sec));
+    }
+  }, [halted, paused, remainingMs, rest]);
+
   // Rest reached zero → "Tu turno" for 1.5 s, then the active card.
   useEffect(() => {
-    if (rest && !paused && remainingMs <= 0) {
+    if (rest && !halted && !paused && remainingMs <= 0) {
       lastRestSec.current = restElapsedSec(rest, Date.now());
-      haptics.success();
+      playSound('rest-go');
       setRest(null);
       setYourTurnUntil(Date.now() + YOUR_TURN_MS);
     }
-  }, [paused, remainingMs, rest]);
+  }, [halted, paused, remainingMs, rest]);
 
   useEffect(() => {
     if (yourTurnUntil && now >= yourTurnUntil) {
@@ -323,7 +360,13 @@ export function useSessionRunner({
       distanceM: current.distanceM,
     };
     const setsAfter = withSet(sets, next);
-    haptics.light();
+    // The set that completes the exercise sounds (exercise-complete, with
+    // its medium haptic); any other set keeps the light tap.
+    if (isExerciseDone(current, setsAfter) && !isExerciseDone(current, sets)) {
+      playSound('exercise-complete');
+    } else {
+      haptics.light();
+    }
     setSets(setsAfter);
     writeSet(next, current, setsAfter);
     const after = restAfter(plan, setsAfter, cursor);
@@ -491,6 +534,7 @@ export function useSessionRunner({
       // Sets that failed before must be on the server first (volume).
       await syncBeforeClosing();
       const result = await completeSession(payload);
+      playSound('session-complete');
       setSaveError(null);
       onCompleted(result);
     } catch (error) {
@@ -647,6 +691,7 @@ export function useSessionRunner({
     saveErrorDetail,
     retrySave,
     continueOffline,
+    halt,
     busy,
   };
 }

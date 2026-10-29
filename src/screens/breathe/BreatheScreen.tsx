@@ -97,7 +97,7 @@ export function BreatheScreen({ navigation }: Props) {
   const [sound, setSound] = useState(true);
   const startedAt = useRef<number | null>(null);
   const logged = useRef(false);
-  const soundOn = prefs.sound && sound;
+  const soundOn = prefs.soundMode !== 'silencio' && sound;
 
   // ── Orb ─────────────────────────────────────────────────────────────────
   const scale = useSharedValue(ORB.intro.scale);
@@ -210,7 +210,7 @@ export function BreatheScreen({ navigation }: Props) {
   const toggleSound = () => {
     const next = !sound;
     setSound(next);
-    if (next && prefs.sound) {
+    if (next && prefs.soundMode !== 'silencio') {
       startAmbient();
     } else {
       stopAmbient();
@@ -305,7 +305,7 @@ export function BreatheScreen({ navigation }: Props) {
         <PressableScale accessibilityRole="button" accessibilityLabel="Cerrar" onPress={close} style={styles.round}>
           <X size={18} color={C.white} strokeWidth={2} style={styles.dim} />
         </PressableScale>
-        {stage === 'run' && prefs.sound ? (
+        {stage === 'run' && prefs.soundMode !== 'silencio' ? (
           <PressableScale
             accessibilityRole="button"
             accessibilityLabel={sound ? 'Desactivar sonido ambiente' : 'Activar sonido ambiente'}

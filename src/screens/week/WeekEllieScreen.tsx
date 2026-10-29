@@ -7,7 +7,7 @@ import {
   AppImage,
   BackButton,
   EllieActionButton,
-  LivingHalo,
+  AuraMark,
   PressableScale,
   StatusBarV2,
   TextV2,
@@ -218,7 +218,7 @@ export function WeekEllieScreen({ navigation }: Props) {
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <View style={styles.gap18}>
-          <LivingHalo size={56} state={phase === 'gen' ? 'thinking' : 'idle'} />
+          <AuraMark size={56} state={phase === 'gen' ? 'processing' : 'rest'} />
           <View style={styles.gap8}>
             <TextV2 color={colors.text.secondary} style={styles.ellieLabel}>
               ELLIE

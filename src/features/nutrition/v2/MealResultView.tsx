@@ -6,7 +6,7 @@ import {
   Button,
   FilterChip,
   GlassSurface,
-  LivingHalo,
+  AuraMark,
   PressableScale,
   StatusBarV2,
   TextV2,
@@ -136,7 +136,7 @@ export function MealResultView({
             </View>
             {estimate ? (
               <View style={styles.chip}>
-                <LivingHalo size={18} state="idle" />
+                <AuraMark size={18} tone="dark" />
                 <TextV2 variant="eyebrow" color="#FFFFFF">
                   {es ? 'ESTIMACIÓN DE ELLIE' : "ELLIE'S ESTIMATE"}
                 </TextV2>
@@ -172,7 +172,7 @@ export function MealResultView({
 
             {low ? (
               <View style={[styles.note, { backgroundColor: colors.surface.muted }]}>
-                <LivingHalo size={22} state="idle" />
+                <AuraMark size={22} />
                 <TextV2 variant="meta" style={styles.flex}>
                   {es
                     ? 'No estoy segura de algún alimento. Revisa las porciones y quita lo que no sea.'
@@ -279,7 +279,7 @@ export function MealResultView({
             {onHint ? (
               <View style={styles.section}>
                 <View style={[styles.hintField, { backgroundColor: colors.surface.muted }]}>
-                  <LivingHalo size={26} state={hinting ? 'thinking' : 'idle'} />
+                  <AuraMark size={26} state={hinting ? 'processing' : 'rest'} />
                   <TextInput
                     accessibilityLabel={es ? 'Dile algo a ELLIE' : 'Tell ELLIE something'}
                     value={hint}

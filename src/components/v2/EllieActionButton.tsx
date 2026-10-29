@@ -1,15 +1,15 @@
 import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { haptics } from '@app/components/v2/haptics';
-import { LivingHalo } from '@app/components/v2/LivingHalo';
+import { AuraMark } from '@app/components/v2/AuraMark';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
 // Action powered by ELLIE (handoff v2.12 §22.2). Every action that calls the
-// AI carries the mini Living Halo on the left instead of sparkles.
-// - `primary`: Ember pill (`ember.strong`, white text 15–17/600), Halo 20–22,
+// AI carries AURA small on the left instead of sparkles.
+// - `primary`: Ember pill (`ember.strong`, white text 15–17/600), AURA 20–22,
 //   10 pt gap, no extra glow.
-// - `compact`: Halo + Ember-accent text, no fill.
+// - `compact`: AURA + Ember-accent text, no fill.
 export type EllieActionButtonProps = {
   label: string;
   onPress: () => void;
@@ -76,7 +76,7 @@ export function EllieActionButton({
         style,
       ]}
     >
-      <LivingHalo size={sizing.halo} state={loading ? 'thinking' : 'idle'} />
+      <AuraMark size={sizing.halo} state={loading ? 'processing' : 'rest'} />
       <TextV2
         variant={sizing.text}
         color={fg}

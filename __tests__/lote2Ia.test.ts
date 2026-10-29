@@ -279,9 +279,9 @@ describe('B-25 · water goal from profiles.daily_water_goal only', () => {
 
     const rings = (goalGlasses: number | null) =>
       buildDayRings({
-        mode: 'workout',
+        isNewUser: false,
         challenge: null,
-        workout: { minutesToday: 0, completedToday: false, targetMinutes: 30 },
+        workout: { plan: 'none' },
         nutrition: { hasPlan: false, calories: 0, targetCalories: 0 },
         hydration: { todayMl: 2000, goalGlasses },
       }).rings.find(ring => ring.kind === 'hydration')!;

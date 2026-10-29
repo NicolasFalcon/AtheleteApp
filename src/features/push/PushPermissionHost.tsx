@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Button, LivingHalo, Sheet, TextV2, useToast } from '@app/components/v2';
+import { Button, AuraMark, Sheet, TextV2, useToast } from '@app/components/v2';
 import { PROMPT_COPY } from '@app/features/push/pushCopy';
 import { shouldPrompt } from '@app/features/push/pushPermission';
 import { clearPushPrompt, subscribePushPrompt } from '@app/features/push/pushPromptStore';
@@ -109,7 +109,7 @@ export function PushPermissionHost() {
       }
     >
       <View style={styles.body}>
-        <LivingHalo size={48} state="idle" />
+        <AuraMark size={48} />
         <TextV2 variant="title22">{PROMPT_COPY.title[language]}</TextV2>
         <TextV2 variant="body" tone="secondary">
           {PROMPT_COPY.text[language]}

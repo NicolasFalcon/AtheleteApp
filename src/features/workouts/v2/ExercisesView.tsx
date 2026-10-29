@@ -2,7 +2,7 @@ import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Camera, ChevronRight, SlidersHorizontal } from 'lucide-react-native';
 import {
-  LivingHalo,
+  AuraMark,
   EquipmentBubble,
   PressableScale,
   SearchField,
@@ -224,7 +224,7 @@ function ScanCard({ onPress }: { onPress: () => void }) {
       </View>
       <View style={styles.scanTexts}>
         <View style={styles.scanEyebrow}>
-          <LivingHalo size={18} />
+          <AuraMark size={18} tone="dark" />
           <TextV2 variant="eyebrow" color="#A8A6A1">
             Con ELLIE
           </TextV2>

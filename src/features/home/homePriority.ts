@@ -1,4 +1,3 @@
-import { quizMasterProgress } from '@app/features/quiz/quizModel';
 import {
   formatThousands,
   ratio,
@@ -136,34 +135,24 @@ export function resolveHomeSlides({
     return [SLIDES.new];
   }
 
+  // v2.18: at most 2 slides, the action of the day and Core 33 when a
+  // challenge is active (Home.dc.html `order`).
   const coreActive = isChallengeActive(challenge);
   const coreClosed = isCoreClosedToday(challenge);
+  const coreSlide = coreClosed ? SLIDES.core33Closed : SLIDES.core33;
 
-  const workoutSlot: HomeSlide | null = hasResumableSession
-    ? SLIDES.resume
-    : workoutDoneToday
-    ? null
-    : SLIDES.workout;
-  const coreSlot: HomeSlide | null =
-    coreActive && !coreClosed ? SLIDES.core33 : null;
-
-  const pending: HomeSlide[] =
-    core33FirstPriority && !hasResumableSession
-      ? [coreSlot, workoutSlot].filter((slide): slide is HomeSlide => slide !== null)
-      : [workoutSlot, coreSlot].filter((slide): slide is HomeSlide => slide !== null);
-
-  if (pending.length === 0) {
-    return [SLIDES.allDone];
+  if (workoutDoneToday && !hasResumableSession) {
+    // Session done: Core 33 (if still open) goes to slide 1.
+    return coreActive && !coreClosed ? [SLIDES.core33, SLIDES.workoutDone] : [SLIDES.allDone];
   }
 
-  const closed: HomeSlide[] = [];
-  if (workoutDoneToday) {
-    closed.push(SLIDES.workoutDone);
+  const action = hasResumableSession ? SLIDES.resume : SLIDES.workout;
+  if (!coreActive) {
+    return [action];
   }
-  if (coreActive && coreClosed) {
-    closed.push(SLIDES.core33Closed);
-  }
-  return [...pending, ...closed];
+  return core33FirstPriority && !hasResumableSession && !coreClosed
+    ? [coreSlide, action]
+    : [action, coreSlide];
 }
 
 // Changes when the set or the order of slides changes (to bring the carousel
@@ -249,8 +238,11 @@ export {
   waterGoalGlasses,
 } from '@app/features/nutrition/nutritionModel';
 
-// ── Tu día ─────────────────────────────────────────────────────────────────
-export type DayRingKind = 'core33' | 'workout' | 'nutrition' | 'hydration';
+// ── Tu día (v2.18 §28.14 · anillos dinámicos) ─────────────────────────────
+// From outside in: Entrenamiento (always), Core 33 (active challenge),
+// Nutrición (with a plan, or without one once kcal are logged) and
+// Hidratación (always). "N % completado" is the mean of the visible rings.
+export type DayRingKind = 'workout' | 'core33' | 'nutrition' | 'hydration';
 
 export type DayRing = {
   kind: DayRingKind;
@@ -259,16 +251,25 @@ export type DayRing = {
   unit: string;
   progress: number; // 0–1
   done: boolean;
+  // Text instead of a figure (Descanso, Sin entreno hoy, Hecho): 15/600.
+  text?: boolean;
+  // "Sin entreno hoy" carries the "Entrenar →" link.
+  link?: boolean;
+  // Rest day: the ring is full at 30 % opacity.
+  opacity?: number;
 };
 
+// Today's training: a planned session (its sets), a rest day of the week
+// plan, or nothing planned.
+export type DayWorkout =
+  | { plan: 'session'; setsDone: number; setsTotal: number | null; completedToday: boolean }
+  | { plan: 'rest' }
+  | { plan: 'none' };
+
 export type DayRingsInput = {
-  mode: HomeMode;
+  isNewUser: boolean;
   challenge: HomeChallengeState;
-  workout: {
-    minutesToday: number; // trainedMinutesToday
-    completedToday: boolean; // a session completed today closes the ring
-    targetMinutes: number;
-  };
+  workout: DayWorkout;
   nutrition: { hasPlan: boolean; calories: number; targetCalories: number };
   // profiles.daily_water_goal; null: no goal (the ring only counts).
   hydration: { todayMl: number; goalGlasses: number | null };
@@ -279,74 +280,81 @@ const clamp01 = (value: number) =>
 
 export { formatThousands } from '@app/features/nutrition/nutritionModel';
 
+function workoutRing(workout: DayWorkout): DayRing {
+  const base = { kind: 'workout' as const, label: 'Entrenamiento', unit: '' };
+  if (workout.plan === 'rest') {
+    return { ...base, value: 'Descanso', progress: 1, done: false, text: true, opacity: 0.3 };
+  }
+  if (workout.plan === 'none') {
+    return { ...base, value: 'Sin entreno hoy', progress: 0, done: false, text: true, link: true };
+  }
+  const total = workout.setsTotal;
+  if (total === null || total <= 0) {
+    // Sets unknown (a route session, or the routine has not loaded yet).
+    return workout.completedToday
+      ? { ...base, value: 'Hecho', progress: 1, done: true, text: true }
+      : { ...base, value: '—', unit: 'series', progress: 0, done: false };
+  }
+  const done = workout.completedToday ? total : Math.min(workout.setsDone, total);
+  return {
+    ...base,
+    value: `${done}/${total}`,
+    unit: 'series',
+    progress: clamp01(done / total),
+    done: done >= total,
+  };
+}
+
 export function buildDayRings({
-  mode,
+  isNewUser,
   challenge,
   workout,
   nutrition,
   hydration,
 }: DayRingsInput): { rings: DayRing[]; dayPct: number } {
-  const showCore =
-    isChallengeActive(challenge) &&
-    (mode === 'workout' || mode === 'resume' || mode === 'workoutDone');
+  const rings: DayRing[] = [workoutRing(workout)];
 
-  const first: DayRing = showCore
-    ? {
-        kind: 'core33',
-        label: 'Core 33',
-        value: `${challenge!.completedToday}/${challenge!.totalHabits}`,
-        unit: 'hábitos',
-        progress: clamp01(
-          challenge!.completedToday / Math.max(challenge!.totalHabits, 1),
-        ),
-        done: isCoreClosedToday(challenge),
-      }
-    : {
-        kind: 'workout',
-        label: 'Entreno',
-        value: String(workout.minutesToday),
-        unit: `de ${workout.targetMinutes} min`,
-        progress: workout.completedToday
-          ? 1
-          : clamp01(workout.minutesToday / Math.max(workout.targetMinutes, 1)),
-        done:
-          workout.completedToday ||
-          workout.minutesToday >= Math.max(workout.targetMinutes, 1),
-      };
+  if (isChallengeActive(challenge)) {
+    rings.push({
+      kind: 'core33',
+      label: 'Core 33',
+      value: `${challenge!.completedToday}/${challenge!.totalHabits}`,
+      unit: 'hábitos',
+      progress: clamp01(challenge!.completedToday / Math.max(challenge!.totalHabits, 1)),
+      done: isCoreClosedToday(challenge),
+    });
+  }
 
-  const glasses = toGlasses(hydration.todayMl);
-  const goal = hydration.goalGlasses && hydration.goalGlasses > 0 ? hydration.goalGlasses : null;
-  const hydrationDone = goal !== null && glasses >= goal;
-
-  const rings: DayRing[] = [
-    first,
-    {
+  if (nutrition.hasPlan || nutrition.calories > 0) {
+    rings.push({
       kind: 'nutrition',
       label: nutrition.hasPlan ? 'Nutrición' : 'Nutrición · sin plan',
       value: formatThousands(nutrition.calories),
       unit: 'kcal',
-      progress: nutrition.hasPlan
-        ? ratio(nutrition.calories, nutrition.targetCalories)
-        : 0,
-      done:
-        nutrition.hasPlan &&
-        nutrition.calories >= Math.max(nutrition.targetCalories, 1),
-    },
-    {
-      kind: 'hydration',
-      label: hydrationDone ? 'Hidratación · cumplida' : 'Hidratación',
-      value: String(glasses),
-      unit: goal ? `de ${goal} vasos` : glasses === 1 ? 'vaso' : 'vasos',
-      progress: goal ? clamp01(glasses / goal) : 0,
-      done: hydrationDone,
-    },
-  ];
+      // Without a plan there is no daily target: the ring stays empty.
+      progress: nutrition.hasPlan ? ratio(nutrition.calories, nutrition.targetCalories) : 0,
+      done: nutrition.hasPlan && nutrition.calories >= Math.max(nutrition.targetCalories, 1),
+    });
+  }
 
-  if (mode === 'new') {
+  const glasses = toGlasses(hydration.todayMl);
+  const goal = hydration.goalGlasses && hydration.goalGlasses > 0 ? hydration.goalGlasses : null;
+  const hydrationDone = goal !== null && glasses >= goal;
+  rings.push({
+    kind: 'hydration',
+    label: hydrationDone ? 'Hidratación · cumplida' : 'Hidratación',
+    value: String(glasses),
+    // "11 / 14 vasos": short enough to stay on one line next to +1.
+    unit: goal ? `/ ${goal} vasos` : glasses === 1 ? 'vaso' : 'vasos',
+    progress: goal ? clamp01(glasses / goal) : 0,
+    done: hydrationDone,
+  });
+
+  if (isNewUser) {
     return {
       rings: rings.map(ring => ({
         ...ring,
-        value: '0',
+        value: ring.text ? ring.value : '0',
         progress: 0,
         done: false,
       })),
@@ -355,10 +363,8 @@ export function buildDayRings({
   }
 
   const dayPct = Math.round(
-    (rings.reduce((total, ring) => total + ring.progress, 0) / rings.length) *
-      100,
+    (rings.reduce((total, ring) => total + ring.progress, 0) / rings.length) * 100,
   );
-
   return { rings, dayPct };
 }
 
@@ -421,18 +427,6 @@ export function prCurve(
     points: coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '),
     last: coords[coords.length - 1],
   };
-}
-
-// ── Quiz: progress towards the Quiz Master badge ───────────────────────────
-// Same rule as the Quiz portada (quizModel): share of active categories with
-// a perfect (100) best score.
-export function quizMastery(categories: Array<{ bestScore?: number }>): {
-  mastered: number;
-  total: number;
-  progress: number;
-  line: string;
-} {
-  return quizMasterProgress(categories);
 }
 
 // ── Formatting ─────────────────────────────────────────────────────────────
@@ -533,37 +527,20 @@ export function bestMarkParts(
   }
 }
 
-// ── Order of the sections under the hero (v2.12) ───────────────────────────
-// Tu día → Tu ruta → [Core 33] → banda de ELLIE → [reto oficial] → Para
-// entrenar esta semana → Quiz → Wear. "Tu mejor marca" no longer exists.
-export type HomeSectionKey =
-  | 'week'
-  | 'rings'
-  | 'recovery'
-  | 'route'
-  | 'core33Invite'
-  | 'ellie'
-  | 'challenge'
-  | 'routines'
-  | 'quiz'
-  | 'wear';
+// ── Order of the sections under the hero (v2.18) ───────────────────────────
+// Tu día → [Core 33 invitation] → RECUPERA (Sueño + Respira) → MUÉVETE Y
+// COMPITE ([reto oficial] + Tu ruta) → APRENDE Y JUEGA (Athelete Play) →
+// Wear. "Tu semana" lives inside Tu día; the ELLIE band and "Para entrenar
+// esta semana" are gone.
+export type HomeSectionKey = 'day' | 'core33Invite' | 'recovery' | 'compete' | 'play' | 'wear';
 
-export function homeSectionOrder(options: {
-  core33Invite: boolean;
-  challenge: boolean;
-}): HomeSectionKey[] {
-  // v2.15 (HOME_18): "Tu semana" is the first block of the linen surface.
+export function homeSectionOrder(options: { core33Invite: boolean }): HomeSectionKey[] {
   const order: (HomeSectionKey | null)[] = [
-    'week',
-    'rings',
-    // v2.15 (HOME_19–20): Sueño + Respira, between Tu día and Tu ruta.
-    'recovery',
-    'route',
+    'day',
     options.core33Invite ? 'core33Invite' : null,
-    'ellie',
-    options.challenge ? 'challenge' : null,
-    'routines',
-    'quiz',
+    'recovery',
+    'compete',
+    'play',
     'wear',
   ];
   return order.filter((key): key is HomeSectionKey => key !== null);

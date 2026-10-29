@@ -43,7 +43,7 @@ export const MONTH_ABBR = [
   'nov',
   'dic',
 ];
-export const WEEKDAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+export const WEEKDAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 
 // Capsule scale: this many minutes fill a day capsule (prototype: 45).
 export const CAPSULE_FULL_MINUTES = 45;

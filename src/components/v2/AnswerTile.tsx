@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
+  ZoomIn,
   useAnimatedStyle,
   useSharedValue,
   withSequence,
@@ -10,11 +11,14 @@ import Animated, {
 import { Check, X } from 'lucide-react-native';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
-import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
-// idle = waiting for a touch · correct = the right answer (Ember) · wrong =
-// the option the player chose · dim = any other option once answered.
+// idle = waiting for a touch · correct = the right answer (green) · wrong =
+// the option the player chose (red) · dim = any other option once answered.
 export type AnswerTileState = 'idle' | 'correct' | 'wrong' | 'dim';
+
+// Athelete Play v2.18 (Quiz.dc.html): green hit, red miss on the dark scene.
+export const ANSWER_GREEN = '#2FD27A';
+export const ANSWER_RED = '#FF4D4F';
 
 export type AnswerTileProps = {
   letter: string;
@@ -26,8 +30,9 @@ export type AnswerTileProps = {
   onPress: () => void;
 };
 
-// Answer option of a Quiz round (scene): a lettered mark and the text. The
-// answer is a single touch, there is no confirm step (handoff · Ronda).
+// Answer option of a Play round (scene): a lettered mark, the text and, once
+// answered, a check or a cross at the end. A single touch answers; there is
+// no confirm step.
 export function AnswerTile({
   letter,
   text,
@@ -36,7 +41,6 @@ export function AnswerTile({
   disabled = false,
   onPress,
 }: AnswerTileProps) {
-  const { colors } = useThemeV2();
   const shake = useSharedValue(0);
   const pop = useSharedValue(1);
 
@@ -52,10 +56,7 @@ export function AnswerTile({
         withTiming(0, { duration: 60 }),
       );
     } else if (state === 'correct') {
-      pop.value = withSequence(
-        withTiming(1.04, { duration: 120 }),
-        withSpring(1, { damping: 8 }),
-      );
+      pop.value = withSequence(withTiming(1.03, { duration: 120 }), withSpring(1, { damping: 8 }));
     }
   }, [chosen, pop, shake, state]);
 
@@ -65,7 +66,7 @@ export function AnswerTile({
 
   const correct = state === 'correct';
   const wrong = state === 'wrong';
-  const ink = colors.ember.onText;
+  const tint = correct ? ANSWER_GREEN : wrong ? ANSWER_RED : null;
 
   return (
     <Animated.View style={animated}>
@@ -79,48 +80,36 @@ export function AnswerTile({
           styles.tile,
           {
             backgroundColor: correct
-              ? colors.ember.base
+              ? 'rgba(47,210,122,.12)'
               : wrong
-              ? 'rgba(255,255,255,.04)'
-              : 'rgba(255,255,255,.06)',
-            boxShadow: correct
-              ? '0 10px 30px rgba(255,91,31,.35)'
-              : wrong
-              ? 'inset 0 0 0 2px rgba(255,255,255,.3)'
-              : 'inset 0 0 0 1px rgba(255,255,255,.08)',
-            opacity: state === 'dim' ? 0.35 : 1,
+              ? 'rgba(255,77,79,.12)'
+              : 'rgba(255,255,255,.05)',
+            boxShadow: tint ? `inset 0 0 0 1.5px ${tint}` : 'inset 0 0 0 1px rgba(255,255,255,.08)',
+            opacity: state === 'dim' ? 0.4 : 1,
           },
         ]}
       >
-        <View
-          style={[
-            styles.mark,
-            {
-              backgroundColor: correct
-                ? ink
-                : wrong
-                ? 'rgba(255,255,255,.2)'
-                : 'rgba(255,255,255,.1)',
-            },
-          ]}
-        >
-          {correct ? (
-            <Check size={18} color={colors.ember.base} strokeWidth={3} />
-          ) : wrong ? (
-            <X size={18} color="#FFFFFF" strokeWidth={3} />
-          ) : (
-            <TextV2 variant="bodyStrong" color="#FFFFFF">
-              {letter}
-            </TextV2>
-          )}
+        <View style={[styles.mark, { backgroundColor: tint ?? 'rgba(255,255,255,.1)' }]}>
+          <TextV2 variant="bodyStrong" color={correct ? '#0B1A11' : '#FFFFFF'} style={styles.letter}>
+            {letter}
+          </TextV2>
         </View>
         <TextV2
-          variant="voice"
-          color={correct ? ink : wrong ? '#8C8A85' : '#E8E6E1'}
+          variant="bodyL"
+          color={tint ? '#FFFFFF' : '#E8E6E1'}
           style={[styles.text, correct && styles.textStrong]}
         >
           {text}
         </TextV2>
+        {tint ? (
+          <Animated.View entering={ZoomIn.duration(400)} style={[styles.end, { backgroundColor: tint }]}>
+            {correct ? (
+              <Check size={14} color="#0B1A11" strokeWidth={3} />
+            ) : (
+              <X size={14} color="#FFFFFF" strokeWidth={3} />
+            )}
+          </Animated.View>
+        ) : null}
       </PressableScale>
     </Animated.View>
   );
@@ -128,21 +117,30 @@ export function AnswerTile({
 
 const styles = StyleSheet.create({
   tile: {
-    minHeight: 64,
-    borderRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    minHeight: 62,
+    borderRadius: 18,
+    paddingVertical: 11,
+    paddingLeft: 12,
+    paddingRight: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
   },
   mark: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  text: { flex: 1 },
+  letter: { fontSize: 16, fontWeight: '700' },
+  text: { flex: 1, lineHeight: 22 },
   textStrong: { fontWeight: '600' },
+  end: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

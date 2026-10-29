@@ -12,7 +12,10 @@ import type { HomeChallengeCard } from '@app/features/home/homeChallengeSection'
 // drawn by `officialBadge.ts` (TODO(badges-oficiales)).
 const COVER = require('@app/assets/v2/photos/home/reto-overhead.jpg');
 const COVER_ASPECT = 900 / 601;
-const HEIGHT = 420;
+// v2.18 (MUÉVETE Y COMPITE): a card inside the sheet's gutter, 300 pt, r 28.
+const HEIGHT = 300;
+const RADIUS = 28;
+const GUTTER = 20;
 // Placeholder athletes of "N atletas dentro" (the official challenge only
 // exposes a total, no names).
 const ATHLETES = [
@@ -38,15 +41,16 @@ function Athlete({ source, first }: { source: number; first?: boolean }) {
   );
 }
 
-// Inicio · official challenge (v2.12 §22.3, HOME_12 / HOME_13): a full-width
-// 420 pt black and white photo, dark in both themes, "● RETO OFICIAL" in both
-// states.
+// Inicio · official challenge (v2.12 §22.3, HOME_12 / HOME_13; v2.18 card):
+// a 300 pt black and white photo card, dark in both themes, "● RETO OFICIAL"
+// in both states.
 // - retoOn (joined, not finished): my progress, the CTA opens the challenge.
 // - retoOff (not joined, or already completed): the goal without progress,
 //   "N atletas dentro" and the CTA towards the official challenges.
 export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSectionProps) {
   const { colors } = useThemeV2();
-  const { width } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
+  const width = screenWidth - 2 * GUTTER;
   const joined = card.state === 'joined';
   const reward = card.reward;
   const athletes =
@@ -217,10 +221,9 @@ export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSec
 }
 
 const styles = StyleSheet.create({
-  // Breaks out of the sheet's side padding (full bleed).
   section: {
     height: HEIGHT,
-    marginHorizontal: -20,
+    borderRadius: RADIUS,
     overflow: 'hidden',
     backgroundColor: INK,
   },
@@ -238,7 +241,7 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4 },
   eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 1.4, color: '#FFFFFF' },
   days: { fontWeight: '500' },
-  reward: { position: 'absolute', right: 24, top: 118, alignItems: 'center', gap: 6 },
+  reward: { position: 'absolute', right: 24, top: 60, alignItems: 'center', gap: 6 },
   rewardPoints: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   rewardBadge: {
     fontSize: 11,

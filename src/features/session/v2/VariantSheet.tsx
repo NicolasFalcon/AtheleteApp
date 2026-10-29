@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import {
   Cable,
@@ -19,6 +21,8 @@ import {
   type SessionVariantReason,
 } from '@app/features/session/variantModel';
 import { routineErrorCopy } from '@app/features/workouts/routineErrors';
+import { useMediaUrl } from '@app/lib/media/mediaUrls';
+import { signedImageSource } from '@app/lib/media/imageSource';
 import { muscleLabel } from '@app/services/catalog/catalogService';
 import {
   routinesService,
@@ -49,6 +53,42 @@ const GROUP_ICON: Record<EquipmentGroup, LucideIcon> = {
   bodyweight: PersonStanding,
   dumbbell: Dumbbell,
 };
+
+function VariantThumb({
+  mediaKey,
+  equipmentGroup,
+}: {
+  mediaKey: string | null;
+  equipmentGroup: EquipmentGroup;
+}) {
+  const url = useMediaUrl(mediaKey);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const Icon = GROUP_ICON[equipmentGroup];
+  const source = mediaKey && url && failedUrl !== url
+    ? signedImageSource(url, mediaKey)
+    : null;
+
+  return (
+    <View style={styles.optionThumb}>
+      {source ? (
+        <>
+          <ExpoImage
+            source={source}
+            recyclingKey={mediaKey ?? undefined}
+            cachePolicy="disk"
+            contentFit="cover"
+            style={styles.optionThumbImage}
+            onError={() => setFailedUrl(url)}
+          />
+          {/* §28.5: dimmed (brightness .75) to sit in the dark scene. */}
+          <View style={styles.optionThumbShade} pointerEvents="none" />
+        </>
+      ) : (
+        <Icon size={20} color={C.white} strokeWidth={1.8} />
+      )}
+    </View>
+  );
+}
 
 export type VariantSheetStep =
   | { kind: 'list' }
@@ -221,7 +261,6 @@ export function VariantSheet({
         ) : (
           <View>
             {data?.items.map(item => {
-              const Icon = GROUP_ICON[item.equipmentGroup];
               return (
                 <PressableScale
                   key={item.id}
@@ -230,9 +269,7 @@ export function VariantSheet({
                   onPress={() => onChoose(item)}
                   style={[styles.row, { borderTopColor: C.hairline }]}
                 >
-                  <View style={styles.tile}>
-                    <Icon size={20} color={C.white} strokeWidth={1.8} />
-                  </View>
+                  <VariantThumb mediaKey={item.thumbKey} equipmentGroup={item.equipmentGroup} />
                   <View style={styles.rowTexts}>
                     <View style={styles.nameLine}>
                       <TextV2 variant="body" color={C.white} numberOfLines={1} style={[styles.rowName, styles.shrink]}>
@@ -286,6 +323,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  optionThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: 14,
+    overflow: 'hidden',
+    // §28.5: loading background.
+    backgroundColor: '#2A2826',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionThumbImage: { width: '100%', height: '100%' },
+  optionThumbShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,.25)' },
   rowTexts: { flex: 1, minWidth: 0, gap: 3 },
   nameLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowName: { fontSize: 16 },

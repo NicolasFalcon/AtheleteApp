@@ -3,13 +3,16 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-Athelete.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Athelete.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1D3D3FA430801C4B00A69C23 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = 52CEB72016FE35E6BE452BEF /* MapLibre */; };
+		1DB052953093D5DA000719A5 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DB052943093D5D9000719A5 /* WidgetKit.framework */; };
+		1DB052973093D5DA000719A5 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DB052963093D5DA000719A5 /* SwiftUI.framework */; };
+		1DB052A83093D5DD000719A5 /* AtheleteLiveActivityExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 1DB052933093D5D9000719A5 /* AtheleteLiveActivityExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		3946AC63E42CD2D11FEE037A /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44DD9EDCBA99F45998014CB3 /* ExpoModulesProvider.swift */; };
 		70E275AFA20F4C83B96C8A01 /* Inter.ttc in Resources */ = {isa = PBXBuildFile; fileRef = 70E275AFA20F4C83B96C8A00 /* Inter.ttc */; };
 		70E275AFA20F4C83B96C8A11 /* Anton-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70E275AFA20F4C83B96C8A10 /* Anton-Regular.ttf */; };
@@ -18,12 +21,39 @@
 		FBD3CDFADD36EE2EED0A21A8 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		1DB052A63093D5DD000719A5 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1DB052923093D5D9000719A5;
+			remoteInfo = AtheleteLiveActivityExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		1DB052A93093D5DD000719A5 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1DB052A83093D5DD000719A5 /* AtheleteLiveActivityExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		13B07F961A680F5B00A75B9A /* Athelete.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Athelete.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Athelete/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Athelete/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Athelete/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		1D3D3FA630801CF400A69C23 /* Athelete.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = Athelete.entitlements; path = Athelete/Athelete.entitlements; sourceTree = "<group>"; };
+		1DB052933093D5D9000719A5 /* AtheleteLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AtheleteLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1DB052943093D5D9000719A5 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		1DB052963093D5DA000719A5 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		3B4392A12AC88292D35C810B /* Pods-Athelete.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Athelete.debug.xcconfig"; path = "Target Support Files/Pods-Athelete/Pods-Athelete.debug.xcconfig"; sourceTree = "<group>"; };
 		44DD9EDCBA99F45998014CB3 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-Athelete/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-Athelete.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Athelete.release.xcconfig"; path = "Target Support Files/Pods-Athelete/Pods-Athelete.release.xcconfig"; sourceTree = "<group>"; };
@@ -35,6 +65,31 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		1DB052AC3093D5DD000719A5 /* Exceptions for "AtheleteLiveActivity" folder in "AtheleteLiveActivityExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 1DB052923093D5D9000719A5 /* AtheleteLiveActivityExtension */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		1DB052983093D5DA000719A5 /* AtheleteLiveActivity */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				1DB052AC3093D5DD000719A5 /* Exceptions for "AtheleteLiveActivity" folder in "AtheleteLiveActivityExtension" target */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = AtheleteLiveActivity;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
 /* Begin PBXFrameworksBuildPhase section */
 		13B07F8C1A680F5B00A75B9A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
@@ -42,6 +97,15 @@
 			files = (
 				1D3D3FA430801C4B00A69C23 /* MapLibre in Frameworks */,
 				0C80B921A6F3F58F76C31292 /* libPods-Athelete.a in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1DB052903093D5D9000719A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1DB052973093D5DA000719A5 /* SwiftUI.framework in Frameworks */,
+				1DB052953093D5DA000719A5 /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -76,6 +140,8 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				5DCACB8F33CDC322A6C60F78 /* libPods-Athelete.a */,
+				1DB052943093D5D9000719A5 /* WidgetKit.framework */,
+				1DB052963093D5DA000719A5 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -100,6 +166,7 @@
 			children = (
 				13B07FAE1A68108700A75B9A /* Athelete */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
+				1DB052983093D5DA000719A5 /* AtheleteLiveActivity */,
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
@@ -114,6 +181,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* Athelete.app */,
+				1DB052933093D5D9000719A5 /* AtheleteLiveActivityExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -143,10 +211,12 @@
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
 				43A0414CB907720C5590FD12 /* [MapLibre React Native] Remove MapLibre.xcframework-ios.signature */,
+				1DB052A93093D5DD000719A5 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1DB052A73093D5DD000719A5 /* PBXTargetDependency */,
 			);
 			name = Athelete;
 			packageProductDependencies = (
@@ -156,16 +226,40 @@
 			productReference = 13B07F961A680F5B00A75B9A /* Athelete.app */;
 			productType = "com.apple.product-type.application";
 		};
+		1DB052923093D5D9000719A5 /* AtheleteLiveActivityExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1DB052AD3093D5DD000719A5 /* Build configuration list for PBXNativeTarget "AtheleteLiveActivityExtension" */;
+			buildPhases = (
+				1DB0528F3093D5D9000719A5 /* Sources */,
+				1DB052903093D5D9000719A5 /* Frameworks */,
+				1DB052913093D5D9000719A5 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1DB052983093D5DA000719A5 /* AtheleteLiveActivity */,
+			);
+			name = AtheleteLiveActivityExtension;
+			productName = AtheleteLiveActivityExtension;
+			productReference = 1DB052933093D5D9000719A5 /* AtheleteLiveActivityExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
 		83CBB9F71A601CBA00E9B192 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 1210;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1120;
+					};
+					1DB052923093D5D9000719A5 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -186,6 +280,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* Athelete */,
+				1DB052923093D5D9000719A5 /* AtheleteLiveActivityExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -200,6 +295,13 @@
 				70E275AFA20F4C83B96C8A01 /* Inter.ttc in Resources */,
 				70E275AFA20F4C83B96C8A11 /* Anton-Regular.ttf in Resources */,
 				FBD3CDFADD36EE2EED0A21A8 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		1DB052913093D5D9000719A5 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -333,7 +435,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		1DB0528F3093D5D9000719A5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1DB052A73093D5DD000719A5 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1DB052923093D5D9000719A5 /* AtheleteLiveActivityExtension */;
+			targetProxy = 1DB052A63093D5DD000719A5 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
@@ -399,6 +516,99 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		1DB052AA3093D5DD000719A5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 6H5XKX54N3;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AtheleteLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AtheleteLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.athelete.app.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		1DB052AB3093D5DD000719A5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 6H5XKX54N3;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = AtheleteLiveActivity/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = AtheleteLiveActivity;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.0;
+				MTL_FAST_MATH = YES;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.athelete.app.LiveActivity;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -566,6 +776,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1DB052AD3093D5DD000719A5 /* Build configuration list for PBXNativeTarget "AtheleteLiveActivityExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1DB052AA3093D5DD000719A5 /* Debug */,
+				1DB052AB3093D5DD000719A5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

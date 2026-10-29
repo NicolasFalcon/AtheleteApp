@@ -29,7 +29,7 @@ Suggested first feature modules for Athelete:
 - `ellie`
 - `progress`
 - `pr-tracking`
-- `quiz`
+- `play`
 - `profile`
 - `notifications`
 

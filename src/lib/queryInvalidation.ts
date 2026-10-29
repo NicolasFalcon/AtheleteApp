@@ -68,13 +68,15 @@ export async function invalidateWorkoutQueries(
   ]);
 }
 
-export async function invalidateQuizQueries(
+// After a Play round reaches the server: Play itself (portada, Inicio's card
+// and streak) and every view that shows points or medals.
+export async function invalidatePlayQueries(
   queryClient: QueryClient,
   userId: string,
 ) {
   await Promise.allSettled([
     queryClient.invalidateQueries({
-      queryKey: ['quiz-categories', userId],
+      queryKey: ['play-home', userId],
     }),
     queryClient.invalidateQueries({
       queryKey: ['profile', 'overview', userId],

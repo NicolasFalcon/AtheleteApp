@@ -3,7 +3,7 @@ import { Image, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Defs, Line, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, ChevronLeft, Heart, Minus, Plus } from 'lucide-react-native';
-import { LivingHalo, PressableScale, TextV2 } from '@app/components/v2';
+import { AuraMark, PressableScale, TextV2 } from '@app/components/v2';
 import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
 import { DAY_NAMES, weekdayIndex } from '@app/features/week/weekModel';
 import {
@@ -535,7 +535,7 @@ function SignalTile({
 export function NightEllieBand({ text, onPress }: { text: string; onPress: () => void }) {
   return (
     <PressableScale accessibilityRole="button" onPress={onPress} style={styles.ellie}>
-      <LivingHalo size={36} />
+      <AuraMark size={36} tone="dark" />
       <TextV2 color={NIGHT.text} style={styles.ellieText}>
         {text}
       </TextV2>

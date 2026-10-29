@@ -1,0 +1,6 @@
+{
+  "name": "live-activity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ActivityKit bridge for the rest Live Activity (local Expo module)"
+}

@@ -43,6 +43,7 @@ import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { PRInsert } from '@app/shared';
+import { playSound, useSoundPreload } from '@app/features/sound/soundService';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'PersonalRecords'>;
@@ -54,6 +55,7 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // "Registrar récord" sheet (RECORDS_02). Manual records only; a mark detected
 // in a session shows as such in the history.
 export function PersonalRecordsScreen({ navigation, route }: Props) {
+  useSoundPreload(['pr']);
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -132,6 +134,8 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
         valueDistanceM: insert.valueDistanceM ?? null,
       });
       if (beatsBest) {
+        // §28.7: pr just before the celebration (which fires the haptic).
+        playSound('pr', { haptic: false });
         setCelebration({
           value: shown.value,
           unit: shown.unit,

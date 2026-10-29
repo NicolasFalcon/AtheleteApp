@@ -66,6 +66,8 @@ export type HomeHeroData = {
     done: number;
     total: number;
     minutes: number; // active minutes so far (pauses excluded)
+    // Estimated minutes still to go (never 0); null: no estimate.
+    minutesLeft: number | null;
     inProgress?: boolean;
   } | null;
   // Finished session for `workoutDone`.
@@ -222,8 +224,8 @@ export function HomeHero(props: HomeHeroProps) {
   );
 }
 
-// Named capsules, one per slide: the active one white with dark text, the
-// rest glass; the ones closed today carry an Ember dot. "1 / N" on the right.
+// Pagination dots (v2.18): the current slide is a short white bar, the other
+// a small dot. Each dot is a 44 pt target that goes to its slide.
 function HeroPager({
   slides,
   index,
@@ -233,7 +235,7 @@ function HeroPager({
   index: number;
   onSelect: (index: number) => void;
 }) {
-  const { colors, scene } = useThemeV2();
+  const { scene } = useThemeV2();
 
   return (
     <View style={styles.pager} pointerEvents="box-none">
@@ -248,32 +250,17 @@ function HeroPager({
             } de ${slides.length}`}
             accessibilityState={{ selected: active }}
             onPress={() => onSelect(position)}
-            style={styles.capsuleHit}
+            style={styles.dotHit}
           >
             <View
               style={[
-                styles.capsule,
-                {
-                  backgroundColor: active ? scene.cta.onScene : scene.glass.onPhoto,
-                },
+                active ? styles.dotActive : styles.dot,
+                { backgroundColor: active ? scene.cta.onScene : scene.onDark.tertiary },
               ]}
-            >
-              {slide.closed ? (
-                <View style={[styles.capsuleDot, { backgroundColor: colors.ember.base }]} />
-              ) : null}
-              <TextV2
-                variant="metaStrong"
-                color={active ? scene.cta.onSceneText : scene.onDark.primary}
-              >
-                {slide.label}
-              </TextV2>
-            </View>
+            />
           </Pressable>
         );
       })}
-      <TextV2 variant="meta" color={scene.onDark.tertiary} style={styles.position}>
-        {`${index + 1} / ${slides.length}`}
-      </TextV2>
     </View>
   );
 }
@@ -341,7 +328,7 @@ function HeroTop({
         <TextV2 variant="bodyStrong" numberOfLines={1}>
           {greeting}
         </TextV2>
-        <TextV2 variant="caption" tone="tertiary" numberOfLines={1}>
+        <TextV2 variant="meta" tone="secondary" numberOfLines={1}>
           {dateLine}
         </TextV2>
       </View>
@@ -618,7 +605,9 @@ function ResumeContent({
         )}
       />
       <Button
-        label={`Retomar · ${resume?.minutes ?? 0} min`}
+        label={
+          resume?.minutesLeft ? `Retomar · quedan ~${resume.minutesLeft} min` : 'Retomar'
+        }
         variant="onScene"
         icon={Play}
         iconPosition="end"
@@ -791,35 +780,21 @@ const styles = StyleSheet.create({
   },
   pager: {
     position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 44,
+    left: 0,
+    right: 0,
+    bottom: 40,
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 2,
   },
-  capsuleHit: {
+  dotHit: {
+    width: 28,
     height: 44,
-    paddingHorizontal: 3,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  capsule: {
-    height: 28,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  capsuleDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  position: {
-    marginLeft: 'auto',
-    paddingRight: 6,
-  },
+  dot: { width: 7, height: 7, borderRadius: 4 },
+  dotActive: { width: 18, height: 7, borderRadius: 4 },
   content: {
     gap: 18,
   },

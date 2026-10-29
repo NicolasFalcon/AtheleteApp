@@ -157,7 +157,8 @@ export function RouteCard({
 
 const styles = StyleSheet.create({
   card: {
-    height: 212,
+    // v2.18: a little lower inside MUÉVETE Y COMPITE (was 212).
+    height: 188,
     borderRadius: 22,
     overflow: 'hidden',
     backgroundColor: '#121110',

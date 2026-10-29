@@ -32,7 +32,7 @@ import type { RegisteredMeal } from '@app/hooks/useRegisteredMeal';
 import {
   Button,
   EllieActionButton,
-  LivingHalo,
+  AuraMark,
   PressableScale,
   TextV2,
   useThemeV2,
@@ -63,7 +63,7 @@ export function EllieVoice({
     <View style={styles.voiceRow}>
       <View style={styles.voiceOrb}>
         {showOrb ? (
-          <LivingHalo size={24} state={muted ? 'offline' : 'idle'} />
+          <AuraMark size={24} offline={muted} />
         ) : null}
       </View>
       {muted ? (
@@ -254,7 +254,7 @@ export function ThinkingIndicator() {
       accessibilityLabel="ELLIE está escribiendo"
     >
       <View style={styles.voiceOrb}>
-        <LivingHalo size={24} state="thinking" />
+        <AuraMark size={24} state="processing" />
       </View>
       <View style={styles.dots}>
         <Dot index={0} />

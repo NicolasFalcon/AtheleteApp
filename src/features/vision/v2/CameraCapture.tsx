@@ -4,7 +4,7 @@ import { Linking, StyleSheet, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Camera as CameraIcon, Image as ImageIcon, X, Zap, ZapOff } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, LivingHalo, PressableScale, StatusBarV2, TextV2 } from '@app/components/v2';
+import { Button, AuraMark, PressableScale, StatusBarV2, TextV2 } from '@app/components/v2';
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
 import { haptics } from '@app/components/v2/haptics';
 
@@ -12,7 +12,7 @@ const SCENE = '#0E0D0C';
 const CORNER = 44;
 
 // Live camera of the photo flows (design §23.3 / §10): full screen, dark in
-// both modes. Header: close · a pill "Registrar con ELLIE" with the mini Halo ·
+// both modes. Header: close · a pill "Registrar con ELLIE" with AURA small ·
 // flash. A 300 × 300 framing guide with four corners (white; Ember when ELLIE
 // recognises the subject, a feature that is not available yet), a hint, and at
 // the bottom the gallery, the shutter and an optional "Sin foto".
@@ -82,7 +82,7 @@ export function CameraCapture({
         <X size={20} color="#FFFFFF" strokeWidth={2} />
       </PressableScale>
       <View style={styles.pill}>
-        <LivingHalo size={20} state="idle" />
+        <AuraMark size={20} tone="dark" />
         <TextV2 variant="bodyStrong" color="#FFFFFF">
           {headerLabel}
         </TextV2>

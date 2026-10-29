@@ -77,7 +77,12 @@ export function usePushEvents(): void {
       handleNotification: async notification => {
         const local = isLocal(notification);
         const target = local ? null : targetOf(notification);
-        const there = target ? isAlreadyThere(navigationRef.getCurrentRoute(), target) : false;
+        // The end of the rest only matters with the app in the background
+        // (the session screen already shows "¡Vamos!").
+        const restEnd =
+          (notification.request.content.data as Record<string, unknown> | undefined)?.kind === 'rest-end';
+        const there =
+          restEnd || (target ? isAlreadyThere(navigationRef.getCurrentRoute(), target) : false);
         return {
           shouldShowBanner: !there,
           shouldShowList: !there,

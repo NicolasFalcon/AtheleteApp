@@ -1,4 +1,4 @@
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { NativeBottomTabScreenProps } from '@react-navigation/bottom-tabs/unstable';
 import type {
   CompositeScreenProps,
   NavigatorScreenParams,
@@ -9,12 +9,7 @@ import type {
 } from '@react-navigation/native-stack';
 import type { Core33ChallengeId } from '@app/features/core33/core33Catalog';
 import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
-import type {
-  QuizChallengeRouteParams,
-  QuizLandingRouteParams,
-  QuizQuestionRouteParams,
-  QuizResultRouteParams,
-} from '@app/types/quiz';
+import type { PlayAnswerPayload, PlayRound, PlayRoute } from '@app/services/supabase/play';
 
 export type AuthStackParamList = {
   Login: undefined;
@@ -214,10 +209,19 @@ export type AppStackParamList = {
   CreateRoutine: RoutineBuilderRouteParams | undefined;
   EditRoutine: EditRoutineRouteParams;
   AddExerciseToRoutine: AddExerciseToRoutineRouteParams;
-  QuizLanding: QuizLandingRouteParams;
-  QuizChallenge: QuizChallengeRouteParams;
-  QuizQuestion: QuizQuestionRouteParams;
-  QuizResult: QuizResultRouteParams;
+  // Athelete Play v2 (§28.6.1).
+  PlayHome: undefined;
+  PlayLevel: { route: PlayRoute; level: number; isDaily: boolean };
+  PlayRound: { round: PlayRound };
+  PlayResult: {
+    round: Omit<PlayRound, 'questions'>;
+    answers: PlayAnswerPayload[];
+    finishedAt: string;
+    tz: string;
+    // Local figures, shown only while the server has not answered.
+    localScore: number;
+    localBestStreak: number;
+  };
   EllieChat: EllieChatRouteParams | undefined;
   Week: undefined;
   Sleep: undefined;
@@ -280,7 +284,7 @@ export type AppScreenProps<RouteName extends AppRouteName> =
 // Props of a tab root: can switch tabs and push shared screens, typed.
 export type TabScreenProps<RouteName extends keyof MainTabParamList> =
   CompositeScreenProps<
-    BottomTabScreenProps<MainTabParamList, RouteName>,
+    NativeBottomTabScreenProps<MainTabParamList, RouteName>,
     NativeStackScreenProps<RootStackParamList>
   >;
 

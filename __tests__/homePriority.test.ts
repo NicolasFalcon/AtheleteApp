@@ -7,7 +7,6 @@ import {
   formatThousands,
   hasCompletedEver,
   prCurve,
-  quizMastery,
   resolveHomeMode,
   resolveHomeSlides,
   slidesKey,
@@ -86,77 +85,70 @@ describe('resolveHomeMode', () => {
 });
 
 const ringsInput: DayRingsInput = {
-  mode: 'workout',
+  isNewUser: false,
   challenge: openCore,
-  workout: { minutesToday: 0, completedToday: false, targetMinutes: 35 },
+  workout: { plan: 'session', setsDone: 6, setsTotal: 18, completedToday: false },
   nutrition: { hasPlan: true, calories: 1425, targetCalories: 2850 },
   hydration: { todayMl: 1750, goalGlasses: 14 },
 };
 
-describe('buildDayRings', () => {
-  it('uses Core 33 as first ring while training is pending', () => {
+describe('buildDayRings · v2.18 anillos dinámicos', () => {
+  it('Entrenamiento, Core 33, Nutrición, Hidratación from outside in', () => {
     const { rings, dayPct } = buildDayRings(ringsInput);
-
-    expect(rings.map(ring => ring.kind)).toEqual([
-      'core33',
-      'nutrition',
-      'hydration',
-    ]);
-    expect(rings[0].value).toBe('1/3');
-    expect(rings[1].value).toBe('1.425');
-    expect(rings[1].progress).toBeCloseTo(0.5);
-    expect(rings[2].value).toBe('7');
-    expect(rings[2].unit).toBe('de 14 vasos');
-    expect(dayPct).toBe(Math.round(((1 / 3 + 0.5 + 0.5) / 3) * 100));
+    expect(rings.map(ring => ring.kind)).toEqual(['workout', 'core33', 'nutrition', 'hydration']);
+    expect(rings[0]).toMatchObject({ value: '6/18', unit: 'series' });
+    expect(rings[1].value).toBe('1/3');
+    expect(rings[2].value).toBe('1.425');
+    expect(rings[3]).toMatchObject({ value: '7', unit: '/ 14 vasos' });
+    expect(dayPct).toBe(Math.round(((6 / 18 + 1 / 3 + 0.5 + 0.5) / 4) * 100));
   });
 
-  it('uses the workout ring in Core 33 mode and without a challenge', () => {
-    expect(buildDayRings({ ...ringsInput, mode: 'core33' }).rings[0].kind).toBe(
-      'workout',
-    );
-    expect(
-      buildDayRings({ ...ringsInput, challenge: null }).rings[0],
-    ).toMatchObject({ kind: 'workout', value: '0', unit: 'de 35 min' });
+  it('shows 2 rings without a challenge nor nutrition', () => {
+    const { rings } = buildDayRings({
+      ...ringsInput,
+      challenge: null,
+      nutrition: { hasPlan: false, calories: 0, targetCalories: 0 },
+    });
+    expect(rings.map(ring => ring.kind)).toEqual(['workout', 'hydration']);
   });
 
-  it('fills the workout ring with the minutes trained today', () => {
-    const base = { ...ringsInput, mode: 'allDone' as const };
+  it('rest day and no training today', () => {
+    expect(buildDayRings({ ...ringsInput, workout: { plan: 'rest' } }).rings[0]).toMatchObject({
+      value: 'Descanso',
+      progress: 1,
+      opacity: 0.3,
+      text: true,
+    });
+    expect(buildDayRings({ ...ringsInput, workout: { plan: 'none' } }).rings[0]).toMatchObject({
+      value: 'Sin entreno hoy',
+      progress: 0,
+      link: true,
+    });
+  });
+
+  it('a completed session fills the training ring', () => {
     expect(
       buildDayRings({
-        ...base,
-        workout: { minutesToday: 42, completedToday: true, targetMinutes: 35 },
+        ...ringsInput,
+        workout: { plan: 'session', setsDone: 4, setsTotal: 18, completedToday: true },
       }).rings[0],
-    ).toMatchObject({ value: '42', progress: 1, done: true });
-    expect(
-      buildDayRings({
-        ...base,
-        mode: 'core33',
-        workout: { minutesToday: 14, completedToday: false, targetMinutes: 35 },
-      }).rings[0],
-    ).toMatchObject({ value: '14', progress: 0.4, done: false });
+    ).toMatchObject({ value: '18/18', progress: 1, done: true });
   });
 
-  it('shows empty rings for a new user and no nutrition without a plan', () => {
-    const fresh = buildDayRings({ ...ringsInput, mode: 'new' });
+  it('new user: empty rings; nutrition without a plan stays empty', () => {
+    const fresh = buildDayRings({ ...ringsInput, isNewUser: true });
     expect(fresh.dayPct).toBe(0);
     expect(fresh.rings.every(ring => ring.progress === 0)).toBe(true);
-
     const noPlan = buildDayRings({
       ...ringsInput,
       nutrition: { hasPlan: false, calories: 900, targetCalories: 0 },
     });
-    expect(noPlan.rings[1]).toMatchObject({
-      label: 'Nutrición · sin plan',
-      progress: 0,
-    });
+    expect(noPlan.rings[2]).toMatchObject({ label: 'Nutrición · sin plan', progress: 0 });
   });
 
   it('marks hydration as met at the goal', () => {
     expect(
-      buildDayRings({
-        ...ringsInput,
-        hydration: { todayMl: 3500, goalGlasses: 14 },
-      }).rings[2],
+      buildDayRings({ ...ringsInput, hydration: { todayMl: 3500, goalGlasses: 14 } }).rings[3],
     ).toMatchObject({ label: 'Hidratación · cumplida', done: true });
   });
 });
@@ -215,20 +207,6 @@ describe('helpers', () => {
       prCurve([record(80, 1)], 'max_weight')?.points.split(' '),
     ).toHaveLength(2);
     expect(prCurve([], 'max_weight')).toBeNull();
-  });
-
-  it('measures progress towards Quiz Master', () => {
-    expect(
-      quizMastery([{ bestScore: 100 }, { bestScore: 70 }, {}]),
-    ).toMatchObject({
-      mastered: 1,
-      total: 3,
-      line: '1 de 3 categorías al 100 %',
-    });
-    expect(quizMastery([{ bestScore: 100 }]).line).toBe(
-      'Quiz Master desbloqueado',
-    );
-    expect(quizMastery([]).progress).toBe(0);
   });
 });
 
@@ -354,38 +332,18 @@ describe('hasCompletedEver', () => {
 });
 
 describe('homeSectionOrder', () => {
-  it('follows v2.15: Tu semana → Tu día → Tu ruta → ELLIE → Para entrenar → Quiz → Wear', () => {
-    expect(homeSectionOrder({ core33Invite: false, challenge: false })).toEqual([
-      'week',
-      'rings',
+  it('follows v2.18: Tu día → Recupera → Muévete y compite → Aprende y juega → Wear', () => {
+    expect(homeSectionOrder({ core33Invite: false })).toEqual([
+      'day',
       'recovery',
-      'route',
-      'ellie',
-      'routines',
-      'quiz',
+      'compete',
+      'play',
       'wear',
     ]);
   });
 
-  it('puts the Core 33 invitation after the route and the challenge after ELLIE', () => {
-    expect(homeSectionOrder({ core33Invite: true, challenge: true })).toEqual([
-      'week',
-      'rings',
-      'recovery',
-      'route',
-      'core33Invite',
-      'ellie',
-      'challenge',
-      'routines',
-      'quiz',
-      'wear',
-    ]);
-  });
-
-  it('never has a best-mark section', () => {
-    expect(homeSectionOrder({ core33Invite: true, challenge: true })).not.toContain(
-      'bestMark' as never,
-    );
+  it('puts the Core 33 invitation right after Tu día', () => {
+    expect(homeSectionOrder({ core33Invite: true })[1]).toBe('core33Invite');
   });
 });
 
@@ -445,10 +403,10 @@ describe('resolveHomeSlides · carrusel de estados', () => {
       'core33',
       'workoutDone',
     ]);
-    // A session saved after finishing one: pending first, closed last.
+    // A session saved after finishing one: at most 2 slides (v2.18).
     expect(
       kinds({ workoutDoneToday: true, hasResumableSession: true, challenge: openCore }),
-    ).toEqual(['resume', 'core33', 'workoutDone']);
+    ).toEqual(['resume', 'core33']);
   });
 
   it('nothing pending is a single "Día completo"', () => {

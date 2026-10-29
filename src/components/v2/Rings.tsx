@@ -17,15 +17,25 @@ export type Ring = {
 };
 
 export type RingsProps = {
-  rings: Ring[]; // outer → inner, up to 3
+  rings: Ring[]; // outer → inner, 2–4
+  // Defaults to the natural size for the number of rings.
   size?: number;
   stroke?: number;
   trackColor?: string;
   style?: StyleProp<ViewStyle>;
 };
 
-// Geometry of the prototype at 156 pt: radii 64 / 49 / 34, stroke 12.
-const BASE = { size: 156, outer: 64, step: 15 };
+// Geometry of Tu día (v2.18 §28.14, Home.dc.html): the inner ring has radius
+// 34 and each one outside adds 15; the instrument is 2 × outer radius + 20
+// (118 pt with 2 rings, 148 with 3, 178 with 4).
+const INNER = 34;
+const STEP = 15;
+const MAX_RINGS = 4;
+
+export function ringsSize(count: number): number {
+  const n = Math.min(MAX_RINGS, Math.max(1, count));
+  return 2 * (INNER + (n - 1) * STEP) + 20;
+}
 
 function RingArc({
   ring,
@@ -67,24 +77,28 @@ function RingArc({
   );
 }
 
-// Concentric day rings ("Tu día"): Entreno/Core 33, Nutrición, Hidratación.
+// Concentric day rings ("Tu día"), outside in, starting at the top and
+// running clockwise.
 export function Rings({
   rings,
-  size = 156,
+  size: sizeProp,
   stroke = 12,
   trackColor,
   style,
 }: RingsProps) {
   const { colors } = useThemeV2();
-  const scale = size / BASE.size;
+  const shown = rings.slice(0, MAX_RINGS);
+  const natural = ringsSize(shown.length);
+  const size = sizeProp ?? natural;
+  const scale = size / natural;
   const center = size / 2;
   const track = trackColor ?? colors.surface.track;
 
   return (
     <Svg width={size} height={size} style={style}>
       <G rotation={-90} origin={`${center}, ${center}`}>
-        {rings.slice(0, 3).map((ring, index) => {
-          const radius = (BASE.outer - index * BASE.step) * scale;
+        {shown.map((ring, index) => {
+          const radius = (INNER + (shown.length - 1 - index) * STEP) * scale;
 
           return (
             <G key={index}>

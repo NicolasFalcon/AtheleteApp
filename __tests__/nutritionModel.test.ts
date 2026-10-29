@@ -121,9 +121,9 @@ describe('the same numbers on every screen', () => {
   it('Inicio rings and Progreso water agree with Nutrición', () => {
     const totals = buildDayTotals({ plan, log, waterMl: 1750, goalGlasses: 14 });
     const { rings } = buildDayRings({
-      mode: 'workout',
+      isNewUser: false,
       challenge: null as never,
-      workout: { minutesToday: 0, completedToday: false, targetMinutes: 30 },
+      workout: { plan: 'none' },
       nutrition: { hasPlan: true, calories: log.calories, targetCalories: plan.targetCalories },
       hydration: { todayMl: 1750, goalGlasses: 14 },
     });

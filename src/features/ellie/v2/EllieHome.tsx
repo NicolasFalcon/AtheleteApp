@@ -18,7 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react-native';
 import {
-  LivingHalo,
+  AuraMark,
   PressableScale,
   TextV2,
   useThemeV2,
@@ -104,7 +104,7 @@ export function EllieHeader({ onHistory }: { onHistory: () => void }) {
   );
 }
 
-// The Living Halo (168 pt) inside a 236 pt ring with an Ember arc, and the
+// AURA (168 pt) inside a 236 pt ring with an Ember arc, and the
 // "ELLIE EN LÍNEA" pill on the ring's lower edge.
 export function EllieOrbStage({
   orbState,
@@ -125,7 +125,7 @@ export function EllieOrbStage({
       <View style={[styles.ring, { borderColor: cover.ring }]} />
       <View style={[styles.ring, styles.arc, { borderRightColor: colors.ember.base }]} />
       <Animated.View style={haloStyle}>
-        <LivingHalo size="cover" state={orbState} shadow />
+        <AuraMark size={168} offline={orbState === 'offline'} />
       </Animated.View>
       <View
         style={[
@@ -148,7 +148,7 @@ export function EllieOrbStage({
 }
 
 // Centred message (28/500 + 16 secondary) and the two answers in a 1.3 : 1
-// grid: Ember with the mini Halo and an arrow, and an outlined one.
+// grid: Ember with AURA small and an arrow, and an outlined one.
 export function EllieMessage({
   headline,
   subtitle,
@@ -180,7 +180,7 @@ export function EllieMessage({
           onPress={() => onAsk(primary)}
           style={[styles.primary, { backgroundColor: colors.ember.strong }]}
         >
-          <LivingHalo size={22} />
+          <AuraMark size={22} />
           <TextV2 variant="bodyStrong" color="#FFFFFF" numberOfLines={2} style={styles.primaryText}>
             {primary.text}
           </TextV2>
@@ -289,7 +289,7 @@ export function EllieAskField({ onPress }: { onPress: () => void }) {
           },
         ]}
       >
-        <LivingHalo size={36} />
+        <AuraMark size={36} />
         <TextV2 variant="bodyL" color={cover.secondary} style={styles.askText}>
           {placeholder}
         </TextV2>

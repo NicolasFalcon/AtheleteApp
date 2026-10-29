@@ -7,7 +7,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { ArrowUp, ImagePlus } from 'lucide-react-native';
-import { LivingHalo, type LivingHaloState } from '@app/components/v2/LivingHalo';
+import { AuraMark, type AuraState } from '@app/components/v2/AuraMark';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -24,7 +24,7 @@ export type EllieComposerProps = {
   canSend?: boolean;
   // Photo button (image-plus), left of send: opens the Cámara / Galería menu.
   onPhoto?: () => void;
-  haloState?: LivingHaloState;
+  auraState?: AuraState;
   // Inactive field (no connection, limit): dimmed and not editable.
   disabled?: boolean;
   autoFocus?: boolean;
@@ -44,7 +44,7 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
       onPress,
       canSend = false,
       onPhoto,
-      haloState = 'idle',
+      auraState = 'rest',
       disabled = false,
       autoFocus,
       style,
@@ -92,7 +92,7 @@ export const EllieComposer = forwardRef<TextInput, EllieComposerProps>(
 
     const body = (
       <>
-        <LivingHalo size="input" state={haloState} />
+        <AuraMark size={32} state={auraState} />
         {button ? (
           <TextV2
             variant="bodyL"

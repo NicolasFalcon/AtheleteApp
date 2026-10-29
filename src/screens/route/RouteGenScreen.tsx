@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Linking, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, RefreshCw } from 'lucide-react-native';
-import { Button, LivingHalo, TextV2, useThemeV2 } from '@app/components/v2';
+import { Button, AuraMark, TextV2, useThemeV2 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
 import { useLocationAccess } from '@app/features/route/useLocationAccess';
 import { RouteMap } from '@app/features/route/RouteMap';
@@ -138,12 +138,12 @@ export function RouteGenScreen({ navigation }: AppScreenProps<'RouteGen'>) {
           </View>
         ) : loading && !origin ? (
           <View style={styles.loading}>
-            <LivingHalo size={64} />
+            <AuraMark size={64} />
             <TextV2 variant="title22">Buscando tu ubicación…</TextV2>
           </View>
         ) : loading ? (
           <View style={styles.loading}>
-            <LivingHalo size={64} />
+            <AuraMark size={64} />
             <TextV2 variant="title22">Generando tu ruta…</TextV2>
             <TextV2 variant="body" tone="secondary" style={styles.center}>
               ELLIE busca un recorrido de {session.config.km} km cerca de ti.

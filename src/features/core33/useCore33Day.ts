@@ -10,7 +10,7 @@ import {
   markDayClosedShown,
   wasDayClosedShown,
 } from '@app/features/core33/dayClosedSeen';
-import { playSound } from '@app/features/sound/soundService';
+import { playSound, useSoundPreload } from '@app/features/sound/soundService';
 import { useAuth } from '@app/hooks/useAuth';
 import { useCore33 } from '@app/hooks/useCore33';
 import { invalidateCore33Queries } from '@app/lib/queryInvalidation';
@@ -39,6 +39,7 @@ export function useCore33Day(options: { onChallengeCompleted?: () => void } = {}
   const { stateQuery } = useCore33();
   const state = stateQuery.data;
   const [overrides, setOverrides] = useState<Record<number, boolean>>({});
+  useSoundPreload(['habit-check', 'core33-day-close']);
   const logsRef = useRef<Record<string, boolean[]>>({});
   const chain = useRef<Promise<unknown>>(Promise.resolve());
   const pending = useRef(0);
@@ -94,15 +95,20 @@ export function useCore33Day(options: { onChallengeCompleted?: () => void } = {}
       const previous = !dayBefore[index];
       logsRef.current = { ...before, [date]: dayBefore };
 
+      // §28.7: habit-check when marking (not unmarking); if the tap closes
+      // the day only core33-day-close (days 1–32) or the day-33 celebration.
       if (!isDayDone(dayBefore, total)) {
         cancelDayClosed();
+        if (dayBefore[index]) {
+          playSound('habit-check');
+        }
       } else if (!isDayDone(before[date], total)) {
         const closedDays = Math.min(
           CORE33_TOTAL_DAYS,
           getCompletedChallengeDays(logsRef.current),
         );
         if (showsDayClosedSheet(closedDays)) {
-          playSound({ type: 'day-close' });
+          playSound('core33-day-close');
           scheduleDayClosed(profile.id, challenge.id, date, closedDays);
         }
       }
