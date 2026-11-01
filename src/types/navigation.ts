@@ -110,17 +110,23 @@ export type NutritionPlanRouteParams = undefined;
 export type CaloriesCameraRouteParams = {
   source?: 'home' | 'nutrition';
   todayKcal?: number;
+  // The moment chosen in Registrar comida (Nutrición · Hoy).
+  slot?: import('@app/services/supabase/nutritionDay').NutritionSlot;
 };
 
 // Result / editor of a meal. `draft` is a MealDraft (plain data). With
 // `mealId` it edits that meal ("Guardar cambios"); otherwise it adds one with
 // `source` (photo of Calorías or the card of the chat).
+// `text`: the foods of parse-meal-text (Describir). `entry`: an entry of
+// Nutrición · Hoy opened to edit it (update_meal_entry). Photo and text are
+// saved with log_meal_entry in the chosen moment (nut-1).
 export type MealReviewRouteParams = {
   draft: import('@app/features/nutrition/mealDraft').MealDraft;
   photoUri?: string | null;
-  source: 'photo' | 'chat';
+  source: 'photo' | 'chat' | 'text';
   chatMessageId?: string;
   mealId?: string;
+  entry?: { id: string; date: string };
 };
 
 export type MealDetailRouteParams = { mealId: string; date?: string | null };
@@ -241,6 +247,7 @@ export type AppStackParamList = {
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;
   NutritionPlan: NutritionPlanRouteParams | undefined;
+  Supplements: undefined;
   CaloriesCamera: CaloriesCameraRouteParams | undefined;
   MealReview: MealReviewRouteParams;
   MealDetail: MealDetailRouteParams;

@@ -26,8 +26,18 @@ import {
   useToast,
   useTopSafeBarHeight,
 } from '@app/components/v2';
-import { APP_ROUTES } from '@app/constants/routes';
-import { CANNED_PROMPTS, showSuggestions } from '@app/features/ellie/chatModel';
+import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
+import {
+  CANNED_PROMPTS,
+  showSuggestions,
+} from '@app/features/ellie/chatModel';
+import {
+  DiscomfortCheckCard,
+  PlanPlaceholderCard,
+  RoutineProposalCard,
+  RoutineProposalSheet,
+} from '@app/features/ellie/v2/RoutineProposalParts';
+import { NO_EDITS, type RoutineEdits } from '@app/services/ellie/ellieProposals';
 import { isRetryable } from '@app/features/ellie/ellieCopy';
 import {
   EllieVoice,
@@ -149,6 +159,19 @@ export function EllieChatScreen({ navigation, route }: Props) {
   const photo = usePhotoAttachment();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const sentPrompt = useRef(false);
+  // The routine proposal whose detail sheet is open (one at a time).
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [sheetBusy, setSheetBusy] = useState<'start' | 'save' | 'discard' | null>(null);
+  const sheetCard = state.messages.find(
+    message => message.id === sheetId && message.kind === 'routineProposal',
+  );
+  const sheetProposal =
+    sheetCard?.kind === 'routineProposal' ? sheetCard.proposal : null;
+  // The sheet keeps its proposal while it closes (no blank frame).
+  const lastSheetProposal = useRef(sheetProposal);
+  if (sheetProposal) {
+    lastSheetProposal.current = sheetProposal;
+  }
 
   // The cover's history button: the list opens once the push has settled
   // (iOS does not present a sheet during the transition).
@@ -170,6 +193,9 @@ export function EllieChatScreen({ navigation, route }: Props) {
   }, [chat, params?.mode, params?.prompt]);
 
   const offline = state.blocked === 'offline';
+  // AURA: processing until the first delta, active while it streams; back to
+  // rest it finishes the turn without a cut.
+  const aura = state.streaming ? 'active' : state.thinking ? 'processing' : 'rest';
   const loading = chat.loading;
   const autoFocus = Boolean(params?.focusInput);
   const suggestions = showSuggestions(state);
@@ -186,11 +212,93 @@ export function EllieChatScreen({ navigation, route }: Props) {
 
   const pickSuggestion = (index: number) => {
     const prompt = CANNED_PROMPTS[index];
+    setSheetId(null);
     chat.send(prompt.text, prompt.mode);
+  };
+
+  // Ajustar (sliders): the composer prefilled and focused; nothing is sent.
+  // What is sent then adjusts that card.
+  const adjustRoutine = (proposalId: string) => {
+    chat.adjustDraft(proposalId);
+    input.current?.focus();
+  };
+
+  const SAVE_FAILED = 'No se pudo guardar. Intenta de nuevo.';
+
+  // Guardar (card): the version as ELLIE proposed it.
+  const saveFromCard = (id: string) => {
+    chat
+      .saveProposal(id, NO_EDITS)
+      .then(result => {
+        if (!result.ok && result.code !== 'proposal_not_open') {
+          toast.show(SAVE_FAILED, { tone: 'error' });
+        }
+      })
+      .catch(() => undefined);
+  };
+
+  // Guardar en mis rutinas (sheet): with its variants and removed ones.
+  const saveFromSheet = async (edits: RoutineEdits) => {
+    if (!sheetId || sheetBusy) {
+      return;
+    }
+    setSheetBusy('save');
+    const result = await chat.saveProposal(sheetId, edits);
+    setSheetBusy(null);
+    if (result.ok || result.code === 'proposal_not_open') {
+      setSheetId(null);
+    } else {
+      toast.show(SAVE_FAILED, { tone: 'error' });
+    }
+  };
+
+  // Empezar ahora: the session with the sheet's version (not in Mis rutinas).
+  const startFromSheet = async (edits: RoutineEdits) => {
+    if (!sheetId || sheetBusy) {
+      return;
+    }
+    setSheetBusy('start');
+    const result = await chat.startProposal(sheetId, edits);
+    setSheetBusy(null);
+    if (result.ok && result.workoutId) {
+      setSheetId(null);
+      navigation.navigate(APP_ROUTES.WorkoutSession, {
+        workoutId: result.workoutId,
+        sessionId: result.sessionId ?? undefined,
+      });
+      return;
+    }
+    if (!result.ok && result.code === 'proposal_not_open') {
+      setSheetId(null);
+      return;
+    }
+    toast.show('No se pudo empezar. Intenta de nuevo.', { tone: 'error' });
+  };
+
+  // Descartar (sheet): the card stays as Descartada; a failure keeps the sheet.
+  const discardFromSheet = async () => {
+    if (!sheetId || sheetBusy) {
+      return;
+    }
+    setSheetBusy('discard');
+    const result = await chat.discardProposal(sheetId);
+    setSheetBusy(null);
+    if (result.ok || result.code === 'proposal_not_open') {
+      setSheetId(null);
+      return;
+    }
+    toast.show('No se pudo descartar. Intenta de nuevo.', { tone: 'error' });
+  };
+
+  // A message (written, chip or suggestion) closes the open sheet.
+  const sendText = (text: string) => {
+    setSheetId(null);
+    chat.send(text);
   };
 
   // A photo waiting in the composer goes with the message.
   const sendNow = () => {
+    setSheetId(null);
     const attached = photo.attachment;
     if (attached?.status === 'uploading') {
       return;
@@ -262,6 +370,41 @@ export function EllieChatScreen({ navigation, route }: Props) {
         />
       );
     }
+    if (message.kind === 'routineProposal') {
+      return (
+        <RoutineProposalCard
+          key={message.id}
+          card={message}
+          onOpen={() => setSheetId(message.id)}
+          onSave={() => saveFromCard(message.id)}
+          onAdjust={() => adjustRoutine(message.proposalId)}
+          onQuickAdjust={text => {
+            setSheetId(null);
+            chat.send(text, undefined, null, { adjustProposalId: message.proposalId });
+          }}
+          onOpenWorkouts={() =>
+            navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Workouts })
+          }
+          onReload={() => chat.reloadProposal(message.id)}
+        />
+      );
+    }
+    if (message.kind === 'discomfortCheck') {
+      return (
+        <DiscomfortCheckCard
+          key={message.id}
+          card={message}
+          disabled={state.thinking}
+          onAnswer={(chip, zone) => {
+            setSheetId(null);
+            chat.answerDiscomfort(message.id, chip, zone);
+          }}
+        />
+      );
+    }
+    if (message.kind === 'planPlaceholder') {
+      return <PlanPlaceholderCard key={message.id} card={message} />;
+    }
     if (message.role === 'user') {
       return (
         <UserPill
@@ -294,7 +437,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
       >
         <BackButton variant="muted" onPress={() => navigation.goBack()} />
         <View style={styles.title} accessibilityRole="header">
-          <AuraMark size={28} state={state.thinking ? 'processing' : 'rest'} offline={offline} />
+          <AuraMark size={28} state={aura} offline={offline} />
           <View>
             <TextV2 variant="bodyStrong">ELLIE</TextV2>
             <TextV2 variant="caption" color={colors.ellie.textSecondary}>
@@ -349,7 +492,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
                 </PressableScale>
               ) : null}
               {body}
-              {state.thinking ? <ThinkingIndicator /> : null}
+              {state.thinking && !state.streaming ? <ThinkingIndicator /> : null}
               {suggestions ? (
                 <SuggestionPills
                   items={CANNED_PROMPTS.map(prompt => prompt.text)}
@@ -404,11 +547,31 @@ export function EllieChatScreen({ navigation, route }: Props) {
             canSend={chat.composer.canSend || (photo.attachment?.status === 'ready' && !chat.state.thinking && !chat.composer.disabled)}
             disabled={chat.composer.disabled}
             autoFocus={autoFocus}
-            auraState={state.thinking ? 'processing' : 'rest'}
+            auraState={aura}
             onPhoto={() => setPhotoMenu(true)}
           />
         </View>
       </KeyboardAvoidingView>
+
+      <RoutineProposalSheet
+        open={sheetId !== null && sheetProposal !== null}
+        proposal={sheetProposal ?? lastSheetProposal.current}
+        busy={sheetBusy}
+        onClose={() => {
+          if (!sheetBusy) {
+            setSheetId(null);
+          }
+        }}
+        onStart={edits => {
+          startFromSheet(edits).catch(() => undefined);
+        }}
+        onSave={edits => {
+          saveFromSheet(edits).catch(() => undefined);
+        }}
+        onDiscard={() => {
+          discardFromSheet().catch(() => undefined);
+        }}
+      />
 
       <PhotoSourceSheet
         open={photoMenu}

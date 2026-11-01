@@ -4,7 +4,9 @@ import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuraMark, PressableScale, TextV2, useToast } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
-import { draftFromAnalysis, toSaveInput, type MealDraft } from '@app/features/nutrition/mealDraft';
+import { draftFromAnalysis } from '@app/features/nutrition/mealDraft';
+import { mealTypeToSlot, slotToMealType } from '@app/features/nutrition/nutritionDayModel';
+import { useMealEntryMutations } from '@app/features/nutrition/useNutritionToday';
 import { formatThousands } from '@app/features/nutrition/nutritionModel';
 import { QuickKcalSheet, type QuickKcalResult } from '@app/features/nutrition/v2/QuickKcalSheet';
 import { createPhotoRequestSession } from '@app/features/vision/photoRequest';
@@ -20,8 +22,8 @@ import { CameraCapture } from '@app/features/vision/v2/CameraCapture';
 import { VisionFailureSheet } from '@app/features/vision/v2/VisionFailureSheet';
 import { useVisionUsage } from '@app/features/vision/useVisionUsage';
 import { useAuth } from '@app/hooks/useAuth';
-import { useMealMutations } from '@app/hooks/useMeals';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
+import { getLocalDateKey } from '@app/lib/date';
 import { createUuid } from '@app/lib/uuid';
 import { analyzeMeal, VisionError } from '@app/services/vision/visionService';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -50,7 +52,7 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
   const { profile, signOut } = useAuth();
   const userId = profile?.id;
   const quota = useVisionUsage('meal');
-  const meals = useMealMutations();
+  const entries = useMealEntryMutations();
   const [phase, setPhase] = useState<Phase>({ kind: 'camera' });
   const [step, setStep] = useState(0);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -92,8 +94,11 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
           return;
         }
         playSound('scan-success');
+        const fresh = draftFromAnalysis(draft, new Date());
+        const slot = route.params?.slot;
         navigation.replace(APP_ROUTES.MealReview, {
-          draft: draftFromAnalysis(draft, new Date()),
+          // The moment chosen in Registrar comida wins over the estimate.
+          draft: slot ? { ...fresh, mealType: slotToMealType(slot), mealTypeFromClock: false } : fresh,
           photoUri: uploaded.current.localUri,
           source: 'photo',
         });
@@ -159,21 +164,12 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
   const saveQuick = async (result: QuickKcalResult) => {
     setQuickError(null);
     try {
-      await meals.save.mutateAsync(
-        toSaveInput(
-          {
-            title: result.title,
-            mealType: result.mealType,
-            mealTypeFromClock: false,
-            items: [],
-            manualKcal: result.kcal,
-            confidence: null,
-            warnings: [],
-            imagePath: null,
-          } satisfies MealDraft,
-          { source: 'manual', language },
-        ),
-      );
+      await entries.log.mutateAsync({
+        date: getLocalDateKey(),
+        slot: mealTypeToSlot(result.mealType),
+        items: [{ name: result.title.trim() || 'Kcal rápidas', grams: null, kcal: result.kcal, p: 0, c: 0, g: 0 }],
+        source: 'kcal_rapidas',
+      });
       setQuickOpen(false);
       toast.show(es ? 'Comida registrada' : 'Meal logged');
       navigation.popTo(APP_ROUTES.NutritionPlan);
@@ -265,7 +261,7 @@ export function CaloriesCameraScreen({ navigation, route }: AppScreenProps<'Calo
         onSubmit={result => {
           saveQuick(result).catch(() => undefined);
         }}
-        saving={meals.save.isPending}
+        saving={entries.log.isPending}
         error={quickError}
         reason={quickReason}
         language={language}

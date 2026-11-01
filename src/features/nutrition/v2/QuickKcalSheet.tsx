@@ -28,6 +28,7 @@ export function QuickKcalSheet({
   error = null,
   reason = null,
   language = 'es',
+  initialMealType = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,6 +37,8 @@ export function QuickKcalSheet({
   error?: string | null;
   reason?: string | null;
   language?: EllieLanguage;
+  // The moment already chosen (Registrar comida); else by the clock.
+  initialMealType?: MealType | null;
 }) {
   const { colors } = useThemeV2();
   const es = language === 'es';
@@ -47,9 +50,9 @@ export function QuickKcalSheet({
     if (open) {
       setKcal(0);
       setTitle('');
-      setMealType(mealTypeForTime(new Date()));
+      setMealType(initialMealType ?? mealTypeForTime(new Date()));
     }
-  }, [open]);
+  }, [initialMealType, open]);
 
   return (
     <Sheet

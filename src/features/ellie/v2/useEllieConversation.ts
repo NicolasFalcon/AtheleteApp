@@ -4,13 +4,24 @@ import {
   chatReducer,
   composerState,
   initialChatState,
+  proposalMessageId,
   type EllieMode as PlanMode,
+  type ProposalMessage,
+  type RoutineCardStatus,
 } from '@app/features/ellie/chatModel';
+import { discomfortMessage } from '@app/features/ellie/discomfortModel';
+import { ROUTINE_ADJUST_PREFIX } from '@app/features/ellie/routineProposalModel';
 import { ellieErrorLine, failureEffect, type EllieLanguage } from '@app/features/ellie/ellieCopy';
-import { ellieRoutineInput, historyToMessages, parseTool } from '@app/features/ellie/resultParsing';
+import {
+  ellieRoutineInput,
+  historyToMessages,
+  parseTool,
+  proposalToMessage,
+} from '@app/features/ellie/resultParsing';
 import { useAuth } from '@app/hooks/useAuth';
 import {
   cacheEllieUsage,
+  ellieKeys,
   invalidateEllieConversations,
   useEllieLatest,
   useEllieMessages,
@@ -23,10 +34,26 @@ import { invalidateRoutineLists, routineKeys } from '@app/hooks/useRoutines';
 import { routinesService } from '@app/services/routines/routinesService';
 import {
   EllieError,
+  EllieStreamError,
   sendEllieMessage,
+  streamEllieMessage,
+  type DiscomfortAnswer,
   type EllieMode,
   type EllieReply,
+  type EllieSendInput,
 } from '@app/services/ellie/ellieService';
+import {
+  discardProposal as discardStoredProposal,
+  editsPayload,
+  getProposal,
+  ProposalError,
+  saveRoutineProposal,
+  startRoutineProposal,
+  storedCards,
+  type ProposalErrorCode,
+  type ProposalStatus,
+  type RoutineEdits,
+} from '@app/services/ellie/ellieProposals';
 
 export const defaultGreeting = (name?: string | null) =>
   `Hola${name ? `, ${name}` : ''}. ¿En qué te ayudo hoy?`;
@@ -56,6 +83,34 @@ type Options = {
 
 export type RegenerateBusy = Record<string, boolean>;
 
+type SendExtras = { adjustProposalId?: string | null; discomfortAnswer?: DiscomfortAnswer | null };
+
+// An adjustment replaces the card it was asked from.
+const parentOf = (card: ProposalMessage, extra: SendExtras | undefined) =>
+  card.kind === 'routineProposal' && card.version > 1 && extra?.adjustProposalId
+    ? proposalMessageId(extra.adjustProposalId)
+    : null;
+
+export type ProposalActionResult =
+  | { ok: true; routineId?: string | null; workoutId?: string | null; sessionId?: string | null }
+  | { ok: false; code: ProposalErrorCode };
+
+// get_proposal's status as the state of the card.
+function cardStatus(status: ProposalStatus): RoutineCardStatus {
+  switch (status) {
+    case 'open':
+      return 'open';
+    case 'saved':
+      return 'saved';
+    case 'started':
+      return 'started';
+    case 'discarded':
+      return 'discarded';
+    default:
+      return 'replaced';
+  }
+}
+
 // The state of the chat (chatReducer) wired to ellie-chat: the server keeps the
 // conversation and reads the user's context; the app sends one message per
 // turn with an idempotency key and reads the history. Nothing is inserted from
@@ -78,6 +133,11 @@ export function useEllieConversation({
   const modes = useRef<Record<string, EllieMode | undefined>>({});
   // The photo each message carries (its path in storage): a retry sends it again.
   const images = useRef<Record<string, string | undefined>>({});
+  // What else each message carries (the adjusted proposal, a discomfort
+  // answer): a retry sends it again.
+  const extras = useRef<Record<string, SendExtras | undefined>>({});
+  // The card whose Ajustar left the prefix in the composer.
+  const adjustTarget = useRef<string | null>(null);
 
   // Which conversation is open. Without a request it is the latest one, once
   // known; a conversation created by the first message is adopted here.
@@ -136,10 +196,38 @@ export function useEllieConversation({
         setAdopted(reply.conversationId);
       }
       cacheEllieUsage(queryClient, userId, reply.usage);
+      // A streamed answer does not carry the usage: read it again.
+      if (!reply.usage) {
+        queryClient.invalidateQueries({ queryKey: ellieKeys.usage(userId) }).catch(() => undefined);
+      }
       invalidateEllieConversations(queryClient, userId);
     },
     [queryClient, userId],
   );
+
+  // A JSON reply (no stream, or the server chose not to stream): its text or
+  // legacy tool, then its cards.
+  const paintReply = useCallback((id: string, reply: EllieReply, extra?: SendExtras) => {
+    const parsed = reply.message.tool
+      ? parseTool(reply.message.tool, reply.message.id, reply.message.content)
+      : null;
+    if (parsed) {
+      dispatch({ type: 'tool', id: `assistant-${id}`, intro: parsed.intro, card: parsed.card });
+    } else if (reply.message.content) {
+      dispatch({ type: 'delta', id: reply.message.id || `assistant-${id}`, delta: reply.message.content });
+    }
+    // A replayed answer may carry its card only as tool_data.proposal_id.
+    const cards =
+      reply.cards.length > 0 || !reply.message.tool
+        ? reply.cards
+        : storedCards(reply.message.tool.type, reply.message.tool.data);
+    cards.forEach(card => {
+      const message = proposalToMessage(card, reply.message.id || `assistant-${id}`);
+      if (message) {
+        dispatch({ type: 'proposal', card: message, parentId: parentOf(message, extra) });
+      }
+    });
+  }, []);
 
   const run = useCallback(
     async (
@@ -151,48 +239,118 @@ export function useEllieConversation({
     ) => {
       modes.current[id] = mode;
       dispatch(retry ? { type: 'retry', id } : { type: 'send', id, text, image });
+      const input: EllieSendInput = {
+        conversationId: conversationRef.current,
+        // Same id on every retry (and on the fallback without stream): the
+        // server returns the stored answer (replayed) instead of answering
+        // and charging twice.
+        clientMessageId: id,
+        message: text,
+        mode,
+        imagePath: images.current[id] ?? null,
+        clientContext,
+        adjustProposalId: extras.current[id]?.adjustProposalId ?? null,
+        discomfortAnswer: extras.current[id]?.discomfortAnswer ?? null,
+      };
+      const extra = extras.current[id];
+      const assistantId = `assistant-${id}`;
+      // What the stream painted, removed if it has to be asked again.
+      const painted = new Set<string>();
       try {
-        const reply = await sendEllieMessage({
-          conversationId: conversationRef.current,
-          // Same id on every retry: the server returns the stored answer
-          // (replayed) instead of answering and charging twice.
-          clientMessageId: id,
-          message: text,
-          mode,
-          imagePath: images.current[id] ?? null,
-          clientContext,
-        });
-        afterReply(reply);
-        const parsed = reply.message.tool
-          ? parseTool(reply.message.tool, reply.message.id, reply.message.content)
-          : null;
-        if (parsed) {
-          dispatch({ type: 'tool', id: `assistant-${id}`, intro: parsed.intro, card: parsed.card });
-        } else {
-          dispatch({ type: 'delta', id: reply.message.id || `assistant-${id}`, delta: reply.message.content });
-          dispatch({ type: 'done' });
+        let reply: EllieReply;
+        try {
+          const streamed = await streamEllieMessage(input, {
+            onDelta: delta => {
+              painted.add(assistantId);
+              dispatch({ type: 'delta', id: assistantId, delta });
+            },
+            onCard: card => {
+              const message = proposalToMessage(card, assistantId);
+              if (message) {
+                painted.add(message.id);
+                dispatch({ type: 'proposal', card: message, parentId: parentOf(message, extra) });
+              }
+            },
+          });
+          reply = streamed;
+          if (!streamed.streamed) {
+            paintReply(id, reply, extra);
+          }
+        } catch (error) {
+          if (!(error instanceof EllieStreamError) || !error.fallback) {
+            throw error instanceof EllieStreamError ? error.failure : error;
+          }
+          console.warn('[ellie] Stream falló; se pide sin stream.', error.failure.code);
+          if (painted.size > 0) {
+            dispatch({ type: 'discard', ids: [...painted] });
+          }
+          reply = await sendEllieMessage(input);
+          paintReply(id, reply, extra);
         }
+        afterReply(reply);
+        dispatch({ type: 'done' });
       } catch (error) {
         fail(id, error);
       }
     },
-    [afterReply, clientContext, fail],
+    [afterReply, clientContext, fail, paintReply],
   );
 
   const send = useCallback(
-    (text: string, mode?: PlanMode, image?: { uri: string; path: string } | null) => {
+    (
+      text: string,
+      mode?: PlanMode,
+      image?: { uri: string; path: string } | null,
+      extra?: SendExtras,
+    ): boolean => {
       const trimmed = text.trim() || (image ? PHOTO_TEXT[language] : '');
       if (!trimmed || stateRef.current.thinking || !userId) {
-        return;
+        return false;
       }
       setDraft('');
       const id = createUuid();
       if (image) {
         images.current[id] = image.path;
       }
+      // "Ajusta la rutina: …" after Ajustar adjusts that card.
+      const target =
+        adjustTarget.current && trimmed.startsWith(ROUTINE_ADJUST_PREFIX.trim()) ? adjustTarget.current : null;
+      adjustTarget.current = null;
+      const adjustProposalId = extra?.adjustProposalId ?? target;
+      if (adjustProposalId || extra?.discomfortAnswer) {
+        extras.current[id] = { adjustProposalId, discomfortAnswer: extra?.discomfortAnswer ?? null };
+      }
       run(id, trimmed, mode, false, image ?? null).catch(() => undefined);
+      return true;
     },
     [language, run, userId],
+  );
+
+  // Ajustar: the prefix in the composer; what is sent adjusts that card.
+  const adjustDraft = useCallback((proposalId: string) => {
+    adjustTarget.current = proposalId;
+    setDraft(ROUTINE_ADJUST_PREFIX);
+  }, []);
+
+  // A chip of a discomfort_check card ("Tengo otra molestia" with its zone).
+  const answerDiscomfort = useCallback(
+    (id: string, chip: string, otherZone?: string) => {
+      const card = stateRef.current.messages.find(item => item.id === id);
+      if (!card || card.kind !== 'discomfortCheck' || card.answer) {
+        return;
+      }
+      const answer = discomfortMessage(chip, card.zones, otherZone);
+      if (!answer) {
+        // A chip the app does not know: sent as text.
+        send(chip);
+        return;
+      }
+      const { other, ...discomfortAnswer } = answer.reply;
+      if (send(answer.text, undefined, null, { discomfortAnswer })) {
+        dispatch({ type: 'discomfortAnswered', id, answer: { ...discomfortAnswer, other } });
+      }
+    },
+    [send],
   );
 
   const retry = useCallback(
@@ -206,7 +364,7 @@ export function useEllieConversation({
   );
 
   const settle = useCallback(
-    (id: string, stage: 'active' | 'saved' | 'error', workoutId?: string) =>
+    (id: string, stage: 'active' | 'saved' | 'error' | 'proposed', workoutId?: string) =>
       dispatch({ type: 'stage', id, stage, workoutId }),
     [],
   );
@@ -288,6 +446,10 @@ export function useEllieConversation({
         }
         if (parsed && parsed.card.kind !== 'meal') {
           dispatch({ type: 'replace', id, card: parsed.card, intro: parsed.intro });
+        } else if (reply.cards.length > 0 || typeof reply.message.tool?.data.proposal_id === 'string') {
+          // cards_v2 answers with a proposal instead of the old plan.
+          settle(id, 'proposed');
+          paintReply(id, reply);
         } else {
           settle(id, 'error');
         }
@@ -300,7 +462,142 @@ export function useEllieConversation({
         setBusy(current => ({ ...current, [id]: false }));
       }
     },
-    [afterReply, clientContext, language, onUnauthorized, settle],
+    [afterReply, clientContext, language, onUnauthorized, paintReply, settle],
+  );
+
+  // Cards of the history carry only their proposal_id: read each once.
+  const requested = useRef(new Set<string>());
+  useEffect(() => {
+    state.messages.forEach(message => {
+      if (
+        message.kind !== 'routineProposal' ||
+        message.status !== 'loading' ||
+        requested.current.has(message.id)
+      ) {
+        return;
+      }
+      requested.current.add(message.id);
+      getProposal(message.proposalId)
+        .then(stored =>
+          dispatch({
+            type: 'proposalLoaded',
+            id: message.id,
+            proposal: stored?.routine ?? null,
+            status: stored?.routine ? cardStatus(stored.status) : 'unavailable',
+          }),
+        )
+        .catch(error => {
+          console.warn('[ellie] No se pudo leer la propuesta.', error);
+          requested.current.delete(message.id);
+          dispatch({ type: 'proposalLoaded', id: message.id, proposal: null, status: 'unavailable' });
+        });
+    });
+  }, [state.messages]);
+
+  const reloadProposal = useCallback((id: string) => {
+    requested.current.delete(id);
+    dispatch({ type: 'proposalStatus', id, status: 'loading' });
+  }, []);
+
+  // One client_id per action, proposal and edits: a retry of the same thing
+  // is answered with the same result and never creates it twice.
+  const clientIds = useRef<Record<string, string>>({});
+  const clientIdFor = (action: string, proposalId: string, edits: RoutineEdits) => {
+    const key = `${action}:${proposalId}:${JSON.stringify(editsPayload(edits))}`;
+    clientIds.current[key] = clientIds.current[key] ?? createUuid();
+    return clientIds.current[key];
+  };
+
+  const proposalFailure = useCallback(
+    (id: string, error: unknown, previous: RoutineCardStatus): ProposalActionResult => {
+      const code = error instanceof ProposalError ? error.code : 'unknown';
+      console.warn('[ellie] Acción de propuesta fallida.', code);
+      // Replaced, saved or active elsewhere: the card has no actions anymore.
+      dispatch({ type: 'proposalStatus', id, status: code === 'proposal_not_open' ? 'replaced' : previous });
+      if (code === 'unauthorized') {
+        onUnauthorized?.();
+      }
+      return { ok: false, code };
+    },
+    [onUnauthorized],
+  );
+
+  const refreshAfterRoutine = useCallback(
+    () =>
+      Promise.allSettled([
+        invalidateRoutineLists(queryClient),
+        queryClient.invalidateQueries({ queryKey: ['ellie', 'overview', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['home', 'overview', userId] }),
+      ]),
+    [queryClient, userId],
+  );
+
+  // Guardar (card: no edits) · Guardar en mis rutinas (sheet: its edits).
+  const saveProposal = useCallback(
+    async (id: string, edits: RoutineEdits): Promise<ProposalActionResult> => {
+      const card = stateRef.current.messages.find(item => item.id === id);
+      if (!card || card.kind !== 'routineProposal' || card.status !== 'open') {
+        return { ok: false, code: 'proposal_not_open' };
+      }
+      dispatch({ type: 'proposalStatus', id, status: 'saving' });
+      try {
+        const { routineId } = await saveRoutineProposal(
+          card.proposalId,
+          edits,
+          clientIdFor('save', card.proposalId, edits),
+        );
+        dispatch({ type: 'proposalStatus', id, status: 'saved' });
+        await refreshAfterRoutine();
+        return { ok: true, routineId };
+      } catch (error) {
+        return proposalFailure(id, error, 'open');
+      }
+    },
+    [proposalFailure, refreshAfterRoutine],
+  );
+
+  // Empezar ahora: a session with the sheet's version, not saved in Mis
+  // rutinas. workout.id is the hidden template the session runs.
+  const startProposal = useCallback(
+    async (id: string, edits: RoutineEdits): Promise<ProposalActionResult> => {
+      const card = stateRef.current.messages.find(item => item.id === id);
+      if (!card || card.kind !== 'routineProposal' || card.status !== 'open') {
+        return { ok: false, code: 'proposal_not_open' };
+      }
+      try {
+        const { workoutId, sessionId } = await startRoutineProposal(
+          card.proposalId,
+          edits,
+          clientIdFor('start', card.proposalId, edits),
+        );
+        if (!workoutId) {
+          return { ok: false, code: 'unknown' };
+        }
+        dispatch({ type: 'proposalStatus', id, status: 'started' });
+        return { ok: true, workoutId, sessionId };
+      } catch (error) {
+        return proposalFailure(id, error, 'open');
+      }
+    },
+    [proposalFailure],
+  );
+
+  // Descartar (sheet): discard_proposal; the card stays as Descartada.
+  const discardProposal = useCallback(
+    async (id: string): Promise<ProposalActionResult> => {
+      const card = stateRef.current.messages.find(item => item.id === id);
+      if (!card || card.kind !== 'routineProposal' || card.status !== 'open') {
+        return { ok: false, code: 'proposal_not_open' };
+      }
+      try {
+        await discardStoredProposal(card.proposalId);
+        dispatch({ type: 'proposalStatus', id, status: 'discarded' });
+        return { ok: true };
+      } catch (error) {
+        return proposalFailure(id, error, 'open');
+      }
+    },
+    [proposalFailure],
   );
 
   // A new conversation: the server creates it with the first message.
@@ -309,6 +606,7 @@ export function useEllieConversation({
     loadedFor.current = null;
     setLocalOnly(false);
     setAdopted(null);
+    adjustTarget.current = null;
     dispatch({ type: 'reset', greeting });
     setDraft('');
   }, [greeting]);
@@ -320,6 +618,7 @@ export function useEllieConversation({
       loadedFor.current = null;
       setLocalOnly(false);
       setAdopted(id);
+      adjustTarget.current = null;
       dispatch({ type: 'reset', greeting });
       setDraft('');
     },
@@ -344,10 +643,16 @@ export function useEllieConversation({
     },
     usage: usage.data ?? null,
     send,
+    adjustDraft,
+    answerDiscomfort,
     retry,
     activatePlan,
     saveRoutine,
     anotherVersion,
+    saveProposal,
+    startProposal,
+    discardProposal,
+    reloadProposal,
     newConversation,
     openConversation,
   };

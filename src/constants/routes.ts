@@ -78,6 +78,7 @@ export const APP_ROUTES = {
   PersonalRecords: 'PersonalRecords',
   RegisterPr: 'RegisterPr',
   NutritionPlan: 'NutritionPlan',
+  Supplements: 'Supplements',
   CaloriesCamera: 'CaloriesCamera',
   MealReview: 'MealReview',
   MealDetail: 'MealDetail',

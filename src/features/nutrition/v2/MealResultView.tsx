@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput, View } from 'react-native';
-import { ArrowUp, Camera, Minus, Plus, X } from 'lucide-react-native';
+import { ArrowUp, Camera, Minus, Plus, Star, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Button,
@@ -55,6 +55,9 @@ export function MealResultView({
   onHint,
   hinting = false,
   hintNote = null,
+  ctaLabel: ctaOverride,
+  estimateLabel = false,
+  favorites,
 }: {
   draft: MealDraft;
   onChange: (draft: MealDraft) => void;
@@ -71,6 +74,12 @@ export function MealResultView({
   onHint?: (text: string) => Promise<void>;
   hinting?: boolean;
   hintNote?: string | null;
+  // "Guardar en Desayuno" (Nutrición · Hoy).
+  ctaLabel?: string;
+  // An estimate without a photo (Describir): said under the total.
+  estimateLabel?: boolean;
+  // ☆ on each food (toggle_favorite_food).
+  favorites?: { isOn: (itemId: string) => boolean; toggle: (itemId: string) => void };
 }) {
   // KeyboardAvoidingView measures itself from its parent, which starts
   // below the TopSafeBar (B-01).
@@ -84,6 +93,8 @@ export function MealResultView({
   const [hint, setHint] = useState('');
   const low = isLowConfidence(draft);
   const estimate = draft.imagePath !== null && draft.items.length > 0;
+  // Without a photo (Describir, an entry of the day) there is no hero.
+  const hero = Boolean(uri) || draft.imagePath !== null;
 
   const sendHint = async () => {
     const text = hint.trim();
@@ -95,19 +106,21 @@ export function MealResultView({
   };
 
   const ctaLabel =
-    mode === 'edit'
+    ctaOverride ??
+    (mode === 'edit'
       ? es ? 'Guardar cambios' : 'Save changes'
-      : es ? `Añadir al día · ${formatThousands(totals.kcal)} kcal` : `Add to today · ${formatThousands(totals.kcal)} kcal`;
+      : es ? `Añadir al día · ${formatThousands(totals.kcal)} kcal` : `Add to today · ${formatThousands(totals.kcal)} kcal`);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <StatusBarV2 style="light" />
+      {hero ? <StatusBarV2 style="light" /> : <StatusBarV2 />}
       <KeyboardAvoidingView keyboardVerticalOffset={topSafeBarHeight} style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
         >
+          {hero ? (
           <MealPhoto
             uri={uri}
             height={HERO}
@@ -143,6 +156,18 @@ export function MealResultView({
               </View>
             ) : null}
           </MealPhoto>
+          ) : (
+            <View style={[styles.plainTop, { paddingTop: insets.top + 8 }]}>
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityLabel={es ? 'Cerrar' : 'Close'}
+                onPress={onClose}
+                style={[styles.round44, { backgroundColor: colors.surface.muted }]}
+              >
+                <X size={20} color={colors.text.primary} strokeWidth={2} />
+              </PressableScale>
+            </View>
+          )}
 
           <View style={styles.body}>
             <TextInput
@@ -162,6 +187,14 @@ export function MealResultView({
                 kcal
               </TextV2>
             </View>
+            {estimateLabel ? (
+              <View style={styles.estimateRow}>
+                <AuraMark size={18} />
+                <TextV2 variant="eyebrow" tone="secondary">
+                  {es ? 'ESTIMACIÓN' : 'ESTIMATE'}
+                </TextV2>
+              </View>
+            ) : null}
             {draft.items.length > 0 ? (
               <TextV2 variant="meta" tone="secondary">
                 {es
@@ -221,7 +254,7 @@ export function MealResultView({
                           <TextV2 variant="bodyStrong" numberOfLines={2}>
                             {item.name}
                           </TextV2>
-                          {values.unit ? (
+                          {values.unit && values.unit.gramsPer > 0 ? (
                             <TextV2 variant="meta" tone="secondary">
                               {unitLine(values, language)}
                             </TextV2>
@@ -229,13 +262,29 @@ export function MealResultView({
                           <TextV2 variant="meta" tone="secondary">
                             {`P ${values.protein} · C ${values.carbs} · G ${values.fats} g`}
                           </TextV2>
-                          {values.unit ? (
+                          {values.unit && values.unit.gramsPer > 0 ? (
                             <TextV2 variant="meta" tone="tertiary">
                               {perUnitLine(values.unit, language)}
                             </TextV2>
                           ) : null}
                         </View>
                         <TextV2 variant="bodyStrong">{`${formatThousands(values.kcal)} kcal`}</TextV2>
+                        {favorites ? (
+                          <PressableScale
+                            accessibilityRole="button"
+                            accessibilityLabel={es ? 'Favorito' : 'Favourite'}
+                            accessibilityState={{ selected: favorites.isOn(item.id) }}
+                            hitSlop={8}
+                            onPress={() => favorites.toggle(item.id)}
+                          >
+                            <Star
+                              size={20}
+                              strokeWidth={2}
+                              color={favorites.isOn(item.id) ? colors.ember.base : colors.text.tertiary}
+                              fill={favorites.isOn(item.id) ? colors.ember.base : 'none'}
+                            />
+                          </PressableScale>
+                        ) : null}
                       </View>
                       <View style={styles.foodActions}>
                         <View style={[styles.stepper, { backgroundColor: colors.surface.muted }]}>
@@ -344,6 +393,8 @@ const styles = StyleSheet.create({
   retake: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 44, paddingHorizontal: 16, borderRadius: 22, backgroundColor: 'rgba(14,13,12,.45)' },
   chip: { position: 'absolute', left: 16, bottom: 14, flexDirection: 'row', alignItems: 'center', gap: 8, height: 32, paddingHorizontal: 12, borderRadius: 16, backgroundColor: 'rgba(14,13,12,.55)' },
   body: { padding: 20, gap: 14 },
+  plainTop: { paddingHorizontal: 16 },
+  estimateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title: { fontSize: 24, lineHeight: 30, fontWeight: '600', padding: 0 },
   totalRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   total: { fontSize: 48, lineHeight: 52, fontWeight: '600', letterSpacing: -1.9 },

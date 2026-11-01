@@ -50,6 +50,7 @@ import { MealDetailScreen } from '@app/screens/calories/MealDetailScreen';
 import { MachineScanScreen } from '@app/screens/vision/MachineScanScreen';
 import { MealReviewScreen } from '@app/screens/calories/MealReviewScreen';
 import { NutritionPlanScreen } from '@app/screens/nutrition/NutritionPlanScreen';
+import { SupplementsScreen } from '@app/screens/nutrition/SupplementsScreen';
 import { RegisterPrScreen } from '@app/screens/pr/RegisterPrScreen';
 import { AchievementsScreen } from '@app/screens/profile/AchievementsScreen';
 import { EditProfileScreen } from '@app/screens/profile/EditProfileScreen';
@@ -373,6 +374,10 @@ export function RootNavigator() {
           <Stack.Screen
             name={APP_ROUTES.NutritionPlan}
             component={NutritionPlanScreen}
+          />
+          <Stack.Screen
+            name={APP_ROUTES.Supplements}
+            component={SupplementsScreen}
           />
           <Stack.Screen
             name={APP_ROUTES.CaloriesCamera}

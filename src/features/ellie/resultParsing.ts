@@ -6,7 +6,19 @@ import { parseEllieTool, type EllieTool } from '@app/services/ellie/ellieService
 import type { RoutineInput } from '@app/services/routines/routinesService';
 import type { EllieStoredMessage } from '@app/services/ellie/ellieHistory';
 import { parseMealAnalysis } from '@app/services/vision/visionService';
-import type { CardMessage, ChatMessage } from '@app/features/ellie/chatModel';
+import {
+  proposalMessageId,
+  type CardMessage,
+  type ChatMessage,
+  type ProposalMessage,
+} from '@app/features/ellie/chatModel';
+import {
+  parseDiscomfortCheck,
+  parseRoutineProposal,
+  storedCards,
+  type ProposalCard,
+} from '@app/services/ellie/ellieProposals';
+import { DISCOMFORT_CHIPS, discomfortFromText } from '@app/features/ellie/discomfortModel';
 
 // Reading of the tool data of ellie-chat (docs/backend/ELLIE_SHAPES.md):
 // defaults for whatever is missing. `exercise_id` is always a real exercise of
@@ -118,8 +130,12 @@ export type ParsedTool = {
 };
 
 // A plan the server returned (`tool`) becomes a card. With a plan, the reply's
-// content is the plan's intro_message.
+// content is the plan's intro_message. A tool with proposal_id is a v2 card
+// (storedCards), never the old one.
 export function parseTool(tool: EllieTool, id: string, content: string): ParsedTool | null {
+  if (typeof tool.data.proposal_id === 'string') {
+    return null;
+  }
   const intro =
     content || (typeof tool.data.intro_message === 'string' ? tool.data.intro_message : '');
   if (tool.type === 'meal_analysis') {
@@ -145,10 +161,75 @@ export function parseTool(tool: EllieTool, id: string, content: string): ParsedT
   };
 }
 
+// A card of cards_v2 as a chat message. With its payload (stream / JSON) the
+// routine is ready; from the history (proposal_id only) it is `loading` until
+// get_proposal answers. A routine card without proposal_id is not shown.
+export function proposalToMessage(card: ProposalCard, fallbackId: string): ProposalMessage | null {
+  const id = card.proposalId ? proposalMessageId(card.proposalId) : `${fallbackId}-${card.type}`;
+  if (card.type === 'discomfort_check') {
+    const check = parseDiscomfortCheck(card.payload);
+    return {
+      id,
+      role: 'assistant',
+      kind: 'discomfortCheck',
+      zones: check.zones,
+      chips: check.chips.length > 0 ? check.chips : [...DISCOMFORT_CHIPS],
+      answer: null,
+    };
+  }
+  if (card.type !== 'routine_proposal') {
+    return { id, role: 'assistant', kind: 'planPlaceholder', cardType: card.type };
+  }
+  if (!card.proposalId) {
+    return null;
+  }
+  const proposal = card.payload
+    ? parseRoutineProposal(card.proposalId, card.payload, {
+        version: card.version,
+        adjustLabel: card.adjustLabel,
+      })
+    : null;
+  return {
+    id,
+    role: 'assistant',
+    kind: 'routineProposal',
+    proposalId: card.proposalId,
+    version: card.version,
+    adjustLabel: card.adjustLabel,
+    proposal,
+    status: proposal ? 'open' : 'loading',
+  };
+}
+
 // The stored conversation as chat messages: text, and the cards of the plans
 // ELLIE generated (chat_messages.tool_type / tool_data).
 export function historyToMessages(rows: EllieStoredMessage[]): ChatMessage[] {
+  return answeredDiscomforts(storedMessages(rows));
+}
+
+// A discomfort_check followed by the user's reply shows that reply.
+function answeredDiscomforts(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message, index) => {
+    if (message.kind !== 'discomfortCheck') {
+      return message;
+    }
+    const reply = messages.slice(index + 1).find(item => item.role === 'user');
+    const answer = reply?.kind === 'text' ? discomfortFromText(reply.text, message.zones) : null;
+    return answer ? { ...message, answer } : message;
+  });
+}
+
+function storedMessages(rows: EllieStoredMessage[]): ChatMessage[] {
   return rows.flatMap((row): ChatMessage[] => {
+    const cards = row.role === 'assistant' ? storedCards(row.toolType, row.toolData) : [];
+    if (cards.length > 0) {
+      return [
+        ...(row.content ? [{ id: row.id, role: 'assistant' as const, kind: 'text' as const, text: row.content }] : []),
+        ...cards
+          .map(card => proposalToMessage(card, row.id))
+          .filter((message): message is ProposalMessage => message !== null),
+      ];
+    }
     if (row.role === 'user') {
       return [
         {

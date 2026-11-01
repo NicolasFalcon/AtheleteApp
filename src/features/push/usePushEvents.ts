@@ -6,6 +6,14 @@ import { notificationsModule } from '@app/features/push/notificationsNative';
 import { isAlreadyThere, navigateToTarget, resolveTarget } from '@app/features/push/pushNavigation';
 import { pushChecks } from '@app/features/push/pushChecks';
 import { parsePushData, targetForPush } from '@app/features/push/pushRoute';
+import {
+  ACTION_SNOOZE,
+  ACTION_TAKEN,
+  handleSupplementAction,
+  isSupplementReminder,
+  registerSupplementCategory,
+} from '@app/features/push/supplementActions';
+import { APP_ROUTES } from '@app/constants/routes';
 import { getSocialService } from '@app/services/social/socialSource';
 import { useAuth } from '@app/hooks/useAuth';
 import { navigationRef } from '@app/navigation/navigationRef';
@@ -43,6 +51,12 @@ export function usePushEvents(): void {
         return;
       }
       handled.current.add(key);
+      // A tap on a supplement reminder opens Nutrición (its actions never
+      // get here: see `act`).
+      if (isSupplementReminder(response)) {
+        (navigationRef.navigate as (route: string) => void)(APP_ROUTES.NutritionPlan);
+        return;
+      }
       const target = targetOf(response.notification);
       if (!target) {
         // A local reminder or something that is not ours: nothing to open.
@@ -53,6 +67,26 @@ export function usePushEvents(): void {
         (navigationRef.navigate as (route: string, options?: object) => void)(name, params);
       }, resolved);
       client.invalidateQueries({ queryKey: ['social'] }).catch(() => undefined);
+    },
+    [client],
+  );
+
+  // "Tomado" / "Recordar en 30 min" of a supplement reminder: done at once,
+  // without navigating (the app may be running in the background only).
+  const act = useCallback(
+    (response: NotificationResponse): boolean => {
+      const action = response.actionIdentifier;
+      if ((action !== ACTION_TAKEN && action !== ACTION_SNOOZE) || !isSupplementReminder(response)) {
+        return false;
+      }
+      const key = `${response.notification.request.identifier}:${action}`;
+      if (!handled.current.has(key)) {
+        handled.current.add(key);
+        handleSupplementAction(response)
+          .then(() => client.invalidateQueries({ queryKey: ['nutrition-day'] }))
+          .catch(() => undefined);
+      }
+      return true;
     },
     [client],
   );
@@ -97,13 +131,18 @@ export function usePushEvents(): void {
         client.invalidateQueries({ queryKey: ['social'] }).catch(() => undefined);
       }
     });
+    registerSupplementCategory().catch(() => undefined);
     const responded = Notifications.addNotificationResponseReceivedListener(response => {
+      if (act(response)) {
+        return;
+      }
       pending.current = response;
       flush();
     });
-    // The notification that opened the app from closed.
+    // The notification that opened the app from closed (or launched it in
+    // the background for an action).
     const last = Notifications.getLastNotificationResponse();
-    if (last) {
+    if (last && !act(last)) {
       pending.current = last;
     }
     return () => {
@@ -111,7 +150,7 @@ export function usePushEvents(): void {
       responded.remove();
       Notifications.setNotificationHandler(null);
     };
-  }, [client, flush]);
+  }, [act, client, flush]);
 
   // Cold start: the navigator may take a moment to be ready after the flow
   // is the app one.

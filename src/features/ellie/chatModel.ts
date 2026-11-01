@@ -5,6 +5,8 @@ import type {
   EllieGeneratedWorkout,
 } from '@app/services/supabase/ellie-actions';
 import { plainMarkdown } from '@app/features/ellie/markdown';
+import type { ProposalCardType, RoutineProposal } from '@app/services/ellie/ellieProposals';
+import type { DiscomfortReply } from '@app/features/ellie/discomfortModel';
 
 // ELLIE · conversación v2: pure state of the chat (messages, send states,
 // generative cards, errors) so the screen and the hook only wire it.
@@ -80,17 +82,67 @@ export type MealCardMessage = {
   meal: MealAnalysis;
 };
 
+// A routine proposal of ELLIE (cards_v2, ELLIE_CARDS_FLOW §1). Several can be
+// open at once; an adjustment replaces only its parent card.
+// loading: read again with get_proposal (history) · unavailable: it could not.
+export type RoutineCardStatus =
+  | 'loading'
+  | 'open'
+  | 'saving'
+  | 'saved'
+  | 'started'
+  | 'replaced'
+  | 'discarded'
+  | 'unavailable';
+
+export type RoutineProposalMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'routineProposal';
+  proposalId: string;
+  version: number;
+  adjustLabel: string | null;
+  proposal: RoutineProposal | null;
+  status: RoutineCardStatus;
+};
+
+// Nutrition cards of cards_v2 arrive in E2: a placeholder until then.
+export type PlanPlaceholderMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'planPlaceholder';
+  cardType: ProposalCardType;
+};
+
+// discomfort_check: the chips until answered, then the answer in one line.
+export type DiscomfortCheckMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'discomfortCheck';
+  zones: string[];
+  chips: string[];
+  answer: DiscomfortReply | null;
+};
+
+export type ProposalMessage = RoutineProposalMessage | PlanPlaceholderMessage | DiscomfortCheckMessage;
+
 export type CardMessage = NutritionCardMessage | WorkoutCardMessage | MealCardMessage;
 export type ChatMessage =
   | UserMessage
   | EllieTextMessage
   | NutritionCardMessage
   | WorkoutCardMessage
-  | MealCardMessage;
+  | MealCardMessage
+  | RoutineProposalMessage
+  | PlanPlaceholderMessage
+  | DiscomfortCheckMessage;
 
 export type ChatState = {
   messages: ChatMessage[];
+  // Between sending and the end of the answer.
   thinking: boolean;
+  // The answer is arriving (first delta or card seen): AURA active, no dots.
+  streaming: boolean;
   // The composer is inactive: limit reached, or no connection.
   blocked: EllieBlock | null;
 };
@@ -106,6 +158,15 @@ export type ChatAction =
   | { type: 'retry'; id: string }
   | { type: 'stage'; id: string; stage: NutritionStage | WorkoutStage; workoutId?: string }
   | { type: 'replace'; id: string; card: CardMessage; intro?: string }
+  // A proposal card (stream or JSON). An adjustment (version > 1) replaces
+  // its parent: `parentId` (the card it was asked from) or else the latest
+  // open routine card.
+  | { type: 'proposal'; card: ProposalMessage; parentId?: string | null }
+  | { type: 'discomfortAnswered'; id: string; answer: DiscomfortReply }
+  | { type: 'proposalLoaded'; id: string; proposal: RoutineProposal | null; status: RoutineCardStatus }
+  | { type: 'proposalStatus'; id: string; status: RoutineCardStatus }
+  // A stream that failed: what it painted goes away before asking again.
+  | { type: 'discard'; ids: string[] }
   | { type: 'reset'; greeting: string };
 
 export const GREETING_ID = 'ellie-greeting';
@@ -118,6 +179,7 @@ export function initialChatState(greeting = ''): ChatState {
   return {
     messages: greeting ? [greetingMessage(greeting)] : [],
     thinking: false,
+    streaming: false,
     blocked: null,
   };
 }
@@ -169,6 +231,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const exists = state.messages.some(message => message.id === action.id);
       return {
         ...state,
+        streaming: state.thinking,
         messages: exists
           ? state.messages.map(message =>
               message.id === action.id && message.kind === 'text'
@@ -185,6 +248,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         thinking: false,
+        streaming: false,
         messages: markLastUser(state.messages, 'sent'),
       };
     case 'tool': {
@@ -195,6 +259,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         ...state,
         thinking: false,
+        streaming: false,
         messages: [
           ...base,
           ...(action.intro
@@ -222,6 +287,7 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       const effect = failureEffect(action.failure.code);
       return {
         thinking: false,
+        streaming: false,
         // A limit or no connection leaves the composer inactive until the
         // user retries (STATE_08).
         blocked: effect === 'limit' ? 'limit' : effect === 'offline' ? 'offline' : state.blocked,
@@ -277,10 +343,78 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       }
       return { ...state, messages: next };
     }
+    case 'proposal': {
+      const card = action.card;
+      const others = state.messages.filter(message => message.id !== card.id);
+      return {
+        ...state,
+        streaming: state.thinking,
+        messages: [
+          ...(card.kind === 'routineProposal' && card.version > 1
+            ? replaceParent(others, action.parentId ?? null)
+            : others),
+          card,
+        ],
+      };
+    }
+    case 'proposalLoaded':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'routineProposal'
+            ? {
+                ...message,
+                proposal: action.proposal,
+                status: action.status,
+                version: action.proposal?.version ?? message.version,
+                adjustLabel: action.proposal?.adjustLabel ?? message.adjustLabel,
+              }
+            : message,
+        ),
+      };
+    case 'proposalStatus':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'routineProposal'
+            ? { ...message, status: action.status }
+            : message,
+        ),
+      };
+    case 'discomfortAnswered':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'discomfortCheck'
+            ? { ...message, answer: action.answer }
+            : message,
+        ),
+      };
+    case 'discard':
+      return {
+        ...state,
+        streaming: false,
+        messages: state.messages.filter(message => !action.ids.includes(message.id)),
+      };
     case 'reset':
       return initialChatState(action.greeting);
   }
 }
+
+// An adjustment replaces only its parent, if it is still open (a saved or
+// started one keeps its state). Without a known parent, the server took the
+// latest open routine card.
+function replaceParent(messages: ChatMessage[], parentId: string | null): ChatMessage[] {
+  const isOpen = (message: ChatMessage): message is RoutineProposalMessage =>
+    message.kind === 'routineProposal' && (message.status === 'open' || message.status === 'saving');
+  const target = parentId ?? [...messages].reverse().find(isOpen)?.id ?? null;
+  return messages.map(message =>
+    message.id === target && isOpen(message) ? { ...message, status: 'replaced' as const } : message,
+  );
+}
+
+// The message id of a proposal card.
+export const proposalMessageId = (proposalId: string) => `proposal-${proposalId}`;
 
 // What the composer can do now.
 export function composerState(

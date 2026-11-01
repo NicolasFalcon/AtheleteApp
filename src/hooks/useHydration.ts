@@ -4,6 +4,7 @@ import { GLASS_ML, toGlasses, waterGoalGlasses } from '@app/features/nutrition/n
 import { hydrationCue } from '@app/features/sound/soundModel';
 import { playCue, useSoundPreload } from '@app/features/sound/soundService';
 import { useAuth } from '@app/hooks/useAuth';
+import { getLocalDateKey } from '@app/lib/date';
 import { addHydrationAmount } from '@app/services/supabase/fitness';
 
 // +1 vaso with an immediate answer: the water of today is raised in every
@@ -39,6 +40,19 @@ export function useHydration() {
 
   const bump = useCallback(
     (deltaMl: number) => {
+      // Nutrición · Hoy (get_nutrition_day of today).
+      queryClient.setQueryData(['nutrition-day', userId ?? 'anon', getLocalDateKey()], (current: any) =>
+        current?.water
+          ? {
+              ...current,
+              water: {
+                ...current.water,
+                ml: Math.max(0, current.water.ml + deltaMl),
+                glasses: Math.max(0, current.water.glasses + Math.sign(deltaMl)),
+              },
+            }
+          : current,
+      );
       queryClient.setQueryData<number>(['nutrition', 'hydration', userId], ml =>
         ml === undefined ? ml : Math.max(0, ml + deltaMl),
       );
@@ -68,15 +82,19 @@ export function useHydration() {
   );
 
   // Returns the glasses of today after this one and the goal (null when the
-  // screens have not read today's water yet).
+  // screens have not read today's water yet). `current`: the glasses and goal
+  // the screen shows (Nutrición · Hoy reads them from get_nutrition_day).
   const addGlass = useCallback(
-    (onError?: () => void): { glasses: number | null; goal: number | null } | null => {
+    (
+      onError?: () => void,
+      current?: { glasses: number; goal: number | null },
+    ): { glasses: number | null; goal: number | null } | null => {
       if (!userId) {
         return null;
       }
       const before = todayMl();
-      const goal = waterGoalGlasses(profile?.dailyWaterGoal);
-      const glasses = before !== null ? toGlasses(before + GLASS_ML) : null;
+      const goal = current ? current.goal : waterGoalGlasses(profile?.dailyWaterGoal);
+      const glasses = current ? current.glasses + 1 : before !== null ? toGlasses(before + GLASS_ML) : null;
       if (glasses !== null) {
         playCue(hydrationCue(glasses, goal));
       }
@@ -95,6 +113,7 @@ export function useHydration() {
           return Promise.allSettled(
             [
               ['nutrition', 'hydration', userId],
+              ['nutrition-day', userId ?? 'anon'],
               ['home', 'overview', userId],
               // Notifications and ELLIE read hydration from the ELLIE overview.
               ['ellie', 'overview', userId],
