@@ -21,12 +21,12 @@ import type { ProfileGender } from '@app/types/auth';
 // Two formats: the 3:4 header of the routine detail and the 7:3 crop of
 // ELLIE's card.
 
-const COVER_BG: ImageSourcePropType = require('../../assets/covers/cover-bg.png');
+const COVER_BG: ImageSourcePropType = require('../../assets/covers/cover-bg.jpg');
 
 // Future: a photo per focus and sex (cover-<focus>-<m|h>.jpg, 1536 × 2048,
 // same overlay). Add each file here as it arrives, e.g.
 //   empuje: { m: require('../../assets/covers/cover-empuje-m.jpg') },
-// Without a photo for the focus or the sex (Otro, not stated): cover-bg.png.
+// Without a photo for the focus or the sex (Otro, not stated): cover-bg.jpg.
 const COVER_PHOTOS: Partial<Record<RoutineFocus, Partial<Record<'m' | 'h', ImageSourcePropType>>>> = {};
 
 export function routineCoverSource(

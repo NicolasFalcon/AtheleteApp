@@ -1,7 +1,7 @@
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
-import { CATEGORY_LABELS } from '@app/features/workouts/workoutsModel';
 import {
   ROUTINE_FOCUS_VALUES,
+  type RoutineCategory,
   type RoutineFocus,
   type Workout,
 } from '@app/shared/domain/types';
@@ -28,6 +28,19 @@ export const ROUTINE_FOCUS_KEYS: Record<RoutineFocus, string> = {
   fullbody: 'routine.focus.fullbody',
 };
 
+// The category of the routine, the word when there is no routine_focus.
+export const ROUTINE_CATEGORY_KEYS: Record<RoutineCategory, string> = {
+  fuerza: 'routine.category.strength',
+  cuerpo_completo: 'routine.focus.fullbody',
+  tren_superior: 'routine.category.upper',
+  tren_inferior: 'routine.category.lower',
+  core: 'routine.focus.core',
+  movilidad: 'routine.category.mobility',
+  acondicionamiento: 'routine.category.conditioning',
+  hiit: 'routine.category.hiit',
+  cardio: 'routine.category.cardio',
+};
+
 const FOCUS_TEXT: Record<EllieLanguage, Record<string, string>> = {
   es: {
     'routine.focus.push': 'EMPUJE',
@@ -40,6 +53,13 @@ const FOCUS_TEXT: Record<EllieLanguage, Record<string, string>> = {
     'routine.focus.back': 'ESPALDA',
     'routine.focus.core': 'CORE',
     'routine.focus.fullbody': 'FULL BODY',
+    'routine.category.strength': 'FUERZA',
+    'routine.category.upper': 'TREN SUPERIOR',
+    'routine.category.lower': 'TREN INFERIOR',
+    'routine.category.mobility': 'MOVILIDAD',
+    'routine.category.conditioning': 'ACONDICIONAMIENTO',
+    'routine.category.hiit': 'HIIT',
+    'routine.category.cardio': 'CARDIO',
   },
   en: {
     'routine.focus.push': 'PUSH',
@@ -52,16 +72,30 @@ const FOCUS_TEXT: Record<EllieLanguage, Record<string, string>> = {
     'routine.focus.back': 'BACK',
     'routine.focus.core': 'CORE',
     'routine.focus.fullbody': 'FULL BODY',
+    'routine.category.strength': 'STRENGTH',
+    'routine.category.upper': 'UPPER BODY',
+    'routine.category.lower': 'LOWER BODY',
+    'routine.category.mobility': 'MOBILITY',
+    'routine.category.conditioning': 'CONDITIONING',
+    'routine.category.hiit': 'HIIT',
+    'routine.category.cardio': 'CARDIO',
   },
 };
 
-export function focusWord(focus: RoutineFocus, language: EllieLanguage): string {
-  const key = ROUTINE_FOCUS_KEYS[focus];
+function text(key: string, language: EllieLanguage): string {
   return FOCUS_TEXT[language][key] ?? FOCUS_TEXT.es[key];
 }
 
-// Detail of a routine: routine_focus; without it, its category as today;
-// without either, no word.
+export function focusWord(focus: RoutineFocus, language: EllieLanguage): string {
+  return text(ROUTINE_FOCUS_KEYS[focus], language);
+}
+
+export function categoryWord(category: RoutineCategory, language: EllieLanguage): string {
+  return text(ROUTINE_CATEGORY_KEYS[category], language);
+}
+
+// Detail of a routine: routine_focus; without it, its category (also
+// localized); without either, no word.
 export function routineFocusWord(
   workout: Pick<Workout, 'routineFocus' | 'routineCategory'>,
   language: EllieLanguage,
@@ -69,9 +103,7 @@ export function routineFocusWord(
   if (workout.routineFocus) {
     return focusWord(workout.routineFocus, language);
   }
-  return workout.routineCategory
-    ? CATEGORY_LABELS[workout.routineCategory].toUpperCase()
-    : null;
+  return workout.routineCategory ? categoryWord(workout.routineCategory, language) : null;
 }
 
 // ── ELLIE: focus from payload.target_groups ─────────────────────────────────
