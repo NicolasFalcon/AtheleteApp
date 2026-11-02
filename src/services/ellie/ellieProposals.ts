@@ -1,4 +1,6 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
+import { focusFromTargetGroups } from '@app/features/workouts/routineFocus';
+import type { RoutineFocus } from '@app/shared/domain/types';
 import { muscleLabel } from '@app/services/catalog/catalogService';
 import {
   bodyPartLabels,
@@ -77,6 +79,8 @@ export type RoutineProposal = {
   level: string;
   muscles: string[];
   equipment: string[];
+  // Cover word, from payload.target_groups (null: no word).
+  focus: RoutineFocus | null;
   reasoning: string;
   // One discreet line about sleep, nutrition or recent training (or null).
   readinessNote: string | null;
@@ -228,6 +232,7 @@ export function parseRoutineProposal(
     level: levelLabel(str(payload.level) ?? 'intermedio'),
     muscles: strings(payload.muscles).map(muscleSlugLabel),
     equipment: strings(payload.equipment).map(equipmentSlugLabel),
+    focus: focusFromTargetGroups(strings(payload.target_groups)),
     reasoning: str(payload.reasoning) ?? '',
     readinessNote: str(payload.readiness_note),
     quickAdjustments: strings(payload.quick_adjustments),

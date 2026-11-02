@@ -38,6 +38,22 @@ export type RoutineCategory = (typeof ROUTINE_CATEGORY_VALUES)[number];
 // order, warmup → main → cooldown; main by default.
 export type RoutineBlock = 'warmup' | 'main' | 'cooldown';
 
+// routine_focus (docs/backend/ROUTINES_SHAPES.md): the word of the routine
+// cover (handoff §28.16). ELLIE's proposals derive it from target_groups.
+export const ROUTINE_FOCUS_VALUES = [
+  'empuje',
+  'tiron',
+  'pierna',
+  'gluteos',
+  'hombros',
+  'brazos',
+  'pecho',
+  'espalda',
+  'core',
+  'fullbody',
+] as const;
+export type RoutineFocus = (typeof ROUTINE_FOCUS_VALUES)[number];
+
 // Computed by the backend from workout_templates.source.
 export type RoutineOrigin = 'official' | 'editorial' | 'ellie' | 'user';
 
@@ -68,6 +84,8 @@ export type Workout = {
   type: WorkoutType;
   // Server-computed group of the routine (see ROUTINE_CATEGORY_VALUES).
   routineCategory?: RoutineCategory | null;
+  // Server-computed focus of the routine (cover word); null when unknown.
+  routineFocus?: RoutineFocus | null;
   duration: number;
   difficulty: WorkoutDifficulty;
   calories: number;

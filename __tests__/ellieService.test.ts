@@ -36,6 +36,9 @@ describe('request body', () => {
       image_path: null,
       mode: 'chat',
       stream: false,
+      cards_v2: true,
+      client_now: expect.objectContaining({ iso: expect.any(String) }),
+      pending: [],
       client_context: 'home',
     });
   });

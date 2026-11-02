@@ -74,6 +74,8 @@ export type PlaySoundOptions = {
   variant?: number;
   // false where the screen already fires the same haptic (Celebration).
   haptic?: boolean;
+  // false where a native module plays the file (rest cues): only the haptic.
+  sound?: boolean;
 };
 
 export function playSound(id: SoundEventId, options: PlaySoundOptions = {}) {
@@ -83,6 +85,9 @@ export function playSound(id: SoundEventId, options: PlaySoundOptions = {}) {
   }
   if (options.haptic !== false) {
     haptics[event.haptic]();
+  }
+  if (options.sound === false) {
+    return;
   }
   const prefs = getFeedbackPrefs();
   if (!allowed(event, prefs.soundMode, prefs.sessionSound)) {

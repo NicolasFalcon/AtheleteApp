@@ -6,6 +6,8 @@ import type {
   RoutineEdits,
   RoutineProposal,
 } from '@app/services/ellie/ellieProposals';
+import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
+import { focusWord } from '@app/features/workouts/routineFocus';
 
 // ELLIE · routine proposal (ELLIE_CARDS_FLOW §1.4–1.5, handoff 28.3): what the
 // card and the detail sheet show, without UI.
@@ -188,6 +190,10 @@ export function availableVariants(
   return exercise.variants.filter(variant => !inRoutine.has(variant.exerciseId)).slice(0, 3);
 }
 
-export function sheetEyebrow(proposal: RoutineProposal): string {
-  return `PROPUESTA DE ELLIE · ${proposal.level.toUpperCase()}`;
+// "PROPUESTA DE ELLIE · EMPUJE · INTERMEDIO" (the focus of the cover, when
+// target_groups gives one).
+export function sheetEyebrow(proposal: RoutineProposal, language: EllieLanguage = 'es'): string {
+  return ['PROPUESTA DE ELLIE', proposal.focus ? focusWord(proposal.focus, language) : null, proposal.level.toUpperCase()]
+    .filter(Boolean)
+    .join(' · ');
 }

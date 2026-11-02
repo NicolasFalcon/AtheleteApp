@@ -1,0 +1,6 @@
+{
+  "name": "rest-cues",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rest countdown sounds scheduled natively, so they play in the background (local Expo module)"
+}

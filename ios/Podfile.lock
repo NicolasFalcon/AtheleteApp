@@ -2198,6 +2198,8 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RestCues (1.0.0):
+    - ExpoModulesCore
   - RNDateTimePicker (9.1.0):
     - hermes-engine
     - RCTRequired
@@ -2678,6 +2680,7 @@ DEPENDENCIES:
   - ReactNativeDependencies (from `../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - "ReactNativeHealthkit (from `../node_modules/@kingstinct/react-native-healthkit`)"
   - "ReactNativeHealthkitCore (from `../node_modules/@react-native-healthkit/core`)"
+  - RestCues (from `../modules/rest-cues/ios`)
   - "RNDateTimePicker (from `../node_modules/@react-native-community/datetimepicker`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNReactNativeHapticFeedback (from `../node_modules/react-native-haptic-feedback`)
@@ -2920,6 +2923,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@kingstinct/react-native-healthkit"
   ReactNativeHealthkitCore:
     :path: "../node_modules/@react-native-healthkit/core"
+  RestCues:
+    :path: "../modules/rest-cues/ios"
   RNDateTimePicker:
     :path: "../node_modules/@react-native-community/datetimepicker"
   RNGestureHandler:
@@ -3054,6 +3059,7 @@ SPEC CHECKSUMS:
   ReactNativeDependencies: c9b98c10a073e99ab3c19915a0d1f4521d831910
   ReactNativeHealthkit: c6007ff9ebf7d641e990849ca8629305687c35cf
   ReactNativeHealthkitCore: eb829444f8155f522646dedf7328d915732465e7
+  RestCues: e15931b952e7b3d908a330359560f44014e6e4fe
   RNDateTimePicker: 7b2738f1e595f83c14580a11c476872755c5befc
   RNGestureHandler: 187c5c7936abf427bc4d22d6c3b1ac80ad1f63c0
   RNReactNativeHapticFeedback: 16e5f7fd37e2acc5a33ea14f48bfd88ff43776ee

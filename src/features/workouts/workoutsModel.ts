@@ -468,6 +468,17 @@ export function pathMeta(
   return [schemeLabel(exercise, recommended), rest].filter(Boolean).join(' · ');
 }
 
+// Warm-up / cool-down row: its duration ("5 min" · "45 s") or the detail it
+// carries (ELLIE's "2 min" lands in notes); never a scheme nor rest.
+export function blockStepMeta(exercise: WorkoutExercise): string | undefined {
+  if (exercise.duration) {
+    return exercise.duration % 60 === 0
+      ? `${exercise.duration / 60} min`
+      : `${exercise.duration} s`;
+  }
+  return exercise.notes?.trim() || undefined;
+}
+
 // "3 × 10 · 60 s" (review / tray chip)
 export function schemeChip(
   exercise: WorkoutExercise,

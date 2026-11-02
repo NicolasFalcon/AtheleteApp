@@ -285,7 +285,7 @@ describe('B-25 · water goal from profiles.daily_water_goal only', () => {
         nutrition: { hasPlan: false, calories: 0, targetCalories: 0 },
         hydration: { todayMl: 2000, goalGlasses },
       }).rings.find(ring => ring.kind === 'hydration')!;
-    expect(rings(8)).toMatchObject({ unit: 'de 8 vasos', done: true, progress: 1 });
+    expect(rings(8)).toMatchObject({ unit: '/ 8 vasos', done: true, progress: 1 });
     expect(rings(null)).toMatchObject({ unit: 'vasos', done: false, progress: 0 });
 
     const week = buildHydrationWeek([{ date: '2026-10-16', waterMl: 3000 }], null, ['2026-10-16', '2026-10-17'], '2026-10-17');

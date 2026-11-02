@@ -1,5 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Alert, ScrollView, Share, StyleSheet, View } from 'react-native';
+import {
+  Alert,
+  ScrollView,
+  Share,
+  StyleSheet,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
@@ -26,9 +33,15 @@ import {
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { exerciseThumbnail } from '@app/features/workouts/workoutAssets';
+import { routineFocusWord } from '@app/features/workouts/routineFocus';
+import {
+  RoutineCoverOverlay,
+  routineCoverSource,
+} from '@app/components/v2/RoutineCover';
 import {
   EQUIPMENT,
   LEVEL_LABELS,
+  blockStepMeta,
   pathMeta,
   routineTypeLabel,
   zoneLabel,
@@ -44,10 +57,7 @@ import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { useRoutine, useRoutineMutations } from '@app/hooks/useRoutines';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
-import {
-  DEFAULT_WORKOUT_THUMBNAIL,
-  resolveWorkoutThumbnailSource,
-} from '@app/lib/workoutThumbnails';
+import { resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import { getWorkoutAccess, type WorkoutExercise } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -64,6 +74,7 @@ const HERO_HEIGHT = 470;
 export function WorkoutDetailScreen({ navigation, route }: Props) {
   const { colors, layout, radius } = useThemeV2();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const { profile } = useAuth();
   const language = useProfileLanguage();
   const routineQuery = useRoutine(route.params.workoutId);
@@ -180,8 +191,12 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
       ? 'Ver sesión'
       : 'Empezar entreno';
 
-  const image = imageBroken
-    ? DEFAULT_WORKOUT_THUMBNAIL
+  // Routines without a photo of their own (ELLIE's, the user's) or whose
+  // photo failed: the 3:4 cover with the focus word (§28.16).
+  const focusWord = routineFocusWord(workout, language);
+  const cover = !workout.imageUrl || imageBroken;
+  const image = cover
+    ? routineCoverSource(workout.routineFocus, profile?.gender)
     : resolveWorkoutThumbnailSource({
         imageUrl: workout.imageUrl,
         type: workout.type,
@@ -200,8 +215,8 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
     matched.some(exercise => exercise?.equipment === item.key),
   );
 
-  // Backend order (warmup → main → cooldown). F-06 will design the warm-up;
-  // for now it is the same path under its own label.
+  // Backend order (warmup → main → cooldown). Warm-up and cool-down rows show
+  // their duration, not a scheme with rest.
   const toStep = (exercise: WorkoutExercise) => {
     const libraryExercise = exercise.exerciseId
       ? details.byId[exercise.exerciseId]
@@ -209,7 +224,10 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
     return {
       key: exercise.id,
       title: exercise.name,
-      subtitle: pathMeta(exercise),
+      subtitle:
+        exercise.block === 'warmup' || exercise.block === 'cooldown'
+          ? blockStepMeta(exercise)
+          : pathMeta(exercise),
       thumbnail: {
         mediaKey: exercise.thumbKey,
         fallback: exerciseThumbnail(libraryExercise?.bodyPart),
@@ -226,7 +244,13 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
     };
   };
   const warmup = workout.exercises.filter(exercise => exercise.block === 'warmup');
-  const path = workout.exercises.filter(exercise => exercise.block !== 'warmup');
+  const cooldown = workout.exercises.filter(
+    exercise => exercise.block === 'cooldown',
+  );
+  // "N ejercicios" counts the main block only, as ELLIE's card and sheet.
+  const path = workout.exercises.filter(
+    exercise => exercise.block !== 'warmup' && exercise.block !== 'cooldown',
+  );
 
   const start = async () => {
     try {
@@ -331,10 +355,23 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
       >
         <WorkoutHero
           variant="detail"
-          height={HERO_HEIGHT}
+          height={cover ? Math.round((screenWidth * 4) / 3) : HERO_HEIGHT}
           image={image}
+          dim={!cover}
+          overlay={
+            cover ? (
+              <RoutineCoverOverlay
+                format="detail"
+                width={screenWidth}
+                word={focusWord}
+              />
+            ) : null
+          }
           onImageError={() => setImageBroken(true)}
-          eyebrow={[routineTypeLabel(workout), LEVEL_LABELS[workout.difficulty]]
+          eyebrow={[
+            focusWord ?? routineTypeLabel(workout),
+            LEVEL_LABELS[workout.difficulty],
+          ]
             .filter(Boolean)
             .join(' · ')}
           title={workout.title}
@@ -342,8 +379,10 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           topOffset={insets.top + 4}
           stats={[
             { value: String(workout.duration), label: 'minutos' },
-            { value: String(workout.exercises.length), label: 'ejercicios' },
-            { value: String(workout.calories), label: 'kcal' },
+            { value: String(path.length), label: 'ejercicios' },
+            ...(workout.calories > 0
+              ? [{ value: String(workout.calories), label: 'kcal' }]
+              : []),
           ]}
           top={
             <>
@@ -413,6 +452,13 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
               <RoutinePath steps={path.map(toStep)} />
             ) : null}
           </View>
+
+          {cooldown.length > 0 ? (
+            <View style={styles.block}>
+              <Eyebrow>Vuelta a la calma</Eyebrow>
+              <RoutinePath steps={cooldown.map(toStep)} />
+            </View>
+          ) : null}
 
           {zones.length > 0 ? (
             <View style={styles.block}>

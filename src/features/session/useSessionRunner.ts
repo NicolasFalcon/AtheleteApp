@@ -60,6 +60,7 @@ import {
 } from '@app/features/session/variantModel';
 import { restCue } from '@app/features/sound/soundModel';
 import { playCue, playSound, useSoundPreload } from '@app/features/sound/soundService';
+import { cancelRestCues, nativeRestCues, scheduleRestCues } from '@app/lib/restCues';
 import type { Workout } from '@app/shared';
 
 const SESSION_SOUNDS = [
@@ -232,7 +233,10 @@ export function useSessionRunner({
   const remainingMs = rest ? restRemainingMs(rest, now) : 0;
 
   // Rest cues (§28.7): rest-warn at 10 s, rest-tick at 5–4–3–2,
-  // rest-tick-strong at 1, only while the countdown runs down.
+  // rest-tick-strong at 1, only while the countdown runs down. With the
+  // native module (iOS) the files sound from there, also in the background;
+  // here only the haptic.
+  const jsRestSound = !nativeRestCues();
   useEffect(() => {
     if (!rest) {
       restSecond.current = null;
@@ -242,19 +246,44 @@ export function useSessionRunner({
     const previous = restSecond.current;
     restSecond.current = sec;
     if (!halted && !paused && previous !== null && sec < previous) {
-      playCue(restCue(previous, sec));
+      playCue(restCue(previous, sec), { sound: jsRestSound });
     }
-  }, [halted, paused, remainingMs, rest]);
+  }, [halted, jsRestSound, paused, remainingMs, rest]);
+
+  // Native rest cues: scheduled for the running rest (a new one, +30 s,
+  // resumed after a pause); cancelled when it is skipped, paused, the
+  // session halts or the screen goes. A rest that ran out is left alone:
+  // rest-go is still sounding and the module lets the session go after it.
+  const runningRestEndsAt = rest && !halted && !paused ? rest.endsAt : null;
+  const scheduledRestEnd = useRef<number | null>(null);
+  useEffect(() => {
+    if (jsRestSound) {
+      return;
+    }
+    const previous = scheduledRestEnd.current;
+    scheduledRestEnd.current = runningRestEndsAt;
+    if (runningRestEndsAt !== null) {
+      scheduleRestCues({ restEndsAt: runningRestEndsAt }).catch(() => undefined);
+    } else if (previous !== null && Date.now() < previous) {
+      cancelRestCues().catch(() => undefined);
+    }
+  }, [jsRestSound, runningRestEndsAt]);
+  useEffect(
+    () => () => {
+      cancelRestCues().catch(() => undefined);
+    },
+    [],
+  );
 
   // Rest reached zero → "Tu turno" for 1.5 s, then the active card.
   useEffect(() => {
     if (rest && !halted && !paused && remainingMs <= 0) {
       lastRestSec.current = restElapsedSec(rest, Date.now());
-      playSound('rest-go');
+      playSound('rest-go', { sound: jsRestSound });
       setRest(null);
       setYourTurnUntil(Date.now() + YOUR_TURN_MS);
     }
-  }, [halted, paused, remainingMs, rest]);
+  }, [halted, jsRestSound, paused, remainingMs, rest]);
 
   useEffect(() => {
     if (yourTurnUntil && now >= yourTurnUntil) {

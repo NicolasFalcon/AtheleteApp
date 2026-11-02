@@ -86,3 +86,8 @@ jest.mock('expo-crypto', () => ({
   ),
   CryptoDigestAlgorithm: {SHA256: 'SHA-256'},
 }));
+
+// expo/fetch (streaming fetch, ESM source): the global fetch in tests.
+jest.mock('expo/fetch', () => ({
+  fetch: (...args: Parameters<typeof fetch>) => globalThis.fetch(...args),
+}));

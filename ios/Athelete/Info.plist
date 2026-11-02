@@ -63,7 +63,7 @@
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Athelete guarda tus entrenos en Apple Health para que todo quede en un solo lugar.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>ATHELETE usa tu ubicación para registrar tus rutas mientras entrenas, incluso con la pantalla bloqueada.</string>
+	<string>Athelete usa tu ubicación para registrar tus rutas mientras entrenas, incluso con la pantalla bloqueada.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Athelete usa tu ubicación para mostrar tu posición y grabar tus rutas de carrera o bici mientras usas la app.</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -104,6 +104,7 @@
 	<array>
 		<string>location</string>
 		<string>remote-notification</string>
+		<string>audio</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
@@ -114,13 +115,6 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>

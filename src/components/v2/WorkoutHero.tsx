@@ -32,6 +32,8 @@ export type WorkoutHeroProps = {
   bottomInset?: number;
   // Remote photos are not baked: an extra dark layer (brightness .8).
   dim?: boolean;
+  // Drawn over the shades (the routine cover's line and word, §28.16).
+  overlay?: ReactNode;
   onImageError?: () => void;
   style?: StyleProp<ViewStyle>;
 };
@@ -51,6 +53,7 @@ export function WorkoutHero({
   variant = 'card',
   bottomInset = 22,
   dim = true,
+  overlay,
   onImageError,
   style,
 }: WorkoutHeroProps) {
@@ -100,6 +103,7 @@ export function WorkoutHero({
           locations={detail ? [0, 0.3, 0.55, 0.96] : [0.3, 1]}
           style={StyleSheet.absoluteFill}
         />
+        {overlay}
         {top ? (
           <View style={[styles.top, { top: topOffset }]}>{top}</View>
         ) : null}

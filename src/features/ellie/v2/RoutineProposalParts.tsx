@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated';
-import LinearGradient from 'react-native-linear-gradient';
 import Video from 'react-native-video';
 import {
   Bookmark,
@@ -28,7 +27,10 @@ import {
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
-import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
+import { RoutineCover } from '@app/components/v2/RoutineCover';
+import { focusWord } from '@app/features/workouts/routineFocus';
+import { useAuth } from '@app/hooks/useAuth';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { MOVEKIT_POSTER } from '@app/features/workouts/workoutAssets';
 import { useLatchedMediaUrl } from '@app/lib/media/mediaUrls';
 import { useAppTheme } from '@app/hooks/useAppTheme';
@@ -229,6 +231,8 @@ export function RoutineProposalCard({
 }) {
   const { colors } = useThemeV2();
   const tone = useProposalColors();
+  const language = useProfileLanguage();
+  const { profile } = useAuth();
   const { proposal, status } = card;
 
   if (status === 'loading' || (!proposal && status !== 'unavailable')) {
@@ -265,7 +269,6 @@ export function RoutineProposalCard({
   const replaced = status === 'replaced';
   const discarded = status === 'discarded';
   const compact = compactExercises(proposal);
-  const cover = proposal.main.find(item => item.image)?.image ?? null;
 
   return (
     <View style={styles.cardWrap}>
@@ -277,30 +280,31 @@ export function RoutineProposalCard({
           replaced || discarded ? styles.replaced : null,
         ]}
       >
-        <View style={styles.hero}>
-          <AppImage source={{ mediaKey: cover, fallback: HOME_PHOTOS.effort }} style={styles.fill} />
-          <LinearGradient
-            pointerEvents="none"
-            colors={['rgba(12,11,10,.1)', 'rgba(12,11,10,.35)', 'rgba(12,11,10,.86)']}
-            locations={[0, 0.45, 1]}
-            style={StyleSheet.absoluteFill}
-          />
+        {/* Cover 7:3 (§28.16): the focus word on the background; the
+            title and the meta go below it. */}
+        <RoutineCover
+          format="card"
+          word={proposal.focus ? focusWord(proposal.focus, language) : null}
+          focus={proposal.focus}
+          gender={profile?.gender}
+        >
           <View style={styles.badge}>
             <TextV2 color="#FFFFFF" style={styles.badgeText}>
               {proposalBadge(proposal)}
             </TextV2>
           </View>
+        </RoutineCover>
+
+        <View style={styles.body}>
           <View style={styles.heroText}>
-            <TextV2 variant="title22" color="#FFFFFF" numberOfLines={2}>
+            <TextV2 variant="title22" numberOfLines={2}>
               {proposal.title}
             </TextV2>
-            <TextV2 variant="meta" color="#D8D6D1">
+            <TextV2 variant="meta" color={colors.text.secondary}>
               {proposalMeta(proposal)}
             </TextV2>
           </View>
-        </View>
 
-        <View style={styles.body}>
           {proposal.muscles.length + proposal.equipment.length > 0 ? (
             <View style={styles.pills}>
               <Pills items={proposal.muscles} />
@@ -819,6 +823,7 @@ export function RoutineProposalSheet({
 }) {
   const { colors } = useThemeV2();
   const tone = useProposalColors();
+  const language = useProfileLanguage();
   const [edits, setEdits] = useState<RoutineEdits>(NO_EDITS);
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -854,7 +859,7 @@ export function RoutineProposalSheet({
     <Sheet
       open={open}
       onClose={onClose}
-      eyebrow={sheetEyebrow(proposal)}
+      eyebrow={sheetEyebrow(proposal, language)}
       title={proposal.title}
       scrollable
       footer={
@@ -977,11 +982,10 @@ const styles = StyleSheet.create({
   card: { borderRadius: 24, overflow: 'hidden' },
   replaced: { opacity: 0.55 },
   loading: { gap: 0 },
-  hero: { height: 150, backgroundColor: '#141312', justifyContent: 'flex-end' },
   badge: {
     position: 'absolute',
-    top: 14,
-    left: 14,
+    top: 12,
+    right: 14,
     height: 22,
     paddingHorizontal: 8,
     borderRadius: 6,
@@ -990,7 +994,7 @@ const styles = StyleSheet.create({
     boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.28)',
   },
   badgeText: { fontSize: 10, lineHeight: 12, fontWeight: '700', letterSpacing: 0.8 },
-  heroText: { padding: 16, gap: 2 },
+  heroText: { gap: 3 },
   body: { padding: 16, gap: 14 },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   pill: { height: 26, paddingHorizontal: 10, borderRadius: 13, justifyContent: 'center' },

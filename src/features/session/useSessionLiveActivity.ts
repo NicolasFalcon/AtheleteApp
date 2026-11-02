@@ -19,6 +19,7 @@ import {
   updateLiveActivity,
   type LiveActivityState,
 } from '@app/lib/liveActivity';
+import { restCuesAudible } from '@app/lib/restCues';
 import type { Workout } from '@app/shared';
 
 export const REST_END_NOTIFICATION_ID = 'athelete-rest-end';
@@ -55,7 +56,8 @@ async function applyRestNotification(state: LiveActivityState | null): Promise<v
     content: {
       title: plan.title,
       body: plan.body,
-      sound: 'default',
+      // Silent when the native rest cues sound (rest-go at the same time).
+      sound: restCuesAudible() ? false : 'default',
       data: { [LOCAL_FLAG]: true, kind: REST_END_KIND },
     },
     trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: plan.fireAt },

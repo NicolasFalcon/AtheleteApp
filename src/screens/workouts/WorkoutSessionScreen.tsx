@@ -27,6 +27,7 @@ import { invalidateWeek, weekKeys } from '@app/hooks/useWeekPlan';
 import { routinesService, type ExerciseVariant } from '@app/services/routines/routinesService';
 import { weekPlanService } from '@app/services/routines/weekPlanService';
 import { setFeedbackPrefs, useFeedbackPrefs } from '@app/lib/feedbackPrefs';
+import { cancelRestCues } from '@app/lib/restCues';
 import type { WeekPlan } from '@app/features/week/weekModel';
 import type { Workout } from '@app/shared';
 import {
@@ -180,13 +181,15 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   const liveActivity = useSessionLiveActivity({ runner, sessionId, workout });
   // Every way out of the session (finished, saved for later, discarded,
   // back, a failed load, the unmount): the runner stops ticking and sounding,
-  // and the Live Activity and the rest notification end before navigating.
+  // the native rest cues stop and give the audio session back, and the Live
+  // Activity and the rest notification end before navigating.
   // Idempotent; capped so a stuck native call never blocks the exit.
   const haltRunner = runner.halt;
   const endLiveActivity = liveActivity.teardown;
   const teardownSession = useCallback(
     (reason: string) => {
       haltRunner();
+      cancelRestCues().catch(() => undefined);
       return Promise.race([
         endLiveActivity(reason),
         new Promise<void>(resolve => setTimeout(resolve, TEARDOWN_MAX_MS)),

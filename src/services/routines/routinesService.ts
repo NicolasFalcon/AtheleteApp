@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
+import { parseRoutineFocus } from '@app/features/workouts/routineFocus';
 import { parseRoutineCategory } from '@app/shared/data/workouts';
 import type {
   RoutineBlock,
@@ -267,6 +268,7 @@ export function mapRoutine(raw: unknown): Workout {
     calories: num(row.calories) ?? 0,
     targetMuscles: strings(row.target_muscles),
     routineCategory: parseRoutineCategory(str(row.routine_category)),
+    routineFocus: parseRoutineFocus(row.routine_focus),
     exercises,
     exerciseCount: num(row.exercise_count) ?? exercises.length,
     isPremium: false,
