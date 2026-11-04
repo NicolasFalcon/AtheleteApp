@@ -1,5 +1,6 @@
+import { parseRoutineFocus } from '@app/features/workouts/routineFocus';
 import { parseRoutineCategory } from '@app/shared/data/workouts';
-import type { Workout, WorkoutType } from '@app/shared/domain/types';
+import type { RoutineFocus, Workout, WorkoutType } from '@app/shared/domain/types';
 
 // Tu semana (handoff v2.15 §25.1, contract docs/backend/V2_15_SHAPES.md §2):
 // the shapes of get_week_plan and plan_week_with_ellie as the app reads them,
@@ -22,6 +23,8 @@ export type WeekRoutine = {
   type: WorkoutType;
   duration: number;
   routineCategory: Workout['routineCategory'];
+  // routine_focus: the word of its cover (§28.16).
+  routineFocus: RoutineFocus | null;
   exerciseCount: number | null;
   thumbKey: string | null;
 };
@@ -108,6 +111,7 @@ export function parseWeekRoutine(raw: unknown): WeekRoutine | null {
     type: TYPES.find(item => item === row.type) ?? 'strength',
     duration: num(row.duration) ?? 0,
     routineCategory: parseRoutineCategory(str(row.routine_category)),
+    routineFocus: parseRoutineFocus(row.routine_focus),
     exerciseCount: num(row.exercise_count),
     thumbKey: str(row.thumb_key),
   };
@@ -121,6 +125,7 @@ export function weekRoutineFrom(workout: Workout): WeekRoutine {
     type: workout.type,
     duration: workout.duration,
     routineCategory: workout.routineCategory,
+    routineFocus: workout.routineFocus ?? null,
     exerciseCount: workout.exerciseCount ?? null,
     thumbKey: workout.thumbKey ?? null,
   };

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -33,10 +35,22 @@ import {
 } from '@app/features/ellie/chatModel';
 import {
   DiscomfortCheckCard,
-  PlanPlaceholderCard,
   RoutineProposalCard,
   RoutineProposalSheet,
 } from '@app/features/ellie/v2/RoutineProposalParts';
+import {
+  NutritionPrefsCard,
+  NutritionProposalCard,
+  NutritionProposalSheet,
+} from '@app/features/ellie/v2/NutritionProposalParts';
+import {
+  PLAN_ADJUST_PREFIX,
+  PLAN_ANOTHER_VERSION,
+} from '@app/features/ellie/nutritionProposalModel';
+import {
+  getFoodPreferences,
+  type PlanEdits,
+} from '@app/services/ellie/nutritionProposals';
 import { NO_EDITS, type RoutineEdits } from '@app/services/ellie/ellieProposals';
 import { isRetryable } from '@app/features/ellie/ellieCopy';
 import {
@@ -173,6 +187,37 @@ export function EllieChatScreen({ navigation, route }: Props) {
     lastSheetProposal.current = sheetProposal;
   }
 
+  // The nutrition plan whose detail sheet is open, and its activation.
+  const [planSheetId, setPlanSheetId] = useState<string | null>(null);
+  const [planBusy, setPlanBusy] = useState<'activate' | 'discard' | null>(null);
+  const [planError, setPlanError] = useState<string | null>(null);
+  const planCard = state.messages.find(
+    message => message.id === planSheetId && message.kind === 'nutritionProposal',
+  );
+  const planProposal = planCard?.kind === 'nutritionProposal' ? planCard.proposal : null;
+  const lastPlanProposal = useRef(planProposal);
+  if (planProposal) {
+    lastPlanProposal.current = planProposal;
+  }
+  const openPlanSheet = (id: string) => {
+    setPlanError(null);
+    setPlanSheetId(id);
+  };
+  const closeSheets = () => {
+    setSheetId(null);
+    setPlanSheetId(null);
+  };
+
+  // The saved food preferences (get_food_preferences): "Cambiar" opens the
+  // questions with them, and answered cards of the history show them.
+  const askingPrefs = state.messages.some(message => message.kind === 'nutritionPrefs');
+  const foodPrefs = useQuery({
+    queryKey: ['nutrition', 'food-preferences', profile?.id],
+    queryFn: getFoodPreferences,
+    enabled: askingPrefs && Boolean(profile?.id),
+    staleTime: 60_000,
+  });
+
   // The cover's history button: the list opens once the push has settled
   // (iOS does not present a sheet during the transition).
   useEffect(() => {
@@ -212,7 +257,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
 
   const pickSuggestion = (index: number) => {
     const prompt = CANNED_PROMPTS[index];
-    setSheetId(null);
+    closeSheets();
     chat.send(prompt.text, prompt.mode);
   };
 
@@ -290,15 +335,76 @@ export function EllieChatScreen({ navigation, route }: Props) {
     toast.show('No se pudo descartar. Intenta de nuevo.', { tone: 'error' });
   };
 
+  // Ajustar (plan): "Ajusta el plan: " in the composer, focused.
+  const adjustPlan = (proposalId: string) => {
+    chat.adjustDraft(proposalId, PLAN_ADJUST_PREFIX);
+    input.current?.focus();
+  };
+
+  const ACTIVATE_FAILED: Record<string, string> = {
+    plan_invalid: 'El plan no pasó la revisión. Pide otra versión a ELLIE.',
+    offline: 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
+  };
+
+  // Activar plan (sheet). Another plan active: confirm and call again
+  // replacing it. A failure keeps the sheet open with the error and
+  // "Reintentar"; closing it leaves the card open.
+  const activateFromSheet = async (edits: PlanEdits, confirmReplace = false) => {
+    if (!planSheetId || planBusy) {
+      return;
+    }
+    const id = planSheetId;
+    setPlanBusy('activate');
+    setPlanError(null);
+    const result = await chat.activatePlanProposal(id, edits, confirmReplace);
+    setPlanBusy(null);
+    if (result.ok) {
+      setPlanSheetId(null);
+      return;
+    }
+    if (result.code === 'plan_active_exists') {
+      Alert.alert('Ya tienes un plan activo. ¿Sustituirlo?', undefined, [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sustituir',
+          onPress: () => {
+            activateFromSheet(edits, true).catch(() => undefined);
+          },
+        },
+      ]);
+      return;
+    }
+    if (result.code === 'proposal_not_open') {
+      setPlanSheetId(null);
+      return;
+    }
+    setPlanError(ACTIVATE_FAILED[result.code] ?? 'No se pudo activar el plan. Inténtalo de nuevo.');
+  };
+
+  // Descartar (plan sheet): the card stays as Descartado.
+  const discardPlanFromSheet = async () => {
+    if (!planSheetId || planBusy) {
+      return;
+    }
+    setPlanBusy('discard');
+    const result = await chat.discardProposal(planSheetId);
+    setPlanBusy(null);
+    if (result.ok || result.code === 'proposal_not_open') {
+      setPlanSheetId(null);
+      return;
+    }
+    toast.show('No se pudo descartar. Intenta de nuevo.', { tone: 'error' });
+  };
+
   // A message (written, chip or suggestion) closes the open sheet.
   const sendText = (text: string) => {
-    setSheetId(null);
+    closeSheets();
     chat.send(text);
   };
 
   // A photo waiting in the composer goes with the message.
   const sendNow = () => {
-    setSheetId(null);
+    closeSheets();
     const attached = photo.attachment;
     if (attached?.status === 'uploading') {
       return;
@@ -379,7 +485,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
           onSave={() => saveFromCard(message.id)}
           onAdjust={() => adjustRoutine(message.proposalId)}
           onQuickAdjust={text => {
-            setSheetId(null);
+            closeSheets();
             chat.send(text, undefined, null, { adjustProposalId: message.proposalId });
           }}
           onOpenWorkouts={() =>
@@ -396,14 +502,51 @@ export function EllieChatScreen({ navigation, route }: Props) {
           card={message}
           disabled={state.thinking}
           onAnswer={(chip, zone) => {
-            setSheetId(null);
+            closeSheets();
             chat.answerDiscomfort(message.id, chip, zone);
           }}
         />
       );
     }
-    if (message.kind === 'planPlaceholder') {
-      return <PlanPlaceholderCard key={message.id} card={message} />;
+    if (message.kind === 'nutritionPrefs') {
+      return (
+        <NutritionPrefsCard
+          key={message.id}
+          card={message}
+          current={foodPrefs.data ?? null}
+          disabled={state.thinking}
+          onSubmit={prefs => {
+            closeSheets();
+            return chat.submitPrefs(message.id, prefs).then(ok => {
+              if (ok) {
+                foodPrefs.refetch().catch(() => undefined);
+              }
+              return ok;
+            });
+          }}
+          onChange={() => chat.reopenPrefs(message.id)}
+        />
+      );
+    }
+    if (message.kind === 'nutritionProposal') {
+      return (
+        <NutritionProposalCard
+          key={message.id}
+          card={message}
+          onOpen={() => openPlanSheet(message.id)}
+          onAnother={() => {
+            closeSheets();
+            chat.send(PLAN_ANOTHER_VERSION, undefined, null, { adjustProposalId: message.proposalId });
+          }}
+          onAdjust={() => adjustPlan(message.proposalId)}
+          onQuickAdjust={text => {
+            closeSheets();
+            chat.send(text, undefined, null, { adjustProposalId: message.proposalId });
+          }}
+          onOpenNutrition={() => navigation.navigate(APP_ROUTES.NutritionPlan)}
+          onReload={() => chat.reloadProposal(message.id)}
+        />
+      );
     }
     if (message.role === 'user') {
       return (
@@ -570,6 +713,25 @@ export function EllieChatScreen({ navigation, route }: Props) {
         }}
         onDiscard={() => {
           discardFromSheet().catch(() => undefined);
+        }}
+      />
+
+      <NutritionProposalSheet
+        open={planSheetId !== null && planProposal !== null}
+        proposal={planProposal ?? lastPlanProposal.current}
+        busy={planBusy}
+        error={planError}
+        onClose={() => {
+          if (!planBusy) {
+            setPlanSheetId(null);
+            setPlanError(null);
+          }
+        }}
+        onActivate={edits => {
+          activateFromSheet(edits).catch(() => undefined);
+        }}
+        onDiscard={() => {
+          discardPlanFromSheet().catch(() => undefined);
         }}
       />
 

@@ -450,10 +450,17 @@ export const supabaseRouteService: RouteService = {
   },
 
   // ── Comunidad ───────────────────────────────────────────────────────────
-  async shareToCommunity(activityId) {
-    const { data, error } = await client().rpc('create_post', {
-      _type: 'route',
-      _source_id: activityId,
+  async shareToCommunity(activityId, visibility) {
+    // Not in the generated database types yet (Comunidad abierta).
+    const supabase = client();
+    const rpc = supabase.rpc as unknown as (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: unknown; error: { message: string } | null }>;
+    const { data, error } = await rpc.call(supabase, 'create_community_post', {
+      p_type: 'route',
+      p_source_id: activityId,
+      p_visibility: visibility,
     });
     if (error) {
       throw error;

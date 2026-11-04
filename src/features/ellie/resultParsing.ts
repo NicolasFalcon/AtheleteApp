@@ -13,11 +13,13 @@ import {
   type ProposalMessage,
 } from '@app/features/ellie/chatModel';
 import {
+  isProposalCardType,
   parseDiscomfortCheck,
   parseRoutineProposal,
   storedCards,
   type ProposalCard,
 } from '@app/services/ellie/ellieProposals';
+import { parseNutritionProposal } from '@app/services/ellie/nutritionProposals';
 import { DISCOMFORT_CHIPS, discomfortFromText } from '@app/features/ellie/discomfortModel';
 
 // Reading of the tool data of ellie-chat (docs/backend/ELLIE_SHAPES.md):
@@ -130,10 +132,14 @@ export type ParsedTool = {
 };
 
 // A plan the server returned (`tool`) becomes a card. With a plan, the reply's
-// content is the plan's intro_message. A tool with proposal_id is a v2 card
-// (storedCards), never the old one.
+// content is the plan's intro_message. A tool with proposal_id, a v2 card type
+// or a cards list is a v2 card (storedCards), never the old one.
 export function parseTool(tool: EllieTool, id: string, content: string): ParsedTool | null {
-  if (typeof tool.data.proposal_id === 'string') {
+  if (
+    'proposal_id' in tool.data ||
+    isProposalCardType(tool.data.type) ||
+    Array.isArray(tool.data.cards)
+  ) {
     return null;
   }
   const intro =
@@ -177,11 +183,29 @@ export function proposalToMessage(card: ProposalCard, fallbackId: string): Propo
       answer: null,
     };
   }
-  if (card.type !== 'routine_proposal') {
-    return { id, role: 'assistant', kind: 'planPlaceholder', cardType: card.type };
+  if (card.type === 'nutrition_prefs_request') {
+    return { id, role: 'assistant', kind: 'nutritionPrefs', prefs: null, answered: false };
   }
   if (!card.proposalId) {
     return null;
+  }
+  if (card.type === 'nutrition_plan_proposal') {
+    const plan = card.payload
+      ? parseNutritionProposal(card.proposalId, card.payload, {
+          version: card.version,
+          adjustLabel: card.adjustLabel,
+        })
+      : null;
+    return {
+      id,
+      role: 'assistant',
+      kind: 'nutritionProposal',
+      proposalId: card.proposalId,
+      version: card.version,
+      adjustLabel: card.adjustLabel,
+      proposal: plan,
+      status: plan ? 'open' : 'loading',
+    };
   }
   const proposal = card.payload
     ? parseRoutineProposal(card.proposalId, card.payload, {
@@ -204,7 +228,17 @@ export function proposalToMessage(card: ProposalCard, fallbackId: string): Propo
 // The stored conversation as chat messages: text, and the cards of the plans
 // ELLIE generated (chat_messages.tool_type / tool_data).
 export function historyToMessages(rows: EllieStoredMessage[]): ChatMessage[] {
-  return answeredDiscomforts(storedMessages(rows));
+  return answeredPrefs(answeredDiscomforts(storedMessages(rows)));
+}
+
+// A questions card followed by a user message was answered: it shows "TUS
+// PREFERENCIAS" (the values are read with get_food_preferences).
+function answeredPrefs(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message, index) =>
+    message.kind === 'nutritionPrefs' && messages.slice(index + 1).some(item => item.role === 'user')
+      ? { ...message, answered: true }
+      : message,
+  );
 }
 
 // A discomfort_check followed by the user's reply shows that reply.

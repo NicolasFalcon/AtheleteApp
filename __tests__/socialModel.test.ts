@@ -214,13 +214,13 @@ describe('relationship and allowed actions', () => {
   });
 });
 
-describe('real photo only for friends (DA-119)', () => {
-  it('shows the photo to the owner and to friends only', () => {
+describe('real photo whenever there is one, never for a block', () => {
+  it('shows the photo to everyone but a blocked person', () => {
     expect(canShowRealPhoto('self')).toBe(true);
     expect(canShowRealPhoto('friends')).toBe(true);
-    expect(canShowRealPhoto('none')).toBe(false);
-    expect(canShowRealPhoto('request_sent')).toBe(false);
-    expect(canShowRealPhoto('request_received')).toBe(false);
+    expect(canShowRealPhoto('none')).toBe(true);
+    expect(canShowRealPhoto('request_sent')).toBe(true);
+    expect(canShowRealPhoto('request_received')).toBe(true);
     expect(canShowRealPhoto('blocked')).toBe(false);
   });
 

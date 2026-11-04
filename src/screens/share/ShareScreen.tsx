@@ -21,7 +21,8 @@ import {
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { createPostErrorCopy, publishedToast } from '@app/features/social/postModel';
-import type { CreatePostError } from '@app/features/social/postTypes';
+import type { CreatePostError, PostVisibility } from '@app/features/social/postTypes';
+import { CommunityShareSheet } from '@app/features/social/v2/CommunityShare';
 import { invalidateSocialContent } from '@app/features/social/useSocial';
 import {
   captureScene,
@@ -89,6 +90,8 @@ export function ShareScreen({ navigation, route }: Props) {
   const [remembered, setRemembered] = useState<Partial<Record<PhotoKind, StickerTone>>>({});
   const [tone, setTone] = useState<StickerTone>('glass');
   const [busy, setBusy] = useState<null | 'stories' | 'download' | 'more' | 'community'>(null);
+  // A route goes to Comunidad through the Pública / Solo amigos sheet.
+  const [communityOpen, setCommunityOpen] = useState(false);
   const [sheet, setSheet] = useState<null | 'noInstagram' | 'photosDenied'>(null);
 
   const stickerRef = useRef<View>(null);
@@ -201,16 +204,28 @@ export function ShareScreen({ navigation, route }: Props) {
       navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'workout', sourceId: target.sessionId });
       return;
     }
+    setCommunityOpen(true);
+  };
+
+  const shareRoute = (visibility: PostVisibility): Promise<'guidelines_required' | void> => {
+    if (target.kind !== 'route') {
+      return Promise.resolve();
+    }
     setBusy('community');
-    routeService
-      .shareToCommunity(target.activityId)
+    return routeService
+      .shareToCommunity(target.activityId, visibility)
       .then(result => {
+        setCommunityOpen(false);
         invalidateSocialContent(queryClient);
         toast.show(publishedToast(result.created, language));
         navigation.navigate(APP_ROUTES.SocialPost, { postId: result.postId });
       })
-      .catch(error => {
+      .catch((error): 'guidelines_required' | void => {
         const code = error instanceof RouteServiceError ? error.code : 'unknown';
+        if (code === 'guidelines_required') {
+          return 'guidelines_required';
+        }
+        setCommunityOpen(false);
         toast.show(
           code === 'route_private' ? copy.routePrivate : createPostErrorCopy(code as CreatePostError, language).message,
           { tone: 'error' },
@@ -446,6 +461,13 @@ export function ShareScreen({ navigation, route }: Props) {
           {copy.photosDeniedText}
         </TextV2>
       </Sheet>
+
+      <CommunityShareSheet
+        open={communityOpen}
+        busy={busy === 'community'}
+        onClose={() => setCommunityOpen(false)}
+        onPublish={shareRoute}
+      />
     </View>
   );
 }

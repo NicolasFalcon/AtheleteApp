@@ -7,6 +7,7 @@ import type {
 import type { DistanceKey } from '@app/features/route/routeMappers';
 import type { RoutePersonalBest } from '@app/features/route/routeRecords';
 import type { RejectedSave } from '@app/features/route/rejectedSaves';
+import type { PostVisibility } from '@app/features/social/postTypes';
 
 // What Ruta needs from the backend (`supabaseRouteService`).
 // Contracts: docs/backend/ROUTE_RPC_SHAPES.md.
@@ -48,8 +49,13 @@ export interface RouteService {
     achievedAt: string;
   }): Promise<void>;
 
-  // create_post('route', activity_id). `created: false` = it was already shared.
-  shareToCommunity(activityId: string): Promise<{ postId: string; created: boolean }>;
+  // create_community_post('route', activity_id, visibility). `created: false`
+  // = it was already shared. Public needs the community guidelines
+  // (RouteServiceError 'guidelines_required').
+  shareToCommunity(
+    activityId: string,
+    visibility: PostVisibility,
+  ): Promise<{ postId: string; created: boolean }>;
 
   // Activities waiting for network. Sends what is due; returns how many went up.
   flushPending(): Promise<number>;

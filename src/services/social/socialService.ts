@@ -20,6 +20,10 @@ import type { AttachmentFocus } from '@app/services/social/attachmentSources';
 import type {
   ActivityItem,
   AttachmentSource,
+  CommunityCursor,
+  CommunityFeedKind,
+  CommunityFeedPage,
+  CommunityProfile,
   CreatePostInput,
   CreatePostResult,
   FeedComment,
@@ -116,6 +120,25 @@ export interface SocialService {
   ): Promise<{ templateId: string; created: boolean }>;
   getTermsAccepted(): Promise<boolean>;
   acceptTerms(): Promise<void>;
+
+  // ── Comunidad abierta ──
+  // get_community_feed (public posts) / get_following_feed (people I
+  // follow, friends' posts and mine). `cursor` goes back exactly as received.
+  getOpenFeed(
+    kind: CommunityFeedKind,
+    cursor: CommunityCursor | null,
+    limit: number,
+  ): Promise<CommunityFeedPage>;
+  getCommunityProfile(userId: string): Promise<CommunityProfile | null>;
+  // Idempotent: the result is the state after the call.
+  followUser(userId: string): Promise<boolean>;
+  unfollowUser(userId: string): Promise<boolean>;
+  // profiles.community_guidelines_accepted_at is set (public posts).
+  getCommunityGuidelinesAccepted(): Promise<boolean>;
+  acceptCommunityGuidelines(): Promise<void>;
+  // profiles.is_private: my posts stay out of Comunidad.
+  getPrivateAccount(): Promise<boolean>;
+  setPrivateAccount(value: boolean): Promise<void>;
 
   // ── Retos, notificaciones y moderación (tanda C) ──
   getMyChallenges(): Promise<MyChallenges>;

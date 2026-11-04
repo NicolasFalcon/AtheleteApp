@@ -213,6 +213,8 @@ export function buildPostFixtures(
       liked_by_me: Boolean(seed.likedByMe),
       author: authorOf(seed.who),
       relationship: relationOf(seed.who),
+      visibility: 'friends',
+      is_following: null,
     };
   };
 

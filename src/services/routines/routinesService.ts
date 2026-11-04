@@ -66,6 +66,7 @@ export type RoutineSuggestion = {
   routineId: string;
   title: string;
   routineCategory: Workout['routineCategory'];
+  routineFocus: Workout['routineFocus'];
   zone: string | null;
   difficulty: WorkoutDifficulty;
   duration: number;
@@ -310,6 +311,7 @@ export function parseTodaySuggestion(body: Record<string, unknown>): TodaySugges
       routineId,
       title: str(raw.title) ?? '',
       routineCategory: parseRoutineCategory(str(raw.routine_category)),
+      routineFocus: parseRoutineFocus(raw.routine_focus),
       zone: str(raw.zone),
       difficulty: DIFFICULTIES.find(item => item === raw.difficulty) ?? 'intermediate',
       duration: num(raw.duration) ?? 0,

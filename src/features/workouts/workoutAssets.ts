@@ -10,9 +10,6 @@ import type { WorkoutType } from '@app/shared';
 // - zone-*: anatomical crops of `anatomia.jpg` (Piernas / Glúteos: photos)
 //   with grayscale .85 · sepia .22 · brightness .9 · contrast 1.12 and the
 //   left fade. The 7 definitive anatomical assets are TO CREATE (§15).
-// - thumb-*: square anatomical crops per body part (rows / path / picker)
-//   until each exercise has its MoveKit poster.
-// - movekit-poster: video area mockup (studio background + anatomy).
 export const ZONE_IMAGES: Record<ZoneKey, ImageSourcePropType> = {
   chest: require('@app/assets/v2/workouts/zone-chest.png'),
   back: require('@app/assets/v2/workouts/zone-back.png'),
@@ -48,20 +45,10 @@ export const MUSCLE_HOTSPOTS: Record<ZoneKey, { top: number; left: number }> = {
   glutes: { top: 26, left: 62 },
 };
 
-const THUMBS: Record<ZoneKey | 'default', ImageSourcePropType> = {
-  chest: require('@app/assets/v2/workouts/thumb-chest.jpg'),
-  back: require('@app/assets/v2/workouts/thumb-back.jpg'),
-  shoulders: require('@app/assets/v2/workouts/thumb-shoulders.jpg'),
-  arms: require('@app/assets/v2/workouts/thumb-arms.jpg'),
-  core: require('@app/assets/v2/workouts/thumb-core.jpg'),
-  legs: require('@app/assets/v2/workouts/thumb-legs.jpg'),
-  glutes: require('@app/assets/v2/workouts/thumb-glutes.jpg'),
-  default: require('@app/assets/v2/workouts/thumb-default.jpg'),
-};
-
-export function exerciseThumbnail(bodyPart?: string | null): ImageSourcePropType {
-  return THUMBS[(bodyPart as ZoneKey) ?? 'default'] ?? THUMBS.default;
-}
+// Brand placeholder of exercise media (no media, still loading or failed):
+// cover-bg for the large areas, its crop on the isotipo for thumbnails.
+export const MEDIA_PLACEHOLDER: ImageSourcePropType = require('@app/assets/covers/cover-bg.jpg');
+export const MEDIA_PLACEHOLDER_THUMB: ImageSourcePropType = require('@app/assets/covers/cover-thumb.jpg');
 
 export const EQUIPMENT_IMAGES: Record<EquipmentKey, ImageSourcePropType> = {
   bodyweight: require('@app/assets/v2/workouts/eq-bodyweight.jpg'),
@@ -81,4 +68,40 @@ export const TYPE_IMAGES: Record<WorkoutType, ImageSourcePropType> = {
 
 export const SCAN_IMAGE: ImageSourcePropType = require('@app/assets/v2/workouts/scan-prensa.jpg');
 
-export const MOVEKIT_POSTER: ImageSourcePropType = require('@app/assets/v2/workouts/movekit-poster.jpg');
+// Entrenos · Por tipo (v2.19 §29.4): category photo by key (slug without
+// separators, see libraryCategoryKey), delivered in colour; the card applies
+// the series treatment. Focal point = object-position of the handoff, so the
+// vertical (164 × 208) and wide (353 × 150) crops keep the subject.
+export type CategoryFocus = { left: `${number}%`; top: `${number}%` };
+
+export type CategoryCover = {
+  image: ImageSourcePropType;
+  focus: CategoryFocus;
+  // Wide card ("Tus rutinas"), when it differs.
+  focusWide?: CategoryFocus;
+};
+
+export const CATEGORY_COVERS: Record<string, CategoryCover> = {
+  fuerza: { image: require('@app/assets/covers/categorias/cat-fuerza.jpg'), focus: { left: '35%', top: '40%' } },
+  hipertrofia: { image: require('@app/assets/covers/categorias/cat-hipertrofia.jpg'), focus: { left: '50%', top: '25%' } },
+  funcional: { image: require('@app/assets/covers/categorias/cat-funcional.jpg'), focus: { left: '45%', top: '30%' } },
+  fullbody: { image: require('@app/assets/covers/categorias/cat-fullbody.jpg'), focus: { left: '50%', top: '35%' } },
+  cardio: { image: require('@app/assets/covers/categorias/cat-cardio.jpg'), focus: { left: '50%', top: '20%' } },
+  hiit: { image: require('@app/assets/covers/categorias/cat-hiit.jpg'), focus: { left: '45%', top: '40%' } },
+  calistenia: { image: require('@app/assets/covers/categorias/cat-calistenia.jpg'), focus: { left: '52%', top: '40%' } },
+  core: { image: require('@app/assets/covers/categorias/cat-core.jpg'), focus: { left: '62%', top: '35%' } },
+  movilidad: { image: require('@app/assets/covers/categorias/cat-movilidad.jpg'), focus: { left: '50%', top: '45%' } },
+  viejaescuela: { image: require('@app/assets/covers/categorias/cat-vieja-escuela.jpg'), focus: { left: '50%', top: '25%' } },
+  encasa: {
+    image: require('@app/assets/covers/categorias/cat-en-casa.jpg'),
+    focus: { left: '50%', top: '45%' },
+    focusWide: { left: '50%', top: '55%' },
+  },
+  misrutinas: { image: require('@app/assets/covers/categorias/cat-mis-rutinas.jpg'), focus: { left: '40%', top: '30%' } },
+};
+
+// Missing photo or failed load: same card, same gradient and text.
+export const CATEGORY_COVER_FALLBACK: CategoryCover = {
+  image: require('@app/assets/covers/categorias/cover-bg.jpg'),
+  focus: { left: '50%', top: '50%' },
+};

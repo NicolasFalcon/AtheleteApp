@@ -21,7 +21,13 @@ import {
 import { ROOT_ROUTES, TAB_ROUTES, APP_ROUTES } from '@app/constants/routes';
 import { badgeIcon } from '@app/features/gamification/badgeIcons';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
+import {
+  RoutineCoverOverlay,
+  routineCoverSource,
+  useRoutineCoverContext,
+} from '@app/components/v2/RoutineCover';
+import { routineFocusWord } from '@app/features/workouts/routineFocus';
+import { useRoutine } from '@app/hooks/useRoutines';
 import { enqueueFeedback } from '@app/features/session/feedbackQueue';
 import { formatDuration, formatKg } from '@app/features/session/sessionModel';
 import { SessionRating } from '@app/features/session/v2/SessionRating';
@@ -205,6 +211,12 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   };
 
   const detail = detailQuery.data;
+  // The routine of the session: its cover (§28.16) is the hero.
+  const routineQuery = useRoutine(detail?.session.workoutId ?? null);
+  const coverContext = useRoutineCoverContext();
+  const routine = routineQuery.data ?? null;
+  const [heroWidth, setHeroWidth] = useState(0);
+  const [heroTextsTop, setHeroTextsTop] = useState<number | null>(null);
   const footerHeight = 56 + 8 + 48 + 12 + Math.max(insets.bottom, 16) + 4;
 
   let sheet: React.ReactNode;
@@ -332,14 +344,32 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
         automaticallyAdjustKeyboardInsets
         contentContainerStyle={{ paddingBottom: footerHeight + 24 }}
       >
-        <View style={[styles.hero, { height: HERO_HEIGHT }]}>
-          <Image source={HOME_PHOTOS.effort} resizeMode="cover" style={styles.fill} />
+        <View
+          style={[styles.hero, { height: HERO_HEIGHT }]}
+          onLayout={event => setHeroWidth(event.nativeEvent.layout.width)}
+        >
+          <Image
+            source={routineCoverSource(routine?.routineFocus, coverContext.gender)}
+            resizeMode="cover"
+            style={styles.fill}
+          />
           <LinearGradient
             colors={['rgba(20,19,18,.5)', 'rgba(20,19,18,.2)', 'rgba(20,19,18,.92)', '#141312']}
             locations={[0, 0.35, 0.88, 1]}
             style={StyleSheet.absoluteFill}
           />
-          <View style={styles.heroContent}>
+          {heroTextsTop !== null ? (
+            <RoutineCoverOverlay
+              format="wide"
+              width={heroWidth}
+              word={routine ? routineFocusWord(routine, coverContext.language) : null}
+              band={{ top: insets.top + 16, bottom: heroTextsTop - 16 }}
+            />
+          ) : null}
+          <View
+            style={styles.heroContent}
+            onLayout={event => setHeroTextsTop(event.nativeEvent.layout.y)}
+          >
             <View style={styles.check}>
               <Check size={34} color="#FFFFFF" strokeWidth={2.4} />
             </View>

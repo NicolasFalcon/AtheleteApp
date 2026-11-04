@@ -11,8 +11,11 @@ import { ArrowLeft, type LucideIcon } from 'lucide-react-native';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
 
-// 'studio': light glass over the MoveKit studio background (Exercise Detail).
+// 'studio': dark glass over the light MoveKit video (Exercise Detail): it
+// reads over any frame. A filled icon turns Ember (active favourite).
 export type IconButtonVariant = 'muted' | 'glass' | 'solid' | 'studio';
+
+const STUDIO_GLASS = 'rgba(18,18,18,.72)';
 
 export type IconButtonProps = {
   icon: LucideIcon;
@@ -50,7 +53,7 @@ export function IconButton({
       : variant === 'solid'
       ? colors.cta.primary
       : variant === 'studio'
-      ? 'rgba(255,255,255,.72)'
+      ? STUDIO_GLASS
       : colors.surface.muted;
   const iconColor =
     variant === 'glass'
@@ -58,9 +61,13 @@ export function IconButton({
       : variant === 'solid'
       ? colors.cta.primaryText
       : variant === 'studio'
-      ? '#121212'
+      ? filled
+        ? colors.ember.base
+        : '#FFFFFF'
       : colors.text.primary;
   const radius = size / 2;
+  const blurred =
+    (variant === 'glass' || variant === 'studio') && Platform.OS === 'ios';
 
   return (
     <PressableScale
@@ -76,17 +83,14 @@ export function IconButton({
           width: size,
           height: size,
           borderRadius: radius,
-          backgroundColor:
-            variant === 'glass' && Platform.OS === 'ios'
-              ? 'transparent'
-              : background,
+          backgroundColor: blurred ? 'transparent' : background,
           opacity: disabled ? 0.35 : 1,
         },
         variant === 'studio' && styles.studio,
         style,
       ]}
     >
-      {variant === 'glass' && Platform.OS === 'ios' ? (
+      {blurred ? (
         <View
           style={[
             StyleSheet.absoluteFill,
@@ -95,7 +99,7 @@ export function IconButton({
         >
           <BlurView
             style={StyleSheet.absoluteFill}
-            blurType="light"
+            blurType={variant === 'studio' ? 'dark' : 'light'}
             blurAmount={theme.blur.glass}
             reducedTransparencyFallbackColor={background}
           />
@@ -162,7 +166,9 @@ export function BackButton({
 
 const styles = StyleSheet.create({
   studio: {
-    boxShadow: '0 0 0 .5px rgba(0,0,0,.06), 0 6px 16px rgba(0,0,0,.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,.12)',
+    boxShadow: '0 4px 12px rgba(0,0,0,.18)',
   },
   base: {
     alignItems: 'center',

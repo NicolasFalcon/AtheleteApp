@@ -499,15 +499,13 @@ export function acceptsRequestsFrom(data: unknown): boolean {
   return asRecord(data)?.accepts_requests !== false;
 }
 
-// DA-119: the real photo is only for the viewer and their friends. Anyone
-// else keeps no photo path at all, so it is never requested or shown.
+// The photo path the server sent is kept (it already leaves out what cannot
+// be seen); someone I blocked keeps none, so it is never requested or shown.
 export function withPhotoPolicy(
   profile: SocialProfileRow,
   relationship: Relationship | 'blocked',
 ): SocialProfileRow {
-  return relationship === 'self' || relationship === 'friends'
-    ? profile
-    : { ...profile, profile_photo_url: '' };
+  return relationship === 'blocked' ? { ...profile, profile_photo_url: '' } : profile;
 }
 
 // "@usuario", or nothing when the person has no username to show.

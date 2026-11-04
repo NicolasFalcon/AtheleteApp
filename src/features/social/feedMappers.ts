@@ -3,6 +3,9 @@ import { parsePoint } from '@app/features/route/routeMappers';
 import { mergeFeedPages, nextFeedCursor } from '@app/features/social/postModel';
 import type {
   AchievementAttachment,
+  CommunityCursor,
+  CommunityFeedPage,
+  CommunityProfile,
   CreatePostError,
   CreatePostResult,
   ActivityItem,
@@ -252,10 +255,24 @@ export function parseAttachment(
 }
 
 // ── get_feed / get_post rows ──────────────────────────────────────────────
-// Feed and detail only show the viewer's posts and their friends', so the
-// relationship with the author is `self` or `friends` (DA-119: real photos).
-export function authorRelationship(authorId: string, me: string): RelationshipState {
-  return authorId === me ? 'self' : 'friends';
+// get_feed only shows the viewer's posts and their friends': `self` or
+// `friends`. The open feeds say it per item
+// (is_friend, friend_request_status), so anyone else is not a friend.
+export function authorRelationship(authorId: string, me: string, row?: Json): RelationshipState {
+  if (authorId === me) {
+    return 'self';
+  }
+  if (!row || typeof row.is_friend !== 'boolean') {
+    return 'friends';
+  }
+  if (row.is_friend) {
+    return 'friends';
+  }
+  return row.friend_request_status === 'sent'
+    ? 'request_sent'
+    : row.friend_request_status === 'received'
+    ? 'request_received'
+    : 'none';
 }
 
 function parseAuthor(row: Json, authorId: string): SocialProfileRow | null {
@@ -302,9 +319,11 @@ export function parseFeedPost(value: unknown, me: string): FeedPost | null {
     deleted_at: null,
     hidden_at: null,
     removed_at: null,
-    liked_by_me: row.liked_by_me === true,
+    liked_by_me: (row.reacted_by_me ?? row.liked_by_me) === true,
     author: parseAuthor(row, authorId),
-    relationship: authorRelationship(authorId, me),
+    relationship: authorRelationship(authorId, me, row),
+    visibility: row.visibility === 'public' ? 'public' : 'friends',
+    is_following: typeof row.is_following === 'boolean' ? row.is_following : null,
   };
 }
 
@@ -328,6 +347,57 @@ export function parseFeedPage(data: unknown, me: string, limit: number): FeedPag
       rows.length >= limit && lastCreatedAt
         ? lastCreatedAt
         : nextFeedCursor(posts, limit),
+  };
+}
+
+// ── get_community_feed / get_following_feed ──────────────────────────────
+// { ok:true, items:[post], next_cursor: {created_at, id} | null }. The cursor
+// goes back exactly as received. ok:false (invalid_cursor…) is an error.
+function parseCursor(value: unknown): CommunityCursor | null {
+  const row = asRecord(value);
+  const createdAt = asString(row?.created_at);
+  const id = asString(row?.id);
+  return createdAt && id ? { created_at: createdAt, id } : null;
+}
+
+export function parseCommunityFeedPage(data: unknown, me: string): CommunityFeedPage {
+  const body = asRecord(data);
+  if (!body || body.ok !== true) {
+    throw new Error(asString(body?.error) ?? 'community feed failed');
+  }
+  const rows = Array.isArray(body.items) ? body.items : [];
+  return {
+    posts: mergeFeedPages(
+      [],
+      rows
+        .map(row => parseFeedPost(row, me))
+        .filter((post): post is FeedPost => post !== null),
+    ),
+    nextCursor: parseCursor(body.next_cursor),
+  };
+}
+
+// get_community_profile → { ok:true, profile } (null when not visible).
+export function parseCommunityProfile(data: unknown): CommunityProfile | null {
+  const body = asRecord(data);
+  const row = asRecord(body?.profile);
+  const id = asString(row?.id);
+  if (!body || body.ok !== true || !row || !id) {
+    return null;
+  }
+  const status = row.friend_request_status;
+  return {
+    id,
+    username: asString(row.username) ?? '',
+    name: asString(row.name) ?? 'Usuario',
+    avatar_key: asString(row.avatar_key) ?? '',
+    profile_photo_url: asString(row.profile_photo_url) ?? '',
+    is_private: row.is_private === true,
+    followers_count: asNumber(row.followers_count) ?? 0,
+    following_count: asNumber(row.following_count) ?? 0,
+    is_following: row.is_following === true,
+    is_friend: row.is_friend === true,
+    friend_request_status: status === 'sent' || status === 'received' ? status : null,
   };
 }
 
@@ -429,9 +499,8 @@ export function toFeedComments(
       deleted_at: row.deleted_at,
       hidden_at: row.hidden_at,
       removed_at: row.removed_at,
-      // DA-119: only the viewer and friends keep a photo path.
-      author:
-        author && relationship === 'none' ? { ...author, profile_photo_url: '' } : author,
+      // The photo path the server sent (none when it cannot be seen).
+      author,
       relationship,
     };
   });
@@ -484,6 +553,9 @@ export function parseCreatePost(data: unknown): CreatePostResult {
     return { ok: true, postId, created: body.created !== false };
   }
   const error = asString(body?.error);
+  if (error && /guideline/i.test(error)) {
+    return { ok: false, error: 'guidelines_required' };
+  }
   return {
     ok: false,
     error: SERVER_ERRORS.includes(error as CreatePostError)

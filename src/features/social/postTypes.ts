@@ -144,7 +144,24 @@ export type FeedPost = Pick<
   author: SocialProfileRow | null;
   // Relationship with the author (photos and avatars depend on it, DA-119).
   relationship: RelationshipState;
+  // Comunidad abierta: who can see it (old posts are all `friends`).
+  visibility: PostVisibility;
+  // Whether I follow the author (only the open feeds send it).
+  is_following: boolean | null;
 };
+
+export type PostVisibility = 'public' | 'friends';
+
+// get_community_feed / get_following_feed: send back exactly the cursor
+// received; null at the end of the list.
+export type CommunityCursor = { created_at: string; id: string };
+
+export type CommunityFeedPage = {
+  posts: FeedPost[];
+  nextCursor: CommunityCursor | null;
+};
+
+export type CommunityFeedKind = 'community' | 'following';
 
 export type FeedPage = {
   posts: FeedPost[];
@@ -225,6 +242,8 @@ export type CreatePostInput = {
   sourceId?: string;
   body: string;
   photo?: PostPhotoDraft | null;
+  // public (Comunidad) or friends; public needs the community guidelines.
+  visibility: PostVisibility;
   // Where a publication with a photo is (the upload comes first).
   onStep?: (step: 'uploading' | 'publishing') => void;
 };
@@ -245,6 +264,8 @@ export type CreatePostError =
   | 'photo_required'
   // A moderator removed the post of that source (Lote 3).
   | 'post_removed'
+  // Public post without having accepted the community guidelines.
+  | 'guidelines_required'
   // The app, before sending: type, size or an invalid post.
   | 'photo_type'
   | 'photo_size'
@@ -260,4 +281,19 @@ export type CreatePostResult =
 
 // `count` is null when the server count could not be read back: the screen
 // then keeps its own optimistic figure.
+// get_community_profile: any community profile, with its counters.
+export type CommunityProfile = {
+  id: string;
+  username: string;
+  name: string;
+  avatar_key: string;
+  profile_photo_url: string;
+  is_private: boolean;
+  followers_count: number;
+  following_count: number;
+  is_following: boolean;
+  is_friend: boolean;
+  friend_request_status: 'sent' | 'received' | null;
+};
+
 export type ToggleLikeResult = { liked: boolean; count: number | null };

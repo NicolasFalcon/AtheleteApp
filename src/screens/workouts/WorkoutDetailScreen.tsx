@@ -32,11 +32,12 @@ import {
 } from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { exerciseThumbnail } from '@app/features/workouts/workoutAssets';
+import { MEDIA_PLACEHOLDER_THUMB } from '@app/features/workouts/workoutAssets';
 import { routineFocusWord } from '@app/features/workouts/routineFocus';
 import {
   RoutineCoverOverlay,
   routineCoverSource,
+  routineKeepsPhoto,
 } from '@app/components/v2/RoutineCover';
 import {
   EQUIPMENT,
@@ -191,10 +192,11 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
       ? 'Ver sesión'
       : 'Empezar entreno';
 
-  // Routines without a photo of their own (ELLIE's, the user's) or whose
-  // photo failed: the 3:4 cover with the focus word (§28.16).
+  // Only an official routine with a photo of its own keeps it; every other
+  // one (ELLIE's, the week plan's, the user's) or a photo that failed: the
+  // 3:4 cover with the focus word (§28.16).
   const focusWord = routineFocusWord(workout, language);
-  const cover = !workout.imageUrl || imageBroken;
+  const cover = !routineKeepsPhoto(workout) || imageBroken;
   const image = cover
     ? routineCoverSource(workout.routineFocus, profile?.gender)
     : resolveWorkoutThumbnailSource({
@@ -230,7 +232,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           : pathMeta(exercise),
       thumbnail: {
         mediaKey: exercise.thumbKey,
-        fallback: exerciseThumbnail(libraryExercise?.bodyPart),
+        fallback: MEDIA_PLACEHOLDER_THUMB,
       },
       trailing: exercise.exerciseId ? (
         <ChevronRight size={18} color={colors.text.tertiary} strokeWidth={2} />

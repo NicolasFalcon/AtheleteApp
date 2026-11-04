@@ -12,6 +12,7 @@ import {
   Mail,
   KeyRound,
   Lightbulb,
+  Lock,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -47,7 +48,7 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useProfileOverview } from '@app/hooks/useProfileOverview';
 import { useProfilePreferences } from '@app/hooks/useProfilePreferences';
 import { moderatorPermissions } from '@app/features/social/moderationModel';
-import { useSocialResource } from '@app/features/social/useSocial';
+import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import {
   mapDeleteAccountResponse,
@@ -90,6 +91,11 @@ export function SettingsScreen({ navigation }: Props) {
   // user never sees it and the screen checks the role again.
   const moderatorRole = useSocialResource('getModeratorRole', s => s.getModeratorRole());
   const isModerator = moderatorPermissions(moderatorRole.data ?? null).canSeePanel;
+  // Cuenta privada (profiles.is_private): optimistic, back if it fails.
+  const socialService = useSocialService();
+  const privateAccount = useSocialResource('getPrivateAccount', s => s.getPrivateAccount());
+  const [privateDraft, setPrivateDraft] = useState<boolean | null>(null);
+  const isPrivate = privateDraft ?? privateAccount.data ?? false;
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const { preferredMode, setPreferredMode } = useAppTheme();
@@ -244,6 +250,27 @@ export function SettingsScreen({ navigation }: Props) {
               onPress={() => navigation.navigate(APP_ROUTES.SocialModeration)}
             />
           ) : null}
+          <Row
+            leading={icon(Lock)}
+            title="Cuenta privada"
+            subtitle="Tus publicaciones no aparecerán en Comunidad"
+            trailing={
+              <SwitchV2
+                accessibilityLabel="Cuenta privada"
+                value={isPrivate}
+                disabled={privateAccount.status !== 'ready'}
+                onValueChange={value => {
+                  setPrivateDraft(value);
+                  socialService
+                    .setPrivateAccount(value)
+                    .catch(() => {
+                      setPrivateDraft(!value);
+                      toast.show('No se pudo cambiar. Inténtalo de nuevo.', { tone: 'error' });
+                    });
+                }}
+              />
+            }
+          />
           <Row
             leading={icon(Shield)}
             title="Privacidad social"

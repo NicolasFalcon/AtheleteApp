@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { MoreHorizontal } from 'lucide-react-native';
+import { FollowButton } from '@app/components/v2/FollowButton';
 import { PersonAvatar } from '@app/components/v2/PersonAvatar';
 import {
   AchievementBody,
@@ -47,6 +48,8 @@ export type PostCardProps = {
   detail?: boolean;
   onOpenPost?: () => void;
   onOpenAuthor?: () => void;
+  // "Seguir" / "Siguiendo" next to the author (the open feeds).
+  followable?: boolean;
   onMore?: () => void;
   onComment?: () => void;
   routineSaved?: boolean;
@@ -67,6 +70,7 @@ export function PostCard({
   detail = false,
   onOpenPost,
   onOpenAuthor,
+  followable = false,
   onMore,
   onComment,
   routineSaved = false,
@@ -163,6 +167,14 @@ export function PostCard({
             </View>
           </View>
         </PressableScale>
+        {followable && post.relationship !== 'self' && post.is_following !== null ? (
+          <FollowButton
+            userId={post.author_id}
+            name={name}
+            following={post.is_following}
+            withTabBar={withTabBar}
+          />
+        ) : null}
         {onMore ? (
           <PressableScale
             accessibilityRole="button"

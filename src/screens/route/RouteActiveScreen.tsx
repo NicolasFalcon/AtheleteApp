@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Linking, StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Mountain, Pause, Play, Target } from 'lucide-react-native';
+import { Mountain, Pause, Play, Target, X } from 'lucide-react-native';
 import { Button, PressableScale, Sheet, TextV2, useToast } from '@app/components/v2';
 import { haptics } from '@app/components/v2/haptics';
 import { APP_ROUTES } from '@app/constants/routes';
 import { clearRecording, createRecordingPersister } from '@app/features/route/activeRecording';
 import { MIN_SAVE_M, saveFinishedRecording } from '@app/features/route/finishRecording';
+import { openLocationSettings } from '@app/features/route/locationSettings';
 import { getLocationSource } from '@app/features/route/locationSourceFactory';
 import { stopAllLocationUpdates } from '@app/features/route/RealLocationSource';
 import {
@@ -78,8 +79,11 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
     [],
   );
   const tracker = useRouteTracker({ source, sport, plan: planPoints, initial });
-  const { state } = tracker;
+  const { state, startFailure, retryStart } = tracker;
   const startRef = useRef(tracker.start);
+  // Android without "Permitir todo el tiempo": recording with the app open is
+  // what is guaranteed, so the screen says it (dismissible).
+  const [foregroundOnly, setForegroundOnly] = useState(false);
   const [confirm, setConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
   // The server refused the activity: it stays on the phone, retry or discard.
@@ -125,6 +129,35 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
       startRef.current();
     }
   }, [state.status]);
+
+  useEffect(() => {
+    let alive = true;
+    source
+      .getBackgroundAccess()
+      .then(access => {
+        if (alive) {
+          setForegroundOnly(access.status === 'denied' || access.status === 'undetermined');
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [source]);
+
+  // Back from Ajustes (or the app reopened) after the GPS failed to start:
+  // try again on its own.
+  useEffect(() => {
+    if (!startFailure) {
+      return undefined;
+    }
+    const subscription = AppState.addEventListener('change', next => {
+      if (next === 'active') {
+        retryStart();
+      }
+    });
+    return () => subscription.remove();
+  }, [retryStart, startFailure]);
 
   const paused = state.status === 'paused';
   const signalLost = trackerSignalLost(state);
@@ -305,16 +338,39 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
               Pausamos la grabación y guardamos lo que llevas. Actívalo en Ajustes para continuar.
             </TextV2>
           </View>
-          <PressableScale
-            accessibilityRole="button"
-            onPress={() => {
-              Linking.openSettings().catch(() => {});
-            }}
-          >
+          <PressableScale accessibilityRole="button" onPress={() => openLocationSettings()}>
             <TextV2 variant="metaStrong" color={EMBER}>
               Ajustes
             </TextV2>
           </PressableScale>
+        </View>
+      ) : startFailure ? (
+        <View style={[styles.banner, { top: insets.top + 60 }]}>
+          <View style={[styles.dotSmall, { borderColor: EMBER }]} />
+          <View style={styles.flex}>
+            <TextV2 variant="bodyStrong" color={DARK.text}>
+              No pudimos iniciar el GPS
+            </TextV2>
+            <TextV2 variant="meta" color={DARK.muted}>
+              {startFailure.servicesOff
+                ? 'La ubicación está desactivada en el teléfono. Actívala para registrar tu recorrido.'
+                : 'Seguimos contando el tiempo, pero aún no registramos tu recorrido.'}
+            </TextV2>
+          </View>
+          <View style={styles.bannerActions}>
+            {startFailure.servicesOff ? (
+              <PressableScale accessibilityRole="button" onPress={() => openLocationSettings(true)}>
+                <TextV2 variant="metaStrong" color={EMBER}>
+                  Abrir Ajustes
+                </TextV2>
+              </PressableScale>
+            ) : null}
+            <PressableScale accessibilityRole="button" onPress={retryStart}>
+              <TextV2 variant="metaStrong" color={startFailure.servicesOff ? DARK.text : EMBER}>
+                Reintentar
+              </TextV2>
+            </PressableScale>
+          </View>
         </View>
       ) : off ? (
         <View style={[styles.banner, { top: insets.top + 60 }]}>
@@ -338,6 +394,34 @@ export function RouteActiveScreen({ navigation }: AppScreenProps<'RouteActive'>)
             <TextV2 variant="meta" color={DARK.muted}>
               Seguimos contando el tiempo. Sal a un lugar abierto.
             </TextV2>
+          </View>
+        </View>
+      ) : foregroundOnly ? (
+        <View style={[styles.banner, { top: insets.top + 60 }]}>
+          <View style={[styles.dotSmall, { borderColor: DARK.quiet }]} />
+          <View style={styles.flex}>
+            <TextV2 variant="bodyStrong" color={DARK.text}>
+              Mantén la app abierta
+            </TextV2>
+            <TextV2 variant="meta" color={DARK.muted}>
+              Sin «Permitir todo el tiempo», la grabación puede detenerse si sales de la app o apagas la
+              pantalla.
+            </TextV2>
+          </View>
+          <View style={styles.bannerActions}>
+            <PressableScale accessibilityRole="button" onPress={() => openLocationSettings()}>
+              <TextV2 variant="metaStrong" color={EMBER}>
+                Ajustes
+              </TextV2>
+            </PressableScale>
+            <PressableScale
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar aviso"
+              hitSlop={8}
+              onPress={() => setForegroundOnly(false)}
+            >
+              <X size={16} color={DARK.muted} strokeWidth={2} />
+            </PressableScale>
           </View>
         </View>
       ) : null}
@@ -563,5 +647,6 @@ const styles = StyleSheet.create({
   },
   finish: { height: 52, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   flex: { flex: 1 },
+  bannerActions: { alignItems: 'flex-end', gap: 10 },
   sheetActions: { flex: 1, flexDirection: 'row', gap: 10 },
 });

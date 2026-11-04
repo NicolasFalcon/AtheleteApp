@@ -57,6 +57,8 @@ function post(id: string, minutesAgo: number, extra: Partial<FeedPost> = {}): Fe
     liked_by_me: false,
     author: null,
     relationship: 'friends',
+    visibility: 'friends',
+    is_following: null,
     ...extra,
   };
 }

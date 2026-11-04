@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { LocationSource } from '@app/features/route/locationSource';
 import { locationStore } from '@app/features/route/locationStore';
 import {
@@ -9,7 +9,9 @@ import {
 import type { LatLng, RouteSport } from '@app/features/route/routeTypes';
 
 // Connects the pure tracker to a LocationSource: fixes while recording and a
-// 500 ms tick for the clock. The screens only see state and four actions.
+// 500 ms tick for the clock. The screens only see state, the actions and
+// whether the platform updates failed to start (retryStart watches again;
+// the recording itself goes on).
 // The source (expo-location) can change without touching this hook.
 export function useRouteTracker(options: {
   source: LocationSource;
@@ -26,6 +28,8 @@ export function useRouteTracker(options: {
   const recording = state.status === 'recording' || state.status === 'paused';
   const sourceRef = useRef(source);
   sourceRef.current = source;
+  const [startFailure, setStartFailure] = useState<{ servicesOff: boolean } | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!recording) {
@@ -40,6 +44,8 @@ export function useRouteTracker(options: {
       event => {
         if (event.type === 'alive') {
           dispatch({ type: 'alive', t: event.t });
+        } else if (event.type === 'start_failed') {
+          setStartFailure({ servicesOff: event.servicesOff });
         } else {
           dispatch({ type: 'revoked', t: sourceRef.current.now() });
         }
@@ -50,7 +56,7 @@ export function useRouteTracker(options: {
       stop();
       clearInterval(tick);
     };
-  }, [recording, source]);
+  }, [recording, source, attempt]);
 
   const start = useCallback(() => dispatch({ type: 'start', t: sourceRef.current.now() }), []);
   const pause = useCallback(() => {
@@ -64,5 +70,10 @@ export function useRouteTracker(options: {
     [],
   );
 
-  return { state, start, pause, resume, finish };
+  const retryStart = useCallback(() => {
+    setStartFailure(null);
+    setAttempt(value => value + 1);
+  }, []);
+
+  return { state, start, pause, resume, finish, startFailure, retryStart };
 }

@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { LOCATION_TASK, toRoutePoint } from '@app/features/route/locationTask';
 import type { RoutePoint } from '@app/features/route/routeTypes';
 
@@ -13,6 +14,11 @@ export type PermissionSnapshot = {
 export type LocationApi = {
   getPermissions(): Promise<PermissionSnapshot>;
   requestPermissions(): Promise<PermissionSnapshot>;
+  // Android only asks for "Permitir todo el tiempo" separately; iOS records
+  // in the background with "Al usar la app" (UIBackgroundModes location).
+  needsBackgroundPermission: boolean;
+  getBackgroundPermissions(): Promise<PermissionSnapshot>;
+  requestBackgroundPermissions(): Promise<PermissionSnapshot>;
   servicesEnabled(): Promise<boolean>;
   getCurrent(): Promise<RoutePoint | null>;
   getLastKnown(maxAgeMs: number): Promise<RoutePoint | null>;
@@ -33,11 +39,19 @@ export type LocationApi = {
 //    outing stays far below the server's 50 000 points) and saves battery;
 //  - Fitness activity type, and iOS must not pause updates by itself (the
 //    app pauses on its own, see routeTracker auto-pause);
-//  - the blue indicator is shown while recording in the background.
+//  - the blue indicator is shown while recording in the background;
+//  - Android: a foreground service with its notification keeps the updates
+//    alive with the screen off (and lets the person come back to the app).
 export const UPDATE_OPTIONS = {
   distanceInterval: 5,
   showsBackgroundLocationIndicator: true,
   pausesUpdatesAutomatically: false,
+  foregroundService: {
+    notificationTitle: 'ATHELETE está grabando tu ruta',
+    notificationBody: 'Toca para volver a tu actividad.',
+    notificationColor: '#FF5B1F',
+    killServiceOnDestroy: false,
+  },
 } as const;
 
 function location() {
@@ -62,6 +76,13 @@ export const expoLocationApi: LocationApi = {
   },
   async requestPermissions() {
     return snapshot(await location().requestForegroundPermissionsAsync());
+  },
+  needsBackgroundPermission: Platform.OS === 'android',
+  async getBackgroundPermissions() {
+    return snapshot(await location().getBackgroundPermissionsAsync());
+  },
+  async requestBackgroundPermissions() {
+    return snapshot(await location().requestBackgroundPermissionsAsync());
   },
   servicesEnabled() {
     return location().hasServicesEnabledAsync();

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, ChevronDown, ChevronRight, Heart, Plus } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, ChevronDown, Heart, Plus, X } from 'lucide-react-native';
 import {
+  AppImage,
   Button,
-  Eyebrow,
   GlassSurface,
   IconButton,
   PressableScale,
+  Segmented,
   Skeleton,
   SkeletonGroup,
   StatusBarV2,
@@ -18,52 +20,65 @@ import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { MoveKitPlayer } from '@app/features/workouts/movekit/MoveKitPlayer';
 import {
-  EQUIPMENT,
-  LEVEL_LABELS,
-  capitalize,
-  zoneLabel,
-} from '@app/features/workouts/workoutsModel';
-import { useExercise } from '@app/hooks/useCatalog';
+  VISIBLE_STEPS,
+  equipmentText,
+  exerciseDetailCopy,
+  historySummary,
+  levelText,
+  splitShortTitle,
+  type ExerciseDetailCopy,
+  type ExerciseHistorySummary,
+} from '@app/features/workouts/exerciseDetailModel';
+import { MEDIA_PLACEHOLDER_THUMB } from '@app/features/workouts/workoutAssets';
+import { capitalize, levelBars } from '@app/features/workouts/workoutsModel';
+import { useCatalogLocale, useExercise } from '@app/hooks/useCatalog';
+import { useExerciseHistory } from '@app/hooks/useExerciseHistory';
 import { useFavoriteExercises } from '@app/hooks/useFavoriteExercises';
 import { useLatchedMediaUrl, useMediaUrl } from '@app/lib/media/mediaUrls';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import {
-  formatPRValue,
-  formatSetsReps,
-  getBestPR,
-  recommendationFor,
-} from '@app/shared';
-import type { PRType } from '@app/shared';
+  routinesService,
+  type ExerciseVariant,
+} from '@app/services/routines/routinesService';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'ExerciseDetail'>;
 
-const PR_ORDER: PRType[] = [
-  'max_weight',
-  'weight_reps',
-  'max_reps',
-  'duration',
-  'distance',
-];
-const ESSENTIAL_STEPS = 3;
+type Tab = 'technique' | 'mistakes' | 'variants';
 
-// Exercise Detail · MoveKit v2 (EXERCISE_01 / 02, handoff §9). Light: the
-// video area bleeds over the studio background; Dark: a light box. Below,
-// name, prescription and best mark, muscles, essential technique (with the
-// full one and common mistakes collapsed) and the fixed "Agregar a rutina".
+// The video takes ~55 % of the screen; the eyebrow and the title sit over
+// its faded bottom (OVERLAP), the controls float just above them.
+const HERO_SHARE = 0.55;
+const OVERLAP = 128;
+const TITLE_SIZE = 44;
+
+// Exercise Detail · sport redesign. Full-bleed MoveKit video fading into the
+// screen, Ember eyebrow and Anton title over it, quick facts (level,
+// equipment), muscle chips, the user's history, Técnica · Errores ·
+// Variantes tabs and the fixed "Agregar a rutina".
 export function ExerciseDetailScreen({ navigation, route }: Props) {
-  const { colors, layout, mode } = useThemeV2();
+  const { colors, display, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const locale = useCatalogLocale();
+  const copy = exerciseDetailCopy(locale);
   const favorites = useFavoriteExercises();
   const exerciseId = route.params.exerciseId;
   // get_exercise (kept on the phone per catalog version). The poster and the
   // video are signed only here.
   const exercisesQuery = useExercise(exerciseId);
   const recordsQuery = usePersonalRecords(exerciseId);
+  const historyQuery = useExerciseHistory(exerciseId);
+  const variantsQuery = useQuery({
+    queryKey: ['exercise-variants', exerciseId, locale],
+    enabled: Boolean(exerciseId),
+    staleTime: 5 * 60 * 1000,
+    queryFn: () => routinesService.listExerciseVariants({ exerciseId, locale }),
+  });
   const [fullscreen, setFullscreen] = useState(Boolean(route.params.fullscreen));
-  const [techOpen, setTechOpen] = useState(false);
-  const [errOpen, setErrOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>('technique');
+  const [allSteps, setAllSteps] = useState(false);
 
   useEffect(() => {
     if (route.params.fullscreen !== undefined) {
@@ -76,31 +91,24 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
   // The video keeps its first URL while the screen is open (no reload).
   const videoUrl = useLatchedMediaUrl(exercise?.videoKey);
 
-  const bestMark = useMemo(() => {
-    const records = recordsQuery.records ?? [];
-    for (const type of PR_ORDER) {
-      const best = getBestPR(records, type);
-      if (best) {
-        // "60 kg" — the reps of a weight × reps mark are left for Récords.
-        return type === 'weight_reps'
-          ? `${best.valueWeight ?? 0} kg`
-          : formatPRValue(best);
-      }
-    }
-    return null;
-  }, [recordsQuery.records]);
+  // Only with the user's own data on this exercise.
+  const history = useMemo(
+    () => historySummary(historyQuery.data ?? [], recordsQuery.records ?? []),
+    [historyQuery.data, recordsQuery.records],
+  );
+  const variants = variantsQuery.data?.items ?? [];
 
+  const heroHeight = Math.round(windowHeight * HERO_SHARE);
   const back = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
-  const lightbox = mode === 'dark';
   const backButton = (
-    <IconButton icon={ArrowLeft} variant="studio" accessibilityLabel="Volver" onPress={back} />
+    <IconButton icon={ArrowLeft} variant="studio" accessibilityLabel={copy.back} onPress={back} />
   );
 
   if (exercisesQuery.error) {
     return (
       <Shell top={insets.top} bg={colors.bg} backButton={backButton}>
         <BlockError
-          message="No pudimos cargar el ejercicio."
+          message={copy.loadError}
           onRetry={() => {
             exercisesQuery.refetch().catch(() => {});
           }}
@@ -112,17 +120,13 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
   if (exercisesQuery.isLoading || !favorites.loaded) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-        <StatusBarV2 style="dark" />
+        <StatusBarV2 />
         <SkeletonGroup>
-          <Skeleton
-            height={lightbox ? 486 : 500}
-            radius={lightbox ? 34 : 0}
-            style={lightbox ? [styles.skeletonBox, { marginTop: insets.top }] : undefined}
-          />
-          <View style={[styles.body, styles.skeletonBody]}>
-            <Skeleton width="80%" height={26} />
-            <Skeleton width="50%" height={14} />
-            <Skeleton width="60%" height={14} />
+          <Skeleton height={heroHeight} radius={0} />
+          <View style={[styles.skeletonBody, { paddingHorizontal: layout.gutter + 4 }]}>
+            <Skeleton width="40%" height={12} />
+            <Skeleton width="85%" height={40} />
+            <Skeleton width="60%" height={40} />
           </View>
         </SkeletonGroup>
       </View>
@@ -132,56 +136,51 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
   if (!exercise) {
     return (
       <Shell top={insets.top} bg={colors.bg} backButton={backButton}>
-        <TextV2 variant="section">Ejercicio no encontrado</TextV2>
+        <TextV2 variant="section">{copy.notFound}</TextV2>
         <TextV2 variant="body" color={colors.text.secondary}>
-          No está en la biblioteca actual.
+          {copy.notInLibrary}
         </TextV2>
       </Shell>
     );
   }
 
   const isFavorite = favorites.isExerciseFavorite(exercise.id);
-  const equipmentLabel =
-    EQUIPMENT.find(item => item.key === exercise.equipment)?.label ??
-    capitalize(exercise.equipment);
-  const meta = [
-    LEVEL_LABELS[exercise.level] ?? capitalize(exercise.level),
-    equipmentLabel,
-    zoneLabel(exercise.bodyPart),
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  // recommended_sets_reps, read with units ("3 × 30 s · por lado", "3 × máx").
-  const scheme = recommendationFor(exercise.recommendedSetsReps, 'hypertrophy');
-  const prescription = formatSetsReps(scheme) || null;
+  const equipment = equipmentText(copy, exercise.equipment);
   const [mainMuscle, ...otherPrimary] = exercise.musclesWorked.primary.map(capitalize);
   const secondaryMuscles = [
     ...otherPrimary,
     ...exercise.musclesWorked.secondary.map(capitalize),
   ];
-  // Essential technique: the coaching cues (short); the full technique is the
-  // step by step. Without cues, the first steps act as the essentials.
-  const essential = (
-    exercise.coachingCues.length > 0 ? exercise.coachingCues : exercise.howToPerform
-  ).slice(0, ESSENTIAL_STEPS);
-  const fullTechnique =
-    exercise.coachingCues.length > 0
-      ? exercise.howToPerform
-      : exercise.howToPerform.slice(ESSENTIAL_STEPS);
+  const eyebrow = [mainMuscle, equipment].filter(Boolean).join(' · ');
+  // Técnica: the step by step (the coaching cues when there are no steps).
+  const steps =
+    exercise.howToPerform.length > 0 ? exercise.howToPerform : exercise.coachingCues;
+  const tabs = [
+    steps.length > 0 ? { key: 'technique' as const, label: copy.technique } : null,
+    exercise.commonMistakes.length > 0 ? { key: 'mistakes' as const, label: copy.mistakes } : null,
+    variants.length > 0 ? { key: 'variants' as const, label: copy.variants } : null,
+  ].filter((item): item is { key: Tab; label: string } => item !== null);
+  // The chosen tab, or the first one left when it has nothing.
+  const shownTab = tabs.find(item => item.key === tab)?.key ?? tabs[0]?.key ?? null;
   const footerHeight = 56 + 12 + Math.max(insets.bottom, 16) + 4;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
-      <StatusBarV2 style={lightbox ? 'light' : 'dark'} />
+      {/* Light over the dark top gradient of the video. */}
+      <StatusBarV2 style="light" />
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: footerHeight + 40 }}
+        contentContainerStyle={{ paddingBottom: footerHeight + 32 }}
       >
         <MoveKitPlayer
           title={exercise.name}
           posterUrl={posterUrl}
           videoUrl={videoUrl}
-          variant={lightbox ? 'lightbox' : 'bleed'}
+          unavailable={!exercise.videoKey}
+          language={locale}
+          height={heroHeight}
+          fadeTo={colors.bg}
+          overlap={OVERLAP}
           fullscreen={fullscreen}
           onFullscreenChange={setFullscreen}
           topInset={insets.top}
@@ -191,7 +190,7 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
               icon={Heart}
               variant="studio"
               filled={isFavorite}
-              accessibilityLabel={isFavorite ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+              accessibilityLabel={isFavorite ? copy.favoriteOn : copy.favoriteOff}
               onPress={() => {
                 favorites.toggleExerciseFavorite(exercise.id).catch(() => {});
               }}
@@ -199,138 +198,159 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
           }
         />
 
-        <View style={[styles.body, { paddingHorizontal: layout.gutter + 4 }]}>
+        <View
+          style={[
+            styles.body,
+            { marginTop: -OVERLAP, paddingHorizontal: layout.gutter + 4 },
+          ]}
+        >
           <View style={styles.head}>
-            <TextV2 variant="title26" style={styles.title}>
+            {eyebrow ? (
+              <TextV2 variant="eyebrow" color={colors.ember.base} numberOfLines={1}>
+                {eyebrow}
+              </TextV2>
+            ) : null}
+            <TextV2
+              accessibilityRole="header"
+              numberOfLines={3}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+              color={colors.text.primary}
+              style={[display.displayS, styles.title]}
+            >
               {exercise.name}
             </TextV2>
-            <TextV2 variant="body" color={colors.text.secondary}>
-              {meta}
-            </TextV2>
-            {prescription || bestMark ? (
-              <View style={styles.figures}>
-                {prescription ? (
-                  <TextV2 variant="bodyStrong">{prescription}</TextV2>
-                ) : null}
-                {prescription && bestMark ? <Dot color={colors.text.disabled} /> : null}
-                {bestMark ? (
-                  <PressableScale
-                    accessibilityRole="button"
-                    accessibilityLabel={`Tu mejor marca: ${bestMark}. Ver récords`}
-                    onPress={() =>
-                      navigation.navigate(APP_ROUTES.PersonalRecords, {
-                        exerciseId: exercise.id,
-                        exerciseName: exercise.name,
-                      })
-                    }
-                    style={styles.best}
-                  >
-                    <TextV2 variant="bodyStrong">{bestMark}</TextV2>
-                    <TextV2 variant="meta" color={colors.text.secondary}>
-                      tu mejor
-                    </TextV2>
-                  </PressableScale>
-                ) : null}
+          </View>
+
+          <View style={styles.facts}>
+            <View style={[styles.fact, { backgroundColor: colors.surface.muted }]}>
+              <TextV2 variant="eyebrow" color={colors.text.secondary}>
+                {copy.level}
+              </TextV2>
+              <View style={styles.factValue}>
+                <EmberBars value={levelBars(exercise.level)} />
+                <TextV2 variant="bodyStrong" numberOfLines={1} style={styles.shrink}>
+                  {levelText(copy, exercise.level)}
+                </TextV2>
               </View>
-            ) : null}
+            </View>
+            <View style={[styles.fact, { backgroundColor: colors.surface.muted }]}>
+              <TextV2 variant="eyebrow" color={colors.text.secondary}>
+                {copy.equipment}
+              </TextV2>
+              <TextV2 variant="bodyStrong" numberOfLines={1}>
+                {equipment}
+              </TextV2>
+            </View>
           </View>
 
           {mainMuscle ? (
             <View style={styles.block}>
-              <Eyebrow>Músculos</Eyebrow>
-              <View style={styles.muscleRow}>
-                <View style={[styles.mainDot, { backgroundColor: colors.ember.base }]} />
-                <TextV2 variant="section" style={styles.flex}>
-                  {mainMuscle}
-                </TextV2>
-              </View>
-              {secondaryMuscles.length > 0 ? (
-                <View style={styles.muscleRow}>
-                  <View
-                    style={[styles.secondaryDot, { backgroundColor: colors.recovery.base }]}
-                  />
-                  <TextV2 variant="body" color={colors.text.bodySoft} style={styles.flex}>
-                    {secondaryMuscles.join(' · ')}
+              <TextV2 variant="eyebrow" color={colors.text.secondary}>
+                {copy.muscles}
+              </TextV2>
+              <View style={styles.chips}>
+                <View style={[styles.chip, { backgroundColor: colors.ember.base }]}>
+                  <TextV2 variant="label" color={colors.ember.onText}>
+                    {mainMuscle}
                   </TextV2>
                 </View>
-              ) : null}
+                {secondaryMuscles.map(muscle => (
+                  <View
+                    key={muscle}
+                    style={[styles.chip, { backgroundColor: colors.surface.muted }]}
+                  >
+                    <TextV2 variant="label">{muscle}</TextV2>
+                  </View>
+                ))}
+              </View>
             </View>
           ) : null}
 
-          {essential.length > 0 ? (
-            <View style={styles.technique}>
-              <Eyebrow>Técnica</Eyebrow>
-              {essential.map((step, index) => (
-                <View key={`${index}-${step}`} style={styles.step}>
-                  <TextV2
-                    variant="bodyStrong"
-                    color={colors.text.tertiary}
-                    style={styles.stepNumber}
-                  >
-                    {index + 1}
-                  </TextV2>
-                  <TextV2 variant="voice" style={styles.flex}>
-                    {step}
-                  </TextV2>
-                </View>
-              ))}
-              {techOpen ? (
-                <View style={styles.more}>
-                  {fullTechnique.map((step, index) => (
-                    <TextV2
+          {history ? (
+            <View style={styles.block}>
+              <TextV2 variant="eyebrow" color={colors.text.secondary}>
+                {copy.history}
+              </TextV2>
+              <HistoryCard
+                history={history}
+                copy={copy}
+                onRecords={() =>
+                  navigation.navigate(APP_ROUTES.PersonalRecords, {
+                    exerciseId: exercise.id,
+                    exerciseName: exercise.name,
+                  })
+                }
+              />
+            </View>
+          ) : null}
+
+          {shownTab ? (
+            <View style={styles.tabs}>
+              {tabs.length > 1 ? (
+                <Segmented options={tabs} value={shownTab} onChange={setTab} />
+              ) : null}
+
+              {shownTab === 'technique' ? (
+                <View>
+                  {(allSteps ? steps : steps.slice(0, VISIBLE_STEPS)).map((step, index) => (
+                    <StepRow
                       key={`${index}-${step}`}
-                      variant="body"
-                      color={colors.text.secondary}
+                      index={index}
+                      text={step}
+                      divider={index > 0}
+                    />
+                  ))}
+                  {steps.length > VISIBLE_STEPS ? (
+                    <PressableScale
+                      accessibilityRole="button"
+                      accessibilityState={{ expanded: allSteps }}
+                      onPress={() => setAllSteps(open => !open)}
+                      style={[styles.toggle, { borderTopColor: colors.divider }]}
                     >
-                      {step}
-                    </TextV2>
+                      <TextV2 variant="bodyStrong">
+                        {allSteps ? copy.fewerSteps : copy.allSteps(steps.length)}
+                      </TextV2>
+                      <ChevronDown
+                        size={16}
+                        color={colors.text.primary}
+                        strokeWidth={2}
+                        style={allSteps ? styles.flip : undefined}
+                      />
+                    </PressableScale>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {shownTab === 'mistakes' ? (
+                <View style={styles.cards}>
+                  {exercise.commonMistakes.map(mistake => (
+                    <MistakeCard key={mistake} text={mistake} />
                   ))}
                 </View>
               ) : null}
-              {fullTechnique.length > 0 ? (
-                <PressableScale
-                  accessibilityRole="button"
-                  accessibilityState={{ expanded: techOpen }}
-                  onPress={() => setTechOpen(open => !open)}
-                  style={styles.toggle}
-                >
-                  <TextV2 variant="bodyStrong">
-                    {techOpen ? 'Menos detalle' : 'Ver técnica completa'}
-                  </TextV2>
-                  <ChevronDown
-                    size={15}
-                    color={colors.text.primary}
-                    strokeWidth={2}
-                    style={techOpen ? styles.flip : undefined}
-                  />
-                </PressableScale>
-              ) : null}
-            </View>
-          ) : null}
 
-          {exercise.commonMistakes.length > 0 ? (
-            <View style={styles.mistakes}>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityState={{ expanded: errOpen }}
-                onPress={() => setErrOpen(open => !open)}
-                style={styles.mistakesHead}
-              >
-                <TextV2 variant="cta">Errores comunes</TextV2>
-                <ChevronRight
-                  size={17}
-                  color={colors.text.primary}
-                  strokeWidth={2}
-                  style={[styles.dim, errOpen ? styles.rotate : null]}
-                />
-              </PressableScale>
-              {errOpen
-                ? exercise.commonMistakes.map(mistake => (
-                    <TextV2 key={mistake} variant="bodyStrong">
-                      {mistake}
-                    </TextV2>
-                  ))
-                : null}
+              {shownTab === 'variants' ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginHorizontal: -(layout.gutter + 4) }}
+                  contentContainerStyle={[
+                    styles.carousel,
+                    { paddingHorizontal: layout.gutter + 4 },
+                  ]}
+                >
+                  {variants.map(variant => (
+                    <VariantCard
+                      key={variant.id}
+                      variant={variant}
+                      onPress={() =>
+                        navigation.push(APP_ROUTES.ExerciseDetail, { exerciseId: variant.id })
+                      }
+                    />
+                  ))}
+                </ScrollView>
+              ) : null}
             </View>
           ) : null}
         </View>
@@ -347,7 +367,7 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
         ]}
       >
         <Button
-          label="Agregar a rutina"
+          label={copy.addToRoutine}
           icon={Plus}
           iconPosition="start"
           onPress={() =>
@@ -362,11 +382,144 @@ export function ExerciseDetailScreen({ navigation, route }: Props) {
   );
 }
 
-function Dot({ color }: { color: string }) {
+// Level: 3 bars of 4 pt, Ember up to the level.
+function EmberBars({ value }: { value: number }) {
+  const { colors } = useThemeV2();
   return (
-    <TextV2 variant="body" color={color}>
-      ·
-    </TextV2>
+    <View style={styles.bars} accessibilityElementsHidden>
+      {[1, 2, 3].map(index => (
+        <View
+          key={index}
+          style={[
+            styles.bar,
+            { backgroundColor: index <= value ? colors.ember.base : colors.outline.strong },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+// veces · última vez · récord (the record opens Récords).
+function HistoryCard({
+  history,
+  copy,
+  onRecords,
+}: {
+  history: ExerciseHistorySummary;
+  copy: ExerciseDetailCopy;
+  onRecords: () => void;
+}) {
+  const { colors } = useThemeV2();
+  const columns = [
+    { value: String(history.times), label: copy.times },
+    { value: history.last ?? '—', label: copy.lastTime },
+    { value: history.record ?? '—', label: copy.record },
+  ];
+  return (
+    <View style={[styles.history, { backgroundColor: colors.surface.muted }]}>
+      {columns.map((column, index) => {
+        const content = (
+          <>
+            <TextV2
+              color={colors.text.primary}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={styles.historyValue}
+            >
+              {column.value}
+            </TextV2>
+            <TextV2 variant="caption" color={colors.text.secondary}>
+              {column.label}
+            </TextV2>
+          </>
+        );
+        const style = [
+          styles.historyColumn,
+          index > 0 ? { borderLeftWidth: 1, borderLeftColor: colors.divider } : null,
+        ];
+        return index === 2 && history.record ? (
+          <PressableScale
+            key={column.label}
+            accessibilityRole="button"
+            accessibilityLabel={copy.seeRecords(history.record)}
+            onPress={onRecords}
+            style={style}
+          >
+            {content}
+          </PressableScale>
+        ) : (
+          <View key={column.label} style={style}>
+            {content}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// Numbered step: Ember circle; a short title in bold, then the sentence.
+function StepRow({ index, text, divider }: { index: number; text: string; divider: boolean }) {
+  const { colors } = useThemeV2();
+  const { title, body } = splitShortTitle(text);
+  return (
+    <View
+      style={[
+        styles.step,
+        divider ? { borderTopWidth: 1, borderTopColor: colors.divider } : null,
+      ]}
+    >
+      <View style={[styles.stepNumber, { borderColor: colors.ember.base }]}>
+        <TextV2 variant="metaStrong" color={colors.ember.base}>
+          {index + 1}
+        </TextV2>
+      </View>
+      <TextV2 variant="body" style={styles.flex}>
+        {title ? <TextV2 variant="bodyStrong">{`${title}. `}</TextV2> : null}
+        {body}
+      </TextV2>
+    </View>
+  );
+}
+
+// ✕ in soft red; short title in bold over the sentence.
+function MistakeCard({ text }: { text: string }) {
+  const { colors } = useThemeV2();
+  const { title, body } = splitShortTitle(text);
+  return (
+    <View style={[styles.mistake, { backgroundColor: colors.surface.muted }]}>
+      <View style={styles.mistakeIcon}>
+        <X size={14} color={MISTAKE_RED} strokeWidth={2.4} />
+      </View>
+      <View style={[styles.flex, styles.mistakeText]}>
+        {title ? <TextV2 variant="bodyStrong">{title}</TextV2> : null}
+        <TextV2 variant="body" color={title ? colors.text.secondary : colors.text.primary}>
+          {body}
+        </TextV2>
+      </View>
+    </View>
+  );
+}
+
+const MISTAKE_RED = '#E5484D';
+
+function VariantCard({ variant, onPress }: { variant: ExerciseVariant; onPress: () => void }) {
+  const { colors } = useThemeV2();
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      accessibilityLabel={variant.name}
+      onPress={onPress}
+      style={[styles.variant, { backgroundColor: colors.surface.muted }]}
+    >
+      <AppImage
+        source={{ mediaKey: variant.thumbKey, fallback: MEDIA_PLACEHOLDER_THUMB }}
+        style={styles.variantThumb}
+      />
+      <TextV2 variant="label" numberOfLines={2} style={styles.variantName}>
+        {variant.name}
+      </TextV2>
+    </PressableScale>
   );
 }
 
@@ -394,80 +547,102 @@ function Shell({
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   flex: { flex: 1 },
+  shrink: { flexShrink: 1 },
   shell: {
     paddingHorizontal: 20,
     gap: 16,
   },
   shellBack: { alignSelf: 'flex-start' },
-  body: {
-    paddingTop: 22,
-    gap: 36,
-  },
-  skeletonBox: { marginHorizontal: 10 },
-  skeletonBody: { paddingHorizontal: 24 },
-  head: { gap: 10 },
+  skeletonBody: { paddingTop: 20, gap: 12 },
+  body: { gap: 28 },
+  head: { gap: 8 },
+  // Anton, caps, up to 3 lines; the box is a bit taller than the font so
+  // capital accents (NATACIÓN) are not cut.
   title: {
-    fontWeight: '700',
-    lineHeight: 30,
+    fontSize: TITLE_SIZE,
+    lineHeight: Math.round(TITLE_SIZE * 1.06),
+    paddingTop: 6,
+    includeFontPadding: false,
   },
-  figures: {
-    marginTop: 4,
+  facts: { flexDirection: 'row', gap: 10 },
+  fact: {
+    flex: 1,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  factValue: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  bars: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  bar: { width: 4, height: 14, borderRadius: 1 },
+  block: { gap: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    height: 38,
+    paddingHorizontal: 16,
+    borderRadius: 19,
+    justifyContent: 'center',
+  },
+  history: {
     flexDirection: 'row',
+    borderRadius: 20,
+    paddingVertical: 16,
+  },
+  historyColumn: {
+    flex: 1,
     alignItems: 'center',
-    gap: 10,
-  },
-  best: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
     gap: 4,
+    paddingHorizontal: 8,
   },
-  block: { gap: 10 },
-  muscleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  mainDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  secondaryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 1,
-  },
-  technique: { gap: 16 },
+  historyValue: { fontSize: 26, lineHeight: 32, fontWeight: '600' },
+  tabs: { gap: 16 },
   step: {
     flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 16,
+    alignItems: 'flex-start',
+    gap: 14,
+    paddingVertical: 16,
   },
   stepNumber: {
-    width: 14,
-    fontWeight: '700',
-  },
-  more: {
-    paddingLeft: 30,
-    gap: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggle: {
-    alignSelf: 'flex-start',
-    paddingLeft: 30,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingTop: 16,
+    borderTopWidth: 1,
   },
   flip: { transform: [{ rotate: '180deg' }] },
-  mistakes: { gap: 14 },
-  mistakesHead: {
+  cards: { gap: 10 },
+  mistake: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 18,
+    padding: 16,
   },
-  dim: { opacity: 0.55 },
-  rotate: { transform: [{ rotate: '90deg' }] },
+  mistakeIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(229,72,77,.14)',
+  },
+  mistakeText: { gap: 4 },
+  carousel: { gap: 10 },
+  variant: {
+    width: 150,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  variantThumb: { width: '100%', height: 96 },
+  variantName: { paddingHorizontal: 12, paddingVertical: 12 },
   footer: {
     position: 'absolute',
     left: 0,

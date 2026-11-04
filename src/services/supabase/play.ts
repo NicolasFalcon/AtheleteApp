@@ -1,6 +1,9 @@
 import { isNetworkError } from '@app/features/session/sessionOutbox';
 import { getSupabaseClient } from '@app/services/supabase/client';
 
+// Question time when start_play_round sends no seconds_per_question.
+export const DEFAULT_SECONDS_PER_QUESTION = 30;
+
 // Athelete Play v2 (contract play-1, docs/backend/PLAY_SHAPES.md): the three
 // RPCs and their parsing. The server computes and validates everything
 // (points, streak, unlocks, levels, goals); the app only shows what comes
@@ -285,7 +288,7 @@ export function parsePlayRound(body: unknown): PlayRound {
     dailyBonusAvailable: bool(data.daily_bonus_available),
     bestScore: num(data.best_score),
     hitsToUnlock: num(data.hits_to_unlock),
-    secondsPerQuestion: int(data.seconds_per_question, 15),
+    secondsPerQuestion: int(data.seconds_per_question, DEFAULT_SECONDS_PER_QUESTION),
     questions,
   };
 }

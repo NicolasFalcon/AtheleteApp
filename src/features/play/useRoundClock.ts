@@ -4,7 +4,7 @@ import { BACKGROUND_LIMIT_MS, QUESTION_MS, secondsLeft } from '@app/features/pla
 
 const STEP_MS = 100;
 
-// Play · ronda: 15 s per question. Restarts when `questionKey` changes and
+// Play · ronda: the question time of the round (seconds_per_question). Restarts when `questionKey` changes and
 // only runs while `running`; time in the background does not count (the
 // clock restarts from where it was). `onSecond` fires once per new whole
 // second and `onExpire` once at 0. Returns the remaining ms and a getter of

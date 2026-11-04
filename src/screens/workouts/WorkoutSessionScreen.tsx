@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, StyleSheet, View, type ImageSourcePropType } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBarV2, TextV2, useToast } from '@app/components/v2';
@@ -44,16 +44,14 @@ import {
   type ThumbFor,
 } from '@app/features/session/v2/SessionViews';
 import {
-  exerciseThumbnail,
-  ZONE_IMAGES,
+  MEDIA_PLACEHOLDER,
+  MEDIA_PLACEHOLDER_THUMB,
 } from '@app/features/workouts/workoutAssets';
-import type { ZoneKey } from '@app/features/workouts/workoutsModel';
 import { useAuth } from '@app/hooks/useAuth';
 import { useExercise } from '@app/hooks/useCatalog';
 import { useRoutine } from '@app/hooks/useRoutines';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
 import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
-import { resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { CompletionResult } from '@app/services/supabase/session';
@@ -214,8 +212,8 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
 
   // Rows and rest cards: the thumb of each exercise (thumb_key of
   // get_routine). The hero card: the poster of the current exercise
-  // (get_exercise, kept on the phone). The muscle image stays as the fallback
-  // for an exercise without media or one that fails to load.
+  // (get_exercise, kept on the phone). The brand placeholder (cover-bg) shows
+  // while it loads, for an exercise without media or one that fails to load.
   const thumbKeys = useMemo(() => {
     const keys: Record<string, string | null | undefined> = {};
     (workout?.exercises ?? []).forEach(exercise => {
@@ -227,39 +225,24 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   }, [workout?.exercises]);
   const thumbFor: ThumbFor = useCallback(
     exercise => {
-      const fallback = exerciseThumbnail(null);
       return {
         source: {
           mediaKey: exercise.exerciseId ? thumbKeys[exercise.exerciseId] : null,
-          fallback,
+          fallback: MEDIA_PLACEHOLDER_THUMB,
         },
-        fallback,
+        fallback: MEDIA_PLACEHOLDER_THUMB,
       };
     },
     [thumbKeys],
   );
   const currentExercise = useExercise(runner.current?.exerciseId ?? null).data;
-  const cardImage = useMemo((): ExerciseImage | null => {
-    const zone = (currentExercise?.bodyPart as ZoneKey | undefined) ?? null;
-    const generic: ImageSourcePropType | null =
-      zone && ZONE_IMAGES[zone]
-        ? ZONE_IMAGES[zone]
-        : workout
-          ? resolveWorkoutThumbnailSource({
-              imageUrl: workout.imageUrl,
-              type: workout.type,
-              targetMuscles: workout.targetMuscles,
-              title: workout.title,
-            })
-          : null;
-    if (!generic) {
-      return null;
-    }
-    return {
-      source: { mediaKey: currentExercise?.posterKey ?? null, fallback: generic },
-      fallback: generic,
-    };
-  }, [currentExercise?.bodyPart, currentExercise?.posterKey, workout]);
+  const cardImage = useMemo(
+    (): ExerciseImage => ({
+      source: { mediaKey: currentExercise?.posterKey ?? null, fallback: MEDIA_PLACEHOLDER },
+      fallback: MEDIA_PLACEHOLDER,
+    }),
+    [currentExercise?.posterKey],
+  );
 
   if (runner.rest) {
     lastRestKind.current = runner.rest.kind;

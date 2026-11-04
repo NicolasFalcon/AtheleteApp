@@ -116,7 +116,45 @@ export function groupOf(workout: Pick<Workout, 'routineCategory'>): WorkoutType 
     : null;
 }
 
-export const COLLECTION_TILES: RoutineCollection[] = ['favorites', 'mine', 'all'];
+// Entrenos · Por tipo (v2.19 §29.1): library categories (list_routine_categories)
+// in two rows, in this order. Keys are the slug without separators, so
+// "full_body" and "fullbody" are the same card. Unknown slugs go at the end
+// of Por formato; "Mis rutinas" is the user's collection, not a category.
+export const LIBRARY_CATEGORY_GROUPS = {
+  goal: ['fuerza', 'hipertrofia', 'funcional', 'fullbody'],
+  format: ['cardio', 'hiit', 'calistenia', 'core', 'movilidad', 'viejaescuela', 'encasa'],
+} as const;
+
+export type LibraryCategoryGroup = keyof typeof LIBRARY_CATEGORY_GROUPS;
+
+// Server slugs spelled in English for the same card.
+const LIBRARY_CATEGORY_ALIASES: Record<string, string> = {
+  oldschool: 'viejaescuela',
+};
+
+export function libraryCategoryKey(slug: string): string {
+  const key = slug.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return LIBRARY_CATEGORY_ALIASES[key] ?? key;
+}
+
+// Cards per row; categories with 0 routines are not shown (§29.5).
+export function groupLibraryCategories<T extends { slug: string; routineCount: number }>(
+  categories: T[],
+): Record<LibraryCategoryGroup, T[]> {
+  const order = (group: readonly string[], item: T) =>
+    group.indexOf(libraryCategoryKey(item.slug));
+  const visible = categories.filter(item => item.routineCount > 0);
+  const goal = visible
+    .filter(item => order(LIBRARY_CATEGORY_GROUPS.goal, item) >= 0)
+    .sort((a, b) => order(LIBRARY_CATEGORY_GROUPS.goal, a) - order(LIBRARY_CATEGORY_GROUPS.goal, b));
+  const known = visible
+    .filter(item => order(LIBRARY_CATEGORY_GROUPS.format, item) >= 0)
+    .sort((a, b) => order(LIBRARY_CATEGORY_GROUPS.format, a) - order(LIBRARY_CATEGORY_GROUPS.format, b));
+  const unknown = visible.filter(
+    item => !goal.includes(item) && !known.includes(item),
+  );
+  return { goal, format: [...known, ...unknown] };
+}
 
 export const COLLECTION_LABELS: Record<RoutineCollection, string> = {
   favorites: 'Favoritas',

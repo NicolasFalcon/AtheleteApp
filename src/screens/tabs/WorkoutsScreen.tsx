@@ -39,7 +39,7 @@ type Segment = 'routines' | 'exercises';
 export function WorkoutsScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   const routinesQuery = useRoutineList('all', { exhaust: true });
   const categoriesQuery = useRoutineCategories();
   const suggestionQuery = useTodaySuggestion();
@@ -129,7 +129,6 @@ export function WorkoutsScreen({ navigation, route }: Props) {
           <RoutinesView
             workouts={workouts}
             categories={categoriesQuery.data ?? []}
-            imageToken={session?.access_token}
             suggestion={suggestionQuery.data?.suggestion ?? null}
             loading={routinesQuery.isLoading || categoriesQuery.isLoading || !favorites.loaded}
             error={Boolean(routinesQuery.error || categoriesQuery.error)}
@@ -148,6 +147,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
             onOpenCollection={collection =>
               navigation.navigate(APP_ROUTES.RoutineList, { collection })
             }
+            onCreateRoutine={() => navigation.navigate(APP_ROUTES.CreateRoutine)}
             onSearch={() =>
               navigation.navigate(APP_ROUTES.RoutineList, {
                 collection: 'all',

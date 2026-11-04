@@ -16,6 +16,9 @@ export type PushTarget =
   // The notification points to a comment: its post is read from the row of
   // the notification (social_notifications.post_id).
   | { kind: 'comment'; notificationId: string }
+  // A new follower without the user in the payload: the follower is the
+  // actor of the notification row.
+  | { kind: 'follower'; notificationId: string }
   | { kind: 'inbox' };
 
 const str = (value: unknown): string | null => (typeof value === 'string' && value.length > 0 ? value : null);
@@ -63,6 +66,13 @@ export function targetForPush(data: PushData): PushTarget {
       }
       return entityType === 'comment' && data.notificationId
         ? { kind: 'comment', notificationId: data.notificationId }
+        : { kind: 'inbox' };
+    case 'new_follower':
+      if (entityId && (entityType === 'user' || entityType === null)) {
+        return { kind: 'profile', userId: entityId };
+      }
+      return data.notificationId
+        ? { kind: 'follower', notificationId: data.notificationId }
         : { kind: 'inbox' };
     case 'content_removed':
       return { kind: 'inbox' };

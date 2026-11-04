@@ -15,6 +15,8 @@ export type SocialNotificationRow = Tables<'social_notifications'>;
 export const NOTIFICATION_TYPES = [
   'friend_request',
   'friend_accepted',
+  // Comunidad abierta: someone started following me.
+  'new_follower',
   'post_like',
   'post_comment',
   'challenge_invite',
@@ -116,6 +118,8 @@ function textFor(
       return `${who} quiere ser tu amigo`;
     case 'friend_accepted':
       return `${who} ya es tu amigo`;
+    case 'new_follower':
+      return `${who} empezó a seguirte`;
     case 'post_like':
       return `${who} ${many ? 'dieron' : 'dio'} me gusta a tu publicación`;
     case 'post_comment':
@@ -143,6 +147,8 @@ export function destinationOf(item: SocialNotification): NotificationDestination
       return { kind: 'friends' };
     case 'friend_accepted':
       return item.actor_id ? { kind: 'profile', userId: item.actor_id } : { kind: 'friends' };
+    case 'new_follower':
+      return item.actor_id ? { kind: 'profile', userId: item.actor_id } : { kind: 'none' };
     case 'post_like':
     case 'post_comment':
       return item.post_id ? { kind: 'post', postId: item.post_id } : { kind: 'none' };

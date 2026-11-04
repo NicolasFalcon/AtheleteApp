@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Image,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { RoutineCoverOverlay } from '@app/components/v2/RoutineCover';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { SceneScope } from '@app/providers/ThemeProvider';
 
@@ -34,6 +35,12 @@ export type WorkoutHeroProps = {
   dim?: boolean;
   // Drawn over the shades (the routine cover's line and word, §28.16).
   overlay?: ReactNode;
+  // Wide routine cover (§28.16): the line and this word in the free band
+  // between the top and the hero's own texts (null: the line only).
+  // `image` is then the cover background.
+  coverWord?: string | null;
+  // Where the band starts (below the buttons pinned at the top).
+  coverTop?: number;
   onImageError?: () => void;
   style?: StyleProp<ViewStyle>;
 };
@@ -54,14 +61,22 @@ export function WorkoutHero({
   bottomInset = 22,
   dim = true,
   overlay,
+  coverWord,
+  coverTop = 30,
   onImageError,
   style,
 }: WorkoutHeroProps) {
   const detail = variant === 'detail';
+  const cover = coverWord !== undefined;
+  const [width, setWidth] = useState(0);
+  const [textsTop, setTextsTop] = useState<number | null>(null);
 
   return (
     <SceneScope>
-      <View style={[styles.hero, { height }, style]}>
+      <View
+        style={[styles.hero, { height }, style]}
+        onLayout={cover ? event => setWidth(event.nativeEvent.layout.width) : undefined}
+      >
         <View style={StyleSheet.absoluteFill}>
           <Image
             source={image}
@@ -104,11 +119,22 @@ export function WorkoutHero({
           style={StyleSheet.absoluteFill}
         />
         {overlay}
+        {cover && textsTop !== null ? (
+          <RoutineCoverOverlay
+            format="wide"
+            width={width}
+            word={coverWord ?? null}
+            band={{ top: coverTop, bottom: textsTop - 16 }}
+          />
+        ) : null}
         {top ? (
           <View style={[styles.top, { top: topOffset }]}>{top}</View>
         ) : null}
         <View
           style={[styles.bottom, { bottom: bottomInset, gap: detail ? 14 : 8 }]}
+          onLayout={
+            cover ? event => setTextsTop(event.nativeEvent.layout.y) : undefined
+          }
         >
           <TextV2 variant="eyebrow" color="#A8A6A1">
             {eyebrow}

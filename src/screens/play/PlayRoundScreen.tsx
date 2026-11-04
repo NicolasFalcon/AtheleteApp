@@ -24,6 +24,7 @@ import {
   isAnswered,
   lastAnswer,
   nextQuestion,
+  questionDurationMs,
   roundPoints,
   streakGlow,
   timeOutQuestion,
@@ -51,23 +52,23 @@ type Props = AppScreenProps<'PlayRound'>;
 const ROUND_SOUNDS = ['play-correct', 'play-combo', 'play-wrong', 'play-tick', 'play-timeup'] as const;
 
 type RoundAction =
-  | { type: 'answer'; question: PlayQuestion; choice: number; elapsedMs: number }
-  | { type: 'timeout'; question: PlayQuestion }
+  | { type: 'answer'; question: PlayQuestion; choice: number; elapsedMs: number; durationMs: number }
+  | { type: 'timeout'; question: PlayQuestion; durationMs: number }
   | { type: 'next' };
 
 function roundReducer(state: RoundState, action: RoundAction): RoundState {
   switch (action.type) {
     case 'answer':
-      return answerQuestion(state, action.question, action.choice, action.elapsedMs);
+      return answerQuestion(state, action.question, action.choice, action.elapsedMs, action.durationMs);
     case 'timeout':
-      return timeOutQuestion(state, action.question);
+      return timeOutQuestion(state, action.question, action.durationMs);
     default:
       return nextQuestion(state);
   }
 }
 
 // Play · ronda (§28.6.1): the questions served by start_play_round, one at a
-// time, answered with a single touch within 15 s. The feedback is local
+// time, answered with a single touch within the round's seconds_per_question. The feedback is local
 // (correct_index, the streak chip and its multiplier); points, record and
 // unlocks come later from the server. Closing abandons the round without a
 // question or a call; more than 120 s in the background drops it. Without
@@ -80,7 +81,8 @@ export function PlayRoundScreen({ navigation, route }: Props) {
   const homeQuery = usePlayHome();
   const routeTitle = routeTitleOf(homeQuery.data)(round.route);
   const [state, dispatch] = useReducer(roundReducer, INITIAL_ROUND);
-  const durationMs = Math.max(5, round.secondsPerQuestion) * 1000;
+  // Always the server's time per question (start_play_round).
+  const durationMs = questionDurationMs(round.secondsPerQuestion);
 
   const total = round.questions.length;
   const question = round.questions[state.index];
@@ -112,7 +114,7 @@ export function PlayRoundScreen({ navigation, route }: Props) {
     onSecond: seconds => playCue(playTickCue(seconds)),
     onExpire: () => {
       if (question) {
-        dispatch({ type: 'timeout', question });
+        dispatch({ type: 'timeout', question, durationMs });
       }
     },
   });
@@ -138,7 +140,7 @@ export function PlayRoundScreen({ navigation, route }: Props) {
         hitsToUnlock: round.hitsToUnlock,
         secondsPerQuestion: round.secondsPerQuestion,
       },
-      answers: answersPayload(round.questions, state.answers),
+      answers: answersPayload(round.questions, state.answers, durationMs),
       // Device time when the round ended; the server validates it.
       finishedAt: new Date().toISOString(),
       tz: deviceTimeZone(),
@@ -229,7 +231,7 @@ export function PlayRoundScreen({ navigation, route }: Props) {
                     chosen={state.selected === index}
                     disabled={answered}
                     onPress={() =>
-                      dispatch({ type: 'answer', question, choice: index, elapsedMs: clock.elapsedMs() })
+                      dispatch({ type: 'answer', question, choice: index, elapsedMs: clock.elapsedMs(), durationMs })
                     }
                   />
                 ))}

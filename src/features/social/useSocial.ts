@@ -27,7 +27,11 @@ import {
   mergeNotificationPages,
   NOTIFICATIONS_PAGE_SIZE,
 } from '@app/features/social/notificationModel';
-import type { FeedPost } from '@app/features/social/postTypes';
+import type {
+  CommunityCursor,
+  CommunityFeedKind,
+  FeedPost,
+} from '@app/features/social/postTypes';
 import type { SocialLoadState } from '@app/features/social/socialTypes';
 import type { SocialService } from '@app/services/social/socialService';
 import { getSocialService } from '@app/services/social/socialSource';
@@ -310,6 +314,58 @@ export function usePostPhotoSource(path: string | null): ImageSourcePropType | n
   }, [path]);
 
   return source;
+}
+
+// ── Comunidad abierta · Comunidad / Siguiendo ─────────────────────────────
+export const OPEN_FEED_PAGE_SIZE = 20;
+
+// get_community_feed / get_following_feed, page by page with the server's
+// cursor. Part of the social cache: publishing, following or blocking
+// refreshes it (the service wrapper).
+export function useOpenFeed(kind: CommunityFeedKind) {
+  ensureFocusManager();
+  const { session } = useAuth();
+  const me = session?.user.id ?? 'anon';
+  const query = useInfiniteQuery({
+    queryKey: [SOCIAL_KEY, me, 'openFeed', kind],
+    queryFn: ({ pageParam }) =>
+      getSocialService().getOpenFeed(kind, pageParam, OPEN_FEED_PAGE_SIZE),
+    initialPageParam: null as CommunityCursor | null,
+    getNextPageParam: last => last.nextCursor ?? undefined,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+    retry: 1,
+  });
+  const posts = useMemo(
+    () =>
+      (query.data?.pages ?? []).reduce<FeedPost[]>(
+        (all, page) => mergeFeedPages(all, page.posts),
+        [],
+      ),
+    [query.data],
+  );
+  const status: SocialLoadState =
+    query.data !== undefined ? 'ready' : query.isError ? 'error' : 'loading';
+  const moreStatus: FeedState['moreStatus'] = query.isFetchingNextPage
+    ? 'loading'
+    : query.isFetchNextPageError
+    ? 'error'
+    : 'idle';
+  const { refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage().catch(() => undefined);
+    }
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
+  const refresh = useCallback(() => refetch().then(() => undefined), [refetch]);
+  return {
+    status,
+    posts,
+    hasMore: Boolean(hasNextPage),
+    moreStatus,
+    loadMore,
+    refresh,
+  };
 }
 
 // ── Feed (paginated) ───────────────────────────────────────────────────────

@@ -18,7 +18,7 @@ import {
 } from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { BlockError } from '@app/features/home/v2/BlockError';
-import { exerciseThumbnail } from '@app/features/workouts/workoutAssets';
+import { MEDIA_PLACEHOLDER_THUMB } from '@app/features/workouts/workoutAssets';
 import {
   activeFilterCount,
   equipmentLabel,
@@ -134,7 +134,7 @@ export function ExerciseListScreen({ navigation, route }: Props) {
       levelBars={levelBars(item.level)}
       thumbnail={{
         mediaKey: item.thumbKey,
-        fallback: exerciseThumbnail(item.bodyPart),
+        fallback: MEDIA_PLACEHOLDER_THUMB,
       }}
       favorite={favorites.isExerciseFavorite(item.id)}
       onPress={() =>

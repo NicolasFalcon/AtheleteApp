@@ -116,6 +116,10 @@ export type CreatePostErrorCopy = {
 // Every ok:false of create_post is a failure with its own text (es / en);
 // an unknown one is the generic message. Never "publicado".
 const POST_ERROR_TEXT: Record<CreatePostError, { es: string; en: string }> = {
+  guidelines_required: {
+    es: 'Para publicar en Comunidad acepta antes las normas. Puedes publicar solo para amigos.',
+    en: 'Accept the community guidelines to post publicly. You can post to friends only.',
+  },
   category_not_shared: {
     es: 'Tienes desactivado compartir esto en Privacidad social.',
     en: 'Sharing this is turned off in your social privacy.',

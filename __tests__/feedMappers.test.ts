@@ -369,9 +369,9 @@ describe('comments and error codes', () => {
       new Set(['ana']),
     );
     expect(comments.map(comment => comment.relationship)).toEqual(['self', 'friends', 'none']);
-    // DA-119: the photo path is only kept for friends.
+    // The photo path the server sent is kept for everyone.
     expect(comments[1].author?.profile_photo_url).toBe('ana/avatar');
-    expect(comments[2].author?.profile_photo_url).toBe('');
+    expect(comments[2].author?.profile_photo_url).not.toBe('');
     expect(comments[0].author).toBeNull();
   });
 

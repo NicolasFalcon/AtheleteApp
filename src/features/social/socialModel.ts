@@ -211,10 +211,11 @@ export function mapSendRequestStatus(
 }
 
 // ── Who is shown with a real photo ─────────────────────────────────────────
-// DA-119: only the viewer and their friends see a real profile photo; anyone
-// else gets initials, even when the bucket policy would allow the photo.
+// Comunidad abierta: the real profile photo whenever the server sends one
+// (it sends none when it cannot be seen: a private account, a block…);
+// initials only without a photo, and always for someone I blocked.
 export function canShowRealPhoto(state: RelationshipState): boolean {
-  return state === 'self' || state === 'friends';
+  return state !== 'blocked';
 }
 
 export function initialsOf(name: string): string {

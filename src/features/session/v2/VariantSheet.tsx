@@ -21,6 +21,7 @@ import {
   type SessionVariantReason,
 } from '@app/features/session/variantModel';
 import { routineErrorCopy } from '@app/features/workouts/routineErrors';
+import { MEDIA_PLACEHOLDER_THUMB } from '@app/features/workouts/workoutAssets';
 import { useMediaUrl } from '@app/lib/media/mediaUrls';
 import { signedImageSource } from '@app/lib/media/imageSource';
 import { muscleLabel } from '@app/services/catalog/catalogService';
@@ -67,23 +68,27 @@ function VariantThumb({
   const source = mediaKey && url && failedUrl !== url
     ? signedImageSource(url, mediaKey)
     : null;
+  // No media (or it failed): the brand placeholder with the equipment icon.
+  // Still signing: the placeholder alone, the thumb fades in over it.
+  const signing = Boolean(mediaKey && !url);
 
   return (
     <View style={styles.optionThumb}>
+      <ExpoImage
+        source={source ?? MEDIA_PLACEHOLDER_THUMB}
+        placeholder={MEDIA_PLACEHOLDER_THUMB}
+        placeholderContentFit="cover"
+        recyclingKey={mediaKey ?? undefined}
+        cachePolicy="disk"
+        contentFit="cover"
+        transition={source ? 200 : 0}
+        style={styles.optionThumbImage}
+        onError={() => setFailedUrl(url)}
+      />
       {source ? (
-        <>
-          <ExpoImage
-            source={source}
-            recyclingKey={mediaKey ?? undefined}
-            cachePolicy="disk"
-            contentFit="cover"
-            style={styles.optionThumbImage}
-            onError={() => setFailedUrl(url)}
-          />
-          {/* §28.5: dimmed (brightness .75) to sit in the dark scene. */}
-          <View style={styles.optionThumbShade} pointerEvents="none" />
-        </>
-      ) : (
+        // §28.5: dimmed (brightness .75) to sit in the dark scene.
+        <View style={styles.optionThumbShade} pointerEvents="none" />
+      ) : signing ? null : (
         <Icon size={20} color={C.white} strokeWidth={1.8} />
       )}
     </View>
@@ -333,7 +338,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionThumbImage: { width: '100%', height: '100%' },
+  optionThumbImage: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   optionThumbShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(0,0,0,.25)' },
   rowTexts: { flex: 1, minWidth: 0, gap: 3 },
   nameLine: { flexDirection: 'row', alignItems: 'center', gap: 8 },

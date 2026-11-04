@@ -37,7 +37,11 @@ import {
   TextV2,
   useThemeV2,
 } from '@app/components/v2';
-import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
+import {
+  RoutineCover,
+  useRoutineCoverContext,
+} from '@app/components/v2/RoutineCover';
+import { focusFromTargetGroups, focusWord } from '@app/features/workouts/routineFocus';
 import {
   DONUT_LENGTH,
   DONUT_RADIUS,
@@ -476,8 +480,10 @@ export function RoutineCard({
   onAnother: () => void;
 }) {
   const { colors, shadow } = useThemeV2();
+  const cover = useRoutineCoverContext();
   const { workout, stage } = card;
   const saved = stage === 'saved';
+  const focus = focusFromTargetGroups(workout.targetMuscles);
   return (
     <View
       style={[
@@ -486,29 +492,21 @@ export function RoutineCard({
         { backgroundColor: colors.surface.raised, boxShadow: shadow.subtle },
       ]}
     >
-      <View style={styles.routineHero}>
-        {workout.imageUrl ? (
-          <Image
-            source={{ uri: workout.imageUrl }}
-            resizeMode="cover"
-            style={styles.fill}
-          />
-        ) : (
-          <Image
-            source={HOME_PHOTOS.effort}
-            resizeMode="cover"
-            style={styles.fill}
-          />
-        )}
-        <View style={styles.routineShade} />
-        <View style={styles.routineText}>
-          <TextV2 variant="title22" color="#FFFFFF" numberOfLines={2}>
-            {workout.title}
-          </TextV2>
-          <TextV2 variant="meta" color="rgba(255,255,255,.8)">
-            {`${workout.duration} min · ${workout.exercises.length} ejercicios`}
-          </TextV2>
-        </View>
+      {/* ELLIE's generated image is not shown: the cover (§28.16) with the
+          focus of its muscles, the title and the meta below it. */}
+      <RoutineCover
+        format="card"
+        word={focus ? focusWord(focus, cover.language) : null}
+        focus={focus}
+        gender={cover.gender}
+      />
+      <View style={styles.routineText}>
+        <TextV2 variant="title22" numberOfLines={2}>
+          {workout.title}
+        </TextV2>
+        <TextV2 variant="meta" color={colors.text.secondary}>
+          {`${workout.duration} min · ${workout.exercises.length} ejercicios`}
+        </TextV2>
       </View>
       <View style={styles.routineActions}>
         {saved ? (
@@ -742,15 +740,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   routine: { padding: 0, overflow: 'hidden' },
-  routineHero: {
-    height: 120,
-    backgroundColor: '#141312',
-    justifyContent: 'flex-end',
-  },
-  routineShade: {
-    ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(0,0,0,.38)',
-  },
-  routineText: { padding: 16, gap: 2 },
+  routineText: { paddingHorizontal: 16, paddingTop: 14, gap: 3 },
   routineActions: { padding: 16, gap: 10 },
 });

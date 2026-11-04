@@ -1,6 +1,6 @@
 import { GuideAnchor, useGuide } from '@app/features/guides/GuideAnchor';
 import { useCallback, useState } from 'react';
-import { Linking, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronRight, EyeOff, Lock, Minus, Play, Plus, X } from 'lucide-react-native';
 import {
@@ -12,6 +12,8 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import { RouteThumb } from '@app/features/route/v2/RouteThumb';
+import { openLocationSettings } from '@app/features/route/locationSettings';
+import { getLocationSource } from '@app/features/route/locationSourceFactory';
 import { useLocationAccess } from '@app/features/route/useLocationAccess';
 import { RouteMap } from '@app/features/route/RouteMap';
 import { KIND_LABEL, formatElevation, formatKm } from '@app/features/route/routeFormat';
@@ -61,6 +63,10 @@ function next<T extends { key: string }>(options: T[], key: string): T['key'] {
   return options[(index + 1) % options.length].key;
 }
 
+// Android: "Permitir todo el tiempo" is explained and asked once per app
+// session, when the person starts recording (never on opening Ruta).
+let backgroundExplained = false;
+
 // Salir ahora / Planear ruta (ROUTE_01–04, 13, 22): the map with the start
 // point, the sport, the target configuration and "Comenzar". The location comes
 // from the LocationSource (expo-location): permission pre-screen, denied /
@@ -72,9 +78,8 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
   useRouteDefaults();
   const { sport, mode, config, plan } = session;
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  // Guía de Ruta (25.4): before recording, never during it.
-  useGuide('route', { enabled: mode === 'now' });
   const [otherOpen, setOtherOpen] = useState(false);
+  const [backgroundOpen, setBackgroundOpen] = useState(false);
   const [mapFailed, setMapFailed] = useState(false);
   const [mapKey, setMapKey] = useState(0);
   // Tus rutas: React Query, not asked again on every visit (B-13).
@@ -82,15 +87,43 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
   const savedCount = savedRoutes.data?.length ?? 0;
   // The last known position at once, the search from the moment Ruta opens;
   // "Comenzar" once the accuracy is ≤ 30 m (B-11).
-  const { access, fix, usable, ready, approximate: lastKnownOnly, request } = useLocationAccess();
+  const { access, fix, usable, ready, approximate: lastKnownOnly, unanswered, request } = useLocationAccess();
   const origin = usable ? fix : null;
+  // Guía de Ruta (25.4): before recording, never during it, and only once
+  // "Comenzar" is on screen (not over the permission pre-screen).
+  useGuide('route', { enabled: mode === 'now' && usable });
 
   const start = useCallback(async () => {
     if (!usable || !ready) {
       return;
     }
+    if (!backgroundExplained) {
+      const background = await getLocationSource().getBackgroundAccess().catch(() => null);
+      if (
+        background &&
+        (background.status === 'undetermined' || background.status === 'denied') &&
+        background.canAskAgain
+      ) {
+        backgroundExplained = true;
+        setBackgroundOpen(true);
+        return;
+      }
+    }
     navigation.navigate(APP_ROUTES.RouteActive);
   }, [navigation, ready, usable]);
+
+  // Whatever the answer, the recording starts; without it RouteActive says
+  // to keep the app open.
+  const answerBackground = useCallback(
+    async (ask: boolean) => {
+      setBackgroundOpen(false);
+      if (ask) {
+        await getLocationSource().requestBackgroundAccess().catch(() => null);
+      }
+      navigation.navigate(APP_ROUTES.RouteActive);
+    },
+    [navigation],
+  );
 
   const close = useCallback(() => {
     if (navigation.canGoBack()) {
@@ -101,6 +134,8 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
   const permission = access?.permission ?? null;
   const rationale = permission === 'undetermined';
   const blocked = permission === 'denied' || permission === 'restricted';
+  // Android after a first "No permitir": the system can still ask.
+  const askAgain = permission === 'denied' && access?.canAskAgain === true;
   const approximate = permission === 'granted' && access?.precise === false;
   const searching = access === null || (usable && !ready);
   const accuracyM = fix?.accuracy !== undefined ? Math.round(fix.accuracy) : undefined;
@@ -193,7 +228,23 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
 
         {mode === 'now' ? (
           <View style={styles.body}>
-            {rationale ? (
+            {rationale && unanswered ? (
+              <View style={styles.state}>
+                <TextV2 variant="title22">No pudimos mostrar el aviso de ubicación</TextV2>
+                <TextV2 variant="body" tone="secondary">
+                  Actívala en Ajustes → Athelete → Ubicación («Al usar la app») o vuelve a intentarlo.
+                </TextV2>
+                <Button label="Abrir Ajustes" variant="primary" fullWidth onPress={() => openLocationSettings()} />
+                <Button
+                  label="Intentar de nuevo"
+                  variant="secondary"
+                  fullWidth
+                  onPress={() => {
+                    request().catch(() => {});
+                  }}
+                />
+              </View>
+            ) : rationale ? (
               <View style={styles.state}>
                 <TextV2 variant="title22">Tu ubicación, solo mientras entrenas</TextV2>
                 <TextV2 variant="body" tone="secondary">
@@ -217,17 +268,28 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
                 </TextV2>
                 <TextV2 variant="body" tone="secondary">
                   {permission === 'restricted'
-                    ? 'Los servicios de ubicación están desactivados o restringidos en este iPhone. Actívalos en Ajustes para registrar tu ruta.'
-                    : 'Para registrar tu ruta usamos tu ubicación solo mientras tienes la app abierta. Actívala en Ajustes.'}
+                    ? 'Los servicios de ubicación están desactivados o restringidos en este teléfono. Actívalos en Ajustes para registrar tu ruta.'
+                    : askAgain
+                      ? 'Para registrar tu ruta usamos tu ubicación solo mientras usas la app.'
+                      : 'Para registrar tu ruta usamos tu ubicación solo mientras tienes la app abierta. Actívala en Ajustes.'}
                 </TextV2>
-                <Button
-                  label="Abrir Ajustes"
-                  variant="primary"
-                  fullWidth
-                  onPress={() => {
-                    Linking.openSettings().catch(() => {});
-                  }}
-                />
+                {askAgain ? (
+                  <Button
+                    label="Permitir ubicación"
+                    variant="primary"
+                    fullWidth
+                    onPress={() => {
+                      request().catch(() => {});
+                    }}
+                  />
+                ) : (
+                  <Button
+                    label="Abrir Ajustes"
+                    variant="primary"
+                    fullWidth
+                    onPress={() => openLocationSettings(permission === 'restricted')}
+                  />
+                )}
               </View>
             ) : approximate ? (
               <View style={styles.state}>
@@ -236,14 +298,7 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
                   Ahora Athelete solo ve tu ubicación aproximada y tu recorrido saldría a kilómetros de
                   donde corres. En Ajustes → Athelete → Ubicación, activa «Ubicación precisa».
                 </TextV2>
-                <Button
-                  label="Abrir Ajustes"
-                  variant="primary"
-                  fullWidth
-                  onPress={() => {
-                    Linking.openSettings().catch(() => {});
-                  }}
-                />
+                <Button label="Abrir Ajustes" variant="primary" fullWidth onPress={() => openLocationSettings()} />
               </View>
             ) : (
               <>
@@ -434,6 +489,39 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
         preview={privacyPreview}
       />
       <Sheet
+        open={backgroundOpen}
+        onClose={() => {
+          answerBackground(false).catch(() => {});
+        }}
+        title="Graba con la pantalla apagada"
+        footer={
+          <View style={styles.sheetActions}>
+            <Button
+              label="Ahora no"
+              variant="secondary"
+              style={styles.flex}
+              onPress={() => {
+                answerBackground(false).catch(() => {});
+              }}
+            />
+            <Button
+              label="Continuar"
+              variant="primary"
+              style={styles.flex}
+              onPress={() => {
+                answerBackground(true).catch(() => {});
+              }}
+            />
+          </View>
+        }
+      >
+        <TextV2 variant="body" tone="secondary">
+          Para seguir registrando tu ruta con el teléfono bloqueado, elige «Permitir todo el tiempo» en
+          la ubicación de Athelete. Solo la usamos mientras grabas; verás una notificación todo ese
+          tiempo.
+        </TextV2>
+      </Sheet>
+      <Sheet
         open={otherOpen}
         onClose={() => setOtherOpen(false)}
         title="Otra distancia"
@@ -542,6 +630,7 @@ const styles = StyleSheet.create({
   pillWide: { flex: 0, paddingHorizontal: 18 },
   body: { gap: 14 },
   state: { gap: 12, paddingVertical: 8 },
+  sheetActions: { flex: 1, flexDirection: 'row', gap: 10 },
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   chips: { flexDirection: 'row', gap: 10 },
   pills: { flexDirection: 'row', gap: 8 },

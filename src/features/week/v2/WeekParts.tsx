@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { GuideAnchor } from '@app/features/guides/GuideAnchor';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
@@ -36,9 +37,19 @@ import {
   type WeekDay,
   type WeekRoutine,
 } from '@app/features/week/weekModel';
-import { DEFAULT_WORKOUT_THUMBNAIL, resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
+import { DEFAULT_WORKOUT_THUMBNAIL } from '@app/lib/workoutThumbnails';
+import {
+  RoutineCoverOverlay,
+  routineCoverSource,
+  useRoutineCoverContext,
+} from '@app/components/v2/RoutineCover';
+import { routineFocusWord } from '@app/features/workouts/routineFocus';
+import type { ProfileGender } from '@app/types/auth';
 
 // Tu semana (handoff v2.15 §25.1, WEEK_01–05).
+
+// Bottom of the day tag row of a header (top 16 + tag 26).
+const HEADER_TAGS_BOTTOM = 42;
 
 // Dark headers (photo and rest) are dark in both themes.
 const DARK = {
@@ -51,16 +62,13 @@ const DARK = {
   missed: '#FF8A5C',
 };
 
-export function routineImage(routine: WeekRoutine | null): AppImageSource {
-  if (!routine) {
-    return DEFAULT_WORKOUT_THUMBNAIL;
-  }
-  const local = resolveWorkoutThumbnailSource({
-    type: routine.type,
-    targetMuscles: [],
-    title: routine.title,
-  });
-  return routine.thumbKey ? { mediaKey: routine.thumbKey, fallback: local } : local;
+// Picture of a week routine in the small pickers: its cover background
+// (§28.16; no word at 44 pt). The day header draws the whole cover.
+export function routineImage(
+  routine: WeekRoutine | null,
+  gender: ProfileGender | null = null,
+): AppImageSource {
+  return routineCoverSource(routine?.routineFocus, gender);
 }
 
 export function routineTypeText(routine: WeekRoutine): string {
@@ -440,22 +448,38 @@ function DayHeader({
   onPick: () => void;
 }) {
   const { colors } = useThemeV2();
+  const cover = useRoutineCoverContext();
+  const [width, setWidth] = useState(0);
+  const [textsTop, setTextsTop] = useState<number | null>(null);
   const isToday = day.date === today;
   const label = dayLabel(day.date, today);
 
   if (isWorkDay(day) && day.routine) {
     const routine = day.routine;
+    // The routine's cover (§28.16): the word in the band between the tags
+    // and the texts at the bottom.
     return (
-      <View style={[styles.header, styles.photoBase]}>
+      <View
+        style={[styles.header, styles.photoBase]}
+        onLayout={event => setWidth(event.nativeEvent.layout.width)}
+      >
         <AppImage
-          source={routineImage(routine)}
-          style={[StyleSheet.absoluteFill, regenerating ? styles.photoRegen : styles.photo]}
+          source={routineImage(routine, cover.gender)}
+          style={[StyleSheet.absoluteFill, regenerating ? styles.photoRegen : null]}
         />
         <LinearGradient
           colors={['rgba(20,19,18,.45)', 'rgba(20,19,18,0)', 'rgba(20,19,18,.92)']}
           locations={[0, 0.3, 1]}
           style={StyleSheet.absoluteFill}
         />
+        {!regenerating && textsTop !== null ? (
+          <RoutineCoverOverlay
+            format="wide"
+            width={width}
+            word={routineFocusWord(routine, cover.language)}
+            band={{ top: HEADER_TAGS_BOTTOM + 16, bottom: textsTop - 16 }}
+          />
+        ) : null}
         <View style={styles.headerTop}>
           <DayTag label={label} today={isToday} variant="glass" />
           {day.status === 'done' ? (
@@ -478,7 +502,10 @@ function DayHeader({
             </TextV2>
           </View>
         ) : null}
-        <View style={styles.headerBottom}>
+        <View
+          style={styles.headerBottom}
+          onLayout={event => setTextsTop(event.nativeEvent.layout.y)}
+        >
           <TextV2 variant="eyebrow" color={DARK.eyebrow}>
             {routineTypeText(routine)}
           </TextV2>
@@ -850,7 +877,6 @@ const styles = StyleSheet.create({
   },
   header: { height: 250, overflow: 'hidden' },
   photoBase: { backgroundColor: '#141312' },
-  photo: { opacity: 0.8 },
   photoRegen: { opacity: 0.25 },
   emptyHeader: { borderTopLeftRadius: 28, borderTopRightRadius: 28 },
   headerTop: {

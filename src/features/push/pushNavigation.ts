@@ -5,6 +5,7 @@ export type TargetChecks = {
   postExists: (postId: string) => Promise<boolean>;
   challengeExists: (challengeId: string) => Promise<boolean>;
   postOfNotification: (notificationId: string) => Promise<string | null>;
+  actorOfNotification: (notificationId: string) => Promise<string | null>;
 };
 
 const INBOX: PushTarget = { kind: 'inbox' };
@@ -21,6 +22,10 @@ export async function resolveTarget(target: PushTarget, checks: TargetChecks): P
       case 'comment': {
         const postId = await checks.postOfNotification(target.notificationId);
         return postId && (await checks.postExists(postId)) ? { kind: 'post', postId } : INBOX;
+      }
+      case 'follower': {
+        const userId = await checks.actorOfNotification(target.notificationId);
+        return userId ? { kind: 'profile', userId } : INBOX;
       }
       default:
         return target;

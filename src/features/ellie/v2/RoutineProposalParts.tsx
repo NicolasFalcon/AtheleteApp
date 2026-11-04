@@ -14,7 +14,6 @@ import {
   Repeat,
   SlidersHorizontal,
   Trash2,
-  Utensils,
 } from 'lucide-react-native';
 import {
   AppImage,
@@ -31,7 +30,7 @@ import { RoutineCover } from '@app/components/v2/RoutineCover';
 import { focusWord } from '@app/features/workouts/routineFocus';
 import { useAuth } from '@app/hooks/useAuth';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
-import { MOVEKIT_POSTER } from '@app/features/workouts/workoutAssets';
+import { MEDIA_PLACEHOLDER, MEDIA_PLACEHOLDER_THUMB } from '@app/features/workouts/workoutAssets';
 import { useLatchedMediaUrl } from '@app/lib/media/mediaUrls';
 import { useAppTheme } from '@app/hooks/useAppTheme';
 import {
@@ -53,7 +52,6 @@ import {
 } from '@app/features/ellie/routineProposalModel';
 import type {
   DiscomfortCheckMessage,
-  PlanPlaceholderMessage,
   RoutineProposalMessage,
 } from '@app/features/ellie/chatModel';
 import {
@@ -75,7 +73,7 @@ import {
 // the chat and its detail sheet. Nothing is saved until the user confirms.
 
 // Card surfaces of 28.3: white / #1C1B19, the change mark in Ember tint.
-function useProposalColors() {
+export function useProposalColors() {
   const { colors } = useThemeV2();
   const { isDark } = useAppTheme();
   return {
@@ -92,7 +90,7 @@ function useProposalColors() {
   };
 }
 
-const CARD_SHADOW = '0 1px 2px rgba(0,0,0,.04), 0 14px 34px rgba(18,18,18,.12)';
+export const CARD_SHADOW = '0 1px 2px rgba(0,0,0,.04), 0 14px 34px rgba(18,18,18,.12)';
 
 function ChangeTag({ tag }: { tag: ProposalChangeTag }) {
   const tone = useProposalColors();
@@ -190,7 +188,7 @@ function ExerciseLine({
       ]}
     >
       <AppImage
-        source={{ mediaKey: image, fallback: MOVEKIT_POSTER }}
+        source={{ mediaKey: image, fallback: MEDIA_PLACEHOLDER_THUMB }}
         style={sheet ? styles.sheetThumb : styles.thumb}
       />
       <View style={styles.flex}>
@@ -521,25 +519,6 @@ export function DiscomfortCheckCard({
   );
 }
 
-// Nutrition cards of cards_v2 (E2): only a placeholder for now.
-export function PlanPlaceholderCard({ card }: { card: PlanPlaceholderMessage }) {
-  const { colors } = useThemeV2();
-  const tone = useProposalColors();
-  return (
-    <View
-      style={[styles.card, styles.placeholder, { backgroundColor: tone.card, boxShadow: CARD_SHADOW }]}
-      accessibilityLabel={card.cardType}
-    >
-      <View style={[styles.thumb, styles.iconBox, { backgroundColor: tone.pill }]}>
-        <Utensils size={18} color={colors.text.secondary} strokeWidth={1.8} />
-      </View>
-      <TextV2 variant="label" color={colors.text.secondary} style={styles.flex}>
-        Propuesta de plan · disponible pronto
-      </TextV2>
-    </View>
-  );
-}
-
 // ── Detail sheet ────────────────────────────────────────────────────────────
 function ExerciseVideo({ image, video, name }: { image: string | null; video: string | null; name: string }) {
   const [playing, setPlaying] = useState(false);
@@ -559,7 +538,7 @@ function ExerciseVideo({ image, video, name }: { image: string | null; video: st
       ) : (
         <>
           <AppImage
-            source={{ mediaKey: image, fallback: MOVEKIT_POSTER }}
+            source={{ mediaKey: image, fallback: MEDIA_PLACEHOLDER }}
             style={StyleSheet.absoluteFill}
             accessibilityLabel={`Video de técnica de ${name}`}
           />
@@ -686,7 +665,7 @@ function MainRow({
                   onPress={() => onSwap(variant)}
                   style={styles.variant}
                 >
-                  <AppImage source={{ mediaKey: variant.image, fallback: MOVEKIT_POSTER }} style={styles.thumb} />
+                  <AppImage source={{ mediaKey: variant.image, fallback: MEDIA_PLACEHOLDER_THUMB }} style={styles.thumb} />
                   <TextV2 variant="label" style={styles.flex}>
                     {variant.name}
                   </TextV2>
@@ -703,7 +682,7 @@ function MainRow({
 
 // "CALENTAMIENTO ……… 5 min": eyebrow on the left, its measure on the right,
 // then the white card (radius 20).
-function Block({
+export function Block({
   title,
   trailing,
   children,

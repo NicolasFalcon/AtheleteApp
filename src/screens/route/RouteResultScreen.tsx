@@ -35,7 +35,8 @@ import {
   type RoutePrivacyValue,
 } from '@app/features/route/v2/RoutePrivacySheet';
 import { createPostErrorCopy, publishedToast } from '@app/features/social/postModel';
-import type { CreatePostError } from '@app/features/social/postTypes';
+import type { CreatePostError, PostVisibility } from '@app/features/social/postTypes';
+import { CommunityShareSheet } from '@app/features/social/v2/CommunityShare';
 import { invalidateSocialContent } from '@app/features/social/useSocial';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { RouteServiceError } from '@app/services/route/routeService';
@@ -77,6 +78,7 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
   const activity: RouteActivity | null = edited ?? activityQuery.data ?? null;
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [posting, setPosting] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [pendingPrivacy, setPendingPrivacy] = useState<RoutePrivacyValue | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -130,11 +132,14 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
     navigation.popToTop();
   };
 
-  const post = () => {
+  // From "Compartir en Comunidad": Pública / Solo amigos, with the guidelines
+  // before the first public post (the sheet asks for them).
+  const post = (visibility: PostVisibility): Promise<'guidelines_required' | void> => {
     setPosting(true);
-    service
-      .shareToCommunity(activity.id)
+    return service
+      .shareToCommunity(activity.id, visibility)
       .then(result => {
+        setShareOpen(false);
         routeStore.patch({ posted: true });
         // The feed and the own profile show it; the person lands on the post
         // (created:false = it was already shared: that post is opened).
@@ -142,8 +147,12 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
         toast.show(publishedToast(result.created, language));
         navigation.navigate(APP_ROUTES.SocialPost, { postId: result.postId });
       })
-      .catch(error => {
+      .catch((error): 'guidelines_required' | void => {
         const code = error instanceof RouteServiceError ? error.code : 'unknown';
+        if (code === 'guidelines_required') {
+          return 'guidelines_required';
+        }
+        setShareOpen(false);
         if (code === 'route_private') {
           // "Solo yo": open the privacy of this activity.
           toast.show(createPostErrorCopy('route_private', language).message);
@@ -377,7 +386,7 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
             variant="primary"
             fullWidth
             disabled={session.posted || posting || activity.visibility === 'me' || Boolean(activity.pending)}
-            onPress={post}
+            onPress={() => setShareOpen(true)}
           />
           <View style={styles.footerRow}>
             <Button
@@ -402,6 +411,12 @@ export function RouteResultScreen({ navigation, route }: AppScreenProps<'RouteRe
           />
         ) : null}
       </View>
+      <CommunityShareSheet
+        open={shareOpen && !viewer}
+        busy={posting}
+        onClose={() => setShareOpen(false)}
+        onPublish={post}
+      />
       <RoutePrivacySheet
         open={privacyOpen && !viewer}
         onClose={() => setPrivacyOpen(false)}

@@ -6,6 +6,7 @@ import { Clock, MoreHorizontal, UserCheck } from 'lucide-react-native';
 import {
   BackButton,
   Button,
+  FollowButton,
   IconButton,
   MetricTrio,
   PersonAvatar,
@@ -30,7 +31,17 @@ import {
   profileSections,
   relationActions,
 } from '@app/features/social/socialModel';
-import type { RelationshipState } from '@app/features/social/socialTypes';
+import {
+  isBlockedNow,
+  markBlocked,
+  markUnblocked,
+  useBlockedVersion,
+} from '@app/features/social/communityStore';
+import type { CommunityProfile } from '@app/features/social/postTypes';
+import type {
+  RelationshipState,
+  SocialProfileRow,
+} from '@app/features/social/socialTypes';
 import {
   useSocialResource,
   useSocialService,
@@ -41,6 +52,10 @@ import {
   ProfilePosts,
   RecordsList,
 } from '@app/features/social/v2/ProfileParts';
+import {
+  ContentActions,
+  type ContentTarget,
+} from '@app/features/social/v2/ContentActions';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import {
@@ -54,8 +69,36 @@ type Props = AppScreenProps<'SocialProfile'>;
 const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 const HERO_HEIGHT = 380;
 
-// Real photo of a friend, signed on demand. Never requested for anyone who is
-// not a friend (DA-119).
+// The relationship get_community_profile describes (for someone whose
+// social profile is not visible: no friendship, open community profile).
+function communityRelationship(community: CommunityProfile): RelationshipState {
+  if (community.is_friend) {
+    return 'friends';
+  }
+  return community.friend_request_status === 'sent'
+    ? 'request_sent'
+    : community.friend_request_status === 'received'
+    ? 'request_received'
+    : 'none';
+}
+
+function communityIdentity(community: CommunityProfile): SocialProfileRow {
+  return {
+    id: community.id,
+    username: community.username,
+    name: community.name,
+    avatar_key: community.avatar_key,
+    profile_photo_url: community.profile_photo_url,
+    goal: '',
+    weight: 0,
+  };
+}
+
+const countLabel = (count: number, one: string, many: string) =>
+  `${count} ${count === 1 ? one : many}`;
+
+// Real photo of the person, signed on demand. Never requested for someone I
+// blocked.
 function useFriendPhoto(
   reference: string | null | undefined,
   allowed: boolean,
@@ -92,9 +135,10 @@ function useFriendPhoto(
   return uri;
 }
 
-// Perfil de otro usuario (SOCIAL_06): hero oscuro con nombre, objetivo y
-// acciones según la relación; debajo, solo lo que el servidor devuelve y su
-// dueño comparte. Lo privado se indica en una línea.
+// Perfil de otro usuario (SOCIAL_06): hero oscuro con nombre, objetivo,
+// seguidores / siguiendo (get_community_profile), "Seguir" y, aparte, la
+// amistad (solicitud) según la relación; debajo, solo lo que el servidor
+// devuelve y su dueño comparte. "···": reportar y bloquear.
 export function SocialProfileScreen({ navigation, route }: Props) {
   const { colors, layout, scene } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -102,23 +146,36 @@ export function SocialProfileScreen({ navigation, route }: Props) {
   const service = useSocialService();
   const { userId } = route.params;
   const lookup = useSocialResource('getProfile', s => s.getProfile(userId), [userId]);
+  const communityResource = useSocialResource(
+    'getCommunityProfile',
+    s => s.getCommunityProfile(userId),
+    [userId],
+  );
+  const community = communityResource.data;
+  const [reportTarget, setReportTarget] = useState<ContentTarget | null>(null);
+  useBlockedVersion();
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const data = lookup.data;
-  const profile = data?.profile ?? null;
+  // A community profile without a visible social profile still opens.
+  const profile = data?.profile ?? (community ? communityIdentity(community) : null);
   const detail = data?.detail ?? null;
-  const relationship: RelationshipState = data?.blocked
-    ? 'blocked'
-    : detail?.relationship ?? 'none';
+  const relationship: RelationshipState =
+    data?.blocked || isBlockedNow(userId)
+      ? 'blocked'
+      : detail?.relationship ?? (community ? communityRelationship(community) : 'none');
   const actions = relationActions(relationship, {
     acceptsRequests: data?.acceptsRequests,
   });
   const sections = profileSections(relationship, detail);
-  // My profile or a friend's: every post, page by page (get_user_posts).
-  const canSeePosts = relationship === 'self' || relationship === 'friends';
+  // Every post I can see, page by page (get_user_posts): mine, a friend's,
+  // or the public ones of an open profile.
+  const privateToMe =
+    Boolean(community?.is_private) && relationship !== 'self' && relationship !== 'friends';
+  const canSeePosts = relationship !== 'blocked' && !privateToMe;
   const userPosts = useUserPosts(userId, lookup.status === 'ready' && canSeePosts);
   const name = profile?.name ?? 'Usuario';
   const photo = useFriendPhoto(
@@ -165,6 +222,8 @@ export function SocialProfileScreen({ navigation, route }: Props) {
   const block = () =>
     run(async () => {
       await service.blockUser(userId);
+      // Everything of theirs leaves the feeds at once.
+      markBlocked(userId);
       setConfirmBlock(false);
       show(`Bloqueaste a ${firstName(name)}`);
     });
@@ -181,6 +240,7 @@ export function SocialProfileScreen({ navigation, route }: Props) {
   const unblock = () =>
     run(async () => {
       await service.unblockUser(userId);
+      markUnblocked(userId);
       show(`${firstName(name)} ya no está bloqueado`);
     });
 
@@ -245,10 +305,29 @@ export function SocialProfileScreen({ navigation, route }: Props) {
                       {subtitle}
                     </TextV2>
                   ) : null}
+                  {community && relationship !== 'blocked' ? (
+                    <TextV2 variant="metaStrong" color={scene.onDark.primary}>
+                      {`${countLabel(community.followers_count, 'seguidor', 'seguidores')} · ${community.following_count} siguiendo`}
+                    </TextV2>
+                  ) : null}
                 </View>
                 <View style={styles.heroActions}>
+                  {community && relationship !== 'self' && relationship !== 'blocked' ? (
+                    <FollowButton
+                      userId={userId}
+                      name={firstName(name)}
+                      following={community.is_following}
+                      size="md"
+                    />
+                  ) : null}
                   {actions.canSendRequest ? (
-                    <Button label="Agregar" size="md" loading={busy} onPress={send} />
+                    <Button
+                      label="Agregar amigo"
+                      variant={community ? 'secondary' : 'primary'}
+                      size="md"
+                      loading={busy}
+                      onPress={send}
+                    />
                   ) : null}
                   {actions.requestsClosed ? (
                     <Button
@@ -307,7 +386,7 @@ export function SocialProfileScreen({ navigation, route }: Props) {
         </SceneScope>
 
         <View style={[styles.body, { backgroundColor: colors.bg, paddingHorizontal: layout.gutter }]}>
-          {lookup.status === 'loading' ? (
+          {lookup.status === 'loading' && !profile ? (
             <SkeletonGroup>
               <Skeleton height={48} radius={12} />
               <Skeleton height={20} width="40%" />
@@ -344,6 +423,23 @@ export function SocialProfileScreen({ navigation, route }: Props) {
                 No ve tu actividad ni tú la suya. Puedes desbloquearle cuando quieras.
               </TextV2>
             </View>
+          ) : null}
+
+          {profile && privateToMe && relationship !== 'blocked' ? (
+            <PrivacyLine text="Cuenta privada: sus publicaciones no aparecen en Comunidad." />
+          ) : null}
+
+          {lookup.status === 'ready' && profile && relationship !== 'blocked' && !detail && canSeePosts ? (
+            <ProfilePosts
+              status={userPosts.status}
+              posts={userPosts.posts}
+              hasMore={userPosts.hasMore}
+              loadingMore={userPosts.loadingMore}
+              emptyText={`${firstName(name)} aún no ha publicado nada en Comunidad.`}
+              onOpen={post => navigation.navigate(APP_ROUTES.SocialPost, { postId: post.id })}
+              onMore={userPosts.loadMore}
+              onRetry={userPosts.reload}
+            />
           ) : null}
 
           {lookup.status === 'ready' && profile && relationship !== 'blocked' && detail ? (
@@ -411,6 +507,16 @@ export function SocialProfileScreen({ navigation, route }: Props) {
               }}
             />
           ) : null}
+          {profile && relationship !== 'self' ? (
+            <Button
+              label={`Reportar a ${firstName(name)}`}
+              variant="outline"
+              onPress={() => {
+                setMenuOpen(false);
+                setReportTarget({ kind: 'user', id: userId, mine: false, startAt: 'report' });
+              }}
+            />
+          ) : null}
           {actions.canBlock ? (
             <Button
               label={`Bloquear a ${firstName(name)}`}
@@ -468,9 +574,15 @@ export function SocialProfileScreen({ navigation, route }: Props) {
         }
       >
         <TextV2 variant="body" tone="secondary">
-          {`${firstName(name)} dejará de ser tu amigo y no podrá ver tu perfil ni tu actividad, ni enviarte solicitudes. Tampoco verás nada suyo. No le avisamos. Puedes desbloquearle desde Privacidad social.`}
+          {`${firstName(name)} dejará de ser tu amigo y no podrá ver tu perfil ni tu actividad, ni seguirte o enviarte solicitudes, y dejaréis de seguiros. Tampoco verás nada suyo. No le avisamos. Puedes desbloquearle desde Privacidad social.`}
         </TextV2>
       </Sheet>
+
+      <ContentActions
+        target={reportTarget}
+        onClose={() => setReportTarget(null)}
+        onDone={() => undefined}
+      />
     </View>
   );
 }

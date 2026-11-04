@@ -1,5 +1,10 @@
-import { expoLocationApi, type LocationApi } from '@app/features/route/expoLocationApi';
+import {
+  expoLocationApi,
+  type LocationApi,
+  type PermissionSnapshot,
+} from '@app/features/route/expoLocationApi';
 import type {
+  BackgroundAccess,
   LocationAccess,
   LocationSource,
   LocationSourceEvent,
@@ -13,9 +18,11 @@ import type { RoutePoint } from '@app/features/route/routeTypes';
 export const HEARTBEAT_MS = 4000;
 export const ALIVE_MAX_AGE_MS = 8000;
 
-// LocationSource over expo-location: permission "Al usar la app" only, a
+// LocationSource over expo-location: permission "Al usar la app" (plus
+// "Permitir todo el tiempo" on Android, asked when recording starts), a
 // current fix for the pre-screen and the background updates task while
-// recording (blue indicator on). Stopping the watch stops the updates.
+// recording (blue indicator on iOS, foreground service notification on
+// Android). Stopping the watch stops the updates.
 export class RealLocationSource implements LocationSource {
   constructor(
     private readonly api: LocationApi = expoLocationApi,
@@ -25,20 +32,41 @@ export class RealLocationSource implements LocationSource {
 
   private async read(request: boolean): Promise<LocationAccess> {
     let snapshot = await this.api.getPermissions();
-    if (request && snapshot.status === 'undetermined' && snapshot.canAskAgain) {
+    // Android can ask again after a first "No permitir"; iOS reports
+    // canAskAgain false once it was answered.
+    if (request && snapshot.status !== 'granted' && snapshot.canAskAgain) {
       snapshot = await this.api.requestPermissions();
     }
+    const { precise, canAskAgain } = snapshot;
     if (snapshot.status === 'undetermined') {
-      return { permission: 'undetermined', precise: snapshot.precise };
+      return { permission: 'undetermined', precise, canAskAgain };
     }
     const servicesOn = await this.api.servicesEnabled().catch(() => true);
     if (!servicesOn) {
-      return { permission: 'restricted', precise: snapshot.precise };
+      return { permission: 'restricted', precise, canAskAgain };
     }
     if (snapshot.status === 'denied') {
-      return { permission: 'denied', precise: snapshot.precise };
+      return { permission: 'denied', precise, canAskAgain };
     }
-    return { permission: 'granted', precise: snapshot.precise };
+    return { permission: 'granted', precise, canAskAgain };
+  }
+
+  async getBackgroundAccess(): Promise<BackgroundAccess> {
+    if (!this.api.needsBackgroundPermission) {
+      return { status: 'not_needed' };
+    }
+    return backgroundAccess(await this.api.getBackgroundPermissions());
+  }
+
+  async requestBackgroundAccess(): Promise<BackgroundAccess> {
+    if (!this.api.needsBackgroundPermission) {
+      return { status: 'not_needed' };
+    }
+    const current = await this.api.getBackgroundPermissions();
+    if (current.status === 'granted' || !current.canAskAgain) {
+      return backgroundAccess(current);
+    }
+    return backgroundAccess(await this.api.requestBackgroundPermissions());
   }
 
   getAccess() {
@@ -67,9 +95,12 @@ export class RealLocationSource implements LocationSource {
   ) {
     let stopped = false;
     let revoked = false;
+    // The updates did not start: the screen shows it (Reintentar starts a new
+    // watch), so the heartbeat does not report it again as a revoked permission.
+    let failed = false;
 
     const checkAccess = async () => {
-      if (stopped || revoked) {
+      if (stopped || revoked || failed) {
         return;
       }
       const access = await this.read(false).catch(() => null);
@@ -96,7 +127,19 @@ export class RealLocationSource implements LocationSource {
         }
         return undefined;
       })
-      .catch(() => checkAccess());
+      .catch(async () => {
+        const access = await this.read(false).catch(() => null);
+        if (stopped || revoked) {
+          return;
+        }
+        if (access && (access.permission === 'denied' || access.permission === 'undetermined')) {
+          revoked = true;
+          onEvent({ type: 'permission_revoked' });
+          return;
+        }
+        failed = true;
+        onEvent({ type: 'start_failed', servicesOff: access?.permission === 'restricted' });
+      });
 
     const timer = setInterval(() => {
       checkAccess().catch(() => undefined);
@@ -121,6 +164,13 @@ export class RealLocationSource implements LocationSource {
       this.api.stopUpdates().catch(() => undefined);
     };
   }
+}
+
+function backgroundAccess(snapshot: PermissionSnapshot): BackgroundAccess {
+  if (snapshot.status === 'granted') {
+    return { status: 'granted' };
+  }
+  return { status: snapshot.status, canAskAgain: snapshot.canAskAgain };
 }
 
 // Stops the platform updates whatever the screens are doing (end, discard,

@@ -7,7 +7,11 @@ import {
 } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { Heart } from 'lucide-react-native';
-import { AppImage, type AppImageSource } from '@app/components/v2/AppImage';
+import {
+  AppImage,
+  isMediaImageSource,
+  type AppImageSource,
+} from '@app/components/v2/AppImage';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -139,7 +143,8 @@ export function LevelBars({ value }: { value: number }) {
   );
 }
 
-// Dark tile with an anatomical crop (Exercise Row, picker, routine path).
+// Dark tile with the exercise thumb (Exercise Row, picker, routine path). The
+// badge only sits on the real media, never on the brand placeholder.
 export function DarkThumb({
   source,
   size,
@@ -153,6 +158,12 @@ export function DarkThumb({
   badge?: string;
   ring?: string;
 }) {
+  const mediaKey = isMediaImageSource(source) ? source.mediaKey : null;
+  const [mediaShown, setMediaShown] = useState(false);
+  useEffect(() => {
+    setMediaShown(false);
+  }, [mediaKey]);
+
   return (
     <View
       style={[
@@ -176,9 +187,14 @@ export function DarkThumb({
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#thumbGlow)" />
         </Svg>
-        <AppImage source={source} style={styles.fill} />
+        <AppImage
+          source={source}
+          style={styles.fill}
+          onMediaLoad={() => setMediaShown(true)}
+          onError={() => setMediaShown(false)}
+        />
       </View>
-      {badge ? (
+      {badge && mediaShown ? (
         <View style={styles.badge}>
           <TextV2 variant="micro" color="#D8D6D1" style={styles.badgeText}>
             {badge}

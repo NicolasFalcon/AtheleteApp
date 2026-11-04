@@ -10,15 +10,14 @@ export type PersonAvatarProps = {
   name: string;
   avatarKey?: string | null;
   profilePhotoUrl?: string | null;
-  // Decides whether a real photo may be shown (DA-119).
+  // A blocked person never shows a real photo.
   relationship: RelationshipState;
   size?: number;
   style?: StyleProp<ViewStyle>;
 };
 
-// Avatar of another person. The real profile photo is shown only to the
-// owner and to friends; anyone else gets initials, even when the storage
-// policy would allow the photo (DA-119).
+// Avatar of another person: the real profile photo when there is one (the
+// server sends none when it cannot be seen), else initials.
 export function PersonAvatar({
   name,
   avatarKey,

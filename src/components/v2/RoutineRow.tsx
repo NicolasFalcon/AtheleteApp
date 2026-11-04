@@ -6,6 +6,10 @@ import {
 } from 'react-native';
 import { Heart } from 'lucide-react-native';
 import { AppImage, type AppImageSource } from '@app/components/v2/AppImage';
+import {
+  RoutineCover,
+  type RoutineCoverInfo,
+} from '@app/components/v2/RoutineCover';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
@@ -13,8 +17,11 @@ import { useThemeV2 } from '@app/components/v2/useThemeV2';
 export type RoutineRowProps = {
   title: string;
   meta: string;
-  // The routine thumb ({ mediaKey, fallback }) or a local picture.
-  image: AppImageSource;
+  // The routine's own photo (an official one that keeps it, see
+  // routineKeepsPhoto)…
+  image?: AppImageSource;
+  // …else its cover (§28.16) in the thumbnail format.
+  cover?: RoutineCoverInfo;
   mine?: boolean; // "Tuya": only the user's own routines are marked
   favorite: boolean;
   onPress: () => void;
@@ -29,6 +36,7 @@ export function RoutineRow({
   title,
   meta,
   image,
+  cover,
   mine = false,
   favorite,
   onPress,
@@ -47,11 +55,20 @@ export function RoutineRow({
         style={styles.main}
       >
         <View style={[styles.photo, { backgroundColor: scene.dotRing }]}>
-          <AppImage
-            source={image}
-            style={styles.fill}
-            onError={onImageError}
-          />
+          {image && !cover ? (
+            <AppImage
+              source={image}
+              style={styles.fill}
+              onError={onImageError}
+            />
+          ) : (
+            <RoutineCover
+              format="thumb"
+              word={cover?.word ?? null}
+              focus={cover?.focus}
+              gender={cover?.gender}
+            />
+          )}
         </View>
         <View style={styles.texts}>
           <View style={styles.titleRow}>

@@ -21,6 +21,7 @@ import {
   useSocialResource,
   useSocialService,
 } from '@app/features/social/useSocial';
+import { markUnblocked } from '@app/features/social/communityStore';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -42,6 +43,7 @@ export function SocialBlockedScreen({ navigation }: Props) {
   const unblock = async (id: string, name: string) => {
     try {
       await service.unblockUser(id);
+      markUnblocked(id);
       toast.show(`${firstName(name)} ya no está bloqueado`);
     } catch {
       toast.show('No se pudo desbloquear', { tone: 'error' });

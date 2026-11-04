@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ImagePlus, Users, X } from 'lucide-react-native';
+import { Globe, ImagePlus, Users, X } from 'lucide-react-native';
 import {
   ATTACHMENT_ICONS,
   AttachmentPreview,
@@ -40,10 +40,15 @@ import {
   type PostIssue,
 } from '@app/features/social/postModel';
 import { pickPostPhoto } from '@app/features/social/postPhotoPicker';
+import {
+  CommunityGuidelinesSheet,
+  VisibilityPicker,
+} from '@app/features/social/v2/CommunityShare';
 import type {
   AttachmentKind,
   AttachmentSource,
   PostPhotoDraft,
+  PostVisibility,
 } from '@app/features/social/postTypes';
 import {
   useSocialResource,
@@ -80,8 +85,10 @@ function titleFor(attach: AttachmentKind | undefined, shared: boolean): string {
 
 // Crear publicación (SOCIAL_02) y Compartir entreno / récord (SOCIAL_13):
 // a short text, an optional photo and an Athelete attachment with figures the
-// user cannot edit. Never only text. Before the first publication the Terms
-// are accepted (BT-43, placeholder URL).
+// user cannot edit. Never only text. Visibility: Pública (Comunidad, by
+// default) or Solo amigos. The first public post asks for the community
+// guidelines (accept_community_guidelines); without them only "Solo amigos".
+// Before the first publication the Terms are accepted (BT-43, placeholder URL).
 export function SocialComposeScreen({ navigation, route }: Props) {
   // KeyboardAvoidingView measures itself from its parent, which starts
   // below the TopSafeBar (B-01).
@@ -105,6 +112,8 @@ export function SocialComposeScreen({ navigation, route }: Props) {
   const [photo, setPhoto] = useState<PostPhotoDraft | null>(null);
   const [issues, setIssues] = useState<PostIssue[]>([]);
   const [termsOpen, setTermsOpen] = useState(false);
+  const [visibility, setVisibility] = useState<PostVisibility>('public');
+  const [guidelinesOpen, setGuidelinesOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   // Where a publication with a photo is: the upload comes first.
   const [step, setStep] = useState<'uploading' | 'publishing'>('publishing');
@@ -126,8 +135,6 @@ export function SocialComposeScreen({ navigation, route }: Props) {
 
   const selected: AttachmentSource | null =
     sources.data?.find(item => item.kind === attachment) ?? null;
-  // Only friends for now (Lote 3): there is no public audience.
-  const audience = language === 'en' ? 'Friends' : 'Amigos';
   const remaining = POST_BODY_MAX - text.length;
 
   const pickPhoto = async () => {
@@ -147,7 +154,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
     setIssues(issue ? [issue] : []);
   };
 
-  const publish = async (termsAccepted: boolean) => {
+  const publish = async (termsAccepted: boolean, audience: PostVisibility = visibility) => {
     const result = validatePost({
       body: text,
       attachment,
@@ -175,6 +182,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
         sourceId: selected?.sourceId,
         body: result.body,
         photo,
+        visibility: audience,
         onStep: setStep,
       });
       if (outcome.ok) {
@@ -183,6 +191,13 @@ export function SocialComposeScreen({ navigation, route }: Props) {
         // service wrapper) and the person lands on the post.
         toast.show(publishedToast(outcome.created, language));
         navigation.replace(APP_ROUTES.SocialPost, { postId: outcome.postId });
+        return;
+      }
+      // Public without the guidelines (accepted elsewhere and undone, or not
+      // read yet): ask for them instead of failing.
+      if (outcome.error === 'guidelines_required') {
+        setPublishing(false);
+        setGuidelinesOpen(true);
         return;
       }
       // Any ok:false (post_removed too) is a failure with its text.
@@ -195,12 +210,27 @@ export function SocialComposeScreen({ navigation, route }: Props) {
     setPublishing(false);
   };
 
-  const onPublish = async () => {
+  const onPublish = async (audience: PostVisibility = visibility) => {
     if (publishing) {
       return;
     }
+    // The first public post: the community guidelines first.
+    if (audience === 'public') {
+      const guidelines = await service.getCommunityGuidelinesAccepted().catch(() => false);
+      if (!guidelines) {
+        setGuidelinesOpen(true);
+        return;
+      }
+    }
     const accepted = await service.getTermsAccepted();
-    publish(accepted);
+    publish(accepted, audience);
+  };
+
+  // Without accepting, only friends.
+  const publishToFriends = () => {
+    setGuidelinesOpen(false);
+    setVisibility('friends');
+    onPublish('friends');
   };
 
   const acceptTerms = async () => {
@@ -244,7 +274,7 @@ export function SocialComposeScreen({ navigation, route }: Props) {
             loading={publishing}
             disabled={publishing}
             loadingLabel={step === 'uploading' ? 'Subiendo foto' : 'Publicando'}
-            onPress={onPublish}
+            onPress={() => onPublish()}
           />
         </View>
       </View>
@@ -270,15 +300,16 @@ export function SocialComposeScreen({ navigation, route }: Props) {
           <View style={styles.flex}>
             <View style={styles.nameRow}>
               <TextV2 variant="bodyStrong">{profile?.name?.split(' ')[0] || 'Tú'}</TextV2>
-              <PressableScale
-                accessibilityRole="button"
-                accessibilityLabel={`Audiencia: ${audience}. Cambiar en Privacidad social`}
-                onPress={() => navigation.navigate(APP_ROUTES.SocialPrivacy)}
-                style={[styles.audience, { backgroundColor: colors.surface.muted }]}
-              >
-                <Users size={12} strokeWidth={2} color={colors.text.primary} />
-                <TextV2 variant="captionStrong">{audience}</TextV2>
-              </PressableScale>
+              <View style={[styles.audience, { backgroundColor: colors.surface.muted }]}>
+                {visibility === 'public' ? (
+                  <Globe size={12} strokeWidth={2} color={colors.text.primary} />
+                ) : (
+                  <Users size={12} strokeWidth={2} color={colors.text.primary} />
+                )}
+                <TextV2 variant="captionStrong">
+                  {visibility === 'public' ? 'Pública' : 'Solo amigos'}
+                </TextV2>
+              </View>
             </View>
             <TextInput
               value={text}
@@ -305,6 +336,8 @@ export function SocialComposeScreen({ navigation, route }: Props) {
             ) : null}
           </View>
         </View>
+
+        <VisibilityPicker value={visibility} onChange={setVisibility} />
 
         {photo ? (
           <View style={[styles.photo, { backgroundColor: colors.surface.muted }]}>
@@ -459,6 +492,16 @@ export function SocialComposeScreen({ navigation, route }: Props) {
           </TextV2>
         </View>
       </Sheet>
+
+      <CommunityGuidelinesSheet
+        open={guidelinesOpen}
+        onClose={() => setGuidelinesOpen(false)}
+        onAccepted={() => {
+          setGuidelinesOpen(false);
+          publish(true, 'public');
+        }}
+        onFriendsOnly={publishToFriends}
+      />
     </KeyboardAvoidingView>
   );
 }

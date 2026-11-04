@@ -9,8 +9,6 @@ import {
   GlassSurface,
   IconButton,
   UnderlineTabs,
-  Skeleton,
-  SkeletonGroup,
   StatusBarV2,
   TextV2,
   useThemeV2,
@@ -23,7 +21,6 @@ import { useSocialResource } from '@app/features/social/useSocial';
 import { ChallengesView } from '@app/features/social/v2/ChallengesView';
 import { FeedView } from '@app/features/social/v2/FeedView';
 import { FriendsView } from '@app/features/social/v2/FriendsView';
-import { NoFriendsState } from '@app/features/social/v2/SocialParts';
 import { useAuth } from '@app/hooks/useAuth';
 import type { CommunitySegment, TabScreenProps } from '@app/types/navigation';
 
@@ -213,46 +210,18 @@ export function CommunityScreen({
         ) : null}
 
         {segment === 'feed' ? (
-          overview.status === 'loading' ? (
-            <SkeletonGroup>
-              <View style={styles.feedSkeleton}>
-                <Skeleton width={40} height={40} radius={20} />
-                <Skeleton width="60%" height={14} />
-              </View>
-              <Skeleton height={220} radius={20} />
-            </SkeletonGroup>
-          ) : (
-            // B-26: without friends it is still the feed (publish and see the
-            // own posts); the invitation to add friends sits on top.
-            <FeedView
-              me={meProfile}
-              invite={
-                noFriends ? (
-                  <NoFriendsState
-                    title="Tu feed empieza con un amigo"
-                    body="Puedes publicar ya: tus publicaciones salen aquí y en tu perfil. Cuando tengas amigos, también verás lo suyo."
-                    onSearch={() => setSegment('amigos')}
-                    onInvite={openInvite}
-                    meanwhile={
-                      challenges.data?.official
-                        ? {
-                            title: challenges.data.official.challenge.title,
-                            onPress: () => setSegment('retos'),
-                          }
-                        : null
-                    }
-                  />
-                ) : null
-              }
-              nearEnd={nearEnd}
-              refreshSignal={refreshSignal}
-              onRefreshed={() => setRefreshing(false)}
-              onCompose={() => navigation.navigate(APP_ROUTES.SocialCompose, {})}
-              onOpenPost={postId => navigation.navigate(APP_ROUTES.SocialPost, { postId })}
-              onOpenRoutine={postId => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}
-              onOpenProfile={openProfile}
-            />
-          )
+          // Comunidad abierta: the feed is open with or without friends (it
+          // shows its own loading state).
+          <FeedView
+            me={meProfile}
+            nearEnd={nearEnd}
+            refreshSignal={refreshSignal}
+            onRefreshed={() => setRefreshing(false)}
+            onCompose={() => navigation.navigate(APP_ROUTES.SocialCompose, {})}
+            onOpenPost={postId => navigation.navigate(APP_ROUTES.SocialPost, { postId })}
+            onOpenRoutine={postId => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}
+            onOpenProfile={openProfile}
+          />
         ) : null}
 
         {segment === 'retos' ? (
@@ -289,10 +258,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   titles: { gap: 2, flexShrink: 1 },
-  feedSkeleton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
 });

@@ -9,6 +9,7 @@ import type {
   PlayRoute,
   PlayRouteView,
 } from '@app/services/supabase/play';
+import { DEFAULT_SECONDS_PER_QUESTION } from '@app/services/supabase/play';
 
 // Pure rules of Athelete Play v2 on the app side (§28.6.1). Everything that
 // counts (points, streak, unlocks, levels, goals) comes from the server; the
@@ -19,7 +20,12 @@ import type {
 export const ROUND_SIZE = 10;
 // A round of 8/10 or more opens the next level (server rule, used for texts).
 export const UNLOCK_SCORE = 8;
-export const QUESTION_MS = 15000;
+// Time per question when the server sends none; each round uses the
+// seconds_per_question of start_play_round.
+export const QUESTION_MS = DEFAULT_SECONDS_PER_QUESTION * 1000;
+// elapsed_ms is never sent above this (submit_play_round).
+export const MAX_ELAPSED_MS = 30_000;
+// The last 5 s: tick and Ember glow, whatever the duration.
 export const URGENT_SECONDS = 5;
 // In the background for longer than this, the round is dropped (no call).
 export const BACKGROUND_LIMIT_MS = 120_000;
@@ -50,6 +56,16 @@ export function streakMultiplier(streak: number): 1 | 2 | 3 {
 
 export function secondsLeft(remainingMs: number): number {
   return Math.max(0, Math.ceil(remainingMs / 1000));
+}
+
+// The question time of a round (ms): the server's seconds, never below 5 s.
+export function questionDurationMs(secondsPerQuestion: number): number {
+  return Math.max(5, secondsPerQuestion) * 1000;
+}
+
+// 0 … the question time, and never above MAX_ELAPSED_MS.
+export function clampElapsedMs(elapsedMs: number, durationMs: number): number {
+  return Math.min(durationMs, MAX_ELAPSED_MS, Math.max(0, Math.round(elapsedMs)));
 }
 
 export function isUrgent(remainingMs: number): boolean {
@@ -106,6 +122,7 @@ export function answerQuestion(
   question: PlayQuestion,
   choice: number,
   elapsedMs: number,
+  durationMs: number,
 ): RoundState {
   if (isAnswered(state) || choice < 0 || choice >= question.options.length) {
     return state;
@@ -118,7 +135,7 @@ export function answerQuestion(
     {
       questionId: question.id,
       choice,
-      elapsedMs: Math.min(QUESTION_MS, Math.max(0, Math.round(elapsedMs))),
+      elapsedMs: clampElapsedMs(elapsedMs, durationMs),
       correct,
       points: correct ? 10 * multiplier : 0,
       multiplier,
@@ -128,14 +145,25 @@ export function answerQuestion(
   );
 }
 
-// The 15 s ran out: a miss with no choice; the streak breaks.
-export function timeOutQuestion(state: RoundState, question: PlayQuestion): RoundState {
+// The question time ran out: a miss with no choice; the streak breaks.
+export function timeOutQuestion(
+  state: RoundState,
+  question: PlayQuestion,
+  durationMs: number,
+): RoundState {
   if (isAnswered(state)) {
     return state;
   }
   return record(
     state,
-    { questionId: question.id, choice: null, elapsedMs: QUESTION_MS, correct: false, points: 0, multiplier: 1 },
+    {
+      questionId: question.id,
+      choice: null,
+      elapsedMs: clampElapsedMs(durationMs, durationMs),
+      correct: false,
+      points: 0,
+      multiplier: 1,
+    },
     TIMED_OUT,
     0,
   );
@@ -158,13 +186,17 @@ export function roundPoints(answers: RoundAnswer[]): number {
 }
 
 // What submit_play_round receives: the 10 answers in the order served.
-export function answersPayload(questions: PlayQuestion[], answers: RoundAnswer[]): PlayAnswerPayload[] {
+export function answersPayload(
+  questions: PlayQuestion[],
+  answers: RoundAnswer[],
+  durationMs: number,
+): PlayAnswerPayload[] {
   return questions.map(question => {
     const answer = answers.find(item => item.questionId === question.id);
     return {
       question_id: question.id,
       choice_index: answer ? answer.choice : null,
-      elapsed_ms: answer ? answer.elapsedMs : QUESTION_MS,
+      elapsed_ms: clampElapsedMs(answer ? answer.elapsedMs : durationMs, durationMs),
     };
   });
 }

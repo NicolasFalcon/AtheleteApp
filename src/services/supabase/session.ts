@@ -91,6 +91,43 @@ export async function fetchSessionDetail(
   };
 }
 
+// The user's work sets of one library exercise, newest first (Exercise
+// Detail · Tu historial). Warm-up sets are left out.
+export type ExerciseHistorySet = {
+  sessionId: string;
+  reps: number | null;
+  weightKg: number | null;
+  durationSec: number | null;
+  distanceM: number | null;
+  completedAt: string;
+};
+
+export async function fetchExerciseHistory(
+  userId: string,
+  exerciseId: string,
+): Promise<ExerciseHistorySet[]> {
+  const client = getClient();
+  const { data, error } = await client
+    .from('workout_session_sets')
+    .select('session_id, reps, weight_kg, duration_sec, distance_m, completed_at')
+    .eq('user_id', userId)
+    .eq('exercise_id', exerciseId)
+    .eq('is_warmup', false)
+    .order('completed_at', { ascending: false })
+    .limit(1000);
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(row => ({
+    sessionId: row.session_id,
+    reps: row.reps,
+    weightKg: row.weight_kg,
+    durationSec: row.duration_sec,
+    distanceM: row.distance_m,
+    completedAt: row.completed_at,
+  }));
+}
+
 // Last weight used by the user per library exercise (proposed kg).
 export async function fetchLastWeights(
   userId: string,

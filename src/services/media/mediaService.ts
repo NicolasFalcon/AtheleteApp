@@ -66,6 +66,9 @@ export const signMediaKeys: SignKeys = async keys => {
   if (error) {
     throw error;
   }
-  catalogPerf.answer('exercise-media-url', startedAt, data, `${keys.length} claves`);
-  return parseSignResult(data, Date.now());
+  const result = parseSignResult(data, Date.now());
+  // [perf] (dev only): the keys the server could not sign (no file behind).
+  const missing = result.missing.length > 0 ? ` · missing: ${result.missing.join(', ')}` : '';
+  catalogPerf.answer('exercise-media-url', startedAt, data, `${keys.length} claves${missing}`);
+  return result;
 };

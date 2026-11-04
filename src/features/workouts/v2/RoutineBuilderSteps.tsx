@@ -39,7 +39,7 @@ import type {
   ExerciseMetricMode,
 } from '@app/features/workouts/types';
 import {
-  exerciseThumbnail,
+  MEDIA_PLACEHOLDER_THUMB,
   TYPE_IMAGES,
 } from '@app/features/workouts/workoutAssets';
 import {
@@ -414,7 +414,7 @@ export function PickStep({
               <DarkThumb
                 source={{
                   mediaKey: exercise.thumbKey,
-                  fallback: exerciseThumbnail(exercise.bodyPart),
+                  fallback: MEDIA_PLACEHOLDER_THUMB,
                 }}
                 size={60}
                 radius={16}

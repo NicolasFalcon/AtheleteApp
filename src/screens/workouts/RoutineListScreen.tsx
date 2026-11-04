@@ -27,8 +27,10 @@ import {
   routineScopeFrom,
   routineScopeTitle,
 } from '@app/features/workouts/workoutsModel';
+import { workoutsText } from '@app/features/workouts/workoutsCopy';
 import { useAuth } from '@app/hooks/useAuth';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { useRoutineCategories, useRoutineList } from '@app/hooks/useRoutines';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { Workout } from '@app/shared';
@@ -46,7 +48,7 @@ export function RoutineListScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const favorites = useFavoriteWorkouts();
-  const { imageFor, markBroken } = useRoutineImages();
+  const { coverFor, imageFor, markBroken } = useRoutineImages();
   const [query, setQuery] = useState('');
   const scope = useMemo(() => routineScopeFrom(route.params), [route.params]);
   const category = route.params?.category;
@@ -114,6 +116,7 @@ export function RoutineListScreen({ navigation, route }: Props) {
       title={item.title}
       meta={routineMeta(item)}
       image={imageFor(item)}
+      cover={coverFor(item)}
       onImageError={() => markBroken(item.id)}
       mine={isMyRoutine(item, userId)}
       favorite={favorites.favoriteWorkoutIds.includes(item.id)}
@@ -225,8 +228,10 @@ export function RoutineListScreen({ navigation, route }: Props) {
 }
 
 // STATE_06 · Favoritas without any favourite.
+// STATE_06 (v2.19 §29.5): title and hint, no Ember CTA.
 function EmptyFavorites({ onShowAll }: { onShowAll: () => void }) {
   const { colors } = useThemeV2();
+  const language = useProfileLanguage();
 
   return (
     <View style={styles.favsEmpty}>
@@ -237,7 +242,7 @@ function EmptyFavorites({ onShowAll }: { onShowAll: () => void }) {
       </View>
       <View style={styles.favsTexts}>
         <TextV2 variant="section" align="center">
-          Sin favoritos todavía
+          {workoutsText(language, 'workouts.favorites.empty.title')}
         </TextV2>
         <TextV2
           variant="body"
@@ -245,7 +250,7 @@ function EmptyFavorites({ onShowAll }: { onShowAll: () => void }) {
           align="center"
           style={styles.favsText}
         >
-          Toca el corazón en cualquier rutina y la tendrás siempre aquí.
+          {workoutsText(language, 'workouts.favorites.empty.body')}
         </TextV2>
       </View>
       <Button

@@ -362,7 +362,7 @@ export function WeekEllieScreen({ navigation }: Props) {
                     <TextV2 variant="cta">{String(dayNumber(day.date))}</TextV2>
                   </View>
                   {work && day.routine ? (
-                    <AppImage source={routineImage(day.routine)} style={[styles.previewThumb, { backgroundColor: colors.divider }]} />
+                    <AppImage source={routineImage(day.routine, profile?.gender ?? null)} style={[styles.previewThumb, { backgroundColor: colors.divider }]} />
                   ) : (
                     <View
                       style={[

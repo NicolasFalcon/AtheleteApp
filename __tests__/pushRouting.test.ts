@@ -49,6 +49,7 @@ describe('entity that no longer exists', () => {
     postExists: async () => true,
     challengeExists: async () => true,
     postOfNotification: async () => 'p9',
+    actorOfNotification: async () => 'u9',
     ...overrides,
   });
 

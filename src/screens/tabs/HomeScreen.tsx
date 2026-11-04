@@ -54,6 +54,10 @@ import { levelProgress } from '@app/features/play/playModel';
 import { usePlayHome } from '@app/features/play/usePlay';
 import { WearCard } from '@app/features/wear/WearCard';
 import type { RoutineSuggestion } from '@app/services/routines/routinesService';
+import { useRoutineCoverContext } from '@app/components/v2/RoutineCover';
+import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
+import { routineFocusWord } from '@app/features/workouts/routineFocus';
+import type { ProfileGender } from '@app/types/auth';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
@@ -77,7 +81,10 @@ const CORE33_FIRST_PRIORITY = false;
 
 // get_today_suggestion → the hero routine (null: no candidate today, the
 // empty "Elige tu entreno de hoy").
-function toHeroWorkout(suggestion: RoutineSuggestion | null): HeroWorkout | null {
+function toHeroWorkout(
+  suggestion: RoutineSuggestion | null,
+  cover: { language: EllieLanguage; gender: ProfileGender | null },
+): HeroWorkout | null {
   return suggestion
     ? {
         title: suggestion.title,
@@ -87,6 +94,11 @@ function toHeroWorkout(suggestion: RoutineSuggestion | null): HeroWorkout | null
         }),
         minutes: suggestion.duration,
         reason: suggestion.reason,
+        cover: {
+          word: routineFocusWord(suggestion, cover.language),
+          focus: suggestion.routineFocus ?? null,
+          gender: cover.gender,
+        },
       }
     : null;
 }
@@ -97,6 +109,7 @@ export function HomeScreen({ navigation }: Props) {
   const { colors, layout, radius } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
+  const coverContext = useRoutineCoverContext();
   const homeQuery = useHomeFeed();
   // Guía de Inicio (25.4): 4 steps, once per user.
   const scrollRef = useRef<ScrollView>(null);
@@ -416,7 +429,7 @@ export function HomeScreen({ navigation }: Props) {
                   ),
                 }
               : null,
-            workout: toHeroWorkout(heroWorkoutSource),
+            workout: toHeroWorkout(heroWorkoutSource, coverContext),
             restDay: restDay ? { kind: restDay.kind } : null,
             resume: resumable
               ? {
@@ -428,6 +441,18 @@ export function HomeScreen({ navigation }: Props) {
                   ),
                   minutesLeft: resumeMinutesLeft,
                   inProgress: resumable.status === 'in_progress',
+                  // dayRoutine is the pending session's routine.
+                  cover: {
+                    word:
+                      dayRoutine?.id === resumable.workoutId
+                        ? routineFocusWord(dayRoutine, coverContext.language)
+                        : null,
+                    focus:
+                      dayRoutine?.id === resumable.workoutId
+                        ? dayRoutine.routineFocus ?? null
+                        : null,
+                    gender: coverContext.gender,
+                  },
                 }
               : null,
             done: completedToday

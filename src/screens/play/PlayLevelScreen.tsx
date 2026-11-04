@@ -8,6 +8,7 @@ import {
   findLevel,
   findRoute,
   levelNeedLine,
+  QUESTION_MS,
   ROUTE_TITLES,
 } from '@app/features/play/playModel';
 import { usePlayHome, useStartRound } from '@app/features/play/usePlay';
@@ -116,7 +117,7 @@ export function PlayLevelScreen({ navigation, route }: Props) {
           <View style={styles.rules}>
             <Rule icon={Flame} label="3 seguidos ×2" />
             <Rule icon={Zap} label="5 seguidos ×3" />
-            <Rule icon={Timer} label="15 s" />
+            <Rule icon={Timer} label={`${QUESTION_MS / 1000} s`} />
           </View>
 
           {error ? (

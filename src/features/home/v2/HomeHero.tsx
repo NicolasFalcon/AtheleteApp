@@ -31,6 +31,11 @@ import {
   type HomeSlideKind,
 } from '@app/features/home/homePriority';
 import { HERO_PHOTO } from '@app/features/home/v2/homePhotos';
+import {
+  RoutineCoverOverlay,
+  routineCoverSource,
+  type RoutineCoverInfo,
+} from '@app/components/v2/RoutineCover';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { ProfileIdentity } from '@app/types/profileIdentity';
 import { tightLine } from '@app/theme/v2';
@@ -46,6 +51,8 @@ export type HeroWorkout = {
   calories?: number | null;
   // Why this routine today ("Ayer hiciste tren superior").
   reason?: string | null;
+  // The routine's cover (§28.16) instead of the slide's photo.
+  cover?: RoutineCoverInfo;
 };
 
 export type HomeHeroData = {
@@ -69,6 +76,8 @@ export type HomeHeroData = {
     // Estimated minutes still to go (never 0); null: no estimate.
     minutesLeft: number | null;
     inProgress?: boolean;
+    // The routine's cover (§28.16) instead of the slide's photo.
+    cover?: RoutineCoverInfo;
   } | null;
   // Finished session for `workoutDone`.
   done: { minutes: number; typeLabel: string } | null;
@@ -105,6 +114,9 @@ const SLIDE_PHOTO: Record<HomeSlideKind, HomeMode> = {
   allDone: 'allDone',
   new: 'new',
 };
+
+// Greeting row pinned at the top (48 pt avatar).
+const TOP_BAR_HEIGHT = 48;
 
 // Slide content sits 58 pt from the bottom; with several slides it rises to
 // 100 pt to leave room for the indicator.
@@ -193,26 +205,17 @@ export function HomeHero(props: HomeHeroProps) {
           style={StyleSheet.absoluteFill}
         >
           {pages.map((slide, position) => (
-            <View key={slide?.kind ?? 'state'} style={{ width, height: HERO_HEIGHT }}>
-              {slide ? (
-                <Image
-                  source={HERO_PHOTO[SLIDE_PHOTO[slide.kind]].source}
-                  resizeMode="cover"
-                  style={styles.photo}
-                  accessibilityIgnoresInvertColors
-                />
-              ) : null}
-              <WarmHalo id={`homeHeroHalo${position}`} />
-              <Scrim variant="hero" style={StyleSheet.absoluteFill} />
-              <View
-                style={[
-                  styles.bottom,
-                  { bottom: multi ? CONTENT_BOTTOM_MANY : CONTENT_BOTTOM_ONE },
-                ]}
-              >
-                <HeroContent {...props} slide={slide} />
-              </View>
-            </View>
+            <HeroPage
+              key={slide?.kind ?? 'state'}
+              slide={slide}
+              position={position}
+              width={width}
+              bottom={multi ? CONTENT_BOTTOM_MANY : CONTENT_BOTTOM_ONE}
+              coverTop={insets.top + 8 + TOP_BAR_HEIGHT + 16}
+              cover={slide && !props.error ? slideCover(slide, props.data) : null}
+            >
+              <HeroContent {...props} slide={slide} />
+            </HeroPage>
           ))}
         </ScrollView>
         <HeroTop {...props} top={insets.top + 8} />
@@ -221,6 +224,80 @@ export function HomeHero(props: HomeHeroProps) {
         ) : null}
       </HeroFrame>
     </SceneScope>
+  );
+}
+
+// The routine a slide stands for: today's (workout · new) or the pending
+// session's (resume). Those slides show its cover (§28.16) instead of the
+// placeholder photo; the others keep their photo.
+function slideCover(slide: HomeSlide, data: HomeHeroData): RoutineCoverInfo | null {
+  switch (slide.kind) {
+    case 'workout':
+    case 'new':
+      return data.workout?.cover ?? null;
+    case 'resume':
+      return data.resume?.cover ?? null;
+    default:
+      return null;
+  }
+}
+
+// One page of the hero. With a routine cover, the word goes in the band
+// between the greeting row and the slide's texts (left out when it does not
+// fit at its minimum).
+function HeroPage({
+  slide,
+  position,
+  width,
+  bottom,
+  coverTop,
+  cover,
+  children,
+}: {
+  slide: HomeSlide | null;
+  position: number;
+  width: number;
+  bottom: number;
+  coverTop: number;
+  cover: RoutineCoverInfo | null;
+  children: ReactNode;
+}) {
+  const [textsTop, setTextsTop] = useState<number | null>(null);
+
+  return (
+    <View style={{ width, height: HERO_HEIGHT }}>
+      {cover ? (
+        <Image
+          source={routineCoverSource(cover.focus, cover.gender)}
+          resizeMode="cover"
+          style={styles.photo}
+          accessibilityIgnoresInvertColors
+        />
+      ) : slide ? (
+        <Image
+          source={HERO_PHOTO[SLIDE_PHOTO[slide.kind]].source}
+          resizeMode="cover"
+          style={styles.photo}
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
+      <WarmHalo id={`homeHeroHalo${position}`} />
+      <Scrim variant="hero" style={StyleSheet.absoluteFill} />
+      {cover && textsTop !== null ? (
+        <RoutineCoverOverlay
+          format="wide"
+          width={width}
+          word={cover.word}
+          band={{ top: coverTop, bottom: textsTop - 16 }}
+        />
+      ) : null}
+      <View
+        style={[styles.bottom, { bottom }]}
+        onLayout={cover ? event => setTextsTop(event.nativeEvent.layout.y) : undefined}
+      >
+        {children}
+      </View>
+    </View>
   );
 }
 

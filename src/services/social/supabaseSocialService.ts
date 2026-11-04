@@ -76,6 +76,8 @@ import {
   isUnavailable,
   isValidationError,
   parseActivityItems,
+  parseCommunityFeedPage,
+  parseCommunityProfile,
   parseCreatePost,
   parseFeedPage,
   parseFeedPost,
@@ -95,6 +97,8 @@ import {
 } from '@app/features/social/postModel';
 import type {
   ActivityItem,
+  CommunityFeedPage,
+  CommunityProfile,
   CreatePostResult,
   FeedComment,
   FeedPage,
@@ -147,6 +151,53 @@ function client() {
     throw new Error('Supabase no está configurado');
   }
   return supabase;
+}
+
+// The RPCs of Comunidad abierta are not in the generated database types yet.
+type LooseRpc = (
+  name: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: (PostgrestLike & object) | null }>;
+
+function looseRpc(name: string, args: Record<string, unknown> = {}) {
+  const supabase = client();
+  return (supabase.rpc as unknown as LooseRpc).call(supabase, name, args);
+}
+
+// `{ ok: false, error }` of a write is a failure (never shown as done).
+function expectOk(data: unknown, name: string): Record<string, unknown> {
+  const body = data && typeof data === 'object' ? (data as Record<string, unknown>) : null;
+  if (body?.ok !== true) {
+    throw new Error(typeof body?.error === 'string' ? body.error : `${name} no respondió ok`);
+  }
+  return body;
+}
+
+// Columns of `profiles` the generated types do not have yet.
+type LooseTable = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: string) => {
+        maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: PostgrestLike }>;
+      };
+    };
+    update: (values: Record<string, unknown>) => {
+      eq: (column: string, value: string) => Promise<{ error: PostgrestLike }>;
+    };
+  };
+};
+
+async function ownProfileColumn(column: string): Promise<unknown> {
+  const me = await currentUserId();
+  const { data, error } = await (client() as unknown as LooseTable)
+    .from('profiles')
+    .select(column)
+    .eq('id', me)
+    .maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data?.[column] ?? null;
 }
 
 async function currentUserId(): Promise<string> {
@@ -366,8 +417,8 @@ export const supabaseSocialService: SocialService = {
       activity: parseFriendActivity(activity),
       counts: parseChallengeCounts(challenges),
     });
-    // Photos are storage paths: sign the friends' ones in one request (DA-119:
-    // only friends get a real photo). The avatars then find them in the cache.
+    // Photos are storage paths: sign the friends' ones in one request. The
+    // avatars then find them in the cache.
     await prefetchProfilePhotoUris(
       overview.friends.map(friend => friend.profile.profile_photo_url),
     ).catch(() => undefined);
@@ -418,7 +469,7 @@ export const supabaseSocialService: SocialService = {
     const profile = identity
       ? withPhotoPolicy(identity, detail?.relationship ?? 'none')
       : null;
-    if (profile && (detail?.relationship === 'friends' || detail?.relationship === 'self')) {
+    if (profile && !block.data) {
       await prefetchProfilePhotoUris([profile.profile_photo_url]).catch(() => undefined);
     }
 
@@ -499,16 +550,13 @@ export const supabaseSocialService: SocialService = {
     }
   },
 
+  // unblock_user: idempotent. The follows removed by the block stay removed.
   async unblockUser(target) {
-    const me = await currentUserId();
-    const { error } = await client()
-      .from('user_blocks')
-      .delete()
-      .eq('blocker_id', me)
-      .eq('blocked_id', target);
+    const { data, error } = await looseRpc('unblock_user', { p_user_id: target });
     if (error) {
       throw error;
     }
+    expectOk(data, 'unblock_user');
   },
 
   async createInvite(): Promise<CreateInviteResult> {
@@ -814,12 +862,15 @@ export const supabaseSocialService: SocialService = {
     }
 
     input.onStep?.('publishing');
-    const { data, error } = await supabase.rpc('create_post', {
-      _type: input.type,
-      ...(input.sourceId ? { _source_id: input.sourceId } : {}),
-      ...(input.body ? { _body: input.body } : {}),
+    // create_community_post: the validations of create_post plus the
+    // visibility; public needs the community guidelines accepted.
+    const { data, error } = await looseRpc('create_community_post', {
+      p_type: input.type,
+      p_visibility: input.visibility,
+      ...(input.sourceId ? { p_source_id: input.sourceId } : {}),
+      ...(input.body ? { p_body: input.body } : {}),
       ...(photoPath && size
-        ? { _photo_path: photoPath, _photo_width: size.width, _photo_height: size.height }
+        ? { p_photo_path: photoPath, p_photo_width: size.width, p_photo_height: size.height }
         : {}),
     });
     if (error) {
@@ -841,6 +892,20 @@ export const supabaseSocialService: SocialService = {
     const check = validateReport({ reason, details: details ?? '' });
     if (!check.ok) {
       throw new SocialValidationError('report');
+    }
+    // Posts and people: report_post / report_user (a repeated report gives
+    // back the same report_id). Comments: the table, as before.
+    if (target !== 'comment') {
+      const { data, error } = await looseRpc(target === 'post' ? 'report_post' : 'report_user', {
+        [target === 'post' ? 'p_post_id' : 'p_user_id']: targetId,
+        p_reason: check.reason,
+        p_details: check.details,
+      });
+      if (error) {
+        return failed(error, 'report');
+      }
+      expectOk(data, target === 'post' ? 'report_post' : 'report_user');
+      return;
     }
     const me = await currentUserId();
     const { error } = await client()
@@ -885,6 +950,75 @@ export const supabaseSocialService: SocialService = {
   async acceptTerms() {
     const me = await currentUserId();
     await AsyncStorage.setItem(`${TERMS_KEY}:${me}`, 'true');
+  },
+
+  // ── Comunidad abierta ───────────────────────────────────────────────────
+  async getOpenFeed(kind, cursor, limit): Promise<CommunityFeedPage> {
+    const me = await currentUserId();
+    const { data, error } = await looseRpc(
+      kind === 'community' ? 'get_community_feed' : 'get_following_feed',
+      { p_limit: Math.min(50, Math.max(1, limit)), p_cursor: cursor },
+    );
+    if (error) {
+      return failed(error);
+    }
+    const page = parseCommunityFeedPage(data, me);
+    await prefetchPostPhotos(page.posts);
+    return page;
+  },
+
+  async getCommunityProfile(userId): Promise<CommunityProfile | null> {
+    const { data, error } = await looseRpc('get_community_profile', { p_user_id: userId });
+    if (error) {
+      if (isUnavailable(error)) {
+        return null;
+      }
+      return failed(error);
+    }
+    return parseCommunityProfile(data);
+  },
+
+  async followUser(userId) {
+    const { data, error } = await looseRpc('follow_user', { p_user_id: userId });
+    if (error) {
+      return failed(error);
+    }
+    return expectOk(data, 'follow_user').following !== false;
+  },
+
+  async unfollowUser(userId) {
+    const { data, error } = await looseRpc('unfollow_user', { p_user_id: userId });
+    if (error) {
+      return failed(error);
+    }
+    return expectOk(data, 'unfollow_user').following === true;
+  },
+
+  async getCommunityGuidelinesAccepted() {
+    return Boolean(await ownProfileColumn('community_guidelines_accepted_at'));
+  },
+
+  async acceptCommunityGuidelines() {
+    const { data, error } = await looseRpc('accept_community_guidelines');
+    if (error) {
+      return failed(error);
+    }
+    expectOk(data, 'accept_community_guidelines');
+  },
+
+  async getPrivateAccount() {
+    return (await ownProfileColumn('is_private')) === true;
+  },
+
+  async setPrivateAccount(value) {
+    const me = await currentUserId();
+    const { error } = await (client() as unknown as LooseTable)
+      .from('profiles')
+      .update({ is_private: value })
+      .eq('id', me);
+    if (error) {
+      throw error;
+    }
   },
 
   // ── Retos (W5) ──────────────────────────────────────────────────────────
@@ -1066,13 +1200,8 @@ export const supabaseSocialService: SocialService = {
     const profiles = await fetchProfiles(notificationActorIds(data)).catch(
       () => new Map<string, SocialProfileRow>(),
     );
-    // A friend request comes from someone who is not a friend yet (DA-119:
-    // no real photo for them).
-    const items = parseNotifications(data, profiles).map(item =>
-      item.actor && item.type === 'friend_request'
-        ? { ...item, actor: withPhotoPolicy(item.actor, 'none') }
-        : item,
-    );
+    // The actors keep the photo the server sent (also a new request's).
+    const items = parseNotifications(data, profiles);
     await prefetchProfilePhotoUris(items.map(item => item.actor?.profile_photo_url)).catch(
       () => undefined,
     );

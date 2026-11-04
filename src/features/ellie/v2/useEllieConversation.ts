@@ -6,9 +6,17 @@ import {
   initialChatState,
   proposalMessageId,
   type EllieMode as PlanMode,
+  type NutritionCardStatus,
   type ProposalMessage,
   type RoutineCardStatus,
 } from '@app/features/ellie/chatModel';
+import { prefsSummary } from '@app/features/ellie/nutritionProposalModel';
+import {
+  activateNutritionPlan,
+  setFoodPreferences,
+  type FoodPrefs,
+  type PlanEdits,
+} from '@app/services/ellie/nutritionProposals';
 import { discomfortMessage } from '@app/features/ellie/discomfortModel';
 import { ROUTINE_ADJUST_PREFIX } from '@app/features/ellie/routineProposalModel';
 import { ellieErrorLine, failureEffect, type EllieLanguage } from '@app/features/ellie/ellieCopy';
@@ -87,7 +95,9 @@ type SendExtras = { adjustProposalId?: string | null; discomfortAnswer?: Discomf
 
 // An adjustment replaces the card it was asked from.
 const parentOf = (card: ProposalMessage, extra: SendExtras | undefined) =>
-  card.kind === 'routineProposal' && card.version > 1 && extra?.adjustProposalId
+  (card.kind === 'routineProposal' || card.kind === 'nutritionProposal') &&
+  card.version > 1 &&
+  extra?.adjustProposalId
     ? proposalMessageId(extra.adjustProposalId)
     : null;
 
@@ -109,6 +119,11 @@ function cardStatus(status: ProposalStatus): RoutineCardStatus {
     default:
       return 'replaced';
   }
+}
+
+// get_proposal's status as the state of a plan card.
+function planStatus(status: ProposalStatus): NutritionCardStatus {
+  return status === 'open' || status === 'active' || status === 'discarded' ? status : 'replaced';
 }
 
 // The state of the chat (chatReducer) wired to ellie-chat: the server keeps the
@@ -137,7 +152,9 @@ export function useEllieConversation({
   // answer): a retry sends it again.
   const extras = useRef<Record<string, SendExtras | undefined>>({});
   // The card whose Ajustar left the prefix in the composer.
-  const adjustTarget = useRef<string | null>(null);
+  // Ajustar: the card the next "Ajusta la rutina: " / "Ajusta el plan: "
+  // message adjusts.
+  const adjustTarget = useRef<{ proposalId: string; prefix: string } | null>(null);
 
   // Which conversation is open. Without a request it is the latest one, once
   // known; a conversation created by the first message is adopted here.
@@ -208,9 +225,11 @@ export function useEllieConversation({
   // A JSON reply (no stream, or the server chose not to stream): its text or
   // legacy tool, then its cards.
   const paintReply = useCallback((id: string, reply: EllieReply, extra?: SendExtras) => {
-    const parsed = reply.message.tool
-      ? parseTool(reply.message.tool, reply.message.id, reply.message.content)
-      : null;
+    // A reply with v2 cards never paints the old plan card (only its text).
+    const parsed =
+      reply.message.tool && reply.cards.length === 0
+        ? parseTool(reply.message.tool, reply.message.id, reply.message.content)
+        : null;
     if (parsed) {
       dispatch({ type: 'tool', id: `assistant-${id}`, intro: parsed.intro, card: parsed.card });
     } else if (reply.message.content) {
@@ -314,7 +333,9 @@ export function useEllieConversation({
       }
       // "Ajusta la rutina: …" after Ajustar adjusts that card.
       const target =
-        adjustTarget.current && trimmed.startsWith(ROUTINE_ADJUST_PREFIX.trim()) ? adjustTarget.current : null;
+        adjustTarget.current && trimmed.startsWith(adjustTarget.current.prefix.trim())
+          ? adjustTarget.current.proposalId
+          : null;
       adjustTarget.current = null;
       const adjustProposalId = extra?.adjustProposalId ?? target;
       if (adjustProposalId || extra?.discomfortAnswer) {
@@ -327,9 +348,9 @@ export function useEllieConversation({
   );
 
   // Ajustar: the prefix in the composer; what is sent adjusts that card.
-  const adjustDraft = useCallback((proposalId: string) => {
-    adjustTarget.current = proposalId;
-    setDraft(ROUTINE_ADJUST_PREFIX);
+  const adjustDraft = useCallback((proposalId: string, prefix: string = ROUTINE_ADJUST_PREFIX) => {
+    adjustTarget.current = { proposalId, prefix };
+    setDraft(prefix);
   }, []);
 
   // A chip of a discomfort_check card ("Tengo otra molestia" with its zone).
@@ -470,33 +491,52 @@ export function useEllieConversation({
   useEffect(() => {
     state.messages.forEach(message => {
       if (
-        message.kind !== 'routineProposal' ||
+        (message.kind !== 'routineProposal' && message.kind !== 'nutritionProposal') ||
         message.status !== 'loading' ||
         requested.current.has(message.id)
       ) {
         return;
       }
       requested.current.add(message.id);
+      const routine = message.kind === 'routineProposal';
       getProposal(message.proposalId)
-        .then(stored =>
+        .then(stored => {
+          if (routine) {
+            dispatch({
+              type: 'proposalLoaded',
+              id: message.id,
+              proposal: stored?.routine ?? null,
+              status: stored?.routine ? cardStatus(stored.status) : 'unavailable',
+            });
+            return;
+          }
           dispatch({
-            type: 'proposalLoaded',
+            type: 'nutritionLoaded',
             id: message.id,
-            proposal: stored?.routine ?? null,
-            status: stored?.routine ? cardStatus(stored.status) : 'unavailable',
-          }),
-        )
+            proposal: stored?.nutrition ?? null,
+            status: stored?.nutrition ? planStatus(stored.status) : 'unavailable',
+          });
+        })
         .catch(error => {
           console.warn('[ellie] No se pudo leer la propuesta.', error);
           requested.current.delete(message.id);
-          dispatch({ type: 'proposalLoaded', id: message.id, proposal: null, status: 'unavailable' });
+          dispatch(
+            routine
+              ? { type: 'proposalLoaded', id: message.id, proposal: null, status: 'unavailable' }
+              : { type: 'nutritionLoaded', id: message.id, proposal: null, status: 'unavailable' },
+          );
         });
     });
   }, [state.messages]);
 
   const reloadProposal = useCallback((id: string) => {
     requested.current.delete(id);
-    dispatch({ type: 'proposalStatus', id, status: 'loading' });
+    const card = stateRef.current.messages.find(item => item.id === id);
+    dispatch(
+      card?.kind === 'nutritionProposal'
+        ? { type: 'nutritionStatus', id, status: 'loading' }
+        : { type: 'proposalStatus', id, status: 'loading' },
+    );
   }, []);
 
   // One client_id per action, proposal and edits: a retry of the same thing
@@ -514,6 +554,23 @@ export function useEllieConversation({
       console.warn('[ellie] Acción de propuesta fallida.', code);
       // Replaced, saved or active elsewhere: the card has no actions anymore.
       dispatch({ type: 'proposalStatus', id, status: code === 'proposal_not_open' ? 'replaced' : previous });
+      if (code === 'unauthorized') {
+        onUnauthorized?.();
+      }
+      return { ok: false, code };
+    },
+    [onUnauthorized],
+  );
+
+  // A failed action on a plan: replaced or active elsewhere → no actions.
+  // Activating and its errors stay in the sheet, so the card stays open.
+  const planFailure = useCallback(
+    (id: string, error: unknown): ProposalActionResult => {
+      const code = error instanceof ProposalError ? error.code : 'unknown';
+      console.warn('[ellie] Acción del plan fallida.', code);
+      if (code === 'proposal_not_open') {
+        dispatch({ type: 'nutritionStatus', id, status: 'replaced' });
+      }
       if (code === 'unauthorized') {
         onUnauthorized?.();
       }
@@ -586,18 +643,86 @@ export function useEllieConversation({
   const discardProposal = useCallback(
     async (id: string): Promise<ProposalActionResult> => {
       const card = stateRef.current.messages.find(item => item.id === id);
-      if (!card || card.kind !== 'routineProposal' || card.status !== 'open') {
+      if (
+        !card ||
+        (card.kind !== 'routineProposal' && card.kind !== 'nutritionProposal') ||
+        card.status !== 'open'
+      ) {
         return { ok: false, code: 'proposal_not_open' };
       }
       try {
         await discardStoredProposal(card.proposalId);
-        dispatch({ type: 'proposalStatus', id, status: 'discarded' });
+        dispatch(
+          card.kind === 'nutritionProposal'
+            ? { type: 'nutritionStatus', id, status: 'discarded' }
+            : { type: 'proposalStatus', id, status: 'discarded' },
+        );
         return { ok: true };
       } catch (error) {
+        if (card.kind === 'nutritionProposal') {
+          return planFailure(id, error);
+        }
         return proposalFailure(id, error, 'open');
       }
     },
-    [proposalFailure],
+    [planFailure, proposalFailure],
+  );
+
+  // Listo (questions card): set_food_preferences, then the summary as the
+  // user's message ("Sin lactosa · Omnívora · 4 comidas"); the card shows
+  // TUS PREFERENCIAS. false: it could not be saved (the card stays).
+  const submitPrefs = useCallback(
+    async (id: string, prefs: FoodPrefs): Promise<boolean> => {
+      try {
+        await setFoodPreferences(prefs);
+      } catch (error) {
+        console.warn('[ellie] No se pudieron guardar las preferencias.', error);
+        if (error instanceof ProposalError && error.code === 'unauthorized') {
+          onUnauthorized?.();
+        }
+        return false;
+      }
+      dispatch({ type: 'prefsAnswered', id, prefs });
+      send(prefsSummary(prefs));
+      return true;
+    },
+    [onUnauthorized, send],
+  );
+
+  // Cambiar: the questions again, with the current values.
+  const reopenPrefs = useCallback((id: string) => {
+    dispatch({ type: 'prefsAnswered', id, prefs: null });
+  }, []);
+
+  // Activar plan (sheet): activate_nutrition_plan with the sheet's changes.
+  // plan_active_exists comes back to the screen, which asks and calls again
+  // with confirmReplace. Nutrition and Inicio read the plan's goal after.
+  const activatePlanProposal = useCallback(
+    async (id: string, edits: PlanEdits, confirmReplace: boolean): Promise<ProposalActionResult> => {
+      const card = stateRef.current.messages.find(item => item.id === id);
+      if (!card || card.kind !== 'nutritionProposal' || card.status !== 'open') {
+        return { ok: false, code: 'proposal_not_open' };
+      }
+      const planId = card.proposal?.planId;
+      if (!planId) {
+        return { ok: false, code: 'not_found' };
+      }
+      try {
+        await activateNutritionPlan(planId, edits, confirmReplace);
+      } catch (error) {
+        return planFailure(id, error);
+      }
+      dispatch({ type: 'nutritionStatus', id, status: 'active' });
+      if (userId) {
+        await Promise.allSettled([
+          invalidateNutritionPlanQueries(queryClient, userId),
+          queryClient.invalidateQueries({ queryKey: ['nutrition'] }),
+          queryClient.invalidateQueries({ queryKey: ['home'] }),
+        ]);
+      }
+      return { ok: true };
+    },
+    [planFailure, queryClient, userId],
   );
 
   // A new conversation: the server creates it with the first message.
@@ -653,6 +778,9 @@ export function useEllieConversation({
     startProposal,
     discardProposal,
     reloadProposal,
+    submitPrefs,
+    reopenPrefs,
+    activatePlanProposal,
     newConversation,
     openConversation,
   };

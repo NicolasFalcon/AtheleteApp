@@ -13,13 +13,19 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { fontsV2 } from '@app/theme/v2/typography';
+import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
+import { useAuth } from '@app/hooks/useAuth';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import type { RoutineFocus } from '@app/shared/domain/types';
 import type { ProfileGender } from '@app/types/auth';
 
 // Routine cover (handoff §28.16): one background without text and an overlay
-// drawn by the app (Ember line + the focus word in Anton, localized).
-// Two formats: the 3:4 header of the routine detail and the 7:3 crop of
-// ELLIE's card.
+// drawn by the app (Ember line + the focus word in Anton, localized). It
+// replaces every generated or stock routine picture; only an official or
+// editorial routine with a photo of its own keeps it (routineKeepsPhoto).
+// Formats: the 3:4 header of the routine detail, the 7:3 crop of ELLIE's
+// card, wide heroes (the word in the free band above the hero's own texts)
+// and list thumbnails.
 
 const COVER_BG: ImageSourcePropType = require('../../assets/covers/cover-bg.jpg');
 
@@ -37,11 +43,79 @@ export function routineCoverSource(
   return (focus && sex && COVER_PHOTOS[focus]?.[sex]) || COVER_BG;
 }
 
-export type RoutineCoverFormat = 'detail' | 'card';
+// Only an official or editorial routine with a photo of its own keeps it.
+// get_routine / list_routines send no routine photo today, so every routine
+// shows its cover.
+export function routineKeepsPhoto(routine: {
+  origin?: string | null;
+  imageUrl?: string | null;
+}): boolean {
+  return (
+    (routine.origin === 'official' || routine.origin === 'editorial') &&
+    Boolean(routine.imageUrl?.trim())
+  );
+}
 
-// Overlay metrics in pt for a cover `width` pt wide.
-function metrics(format: RoutineCoverFormat, width: number) {
-  if (format === 'detail') {
+// Language and sex for the covers of a screen.
+export function useRoutineCoverContext(): {
+  language: EllieLanguage;
+  gender: ProfileGender | null;
+} {
+  const language = useProfileLanguage();
+  const { profile } = useAuth();
+  return { language, gender: profile?.gender ?? null };
+}
+
+export type RoutineCoverFormat = 'detail' | 'card' | 'wide' | 'thumb';
+
+// What a cover needs: the word (focus → category → none), the focus and the
+// sex for the future background photos.
+export type RoutineCoverInfo = {
+  word: string | null;
+  focus: RoutineFocus | null;
+  gender: ProfileGender | null;
+};
+
+// Wide heroes: the free band between the top of the hero (or its top bar)
+// and its own texts. The line sits at `top`; the word fits above `bottom`.
+export type RoutineCoverBand = { top: number; bottom: number };
+
+type Metrics = {
+  left: number;
+  available: number;
+  lineWidth: number;
+  lineHeight: number;
+  lineTop: number;
+  maxSize: number;
+  minSize: number;
+  capTop: number;
+};
+
+// Anton (per em): cap height 0.859.
+const CAP_HEIGHT = 0.859;
+
+// Overlay metrics in pt for a cover `width` pt wide; null: no overlay fits.
+function metrics(format: RoutineCoverFormat, width: number, band?: RoutineCoverBand): Metrics | null {
+  if (format === 'wide') {
+    // The card's measures (24 × 3 line, 25 pt to the capitals, 64–44 pt),
+    // aligned with the hero's 20 pt text margin. The word shrinks to the
+    // band and is left out when not even the minimum fits.
+    if (!band || band.bottom - band.top < 3) {
+      return null;
+    }
+    const capTop = band.top + 25;
+    return {
+      left: 20,
+      available: width - 40,
+      lineWidth: 24,
+      lineHeight: 3,
+      lineTop: band.top,
+      maxSize: Math.min(64, (band.bottom - capTop) / CAP_HEIGHT),
+      minSize: 44,
+      capTop,
+    };
+  }
+  if (format === 'detail' || format === 'thumb') {
     // Relative to the cover width W (W = 393 → 33 · 31 × 3 at 218 · 77–47 · 248).
     return {
       left: width * 0.0833,
@@ -54,6 +128,7 @@ function metrics(format: RoutineCoverFormat, width: number) {
       capTop: width * 0.6302,
     };
   }
+  // card
   return {
     left: 16,
     available: width - 32,
@@ -66,9 +141,12 @@ function metrics(format: RoutineCoverFormat, width: number) {
   };
 }
 
-// Anton: with line height 1.0 the cap height starts 0.064 × size below the
-// top of the text box.
-const CAP_OFFSET = 0.064;
+// Anton (per em): ascender 1.177, cap height 0.859. The word keeps the
+// font's own line height: with lineHeight = size (the CSS model of §28.16)
+// iOS clips everything above the box, the top of the capitals included. In
+// the natural box the cap height starts 1.177 − 0.859 = 0.318 × size below
+// its top, so the capitals still start at capTop.
+const CAP_OFFSET = 0.318;
 
 // Size of the word: measured at the maximum; if it does not fit the useful
 // width, maximum × useful ÷ measured, never below the minimum.
@@ -79,22 +157,31 @@ export function coverWordSize(measured: number, maxSize: number, minSize: number
   return Math.max(minSize, (maxSize * available) / measured);
 }
 
+// Thumbnails narrower than this (44 pt pickers) show the line only: the
+// word would be a few points tall.
+const THUMB_WORD_MIN_WIDTH = 64;
+
 export function RoutineCoverOverlay({
   format,
   width,
   word,
+  band,
 }: {
   format: RoutineCoverFormat;
   width: number;
   word: string | null;
+  // Wide heroes only.
+  band?: RoutineCoverBand;
 }) {
   // Width of the word at the maximum size, keyed by word and size.
   const [measured, setMeasured] = useState<{ key: string; width: number } | null>(null);
-  if (!width) {
+  const m = width ? metrics(format, width, band) : null;
+  if (!m) {
     return null;
   }
-  const m = metrics(format, width);
-  const key = `${word}|${Math.round(m.maxSize)}`;
+  const shown =
+    m.maxSize < m.minSize || (format === 'thumb' && width < THUMB_WORD_MIN_WIDTH) ? null : word;
+  const key = `${shown}|${Math.round(m.maxSize)}`;
   const known = measured?.key === key ? measured.width : null;
   const size = known === null ? m.maxSize : coverWordSize(known, m.maxSize, m.minSize, m.available);
 
@@ -113,16 +200,16 @@ export function RoutineCoverOverlay({
           { left: m.left, top: m.lineTop, width: m.lineWidth, height: m.lineHeight },
         ]}
       />
-      {word ? (
+      {shown ? (
         <>
           {/* Measure at the maximum, off screen and without wrapping. */}
           <View style={styles.measure}>
             <Text
               allowFontScaling={false}
-              style={[styles.word, { fontSize: m.maxSize, lineHeight: m.maxSize }]}
+              style={[styles.word, { fontSize: m.maxSize }]}
               onTextLayout={onMeasure}
             >
-              {word}
+              {shown}
             </Text>
           </View>
           <Text
@@ -137,12 +224,11 @@ export function RoutineCoverOverlay({
                 width: m.available,
                 top: m.capTop - CAP_OFFSET * size,
                 fontSize: size,
-                lineHeight: size,
                 opacity: known === null ? 0 : 1,
               },
             ]}
           >
-            {word}
+            {shown}
           </Text>
         </>
       ) : null}
@@ -150,8 +236,9 @@ export function RoutineCoverOverlay({
   );
 }
 
-// The whole cover at its aspect (detail 3:4, card 7:3), with `children` on
-// top (the card's badge).
+// The whole cover at its aspect (detail 3:4, card 7:3) or filling its parent
+// (thumb), with `children` on top (the card's badge). Wide heroes draw the
+// background and RoutineCoverOverlay themselves, with their band.
 export function RoutineCover({
   format,
   word,
@@ -160,7 +247,7 @@ export function RoutineCover({
   style,
   children,
 }: {
-  format: RoutineCoverFormat;
+  format: Exclude<RoutineCoverFormat, 'wide'>;
   word: string | null;
   focus?: RoutineFocus | null;
   gender?: ProfileGender | null;
@@ -172,7 +259,13 @@ export function RoutineCover({
   return (
     <View
       onLayout={onLayout}
-      style={[styles.cover, { aspectRatio: format === 'detail' ? 3 / 4 : 7 / 3 }, style]}
+      style={[
+        styles.cover,
+        format === 'thumb'
+          ? StyleSheet.absoluteFill
+          : { aspectRatio: format === 'detail' ? 3 / 4 : 7 / 3 },
+        style,
+      ]}
     >
       <Image source={routineCoverSource(focus, gender)} resizeMode="cover" style={StyleSheet.absoluteFill} />
       <RoutineCoverOverlay format={format} width={width} word={word} />

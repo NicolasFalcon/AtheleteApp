@@ -153,6 +153,10 @@ export function SocialPostScreen({ navigation, route }: Props) {
                 id: post.data!.id,
                 mine: post.data!.relationship === 'self',
                 body: post.data!.body,
+                author:
+                  post.data!.relationship === 'self'
+                    ? null
+                    : { id: post.data!.author_id, name: post.data!.author?.name ?? 'Usuario' },
               })
             }
             onOpenRoutine={() => navigation.navigate(APP_ROUTES.SocialRoutine, { postId })}

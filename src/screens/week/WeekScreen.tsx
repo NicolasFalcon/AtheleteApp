@@ -52,6 +52,7 @@ import {
   type WeekDay,
 } from '@app/features/week/weekModel';
 import { routineErrorCopy } from '@app/features/workouts/routineErrors';
+import { useAuth } from '@app/hooks/useAuth';
 import { useHomeFeed } from '@app/hooks/useHomeFeed';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { useRoutineList } from '@app/hooks/useRoutines';
@@ -77,6 +78,7 @@ const DEFAULT_HABITS = ['Movimiento', 'Hidratación', 'Mente'];
 // from today.
 export function WeekScreen({ navigation }: Props) {
   const { colors } = useThemeV2();
+  const { profile } = useAuth();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const cardWidth = width - SIDE * 2;
@@ -527,7 +529,7 @@ export function WeekScreen({ navigation }: Props) {
                   subtitle={`${routineTypeText(routine)} · ${routine.duration} min${
                     routine.exerciseCount ? ` · ${routine.exerciseCount} ejercicios` : ''
                   }`}
-                  image={routineImage(routine)}
+                  image={routineImage(routine, profile?.gender ?? null)}
                   selected={pickerDay.kind === 'session' && pickerDay.routine?.id === routine.id}
                   onPress={() => pick(pickerDay.date, routine.id)}
                 />

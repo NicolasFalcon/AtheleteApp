@@ -17,6 +17,7 @@ export * from '@app/components/v2/EquipmentBubble';
 export * from '@app/components/v2/ExerciseRow';
 export * from '@app/components/v2/FormRow';
 export * from '@app/components/v2/FilterChip';
+export * from '@app/components/v2/FollowButton';
 export * from '@app/components/v2/GlassHeader';
 export * from '@app/components/v2/GlassSurface';
 export * from '@app/components/v2/haptics';

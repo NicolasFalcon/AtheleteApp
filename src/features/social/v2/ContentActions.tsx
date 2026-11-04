@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
-import { Check, Flag, Pencil, Trash2 } from 'lucide-react-native';
+import { Ban, Check, Flag, Pencil, Trash2 } from 'lucide-react-native';
 import {
   Button,
   PressableScale,
@@ -18,22 +18,31 @@ import {
   validateReport,
 } from '@app/features/social/postModel';
 import type { ReportReason } from '@app/features/social/postTypes';
+import { markBlocked } from '@app/features/social/communityStore';
 import { useSocialService } from '@app/features/social/useSocial';
 
 export type ContentTarget = {
-  kind: 'post' | 'comment';
+  // 'user': a profile (report only; the profile has its own block flow).
+  kind: 'post' | 'comment' | 'user';
   id: string;
   mine: boolean;
   // Current text of my post (to edit it).
   body?: string | null;
+  // Someone else's post: "Bloquear a <name>" in the menu.
+  author?: { id: string; name: string } | null;
+  // Opens straight on a step (a profile opens on the report).
+  startAt?: 'report';
 };
 
-type Step = 'menu' | 'report' | 'delete' | 'edit';
+type Step = 'menu' | 'report' | 'delete' | 'edit' | 'block';
 
 const COPY = {
   post: { noun: 'publicación', article: 'esta' },
   comment: { noun: 'comentario', article: 'este' },
+  user: { noun: 'perfil', article: 'este' },
 } as const;
+
+const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 // "⋯" of a post or a comment: Reportar (anyone else's) or Eliminar (yours).
 // Reporting has no screen in the handoff (D-88): a sheet with the six reasons
@@ -48,7 +57,7 @@ export function ContentActions({
   target: ContentTarget | null;
   onClose: () => void;
   // The content left the list: because the user reported or deleted it.
-  onDone: (target: ContentTarget, action: 'reported' | 'deleted' | 'edited') => void;
+  onDone: (target: ContentTarget, action: 'reported' | 'deleted' | 'edited' | 'blocked') => void;
   withTabBar?: boolean;
 }) {
   const { colors } = useThemeV2();
@@ -69,7 +78,7 @@ export function ContentActions({
   // Every time it opens it starts from the menu with an empty report.
   useEffect(() => {
     if (liveTarget) {
-      setStep('menu');
+      setStep(liveTarget.startAt ?? 'menu');
       setReason(null);
       setDetails('');
       setDraft(liveTarget.body ?? '');
@@ -94,7 +103,11 @@ export function ContentActions({
       await service.reportContent(target.kind, target.id, check.reason, check.details);
       onClose();
       onDone(target, 'reported');
-      show('Gracias por avisar. Ya no verás este contenido.');
+      show(
+        target.kind === 'user'
+          ? 'Gracias por avisar. Lo revisaremos.'
+          : 'Gracias por avisar. Ya no verás este contenido.',
+      );
     } catch {
       show('No se pudo enviar el reporte. Inténtalo de nuevo.', 'error');
       setBusy(false);
@@ -141,6 +154,25 @@ export function ContentActions({
     }
   };
 
+  // Block the author: everything of theirs leaves the screen at once.
+  const author = target.author ?? null;
+  const block = async () => {
+    if (busy || !author) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await service.blockUser(author.id);
+      markBlocked(author.id);
+      onClose();
+      onDone(target, 'blocked');
+      show(`Bloqueaste a ${firstNameOf(author.name)}`);
+    } catch {
+      show('No se pudo bloquear. Inténtalo de nuevo.', 'error');
+      setBusy(false);
+    }
+  };
+
   // One sheet whose content changes with the step: two modals presenting and
   // dismissing at once make iOS drop the second one.
   const title =
@@ -150,6 +182,8 @@ export function ContentActions({
       ? `Reportar ${copy.noun}`
       : step === 'edit'
       ? 'Editar el texto'
+      : step === 'block' && author
+      ? `¿Bloquear a ${firstNameOf(author.name)}?`
       : `¿Eliminar ${copy.article} ${copy.noun}?`;
 
   return (
@@ -185,6 +219,14 @@ export function ContentActions({
             onPress={remove}
             style={styles.flex}
           />
+        ) : step === 'block' ? (
+          <Button
+            label="Bloquear"
+            loading={busy}
+            loadingLabel="Bloqueando"
+            onPress={block}
+            style={styles.flex}
+          />
         ) : undefined
       }
     >
@@ -211,18 +253,30 @@ export function ContentActions({
               title={`Reportar ${copy.noun}`}
               subtitle="Se la enviamos al equipo de moderación"
               onPress={() => setStep('report')}
-              divider={false}
+              divider={Boolean(author)}
             />
           )}
+          {!target.mine && author ? (
+            <Row
+              leading={<Ban size={20} strokeWidth={1.8} color={colors.ember.deep} />}
+              title={`Bloquear a ${firstNameOf(author.name)}`}
+              subtitle="Dejarás de ver todo lo suyo"
+              destructive
+              onPress={() => setStep('block')}
+              divider={false}
+            />
+          ) : null}
         </View>
       ) : null}
 
       {step === 'report' ? (
         <View style={styles.reportBody}>
           <TextV2 variant="body" tone="secondary">
-            {`¿Qué pasa con ${copy.article} ${copy.noun}? Dejarás de verl${
-              target.kind === 'post' ? 'a' : 'o'
-            } y lo revisaremos. No se lo decimos a la otra persona.`}
+            {target.kind === 'user'
+              ? '¿Qué pasa con este perfil? Lo revisaremos. No se lo decimos a la otra persona.'
+              : `¿Qué pasa con ${copy.article} ${copy.noun}? Dejarás de verl${
+                  target.kind === 'post' ? 'a' : 'o'
+                } y lo revisaremos. No se lo decimos a la otra persona.`}
           </TextV2>
           <View accessibilityRole="radiogroup">
             {REPORT_REASONS.map(option => {
@@ -302,6 +356,12 @@ export function ContentActions({
             {String(POST_BODY_MAX - draft.length)}
           </TextV2>
         </View>
+      ) : null}
+
+      {step === 'block' && author ? (
+        <TextV2 variant="body" tone="secondary">
+          {`${firstNameOf(author.name)} no podrá ver tu perfil ni tu actividad, ni seguirte o enviarte solicitudes, y dejaréis de seguiros. Tampoco verás nada suyo. No le avisamos. Puedes desbloquearle desde Privacidad social.`}
+        </TextV2>
       ) : null}
 
       {step === 'delete' ? (

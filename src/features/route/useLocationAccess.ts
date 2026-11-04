@@ -13,9 +13,16 @@ import type { RoutePoint } from '@app/features/route/routeTypes';
 // 3 min after leaving Ruta, and the foreground search while the screen is
 // focused; it stops when the screen loses focus (the recording has its own
 // updates). The position also goes to `routeStore.origin`.
+//
+// `unanswered`: "Continuar" asked for the permission but the system dialog
+// never showed (iOS drops the request while another system alert is up, and
+// expo-location then never resolves). The screen offers Ajustes instead.
+const DIALOG_WAIT_MS = 1500;
+
 export function useLocationAccess() {
   const source = getLocationSource();
   const [access, setAccess] = useState<LocationAccess | null>(null);
+  const [unanswered, setUnanswered] = useState(false);
   const snapshot = useSyncExternalStore(locationStore.subscribe, locationStore.get, locationStore.get);
   const alive = useRef(true);
   const usable = access?.permission === 'granted' && access.precise;
@@ -24,16 +31,38 @@ export function useLocationAccess() {
     const next = await source.getAccess().catch(() => null);
     if (alive.current && next) {
       setAccess(next);
+      if (next.permission !== 'undetermined') {
+        setUnanswered(false);
+      }
     }
     return next;
   }, [source]);
 
   const request = useCallback(async () => {
-    const next = await source.requestAccess().catch(() => null);
+    // The dialog takes the app out of 'active'; if that has not happened
+    // after DIALOG_WAIT_MS, the dialog is not coming.
+    let dialogShown = AppState.currentState !== 'active';
+    const subscription = AppState.addEventListener('change', state => {
+      if (state !== 'active') {
+        dialogShown = true;
+      }
+    });
+    const asked = source.requestAccess().catch(() => null);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const waited = new Promise<'waited'>(resolve => {
+      timer = setTimeout(() => resolve('waited'), DIALOG_WAIT_MS);
+    });
+    let next = await Promise.race([asked, waited]);
+    if (next === 'waited') {
+      next = dialogShown ? await asked : await source.getAccess().catch(() => null);
+    }
+    clearTimeout(timer);
+    subscription.remove();
     if (!alive.current || !next) {
       return null;
     }
     setAccess(next);
+    setUnanswered(next.permission === 'undetermined');
     return next;
   }, [source]);
 
@@ -80,6 +109,7 @@ export function useLocationAccess() {
     // Accurate enough to record (≤ 30 m, not the last known one).
     ready: usable && isReadyFix(snapshot.fix),
     usable,
+    unanswered,
     request,
     refresh,
   };

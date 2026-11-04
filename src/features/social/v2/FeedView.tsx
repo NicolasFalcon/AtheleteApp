@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { Plus } from 'lucide-react-native';
 import {
   ActivityLine,
@@ -8,6 +7,7 @@ import {
   PersonAvatar,
   PostCard,
   PressableScale,
+  Segmented,
   Skeleton,
   SkeletonGroup,
   TextV2,
@@ -15,16 +15,23 @@ import {
   useToast,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
+import { isBlockedNow, useBlockedVersion } from '@app/features/social/communityStore';
 import {
   buildFeedEntries,
+  groupActivity,
   isRenderablePost,
   listedContent,
 } from '@app/features/social/postModel';
+import type { CommunityFeedKind } from '@app/features/social/postTypes';
 import { routePostsEnabled } from '@app/features/social/routePosts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@app/hooks/useAuth';
 import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
-import { useFeed, useSocialService } from '@app/features/social/useSocial';
+import {
+  useOpenFeed,
+  useSocialResource,
+  useSocialService,
+} from '@app/features/social/useSocial';
 import {
   ContentActions,
   type ContentTarget,
@@ -32,15 +39,19 @@ import {
 import { SegmentPlaceholder } from '@app/features/social/v2/SocialParts';
 import type { SocialProfileRow } from '@app/features/social/socialTypes';
 
-// Feed (SOCIAL_01): "Comparte tu último entreno", posts by type, activity
-// lines and paginated loading. States: loading (STATE_01), error (STATE_07),
-// empty with friends, loading more, error loading more and end of the list.
-// Without friends (B-26) it is still the feed: publishing works and the own
-// posts show; `invite` (search / invite friends) sits under the composer and
-// replaces the empty state.
+const TABS: { key: CommunityFeedKind; label: string }[] = [
+  { key: 'community', label: 'Comunidad' },
+  { key: 'following', label: 'Siguiendo' },
+];
+
+// Feed (Comunidad abierta): "¿Qué entrenaste hoy?", then two tabs.
+// Comunidad (get_community_feed, by default): public posts of open profiles.
+// Siguiendo (get_following_feed): people I follow, friends' posts and mine,
+// with the friends' activity lines. Infinite scroll with the server's cursor
+// and pull to refresh (from the hub). Each post has "Seguir" next to the
+// author and "···" (report, block).
 export function FeedView({
   me,
-  invite = null,
   nearEnd,
   refreshSignal,
   onRefreshed,
@@ -50,8 +61,6 @@ export function FeedView({
   onOpenProfile,
 }: {
   me: SocialProfileRow;
-  // No friends yet: the invitation, never a block.
-  invite?: ReactNode;
   // The hub scroll is near the bottom: ask for the next page.
   nearEnd: boolean;
   // Pull to refresh: a new value reloads the feed; `onRefreshed` says when it ended.
@@ -67,20 +76,21 @@ export function FeedView({
   const service = useSocialService();
   const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const feed = useFeed();
+  const [tab, setTab] = useState<CommunityFeedKind>('community');
+  const feed = useOpenFeed(tab);
+  // The friends' activity lines live in Siguiendo.
+  const activity = useSocialResource('getFriendActivity', s => s.getFriendActivity(8));
   const [target, setTarget] = useState<ContentTarget | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
-
-  // Coming back from the detail or the composer shows what changed.
-  const first = useCallback(() => {
-    feed.refresh(feed.status === 'ready');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feed.refresh]);
-  useFocusEffect(first);
+  // Reported or deleted here: out of the list before the server answers again.
+  const [gone, setGone] = useState<string[]>([]);
+  useBlockedVersion();
 
   useEffect(() => {
     if (refreshSignal > 0) {
-      feed.refresh(true).finally(onRefreshed);
+      Promise.all([feed.refresh(), tab === 'following' ? activity.reload() : undefined])
+        .catch(() => undefined)
+        .finally(onRefreshed);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshSignal]);
@@ -89,14 +99,24 @@ export function FeedView({
     if (nearEnd) {
       feed.loadMore();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nearEnd, feed.loadMore]);
 
-  // Unknown post types (or `route` without Ruta) are not shown.
+  // Unknown post types (or `route` without Ruta) are not shown; neither is
+  // anything of someone just blocked.
   const routeEnabled = routePostsEnabled();
+  const posts = listedContent(feed.posts).filter(
+    post =>
+      isRenderablePost(post, { routeEnabled }) &&
+      !gone.includes(post.id) &&
+      !isBlockedNow(post.author_id),
+  );
+  const groups = useMemo(
+    () => (tab === 'following' ? groupActivity(activity.data ?? []) : []),
+    [activity.data, tab],
+  );
   const entries = buildFeedEntries(
-    listedContent(feed.posts).filter(post => isRenderablePost(post, { routeEnabled })),
-    feed.activity,
+    posts,
+    groups.filter(group => !group.people.some(person => isBlockedNow(person.id))),
     feed.hasMore,
   );
 
@@ -139,13 +159,121 @@ export function FeedView({
         </View>
       </PressableScale>
 
-      {invite}
+      <Segmented options={TABS} value={tab} onChange={setTab} size="compact" />
 
       <View style={styles.posts}>
-      {feed.status === 'loading' ? (
-        <SkeletonGroup>
-          {[0, 1].map(index => (
-            <View key={index} style={styles.skeletonPost}>
+        {feed.status === 'loading' ? (
+          <SkeletonGroup>
+            {[0, 1].map(index => (
+              <View key={index} style={styles.skeletonPost}>
+                <View style={styles.skeletonHeader}>
+                  <Skeleton width={44} height={44} radius={22} />
+                  <View style={styles.skeletonLines}>
+                    <Skeleton width="40%" height={14} />
+                    <Skeleton width="60%" height={12} />
+                  </View>
+                </View>
+                <Skeleton height={index === 0 ? 260 : 180} radius={24} />
+                <Skeleton width="30%" height={16} />
+              </View>
+            ))}
+          </SkeletonGroup>
+        ) : null}
+
+        {feed.status === 'error' ? (
+          <View style={styles.errorBox}>
+            <TextV2 variant="section" align="center">
+              No pudimos cargar el feed
+            </TextV2>
+            <TextV2 variant="body" tone="secondary" align="center">
+              Sin conexión, tus entrenos siguen funcionando: puedes entrenar y se
+              guardará en cuanto vuelvas a tener red.
+            </TextV2>
+            <Button
+              label="Reintentar"
+              variant="secondary"
+              size="md"
+              onPress={() => {
+                feed.refresh().catch(() => undefined);
+              }}
+            />
+          </View>
+        ) : null}
+
+        {feed.status === 'ready' && entries.length === 0 ? (
+          tab === 'following' ? (
+            <SegmentPlaceholder
+              title="Sigue a atletas desde Comunidad"
+              body="Aquí verás lo que publican las personas que sigues, lo de tus amigos y lo tuyo."
+            >
+              <Button
+                label="Ir a Comunidad"
+                size="md"
+                onPress={() => setTab('community')}
+                style={styles.centered}
+              />
+            </SegmentPlaceholder>
+          ) : (
+            <SegmentPlaceholder
+              title="Aún no hay publicaciones"
+              body="Cuando alguien comparta un entreno, un récord o una rutina en Comunidad, lo verás aquí."
+            >
+              <Button
+                label="Publicar un entreno"
+                size="md"
+                onPress={onCompose}
+                style={styles.centered}
+              />
+            </SegmentPlaceholder>
+          )
+        ) : null}
+
+        {feed.status === 'ready'
+          ? entries.map(entry =>
+              entry.kind === 'activity' ? (
+                <ActivityLine
+                  key={entry.key}
+                  text={entry.group.text}
+                  people={entry.group.people.map(person => ({
+                    key: person.id,
+                    name: person.name,
+                    avatarKey: person.avatar_key,
+                    profilePhotoUrl: person.profile_photo_url,
+                    relationship: 'friends' as const,
+                  }))}
+                  onPress={() => onOpenProfile(entry.group.people[0].id)}
+                />
+              ) : (
+                <PostCard
+                  key={entry.key}
+                  post={entry.post}
+                  withTabBar
+                  followable
+                  onOpenPost={() => onOpenPost(entry.post.id)}
+                  onOpenRoutine={() => onOpenRoutine(entry.post.id)}
+                  onOpenAuthor={() => onOpenProfile(entry.post.author_id)}
+                  onMore={() =>
+                    setTarget({
+                      kind: 'post',
+                      id: entry.post.id,
+                      mine: entry.post.relationship === 'self',
+                      body: entry.post.body,
+                      author:
+                        entry.post.relationship === 'self'
+                          ? null
+                          : { id: entry.post.author_id, name: entry.post.author?.name ?? 'Usuario' },
+                    })
+                  }
+                  routineSaved={saved.includes(entry.post.id)}
+                  onSaveRoutine={() => saveRoutine(entry.post.id)}
+                />
+              ),
+            )
+          : null}
+
+        {feed.status === 'ready' && feed.moreStatus === 'loading' ? (
+          <SkeletonGroup>
+            <View style={styles.skeletonPost}>
               <View style={styles.skeletonHeader}>
                 <Skeleton width={44} height={44} radius={22} />
                 <View style={styles.skeletonLines}>
@@ -153,125 +281,44 @@ export function FeedView({
                   <Skeleton width="60%" height={12} />
                 </View>
               </View>
-              <Skeleton height={index === 0 ? 260 : 180} radius={24} />
-              <Skeleton width="30%" height={16} />
+              <Skeleton height={160} radius={24} />
             </View>
-          ))}
-        </SkeletonGroup>
-      ) : null}
+          </SkeletonGroup>
+        ) : null}
 
-      {feed.status === 'error' ? (
-        <View style={styles.errorBox}>
-          <TextV2 variant="section" align="center">
-            No pudimos cargar el feed
-          </TextV2>
-          <TextV2 variant="body" tone="secondary" align="center">
-            Sin conexión, tus entrenos siguen funcionando: puedes entrenar y se
-            guardará en cuanto vuelvas a tener red.
-          </TextV2>
-          <Button label="Reintentar" variant="secondary" size="md" onPress={feed.retry} />
-        </View>
-      ) : null}
+        {feed.status === 'ready' && feed.moreStatus === 'error' ? (
+          <BlockError message="No pudimos cargar más publicaciones." onRetry={feed.loadMore} />
+        ) : null}
 
-      {feed.status === 'ready' && entries.length === 0 && !invite ? (
-        <SegmentPlaceholder
-          title="Aún no hay publicaciones"
-          body="Cuando tus amigos compartan un entreno, un récord o una rutina, lo verás aquí. Tú decides qué compartes."
-        >
-          <Button
-            label="Publicar un entreno"
-            size="md"
-            onPress={onCompose}
-            style={styles.centered}
-          />
-        </SegmentPlaceholder>
-      ) : null}
-
-      {feed.status === 'ready'
-        ? entries.map(entry =>
-            entry.kind === 'activity' ? (
-              <ActivityLine
-                key={entry.key}
-                text={entry.group.text}
-                people={entry.group.people.map(person => ({
-                  key: person.id,
-                  name: person.name,
-                  avatarKey: person.avatar_key,
-                  profilePhotoUrl: person.profile_photo_url,
-                  relationship: 'friends' as const,
-                }))}
-                onPress={() => onOpenProfile(entry.group.people[0].id)}
-              />
-            ) : (
-              <PostCard
-                key={entry.key}
-                post={entry.post}
-                withTabBar
-                onOpenPost={() => onOpenPost(entry.post.id)}
-                onOpenRoutine={() => onOpenRoutine(entry.post.id)}
-                onOpenAuthor={
-                  entry.post.author
-                    ? () => onOpenProfile(entry.post.author_id)
-                    : undefined
-                }
-                onMore={() =>
-                  setTarget({
-                    kind: 'post',
-                    id: entry.post.id,
-                    mine: entry.post.relationship === 'self',
-                    body: entry.post.body,
-                  })
-                }
-                routineSaved={saved.includes(entry.post.id)}
-                onSaveRoutine={() => saveRoutine(entry.post.id)}
-              />
-            ),
-          )
-        : null}
-
-      {feed.status === 'ready' && feed.moreStatus === 'loading' ? (
-        <SkeletonGroup>
-          <View style={styles.skeletonPost}>
-            <View style={styles.skeletonHeader}>
-              <Skeleton width={44} height={44} radius={22} />
-              <View style={styles.skeletonLines}>
-                <Skeleton width="40%" height={14} />
-                <Skeleton width="60%" height={12} />
-              </View>
-            </View>
-            <Skeleton height={160} radius={24} />
+        {feed.status === 'ready' && !feed.hasMore && entries.length > 0 ? (
+          <View style={[styles.end, { borderTopColor: colors.divider }]}>
+            <TextV2 variant="meta" tone="tertiary" align="center">
+              {tab === 'following'
+                ? 'Estás al día. Descubre a más atletas en Comunidad.'
+                : 'Estás al día. Vuelve más tarde.'}
+            </TextV2>
           </View>
-        </SkeletonGroup>
-      ) : null}
-
-      {feed.status === 'ready' && feed.moreStatus === 'error' ? (
-        <BlockError message="No pudimos cargar más publicaciones." onRetry={feed.retryMore} />
-      ) : null}
-
-      {feed.status === 'ready' && !feed.hasMore && entries.length > 0 ? (
-        <View style={[styles.end, { borderTopColor: colors.divider }]}>
-          <TextV2 variant="meta" tone="tertiary" align="center">
-            Estás al día. Vuelve cuando tus amigos entrenen.
-          </TextV2>
-        </View>
-      ) : null}
-
+        ) : null}
       </View>
 
       <ContentActions
         target={target}
         withTabBar
         onClose={() => setTarget(null)}
-        onDone={(done, action) =>
-          action === 'edited' ? feed.refresh(true) : feed.removePost(done.id)
-        }
+        onDone={(done, action) => {
+          if (action === 'edited') {
+            feed.refresh().catch(() => undefined);
+          } else if (action !== 'blocked') {
+            setGone(current => [...current, done.id]);
+          }
+        }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { gap: 30 },
+  root: { gap: 24 },
   // Posts are 52 pt apart, with no dividers.
   posts: { gap: 52 },
   centered: { alignSelf: 'center' },

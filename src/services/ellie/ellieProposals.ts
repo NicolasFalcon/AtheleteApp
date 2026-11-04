@@ -1,5 +1,9 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
 import { focusFromTargetGroups } from '@app/features/workouts/routineFocus';
+import {
+  parseNutritionProposal,
+  type NutritionProposal,
+} from '@app/services/ellie/nutritionProposals';
 import type { RoutineFocus } from '@app/shared/domain/types';
 import { muscleLabel } from '@app/services/catalog/catalogService';
 import {
@@ -263,6 +267,7 @@ export function parseDiscomfortCheck(payloadValue: unknown): DiscomfortCheck {
 export type StoredProposal = {
   kind: 'routine' | 'nutrition_plan';
   routine: RoutineProposal | null;
+  nutrition: NutritionProposal | null;
   status: ProposalStatus;
   version: number;
 };
@@ -285,6 +290,13 @@ export function parseStoredProposal(id: string, body: unknown): StoredProposal |
             version,
             adjustLabel: str(row.adjust_label),
             status,
+          })
+        : null,
+    nutrition:
+      kind === 'nutrition_plan'
+        ? parseNutritionProposal(str(row.id) ?? id, row.payload, {
+            version,
+            adjustLabel: str(row.adjust_label),
           })
         : null,
   };
@@ -361,6 +373,10 @@ export type ProposalErrorCode =
   | 'version_limit'
   | 'not_found'
   | 'unauthorized'
+  // activate_nutrition_plan (nut-1): another plan is active (confirm to
+  // replace it) · the plan does not pass the server's checks.
+  | 'plan_active_exists'
+  | 'plan_invalid'
   | 'offline'
   | 'unknown';
 
@@ -371,6 +387,8 @@ const KNOWN: readonly ProposalErrorCode[] = [
   'version_limit',
   'not_found',
   'unauthorized',
+  'plan_active_exists',
+  'plan_invalid',
 ];
 
 export class ProposalError extends Error {
@@ -387,7 +405,8 @@ const isNetworkError = (error: unknown) =>
     error instanceof Error ? error.message : String((error as { message?: unknown })?.message ?? error),
   );
 
-async function call(name: string, args: Raw): Promise<Raw> {
+// An RPC of the proposals and nut-1: `{ ok, … }` or a ProposalError.
+export async function call(name: string, args: Raw): Promise<Raw> {
   const client = getSupabaseClient() as unknown as {
     rpc: (
       rpc: string,

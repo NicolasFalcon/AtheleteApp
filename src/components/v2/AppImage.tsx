@@ -5,7 +5,8 @@ import { signedImageSource } from '@app/lib/media/imageSource';
 import { useMediaUrl } from '@app/lib/media/mediaUrls';
 
 // A catalog image by key (movekit/thumbs/…, movekit/posters/…): signed when
-// shown, with a local picture when there is no key or it fails.
+// shown. The local picture is the placeholder while it signs / downloads and
+// what stays when there is no key or it fails.
 export type MediaImageSource = {
   mediaKey: string | null | undefined;
   fallback: ImageSourcePropType;
@@ -21,11 +22,16 @@ type Props = {
   source: AppImageSource;
   style?: StyleProp<ImageStyle>;
   onError?: () => void;
+  // Only when the catalog media itself is on screen (not the fallback).
+  onMediaLoad?: () => void;
   accessibilityLabel?: string;
 };
 
+// The real picture fades in over the placeholder.
+const MEDIA_TRANSITION_MS = 200;
+
 // expo-image (disk cache) for every picture of the workout surfaces.
-export function AppImage({ source, style, onError, accessibilityLabel }: Props) {
+export function AppImage({ source, style, onError, onMediaLoad, accessibilityLabel }: Props) {
   if (isMediaImageSource(source)) {
     return (
       <MediaImage
@@ -33,6 +39,7 @@ export function AppImage({ source, style, onError, accessibilityLabel }: Props) 
         fallback={source.fallback}
         style={style}
         onError={onError}
+        onMediaLoad={onMediaLoad}
         accessibilityLabel={accessibilityLabel}
       />
     );
@@ -53,28 +60,36 @@ function MediaImage({
   fallback,
   style,
   onError,
+  onMediaLoad,
   accessibilityLabel,
 }: {
   mediaKey: string | null | undefined;
   fallback: ImageSourcePropType;
   style?: StyleProp<ImageStyle>;
   onError?: () => void;
+  onMediaLoad?: () => void;
   accessibilityLabel?: string;
 }) {
   const url = useMediaUrl(mediaKey);
   // The URL that failed: a renewed one gets a new chance.
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const remote = mediaKey && url && failedUrl !== url ? signedImageSource(url, mediaKey) : null;
+  const failed = Boolean(url && failedUrl === url);
+  const remote = mediaKey && url && !failed ? signedImageSource(url, mediaKey) : null;
+  // Still signing: nothing yet, the placeholder shows.
+  const signing = Boolean(mediaKey && !url);
 
   return (
     <ExpoImage
-      source={remote ?? (fallback as ImageSource | number)}
+      source={remote ?? (signing ? null : (fallback as ImageSource | number))}
+      placeholder={fallback as ImageSource | number}
+      placeholderContentFit="cover"
       recyclingKey={mediaKey ?? undefined}
       cachePolicy="disk"
       contentFit="cover"
-      transition={remote ? 120 : 0}
+      transition={remote ? MEDIA_TRANSITION_MS : 0}
       style={style}
       accessibilityLabel={accessibilityLabel}
+      onLoad={remote ? onMediaLoad : undefined}
       onError={() => {
         if (remote) {
           setFailedUrl(url);
