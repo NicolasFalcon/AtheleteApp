@@ -603,3 +603,13 @@ where id = (select id from auth.users where email = 'coach@example.com');
 ```
 
 Para desactivarlo no basta con cambiar `is_coach`: primero se deben terminar sus vínculos activos con los RPC o con el flujo administrativo definido para la beta.
+
+### Acceso del coach a la copia asignada: migración pendiente de ejecutar
+
+En `coach-1`, `get_routine(student_template_id)` **no funciona para el coach** aunque el vínculo esté activo: la copia tiene `created_by = student_id` e `is_public = false`; `get_routine_base(uuid)` solo admite `is_public OR created_by = auth.uid()`. `get_routine_coach_base(uuid)` propaga `routine_not_found` y el wrapper final `get_routine(uuid)` retorna ese error antes de añadir `coach`, `coach_note` y `assignment`. El alumno sí puede abrir la copia.
+
+La migración conserva la respuesta base y añade una tercera condición de lectura **solo** cuando la plantilla sea la copia de una asignación `active` del coach solicitante, pertenezca al alumno de esa asignación, el vínculo correspondiente siga `active` y `coach_can_see(coach, student, 'training')` sea verdadero. El wrapper final añade los mismos metadatos de coach para esa lectura. `is_mine` y `can_edit` son `false` para el coach; las rutinas privadas ajenas y las asignaciones `replaced`/`ended` siguen inaccesibles para él. La lectura del alumno y los campos existentes no cambian.
+
+La migración idempotente está en [`20261105120000_coach_assigned_routine_read.sql`](../../supabase/migrations/20261105120000_coach_assigned_routine_read.sql). Amplía el predicado de lectura de `get_routine_base(uuid)` y los metadatos del wrapper final. `can_edit` se calcula explícitamente como `false` cuando el solicitante no es el dueño de la copia. La migración aún no se ha ejecutado.
+
+Verificación recomendada antes de desplegar: el alumno conserva el mismo JSON; el coach del vínculo activo abre el `student_template_id` y recibe `coach`, `coach_note` y `assignment`; otro coach, un vínculo terminado y una asignación reemplazada reciben `routine_not_found`. Repetir la migración no debe cambiar ninguno de estos resultados.
