@@ -296,6 +296,9 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
 
   const saveVariantInRoutine = async (variant: ExerciseVariant) => {
     const target = routineForSave;
+    if (target?.coachAssignment) {
+      return;
+    }
     const templateExerciseId =
       variantPosition !== null ? target?.exercises[variantPosition]?.id ?? null : null;
     if (!target || !templateExerciseId) {
@@ -603,6 +606,8 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
             originalName={planned.name}
             appliedExerciseId={applied?.exerciseId ?? null}
             routineTitle={routineForSave?.title ?? title}
+            // The coach's copy is not edited while assigned (coach-1).
+            canSaveInRoutine={!routineForSave?.coachAssignment}
             reason={variantReason}
             language={language}
             saving={savingVariant}

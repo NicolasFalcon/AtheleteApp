@@ -6,6 +6,10 @@ export type PushData = {
   notificationId: string | null;
   entityType: string | null;
   entityId: string | null;
+  // coach-1 payload (coach_notification_data): link_id and, for
+  // coach_routine_assigned, student_template_id. No entity_type/entity_id.
+  linkId?: string | null;
+  templateId?: string | null;
 };
 
 export type PushTarget =
@@ -19,7 +23,16 @@ export type PushTarget =
   // A new follower without the user in the payload: the follower is the
   // actor of the notification row.
   | { kind: 'follower'; notificationId: string }
-  | { kind: 'inbox' };
+  | { kind: 'inbox' }
+  // ATHELETE Coach (v2.20 §30.5).
+  | { kind: 'coachStudents' }
+  | { kind: 'coachStudent'; linkId: string }
+  | { kind: 'routine'; workoutId: string }
+  | { kind: 'workouts' }
+  | { kind: 'nutrition' }
+  // The other side ended the link. The payload has no role: the coach goes
+  // to Mis alumnos, the student to Perfil (where "Tengo un coach" is back).
+  | { kind: 'coachLinkEnded' };
 
 const str = (value: unknown): string | null => (typeof value === 'string' && value.length > 0 ? value : null);
 
@@ -36,7 +49,29 @@ export function parsePushData(value: unknown): PushData | null {
     notificationId: str(record.notification_id),
     entityType: str(record.entity_type),
     entityId: str(record.entity_id),
+    linkId: str(record.link_id),
+    templateId: str(record.student_template_id),
   };
+}
+
+// coach_* pushes (6 types, COACH_SHAPES §7).
+function coachTarget(data: PushData): PushTarget | null {
+  const { type, linkId, templateId } = data;
+  switch (type) {
+    case 'coach_routine_assigned':
+      return templateId ? { kind: 'routine', workoutId: templateId } : { kind: 'workouts' };
+    case 'coach_nutrition_assigned':
+      return { kind: 'nutrition' };
+    case 'coach_invite_accepted':
+    case 'coach_student_inactive':
+      return linkId ? { kind: 'coachStudent', linkId } : { kind: 'coachStudents' };
+    case 'coach_daily_digest':
+      return { kind: 'coachStudents' };
+    case 'coach_link_ended':
+      return { kind: 'coachLinkEnded' };
+    default:
+      return null;
+  }
 }
 
 const CHALLENGE_TYPES = new Set([
@@ -52,6 +87,10 @@ const CHALLENGE_TYPES = new Set([
 // inbox: it is always a safe place.
 export function targetForPush(data: PushData): PushTarget {
   const { type, entityType, entityId } = data;
+  const coach = coachTarget(data);
+  if (coach) {
+    return coach;
+  }
   switch (type) {
     case 'friend_request':
       return { kind: 'friends' };

@@ -120,6 +120,10 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
       : undefined;
 
   const mode: 'create' | 'edit' = initialWorkoutId ? 'edit' : 'create';
+  // Coach · "Editar copia": a new routine prefilled from another one.
+  const copyFromId =
+    mode === 'create' && params && 'copyFromId' in params ? params.copyFromId : undefined;
+  const afterSave = params && 'afterSave' in params ? params.afterSave : undefined;
   const [step, setStep] = useState<RoutineBuilderStep>('details');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -141,7 +145,7 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
   >(null);
   const hasInitialized = useRef(false);
   // Editing reads the routine with get_routine (the same as the detail).
-  const editWorkoutQuery = useRoutine(mode === 'edit' ? initialWorkoutId : null);
+  const editWorkoutQuery = useRoutine(mode === 'edit' ? initialWorkoutId : copyFromId ?? null);
   // "Agregar a rutina" from an exercise: that exercise (get_exercise).
   const initialExerciseQuery = useExercise(
     mode === 'create' ? initialExerciseId : null,
@@ -167,7 +171,9 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
       return;
     }
 
-    if (mode === 'edit' && initialWorkoutId) {
+    // A copy that cannot be read (not found / no access) starts empty.
+    const copyReady = Boolean(copyFromId) && (workout !== null || !editWorkoutQuery.isLoading);
+    if ((mode === 'edit' && initialWorkoutId) || (copyReady && workout)) {
       if (!workout) {
         return;
       }
@@ -191,6 +197,9 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
       return;
     }
 
+    if (copyFromId && !copyReady) {
+      return;
+    }
     const initialExercises: BuilderExercise[] = [];
     if (initialExerciseQuery.data) {
       initialExercises.push(createBuilderExercise(initialExerciseQuery.data));
@@ -199,6 +208,8 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     setSelectedExercises(initialExercises);
     hasInitialized.current = true;
   }, [
+    copyFromId,
+    editWorkoutQuery.isLoading,
     initialExerciseQuery.data,
     initialExerciseQuery.isLoading,
     initialWorkoutId,
@@ -386,6 +397,10 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
           ? await mutations.updateRoutine({ id: initialWorkoutId, input })
           : (await mutations.createRoutine(input)).routine;
 
+      if (afterSave === 'back') {
+        handleSafeBack();
+        return;
+      }
       navigation.replace(APP_ROUTES.WorkoutDetail, {
         workoutId: savedWorkout.id,
       });
@@ -430,7 +445,8 @@ export function CreateRoutineScreen({ navigation, route }: Props) {
     setDuration(current => clampDuration(current + delta));
 
   const loading = initialExerciseQuery.isLoading || editWorkoutQuery.isLoading;
-  const loadError = initialExerciseQuery.error || editWorkoutQuery.error;
+  // A copy that cannot be read is not an error: the editor starts empty.
+  const loadError = initialExerciseQuery.error || (copyFromId ? null : editWorkoutQuery.error);
 
   const renderBody = () => {
     if (loadError) {

@@ -38,8 +38,31 @@ export async function resolveTarget(target: PushTarget, checks: TargetChecks): P
 
 export type Navigate = (name: string, params?: object) => void;
 
-export function navigateToTarget(navigate: Navigate, target: PushTarget): void {
+export function navigateToTarget(
+  navigate: Navigate,
+  target: PushTarget,
+  context: { isCoach?: boolean } = {},
+): void {
   switch (target.kind) {
+    case 'coachStudents':
+      navigate(APP_ROUTES.CoachStudents);
+      break;
+    case 'coachStudent':
+      navigate(APP_ROUTES.CoachStudent, { linkId: target.linkId });
+      break;
+    case 'routine':
+      navigate(APP_ROUTES.WorkoutDetail, { workoutId: target.workoutId });
+      break;
+    case 'workouts':
+      navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Workouts, params: { area: 'mine' } });
+      break;
+    case 'nutrition':
+      navigate(APP_ROUTES.NutritionPlan);
+      break;
+    case 'coachLinkEnded': {
+      navigate(context.isCoach === true ? APP_ROUTES.CoachStudents : APP_ROUTES.Profile);
+      break;
+    }
     case 'friends':
       navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Community, params: { segment: 'amigos' } });
       break;
@@ -77,6 +100,17 @@ export function isAlreadyThere(
       return current.name === APP_ROUTES.SocialChallenge && params.challengeId === target.challengeId;
     case 'profile':
       return current.name === APP_ROUTES.SocialProfile && params.userId === target.userId;
+    case 'coachStudent':
+      return current.name === APP_ROUTES.CoachStudent && params.linkId === target.linkId;
+    case 'coachStudents':
+      return current.name === APP_ROUTES.CoachStudents;
+    case 'routine':
+      return current.name === APP_ROUTES.WorkoutDetail && params.workoutId === target.workoutId;
+    case 'nutrition':
+      return current.name === APP_ROUTES.NutritionPlan;
+    case 'workouts':
+    case 'coachLinkEnded':
+      return false;
     default:
       // The inbox shows every new notification as it arrives.
       return current.name === APP_ROUTES.SocialNotifications;

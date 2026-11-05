@@ -95,6 +95,7 @@ function mapProfileRow(row: ProfileRow, email: string): ProfileRecord {
     notificationPrefs: parseNotificationPrefs(row.notification_prefs),
     pushPrefs: parsePushPrefs(row.notification_prefs),
     createdAt: (row as { created_at?: string | null }).created_at ?? null,
+    isCoach: (row as { is_coach?: boolean | null }).is_coach === true,
   };
 }
 

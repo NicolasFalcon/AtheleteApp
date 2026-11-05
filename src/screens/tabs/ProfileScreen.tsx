@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SlidersHorizontal } from 'lucide-react-native';
+import { ChevronRight, SlidersHorizontal, UserPlus } from 'lucide-react-native';
 import {
   BackButton,
   IconButton,
@@ -49,6 +49,9 @@ import { useExerciseNames } from '@app/hooks/useCatalog';
 import { usePersonalRecords } from '@app/hooks/usePersonalRecords';
 import { useProfilePhotoUri } from '@app/hooks/useProfilePhotoUri';
 import { useProfileStats } from '@app/hooks/useProfileStats';
+import { useCoachText } from '@app/features/coach/coachCopy';
+import { useMyCoach } from '@app/features/coach/useCoach';
+import { CoachAvatar } from '@app/features/coach/v2/CoachParts';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -279,6 +282,10 @@ export function ProfileScreen({ navigation }: Props) {
                 <Timeline entries={timeline} now={now} />
               </View>
               <PlanGrid items={planItems} />
+              <CoachRow
+                onJoin={() => navigation.navigate(APP_ROUTES.CoachJoin)}
+                onOpen={() => navigation.navigate(APP_ROUTES.MyCoach)}
+              />
               <PressableScale
                 accessibilityRole="button"
                 onPress={() => navigation.navigate(APP_ROUTES.Settings)}
@@ -295,8 +302,46 @@ export function ProfileScreen({ navigation }: Props) {
   );
 }
 
+// Perfil › "Tengo un coach" (no coach) or "Mi coach · {name}" (v2.20 §30.4).
+function CoachRow({ onJoin, onOpen }: { onJoin: () => void; onOpen: () => void }) {
+  const { colors } = useThemeV2();
+  const { t } = useCoachText();
+  const query = useMyCoach();
+  const coach = query.data?.coach ?? null;
+  if (query.isLoading) {
+    return <Skeleton height={64} radius={16} />;
+  }
+  return (
+    <PressableScale
+      accessibilityRole="button"
+      onPress={coach ? onOpen : onJoin}
+      style={[styles.coachRow, { borderTopColor: colors.divider }]}
+    >
+      {coach ? (
+        <CoachAvatar name={coach.name} avatar={coach.avatar} size={52} dark />
+      ) : (
+        <View style={[styles.coachIcon, { backgroundColor: colors.cta.primary }]}>
+          <UserPlus size={22} color={colors.cta.primaryText} strokeWidth={2} />
+        </View>
+      )}
+      <View style={styles.coachTexts}>
+        <TextV2 variant="sub" numberOfLines={1}>
+          {coach ? t('coach.profile.mine', { name: coach.name }) : t('coach.profile.join')}
+        </TextV2>
+        <TextV2 variant="body" tone="secondary" numberOfLines={1}>
+          {coach ? t('coach.profile.mine.sub') : t('coach.profile.join.sub')}
+        </TextV2>
+      </View>
+      <ChevronRight size={20} color={colors.text.tertiary} strokeWidth={2} />
+    </PressableScale>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  coachRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingTop: 24, borderTopWidth: StyleSheet.hairlineWidth },
+  coachIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  coachTexts: { flex: 1, gap: 2 },
   hero: { height: HERO_HEIGHT, overflow: 'hidden' },
   topBar: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   topRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },

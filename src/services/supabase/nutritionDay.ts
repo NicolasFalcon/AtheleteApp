@@ -35,6 +35,9 @@ export type Macros = { kcal: number; p: number; c: number; g: number };
 
 export type NutritionTargets = {
   source: 'plan' | 'profile_estimate';
+  // coach-1: the active plan is the coach's (target_source = 'coach').
+  fromCoach?: boolean;
+  coachName?: string | null;
   dayType: DayType;
   kcal: number;
   protein: number;
@@ -258,8 +261,11 @@ export function parseTargets(value: unknown): NutritionTargets {
   const water = rec(r.water) ?? {};
   const calc = rec(r.calc);
   const adjust = rec(r.training_adjust) ?? {};
+  const fromCoach = r.target_source === 'coach' || r.source === 'coach';
   return {
-    source: r.source === 'plan' ? 'plan' : 'profile_estimate',
+    source: r.source === 'plan' || fromCoach ? 'plan' : 'profile_estimate',
+    fromCoach,
+    coachName: str(r.coach_name),
     dayType: r.day_type === 'training' ? 'training' : 'rest',
     kcal: n0(r.kcal),
     protein: n0(r.protein_g),
@@ -380,7 +386,18 @@ export function parseSupplementsDay(value: unknown): SupplementsDay | null {
 }
 
 export function parseNutritionDay(body: Raw): NutritionDay {
-  const targets = parseTargets(body.targets);
+  const parsed = parseTargets(body.targets);
+  // target_source / coach_name may come at the top of the day too.
+  const coachTop = body.target_source === 'coach';
+  const targets =
+    coachTop || str(body.coach_name)
+      ? {
+          ...parsed,
+          source: coachTop ? ('plan' as const) : parsed.source,
+          fromCoach: parsed.fromCoach || coachTop,
+          coachName: parsed.coachName ?? str(body.coach_name),
+        }
+      : parsed;
   const water = rec(body.water) ?? {};
   const plan = rec(body.plan) ?? {};
   return {

@@ -103,4 +103,12 @@ export const APP_ROUTES = {
   SocialModeration: 'SocialModeration',
   SocialModerationItem: 'SocialModerationItem',
   SocialRoutine: 'SocialRoutine',
+  // ATHELETE Coach (v2.20 §30).
+  CoachStudents: 'CoachStudents',
+  CoachStudent: 'CoachStudent',
+  CoachAssignRoutine: 'CoachAssignRoutine',
+  CoachAssignNutrition: 'CoachAssignNutrition',
+  CoachJoin: 'CoachJoin',
+  CoachConsent: 'CoachConsent',
+  MyCoach: 'MyCoach',
 } as const;

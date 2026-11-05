@@ -115,6 +115,21 @@ export type Workout = {
   exerciseCount?: number;
   createdAt?: string;
   updatedAt?: string;
+  // coach-1: get_routine of a copy assigned by a coach (optional fields
+  // coach / coach_note / assignment).
+  coachAssignment?: WorkoutCoachAssignment | null;
+};
+
+export type WorkoutCoachAssignment = {
+  coachName: string;
+  coachAvatar: string | null;
+  note: string | null;
+  // ISO weekdays 1 (Monday) … 7.
+  days: number[];
+  // {"1":"A","2":"B"} when the routine has A/B days.
+  daySplit: Record<string, string> | null;
+  startDate: string | null;
+  weeks: number | null;
 };
 
 export type WorkoutSession = {

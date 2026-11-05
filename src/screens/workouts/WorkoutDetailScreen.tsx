@@ -58,9 +58,13 @@ import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { useRoutine, useRoutineMutations } from '@app/hooks/useRoutines';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
+import { coachText } from '@app/features/coach/coachCopy';
+import { dayLetter, firstName, ISO_DAYS, isoWeekday } from '@app/features/coach/coachModel';
+import { CoachAvatar, CoachTag } from '@app/features/coach/v2/CoachParts';
+import { getLocalDateKey } from '@app/lib/date';
 import { resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { getWorkoutAccess, type WorkoutExercise } from '@app/shared';
+import { getWorkoutAccess, type Workout, type WorkoutExercise } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'WorkoutDetail'>;
@@ -376,6 +380,11 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           ]
             .filter(Boolean)
             .join(' · ')}
+          eyebrowLeading={
+            workout.coachAssignment ? (
+              <CoachTag label={coachText(language, 'coach.tag')} />
+            ) : undefined
+          }
           title={workout.title}
           bottomInset={52}
           topOffset={insets.top + 4}
@@ -437,6 +446,10 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
             </TextV2>
           ) : null}
 
+          {workout.coachAssignment ? (
+            <CoachBlock assignment={workout.coachAssignment} language={language} />
+          ) : null}
+
           {warmup.length > 0 ? (
             <View style={styles.block}>
               <Eyebrow>Calentamiento</Eyebrow>
@@ -460,6 +473,14 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
               <Eyebrow>Vuelta a la calma</Eyebrow>
               <RoutinePath steps={cooldown.map(toStep)} />
             </View>
+          ) : null}
+
+          {workout.coachAssignment ? (
+            <TextV2 variant="meta" tone="secondary">
+              {coachText(language, 'coach.routine.copy', {
+                name: firstName(workout.coachAssignment.coachName),
+              })}
+            </TextV2>
           ) : null}
 
           {zones.length > 0 ? (
@@ -510,6 +531,76 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
         />
       </GlassSurface>
     </View>
+  );
+}
+
+// The coach's copy (v2.20 §30.2.2): the assigned days with the session
+// letter (A/B) and today in Ember, and the block "Nota de {coach}".
+function CoachBlock({
+  assignment,
+  language,
+}: {
+  assignment: NonNullable<Workout['coachAssignment']>;
+  language: ReturnType<typeof useProfileLanguage>;
+}) {
+  const { colors } = useThemeV2();
+  const today = isoWeekday(getLocalDateKey());
+  const days = new Set(assignment.days);
+  const first = firstName(assignment.coachName);
+  return (
+    <>
+      {assignment.days.length > 0 ? (
+        <View style={styles.block}>
+          <Eyebrow>{coachText(language, 'coach.routine.days')}</Eyebrow>
+          <View style={styles.coachDays}>
+            {ISO_DAYS.map(iso => {
+              const on = days.has(iso);
+              const isToday = on && iso === today;
+              const letter = assignment.daySplit?.[String(iso)] ?? null;
+              return (
+                <View key={iso} style={styles.coachDay}>
+                  <View
+                    style={[
+                      styles.coachDayDisc,
+                      {
+                        backgroundColor: isToday
+                          ? colors.ember.base
+                          : on
+                          ? colors.cta.primary
+                          : colors.surface.muted,
+                      },
+                    ]}
+                  >
+                    <TextV2
+                      variant="bodyStrong"
+                      color={isToday ? '#141312' : on ? colors.cta.primaryText : colors.text.secondary}
+                    >
+                      {dayLetter(language, iso)}
+                    </TextV2>
+                  </View>
+                  {letter && on ? (
+                    <TextV2 variant="captionStrong" tone={isToday ? 'ember' : 'secondary'}>
+                      {letter}
+                    </TextV2>
+                  ) : null}
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+      {assignment.note ? (
+        <View style={[styles.coachNote, { backgroundColor: colors.surface.muted }]}>
+          <View style={styles.coachNoteHead}>
+            <CoachAvatar name={assignment.coachName} avatar={assignment.coachAvatar} size={36} dark />
+            <TextV2 variant="bodyStrong">
+              {coachText(language, 'coach.routine.noteOf', { name: first })}
+            </TextV2>
+          </View>
+          <TextV2 variant="bodyL">{assignment.note}</TextV2>
+        </View>
+      ) : null}
+    </>
   );
 }
 
@@ -612,6 +703,31 @@ const styles = StyleSheet.create({
     lineHeight: 25,
   },
   block: {
+    gap: 10,
+  },
+  coachDays: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  coachDay: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  coachDayDisc: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  coachNote: {
+    borderRadius: 20,
+    padding: 16,
+    gap: 10,
+  },
+  coachNoteHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
   pills: {

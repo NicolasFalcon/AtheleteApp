@@ -44,6 +44,8 @@ import {
   useRoutineCoverContext,
 } from '@app/components/v2/RoutineCover';
 import { routineFocusWord } from '@app/features/workouts/routineFocus';
+import { coachText } from '@app/features/coach/coachCopy';
+import { CoachTag } from '@app/features/coach/v2/CoachParts';
 import type { ProfileGender } from '@app/types/auth';
 
 // Tu semana (handoff v2.15 §25.1, WEEK_01–05).
@@ -506,9 +508,18 @@ function DayHeader({
           style={styles.headerBottom}
           onLayout={event => setTextsTop(event.nativeEvent.layout.y)}
         >
-          <TextV2 variant="eyebrow" color={DARK.eyebrow}>
-            {routineTypeText(routine)}
-          </TextV2>
+          {day.source === 'coach' ? (
+            <View style={styles.coachRow}>
+              <CoachTag label={coachText(cover.language, 'coach.tag')} />
+              <TextV2 variant="eyebrow" color={DARK.eyebrow}>
+                {routineTypeText(routine)}
+              </TextV2>
+            </View>
+          ) : (
+            <TextV2 variant="eyebrow" color={DARK.eyebrow}>
+              {routineTypeText(routine)}
+            </TextV2>
+          )}
           <TextV2 numberOfLines={2} color={DARK.white} style={styles.headTitle}>
             {routine.title}
           </TextV2>
@@ -837,6 +848,7 @@ export function CloseButton({ onPress }: { onPress: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  coachRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   flex1: { flex: 1, minWidth: 0 },
   flexShrink: { flexShrink: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },

@@ -61,6 +61,13 @@ import {
 } from '@app/services/supabase/nutritionDay';
 import { VisionError } from '@app/services/vision/visionService';
 import type { AppScreenProps } from '@app/types/navigation';
+import { useCoachText } from '@app/features/coach/coachCopy';
+import { useCoachMutations, useMyCoach } from '@app/features/coach/useCoach';
+import {
+  CoachNutritionOffer,
+  CoachOfferDeclinedRow,
+  CoachPlanLabel,
+} from '@app/features/coach/v2/NutritionOffer';
 
 type Props = AppScreenProps<'NutritionPlan'>;
 type Tab = 'today' | 'plan' | 'shopping';
@@ -100,6 +107,11 @@ export function NutritionPlanScreen({ navigation }: Props) {
   const [addedFoods, setAddedFoods] = useState<ReadonlySet<string>>(() => new Set());
   const [failure, setFailure] = useState<VisionFailureInput | null>(null);
   const [plannedSlot, setPlannedSlot] = useState<NutritionSlot | null>(null);
+  // ATHELETE Coach (§30.4): pending targets of the coach / their accepted plan.
+  const { t: coachT } = useCoachText();
+  const myCoach = useMyCoach();
+  const { respondNutrition } = useCoachMutations();
+  const [coachBusy, setCoachBusy] = useState<'accept' | 'later' | null>(null);
 
   const day = today.data ?? null;
   const date = today.date;
@@ -241,6 +253,47 @@ export function NutritionPlanScreen({ navigation }: Props) {
     }
   };
 
+  const coach = myCoach.data?.coach ?? null;
+  const offer = coach ? myCoach.data?.nutritionAssignment ?? null : null;
+  const respond = (accept: boolean) => {
+    if (!offer) {
+      return;
+    }
+    setCoachBusy(accept ? 'accept' : 'later');
+    respondNutrition.mutate(
+      { assignmentId: offer.assignmentId, accept },
+      {
+        onSuccess: () => {
+          if (accept) {
+            toast.show(coachT('coach.offer.accepted'));
+          }
+        },
+        onError: () => toast.show(coachT('coach.offer.failed'), { tone: 'error' }),
+        onSettled: () => setCoachBusy(null),
+      },
+    );
+  };
+  // The server says it (target_source 'coach'); an accepted offer counts while
+  // Nutrition is still shared (turning it off deactivates the coach plan).
+  const coachPlanActive =
+    Boolean(day?.targets.fromCoach) ||
+    (offer?.status === 'accepted' && myCoach.data?.shares.nutrition === true);
+  const coachBlock =
+    coach && offer?.status === 'pending' ? (
+      <CoachNutritionOffer
+        coachName={coach.name}
+        coachAvatar={coach.avatar}
+        assignment={offer}
+        busy={coachBusy}
+        onAccept={() => respond(true)}
+        onLater={() => respond(false)}
+      />
+    ) : coach && offer?.status === 'declined' ? (
+      <CoachOfferDeclinedRow coachName={coach.name} busy={coachBusy === 'accept'} onActivate={() => respond(true)} />
+    ) : coachPlanActive ? (
+      <CoachPlanLabel coachName={day?.targets.coachName ?? coach?.name ?? null} />
+    ) : null;
+
   const todayBody = today.isError ? (
     <BlockError message="No pudimos cargar tu nutrición." onRetry={() => today.refetch().catch(() => undefined)} />
   ) : !day ? (
@@ -253,6 +306,7 @@ export function NutritionPlanScreen({ navigation }: Props) {
     </SkeletonGroup>
   ) : (
     <>
+      {coachBlock}
       <TodayRing day={day} onCreatePlan={() => createPlan()} />
       <MacroTanks day={day} />
       <View style={styles.meals}>

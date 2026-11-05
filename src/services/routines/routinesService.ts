@@ -5,6 +5,7 @@ import type {
   RoutineBlock,
   RoutineOrigin,
   Workout,
+  WorkoutCoachAssignment,
   WorkoutDifficulty,
   WorkoutExercise,
   WorkoutType,
@@ -286,6 +287,39 @@ export function mapRoutine(raw: unknown): Workout {
   };
 }
 
+// coach-1 · get_routine adds `coach: { name, avatar }`, `coach_note` and
+// `assignment: { days, day_split, start_date, weeks }` to a copy assigned by
+// a coach. Read from the record or from the routine (both are accepted).
+export function parseCoachAssignment(
+  record: Record<string, unknown>,
+): WorkoutCoachAssignment | null {
+  const routine = asRecord(record.routine) ?? {};
+  const coach = asRecord(record.coach) ?? asRecord(routine.coach);
+  const name = str(coach?.name);
+  if (!coach || !name) {
+    return null;
+  }
+  const assignment = asRecord(record.assignment) ?? asRecord(routine.assignment) ?? {};
+  const split = asRecord(assignment.day_split);
+  const daySplit = split
+    ? Object.fromEntries(
+        Object.entries(split).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+      )
+    : null;
+  return {
+    coachName: name,
+    coachAvatar: str(coach.avatar),
+    note: str(record.coach_note) ?? str(routine.coach_note),
+    days: (Array.isArray(assignment.days) ? assignment.days : [])
+      .map(num)
+      .filter((day): day is number => day !== null && day >= 1 && day <= 7)
+      .sort((a, b) => a - b),
+    daySplit: daySplit && Object.keys(daySplit).length > 0 ? daySplit : null,
+    startDate: str(assignment.start_date),
+    weeks: num(assignment.weeks),
+  };
+}
+
 export function parseTodaySuggestion(body: Record<string, unknown>): TodaySuggestion {
   const source =
     body.source === 'rules' || body.source === 'weekly_plan' ? body.source : 'none';
@@ -459,7 +493,9 @@ export function createRoutinesService(rpc: RoutineRpc = supabaseRpc) {
 
     async getRoutine(id: string): Promise<Workout> {
       const record = expectOk(await rpc('get_routine', { _id: id }));
-      return mapRoutine(record.routine);
+      const routine = mapRoutine(record.routine);
+      const coachAssignment = parseCoachAssignment(record);
+      return coachAssignment ? { ...routine, coachAssignment } : routine;
     },
 
     async listRoutines(params: {

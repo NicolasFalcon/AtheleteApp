@@ -16,11 +16,17 @@ import {
   StatusBarShield,
   StatusBarV2,
   TextV2,
+  UnderlineTabs,
   useThemeV2,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
 import { ExercisesView } from '@app/features/workouts/v2/ExercisesView';
 import { RoutinesView } from '@app/features/workouts/v2/RoutinesView';
+import { useCoachText } from '@app/features/coach/coachCopy';
+import { useIsCoach } from '@app/features/coach/useCoach';
+import { CoachStudentsView } from '@app/features/coach/v2/CoachStudentsView';
+import { isCoachDay } from '@app/features/week/weekModel';
+import { useWeekPlan } from '@app/hooks/useWeekPlan';
 import { useAuth } from '@app/hooks/useAuth';
 import { useCatalogTotal } from '@app/hooks/useCatalog';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
@@ -29,6 +35,7 @@ import type { TabScreenProps } from '@app/types/navigation';
 
 type Props = TabScreenProps<'Workouts'>;
 type Segment = 'routines' | 'exercises';
+type Area = 'mine' | 'students';
 
 // Entrenos v2 (Workouts.dc.html · WORKOUTS_01–03): root header with "+",
 // segmented Rutinas / Ejercicios. Rutinas: every visible routine through
@@ -48,6 +55,19 @@ export function WorkoutsScreen({ navigation, route }: Props) {
   const [segment, setSegment] = useState<Segment>(
     route.params?.segment ?? 'routines',
   );
+  // Coach (v2.20): Mis entrenos (this screen as always) · Mis alumnos.
+  const isCoach = useIsCoach();
+  const { t } = useCoachText();
+  const [area, setArea] = useState<Area>(route.params?.area ?? 'mine');
+  // The coach's assignment takes "Tu próxima sesión" with the COACH label
+  // (get_week_plan, source 'coach'; §30.2.1).
+  const weekQuery = useWeekPlan();
+  const todayDay =
+    weekQuery.data?.days.find(day => day.date === weekQuery.data?.today) ?? null;
+  const coachSession =
+    todayDay && isCoachDay(todayDay) && todayDay.routine && todayDay.status !== 'done'
+      ? { routine: todayDay.routine, minutes: todayDay.minutes, tag: t('coach.tag') }
+      : null;
   const scrollRef = useRef<ScrollView>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
   const onScroll = useCallback(
@@ -62,6 +82,9 @@ export function WorkoutsScreen({ navigation, route }: Props) {
     if (route.params?.segment) {
       setSegment(route.params.segment);
     }
+    if (route.params?.area) {
+      setArea(route.params.area);
+    }
   }, [route.params]);
 
   const firstFocus = useRef(true);
@@ -73,6 +96,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
       }
       routinesQuery.refetch().catch(() => {});
       categoriesQuery.refetch().catch(() => {});
+      weekQuery.refetch().catch(() => {});
       // refetch is stable.
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
@@ -111,25 +135,52 @@ export function WorkoutsScreen({ navigation, route }: Props) {
               onPress={() => navigation.navigate(APP_ROUTES.CreateRoutine)}
             />
           </View>
-          <Segmented
-            options={[
-              { key: 'routines', label: 'Rutinas' },
-              { key: 'exercises', label: 'Ejercicios' },
-            ]}
-            value={segment}
-            onChange={key => {
-              setSegment(key);
-              scrollRef.current?.scrollTo({ y: 0, animated: false });
-              scrollY.setValue(0);
-            }}
-          />
+          {isCoach ? (
+            <UnderlineTabs
+              options={[
+                { key: 'mine', label: t('coach.tabs.mine') },
+                { key: 'students', label: t('coach.tabs.students') },
+              ]}
+              value={area}
+              onChange={key => {
+                setArea(key);
+                scrollRef.current?.scrollTo({ y: 0, animated: false });
+                scrollY.setValue(0);
+              }}
+            />
+          ) : null}
+          {!isCoach || area === 'mine' ? (
+            <Segmented
+              options={[
+                { key: 'routines', label: 'Rutinas' },
+                { key: 'exercises', label: 'Ejercicios' },
+              ]}
+              value={segment}
+              onChange={key => {
+                setSegment(key);
+                scrollRef.current?.scrollTo({ y: 0, animated: false });
+                scrollY.setValue(0);
+              }}
+            />
+          ) : null}
         </View>
 
-        {segment === 'routines' ? (
+        {isCoach && area === 'students' ? (
+          <CoachStudentsView
+            showTitle={false}
+            onOpenStudent={student =>
+              navigation.navigate(APP_ROUTES.CoachStudent, {
+                linkId: student.linkId,
+                name: student.name,
+              })
+            }
+          />
+        ) : segment === 'routines' ? (
           <RoutinesView
             workouts={workouts}
             categories={categoriesQuery.data ?? []}
             suggestion={suggestionQuery.data?.suggestion ?? null}
+            coachSession={coachSession}
             loading={routinesQuery.isLoading || categoriesQuery.isLoading || !favorites.loaded}
             error={Boolean(routinesQuery.error || categoriesQuery.error)}
             onRetry={() => {

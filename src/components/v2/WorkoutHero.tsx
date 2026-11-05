@@ -19,6 +19,8 @@ export type WorkoutHeroProps = {
   image: ImageSourcePropType;
   height: number;
   eyebrow: string;
+  // Drawn before the eyebrow on the same line (the COACH pill, §30.2).
+  eyebrowLeading?: ReactNode;
   title: string;
   // Detalle de rutina: trío of figures with dividers.
   stats?: WorkoutHeroStat[];
@@ -51,6 +53,7 @@ export function WorkoutHero({
   image,
   height,
   eyebrow,
+  eyebrowLeading,
   title,
   stats,
   meta,
@@ -136,9 +139,18 @@ export function WorkoutHero({
             cover ? event => setTextsTop(event.nativeEvent.layout.y) : undefined
           }
         >
-          <TextV2 variant="eyebrow" color="#A8A6A1">
-            {eyebrow}
-          </TextV2>
+          {eyebrowLeading ? (
+            <View style={styles.eyebrowRow}>
+              {eyebrowLeading}
+              <TextV2 variant="eyebrow" color="#A8A6A1">
+                {eyebrow}
+              </TextV2>
+            </View>
+          ) : (
+            <TextV2 variant="eyebrow" color="#A8A6A1">
+              {eyebrow}
+            </TextV2>
+          )}
           <TextV2
             variant={detail ? 'title24' : 'title22'}
             color="#FFFFFF"
@@ -211,6 +223,11 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 20,
     right: 20,
+  },
+  eyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   detailTitle: {
     marginTop: -6,

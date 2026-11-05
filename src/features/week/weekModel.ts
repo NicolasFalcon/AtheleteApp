@@ -38,6 +38,10 @@ export type WeekDay = {
   skippedResolution: 'rescheduled' | 'kept' | null;
   status: WeekDayStatus;
   core33: { active: boolean; day: number; habitsDone: number } | null;
+  // coach-1: a day written by the coach's assignment (label COACH).
+  source?: 'coach' | null;
+  coachName?: string | null;
+  assignmentId?: string | null;
 };
 
 export type WeekFocus = 'strength' | 'hypertrophy' | 'endurance' | 'mixed';
@@ -157,7 +161,15 @@ export function parseWeekDay(raw: unknown): WeekDay {
           habitsDone: num(core.habits_done) ?? 0,
         }
       : null,
+    source: row.source === 'coach' ? 'coach' : null,
+    coachName: str(row.coach_name),
+    assignmentId: str(row.assignment_id),
   };
+}
+
+// The day comes from the coach's assignment (COACH label, v2.20 §30.2).
+export function isCoachDay(day: Pick<WeekDay, 'source'> | null | undefined): boolean {
+  return day?.source === 'coach';
 }
 
 export function parseWeekPlan(body: Record<string, unknown>): WeekPlan {

@@ -1,3 +1,4 @@
+import { useCoachLink } from '@app/features/coach/useCoachLink';
 import { useEffect, type PropsWithChildren } from 'react';
 import { StyleSheet } from 'react-native';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -30,6 +31,8 @@ function AppNavigation({ children }: PropsWithChildren) {
   useSessionFeedbackSync();
   // Tapping the workout Live Activity opens the running session.
   useSessionLink();
+  // ATHELETE Coach invitation links (athelete://coach/join?code=…).
+  useCoachLink();
   // Live Activities and rest notifications with no session open (a killed
   // app…): ended at launch and on every return to the foreground.
   useOrphanLiveActivityCleanup();

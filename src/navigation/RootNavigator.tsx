@@ -21,6 +21,13 @@ import { RouteResultScreen } from '@app/screens/route/RouteResultScreen';
 import { RouteSavedScreen } from '@app/screens/route/RouteSavedScreen';
 import { ShareScreen } from '@app/screens/share/ShareScreen';
 import { WearScreen } from '@app/screens/wear/WearScreen';
+import { CoachAssignNutritionScreen } from '@app/screens/coach/CoachAssignNutritionScreen';
+import { CoachAssignRoutineScreen } from '@app/screens/coach/CoachAssignRoutineScreen';
+import { CoachConsentScreen } from '@app/screens/coach/CoachConsentScreen';
+import { CoachJoinScreen } from '@app/screens/coach/CoachJoinScreen';
+import { CoachStudentScreen } from '@app/screens/coach/CoachStudentScreen';
+import { CoachStudentsScreen } from '@app/screens/coach/CoachStudentsScreen';
+import { MyCoachScreen } from '@app/screens/coach/MyCoachScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -415,6 +422,14 @@ export function RootNavigator() {
             name={APP_ROUTES.BodyScienceArticle}
             component={BodyScienceArticleDetailScreen}
           />
+          {/* ATHELETE Coach (v2.20 §30). */}
+          <Stack.Screen name={APP_ROUTES.CoachStudents} component={CoachStudentsScreen} />
+          <Stack.Screen name={APP_ROUTES.CoachStudent} component={CoachStudentScreen} />
+          <Stack.Screen name={APP_ROUTES.CoachAssignRoutine} component={CoachAssignRoutineScreen} />
+          <Stack.Screen name={APP_ROUTES.CoachAssignNutrition} component={CoachAssignNutritionScreen} />
+          <Stack.Screen name={APP_ROUTES.CoachJoin} component={CoachJoinScreen} />
+          <Stack.Screen name={APP_ROUTES.CoachConsent} component={CoachConsentScreen} />
+          <Stack.Screen name={APP_ROUTES.MyCoach} component={MyCoachScreen} />
         </Stack.Group>
       ) : null}
     </Stack.Navigator>

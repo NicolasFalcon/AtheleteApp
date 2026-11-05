@@ -25,6 +25,9 @@ export const LOCAL_FLAG = 'athelete_local';
 const isLocal = (notification: Notification): boolean =>
   (notification.request.content.data as Record<string, unknown> | undefined)?.[LOCAL_FLAG] === true;
 
+const isCoachPush = (notification: Notification): boolean =>
+  String((notification.request.content.data as Record<string, unknown> | undefined)?.type ?? '').startsWith('coach_');
+
 function targetOf(notification: Notification) {
   const data = parsePushData(notification.request.content.data);
   return data ? targetForPush(data) : null;
@@ -37,7 +40,8 @@ function targetOf(notification: Notification) {
 //    screen of the notification, or to the inbox if the entity is gone;
 //  · icon badge = unread count.
 export function usePushEvents(): void {
-  const { flow, session } = useAuth();
+  const { flow, session, profile } = useAuth();
+  const isCoach = profile?.isCoach === true;
   const client = useQueryClient();
   const userId = session?.user.id;
   const ready = flow === 'app' && Boolean(userId);
@@ -63,12 +67,19 @@ export function usePushEvents(): void {
         return;
       }
       const resolved = await resolveTarget(target, pushChecks);
-      navigateToTarget((name, params) => {
-        (navigationRef.navigate as (route: string, options?: object) => void)(name, params);
-      }, resolved);
+      navigateToTarget(
+        (name, params) => {
+          (navigationRef.navigate as (route: string, options?: object) => void)(name, params);
+        },
+        resolved,
+        { isCoach },
+      );
       client.invalidateQueries({ queryKey: ['social'] }).catch(() => undefined);
+      if (isCoachPush(response.notification)) {
+        client.invalidateQueries({ queryKey: ['coach'] }).catch(() => undefined);
+      }
     },
-    [client],
+    [client, isCoach],
   );
 
   // "Tomado" / "Recordar en 30 min" of a supplement reminder: done at once,
@@ -129,6 +140,12 @@ export function usePushEvents(): void {
     const received = Notifications.addNotificationReceivedListener(notification => {
       if (!isLocal(notification)) {
         client.invalidateQueries({ queryKey: ['social'] }).catch(() => undefined);
+        // A coach push changes what Coach, the week or Nutrición show.
+        if (isCoachPush(notification)) {
+          client.invalidateQueries({ queryKey: ['coach'] }).catch(() => undefined);
+          client.invalidateQueries({ queryKey: ['week'] }).catch(() => undefined);
+          client.invalidateQueries({ queryKey: ['nutrition-day'] }).catch(() => undefined);
+        }
       }
     });
     registerSupplementCategory().catch(() => undefined);

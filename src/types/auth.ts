@@ -71,6 +71,8 @@ export type ProfileRecord = {
   core33InviteDismissCount: number;
   // profiles.created_at ("Atleta desde …" in Perfil).
   createdAt: string | null;
+  // profiles.is_coach (coach-1): activated by hand during the beta.
+  isCoach?: boolean;
   // profiles.notification_prefs (BT-31).
   notificationPrefs: NotificationPrefs;
   // profiles.notification_prefs.push (PUSH_SHAPES §2), with its defaults.

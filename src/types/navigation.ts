@@ -75,12 +75,19 @@ export type RoutineListRouteParams = {
 // Entrenos tab (WORKOUTS_01 / 03).
 export type WorkoutsTabParams = {
   segment?: 'routines' | 'exercises';
+  // Coach only (v2.20): Mis entrenos · Mis alumnos.
+  area?: 'mine' | 'students';
 };
 
 export type RoutineBuilderRouteParams = {
   workoutId?: Workout['id'];
   initialExerciseId?: LibraryExercise['id'];
   initialExerciseName?: string;
+  // Coach · "Editar copia": a new routine prefilled from this one.
+  copyFromId?: Workout['id'];
+  // Coach · Asignar rutina: back to the flow after saving (instead of the
+  // routine's detail).
+  afterSave?: 'back';
 };
 
 export type EditRoutineRouteParams = {
@@ -274,6 +281,19 @@ export type AppStackParamList = {
   SocialModeration: undefined;
   SocialModerationItem: { targetId: string };
   SocialRoutine: { postId: string };
+  // ATHELETE Coach (v2.20 §30).
+  CoachStudents: undefined;
+  CoachStudent: { linkId: string; name?: string };
+  CoachAssignRoutine: {
+    linkId: string;
+    studentName: string;
+    // "Editar copia": opens the editor with this routine first.
+    editCopyOf?: string;
+  };
+  CoachAssignNutrition: { linkId: string };
+  CoachJoin: { code?: string } | undefined;
+  CoachConsent: { code: string; via: 'code' | 'link' };
+  MyCoach: undefined;
 };
 
 export type RootStackParamList = {

@@ -1,3 +1,4 @@
+import { CoachHomeCard } from '@app/features/coach/v2/CoachHomeCard';
 import { GuideAnchor, useGuide } from '@app/features/guides/GuideAnchor';
 import { RecoveryTiles } from '@app/features/home/v2/RecoveryTiles';
 import { RouteCard } from '@app/features/home/v2/RouteCard';
@@ -492,6 +493,7 @@ export function HomeScreen({ navigation }: Props) {
             },
           ]}
         >
+          <CoachHomeCard onOpen={() => navigation.navigate(APP_ROUTES.CoachStudents)} />
           {sections.map(key => {
             switch (key) {
               case 'day':

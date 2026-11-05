@@ -40,6 +40,8 @@ import {
   workoutsText,
 } from '@app/features/workouts/workoutsCopy';
 import type { RoutineLibraryCategory, RoutineSuggestion } from '@app/services/routines/routinesService';
+import type { WeekRoutine } from '@app/features/week/weekModel';
+import { CoachTag } from '@app/features/coach/v2/CoachParts';
 import type { Workout } from '@app/shared';
 
 export type RoutinesViewProps = {
@@ -47,6 +49,9 @@ export type RoutinesViewProps = {
   categories: RoutineLibraryCategory[];
   // get_today_suggestion (null: none today → no hero).
   suggestion: RoutineSuggestion | null;
+  // Today's session of the coach's assignment (get_week_plan, source
+  // 'coach'): it takes the hero with the COACH label (v2.20 §30.2.1).
+  coachSession?: { routine: WeekRoutine; minutes: number | null; tag: string } | null;
   loading: boolean;
   error: boolean;
   onRetry: () => void;
@@ -73,6 +78,7 @@ export function RoutinesView({
   workouts,
   categories,
   suggestion,
+  coachSession = null,
   loading,
   error,
   onRetry,
@@ -107,7 +113,31 @@ export function RoutinesView({
 
   return (
     <>
-      {suggestion ? (
+      {coachSession ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`${coachSession.tag}. Tu próxima sesión: ${coachSession.routine.title}`}
+          onPress={() => onOpenWorkout(coachSession.routine.id)}
+          style={{ marginHorizontal: -layout.gutter }}
+        >
+          <WorkoutHero
+            image={routineCoverSource(coachSession.routine.routineFocus, cover.gender)}
+            coverWord={routineFocusWord(coachSession.routine, cover.language)}
+            dim={false}
+            height={300}
+            eyebrow="Tu próxima sesión"
+            eyebrowLeading={<CoachTag label={coachSession.tag} />}
+            title={coachSession.routine.title}
+            meta={[
+              `${coachSession.minutes ?? coachSession.routine.duration} min`,
+              coachSession.routine.exerciseCount ? `${coachSession.routine.exerciseCount} ejercicios` : null,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            metaTrailing={<PlayDisc />}
+          />
+        </PressableScale>
+      ) : suggestion ? (
         <PressableScale
           accessibilityRole="button"
           accessibilityLabel={`Tu próxima sesión: ${suggestion.title}. ${suggestion.reason}`}

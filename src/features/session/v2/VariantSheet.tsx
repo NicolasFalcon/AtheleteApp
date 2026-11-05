@@ -107,6 +107,7 @@ export function VariantSheet({
   originalName,
   appliedExerciseId,
   routineTitle,
+  canSaveInRoutine = true,
   reason,
   language,
   saving,
@@ -126,6 +127,9 @@ export function VariantSheet({
   originalName: string;
   appliedExerciseId: string | null;
   routineTitle: string;
+  // false: the routine assigned by a coach (can_edit false while the
+  // assignment is active): the variant is for today only.
+  canSaveInRoutine?: boolean;
   reason: SessionVariantReason | null;
   language: 'es' | 'en';
   saving: boolean;
@@ -156,7 +160,9 @@ export function VariantSheet({
       <Sheet open={open} onClose={onClose} eyebrow="Variante elegida" title={step.variant.name}>
         <View style={styles.saveBody}>
           <TextV2 variant="body" color={C.meta}>
-            {`En lugar de ${originalName}. ¿La usamos solo hoy o la guardamos en ${routineTitle}?`}
+            {canSaveInRoutine
+              ? `En lugar de ${originalName}. ¿La usamos solo hoy o la guardamos en ${routineTitle}?`
+              : `En lugar de ${originalName}, solo en esta sesión. La rutina de tu coach no cambia.`}
           </TextV2>
           <View style={styles.saveButtons}>
             <PressableScale
@@ -169,17 +175,19 @@ export function VariantSheet({
                 Solo hoy
               </TextV2>
             </PressableScale>
-            <PressableScale
-              accessibilityRole="button"
-              accessibilityState={{ busy: saving }}
-              disabled={saving}
-              onPress={onSaveInRoutine}
-              style={[styles.bigPill, styles.tilePill, saving ? styles.busy : null]}
-            >
-              <TextV2 variant="cta" color={C.white}>
-                {saving ? 'Guardando…' : 'Guardar en la rutina'}
-              </TextV2>
-            </PressableScale>
+            {canSaveInRoutine ? (
+              <PressableScale
+                accessibilityRole="button"
+                accessibilityState={{ busy: saving }}
+                disabled={saving}
+                onPress={onSaveInRoutine}
+                style={[styles.bigPill, styles.tilePill, saving ? styles.busy : null]}
+              >
+                <TextV2 variant="cta" color={C.white}>
+                  {saving ? 'Guardando…' : 'Guardar en la rutina'}
+                </TextV2>
+              </PressableScale>
+            ) : null}
             <PressableScale accessibilityRole="button" disabled={saving} onPress={onChooseAnother} style={styles.textButton}>
               <TextV2 variant="bodyStrong" color={C.meta}>
                 Elegir otra
