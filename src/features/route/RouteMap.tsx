@@ -20,13 +20,13 @@ import {
 } from '@app/features/route/routeGeoJson';
 import type { LatLng } from '@app/features/route/routeTypes';
 
-export type RouteMapPoint = { id: string; point: LatLng; selected?: boolean; label?: string };
-
 export type RouteMapProps = {
   // 'auto' follows the theme; the live and share scenes force 'dark'.
   mode?: RouteMapMode | 'auto';
   // The route in Ember, with its soft halo.
   route?: readonly LatLng[];
+  // Other routes in solid grey, under `route` (Explorar: the not selected).
+  others?: ReadonlyArray<readonly LatLng[]>;
   // Parts of the track hidden from others (the owner sees them dotted grey).
   hiddenParts?: ReadonlyArray<readonly LatLng[]>;
   // The planned route (dotted, faint) and the guide back to it (dotted Ember).
@@ -38,9 +38,6 @@ export type RouteMapProps = {
   here?: LatLng | null;
   // Hollow start and solid end dots of a finished route.
   endpoints?: boolean;
-  // Hand-drawn points (first hollow, last solid; the selected one has a halo).
-  points?: readonly RouteMapPoint[];
-  onPointPress?: (id: string) => void;
   // Dashed target ring around a centre (Planear ruta · configuración).
   ring?: { center: LatLng; radiusM: number } | null;
   // Camera: fit these points with padding, or centre on one point.
@@ -65,14 +62,13 @@ const PADDING = { top: 0, right: 0, bottom: 0, left: 0 };
 export function RouteMap({
   mode = 'auto',
   route,
+  others,
   hiddenParts,
   plan,
   planStyle = 'grey',
   guide,
   here,
   endpoints = false,
-  points,
-  onPointPress,
   ring,
   fit,
   padding = PADDING,
@@ -91,6 +87,13 @@ export function RouteMap({
 
   const routeData = useMemo(() => lineFeature(route ?? []), [route]);
   const planData = useMemo(() => lineFeature(plan ?? []), [plan]);
+  const othersData = useMemo<LineFC>(
+    () => ({
+      type: 'FeatureCollection',
+      features: (others ?? []).filter(line => line.length > 1).flatMap(line => lineFeature(line).features),
+    }),
+    [others],
+  );
   const guideData = useMemo(() => lineFeature(guide ?? []), [guide]);
   const hiddenData = useMemo<LineFC>(
     () => ({
@@ -99,7 +102,6 @@ export function RouteMap({
     }),
     [hiddenParts],
   );
-  const manualData = useMemo(() => lineFeature((points ?? []).map(p => p.point)), [points]);
   const ringData = useMemo(() => (ring ? circlePolygon(ring.center, ring.radiusM) : null), [ring]);
 
   const camera = useMemo(() => {
@@ -184,6 +186,17 @@ export function RouteMap({
           </GeoJSONSource>
         ) : null}
 
+        {others && others.length > 0 ? (
+          <GeoJSONSource id="others" data={othersData}>
+            <Layer
+              id="others-line"
+              type="line"
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+              paint={{ 'line-color': resolved === 'dark' ? '#8C8A85' : '#A8A6A1', 'line-width': 3.5 }}
+            />
+          </GeoJSONSource>
+        ) : null}
+
         {hiddenParts && hiddenParts.length > 0 ? (
           <GeoJSONSource id="hidden" data={hiddenData}>
             <Layer
@@ -216,23 +229,6 @@ export function RouteMap({
           </GeoJSONSource>
         ) : null}
 
-        {points && points.length > 1 ? (
-          <GeoJSONSource id="manual" data={manualData}>
-            <Layer
-              id="manual-halo"
-              type="line"
-              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-              paint={{ 'line-color': ROUTE_EMBER, 'line-opacity': 0.22, 'line-width': 13 }}
-            />
-            <Layer
-              id="manual-line"
-              type="line"
-              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-              paint={{ 'line-color': ROUTE_EMBER, 'line-width': 4.5 }}
-            />
-          </GeoJSONSource>
-        ) : null}
-
         {guide && guide.length > 1 ? (
           <GeoJSONSource id="guide" data={guideData}>
             <Layer
@@ -254,27 +250,6 @@ export function RouteMap({
             </Marker>
           </>
         ) : null}
-
-        {points?.map((item, index) => {
-          const first = index === 0;
-          const last = index === points.length - 1 && points.length > 1;
-          return (
-            <Marker
-              key={item.id}
-              id={`pt-${item.id}`}
-              lngLat={[item.point.lon, item.point.lat]}
-              onPress={() => onPointPress?.(item.id)}
-            >
-              <View
-                style={[
-                  styles.manual,
-                  first ? styles.manualFirst : last ? styles.manualLast : styles.manualMid,
-                  item.selected ? styles.manualSelected : null,
-                ]}
-              />
-            </Marker>
-          );
-        })}
 
         {here ? (
           <Marker id="here" lngLat={[here.lon, here.lat]}>
@@ -322,17 +297,5 @@ const styles = StyleSheet.create({
     backgroundColor: ROUTE_EMBER,
     borderWidth: 3.5,
     borderColor: '#FFFFFF',
-  },
-  manual: { width: 22, height: 22, borderRadius: 11, borderWidth: 3 },
-  manualFirst: { backgroundColor: '#FFFFFF', borderColor: '#121212' },
-  manualMid: { backgroundColor: '#FFFFFF', borderColor: ROUTE_EMBER },
-  manualLast: { backgroundColor: '#FFFFFF', borderColor: ROUTE_EMBER },
-  manualSelected: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: ROUTE_EMBER,
-    borderColor: '#FFFFFF',
-    boxShadow: '0 0 0 8px rgba(255,91,31,.22)',
   },
 });

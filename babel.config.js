@@ -9,7 +9,7 @@ module.exports = api => {
             'module:react-native-dotenv',
             {
               moduleName: '@env',
-              path: '.env',
+              path: api.env('production') ? '.env.production' : '.env',
               safe: false,
               allowUndefined: true,
             },

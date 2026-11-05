@@ -72,7 +72,7 @@ export function useCore33() {
       await markCore33IntroSeen(profile.id);
       await refreshProfile();
     } catch (error) {
-      console.warn('[core33] No se pudo guardar la intro vista.', error);
+      __DEV__ && console.warn('[core33] No se pudo guardar la intro vista.', error);
     }
   }, [profile?.core33IntroSeenAt, profile?.id, refreshProfile]);
 

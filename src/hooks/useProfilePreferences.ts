@@ -51,7 +51,7 @@ export function useProfilePreferences() {
       await refreshProfile();
       await AsyncStorage.removeItem(legacyPreferencesKey(userId));
     })().catch(error =>
-      console.warn('[preferences] No se pudieron migrar los avisos.', error),
+      __DEV__ && console.warn('[preferences] No se pudieron migrar los avisos.', error),
     );
     // Runs once per user.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -69,7 +69,7 @@ export function useProfilePreferences() {
       saveNotificationPrefs(userId, next)
         .then(() => refreshProfile())
         .catch(error => {
-          console.warn('[preferences] No se pudo guardar.', error);
+          __DEV__ && console.warn('[preferences] No se pudo guardar.', error);
           setNotifications(previous);
           toast.show('No pudimos guardar el cambio', { tone: 'error' });
         })

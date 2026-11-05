@@ -30,7 +30,7 @@ export function useNutritionPlan() {
       }
 
       invalidateNutritionPlanQueries(queryClient, profile.id).catch(error => {
-        console.warn(
+        __DEV__ && console.warn(
           '[nutrition-plan] No se pudieron refrescar todas las superficies.',
           error,
         );

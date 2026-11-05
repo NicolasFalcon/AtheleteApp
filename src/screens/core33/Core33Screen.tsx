@@ -84,7 +84,7 @@ export function Core33Screen({ navigation }: Props) {
         routes: [{ name: ROOT_ROUTES.MainTabs }, { name: APP_ROUTES.Core33Explore }],
       } as never);
     } catch (error) {
-      console.warn('[core33] No se pudo dejar el reto:', error);
+      __DEV__ && console.warn('[core33] No se pudo dejar el reto:', error);
       toast.show('No pudimos dejar el reto', { tone: 'error' });
       setLeaving(false);
     }

@@ -143,7 +143,7 @@ export function useSessionRunner({
         // The planned exercises must exist before any set is replayed: the
         // sets reference them (workout_session_sets_exercise_fk).
         await ensureSessionExercises(sessionId, basePlan).catch(error =>
-          console.warn(
+          __DEV__ && console.warn(
             '[session] Ejercicios planificados sin guardar:',
             describeError(error),
           ),
@@ -201,7 +201,7 @@ export function useSessionRunner({
             .catch(() => {});
         }
       } catch (error) {
-        console.warn('[session] No se pudo cargar la sesión.', error);
+        __DEV__ && console.warn('[session] No se pudo cargar la sesión.', error);
         if (!cancelled) {
           setLoadState('error');
         }
@@ -349,7 +349,7 @@ export function useSessionRunner({
           ),
         )
         .catch(error => {
-          console.warn('[session] Serie sin guardar:', describeError(error));
+          __DEV__ && console.warn('[session] Serie sin guardar:', describeError(error));
           return enqueueSessionWrite(userId, { kind: 'set', write });
         }),
     );
@@ -357,7 +357,7 @@ export function useSessionRunner({
     if (clock) {
       track(
         recordSessionActivity(sessionId, activeSeconds(clock, Date.now())).catch(
-          error => console.warn('[session] Actividad sin registrar.', error),
+          error => __DEV__ && console.warn('[session] Actividad sin registrar.', error),
         ),
       );
     }
@@ -367,7 +367,7 @@ export function useSessionRunner({
           markSessionExercise(sessionId, exercise.position, true),
           syncCompletedExercises(sessionId, plan, setsAfter),
         ]).catch(error =>
-          console.warn('[session] Progreso del ejercicio sin sincronizar.', error),
+          __DEV__ && console.warn('[session] Progreso del ejercicio sin sincronizar.', error),
         ),
       );
     }
@@ -416,7 +416,7 @@ export function useSessionRunner({
     setRest(currentRest => (currentRest ? freezeRest(currentRest, at) : null));
     if (sessionId) {
       setSessionPaused(sessionId, next, activeSeconds(next, at)).catch(error =>
-        console.warn('[session] La pausa no se pudo guardar.', error),
+        __DEV__ && console.warn('[session] La pausa no se pudo guardar.', error),
       );
     }
   }, [clock, sessionId]);
@@ -432,7 +432,7 @@ export function useSessionRunner({
     if (sessionId) {
       // Resuming is activity: the row's minutes are refreshed here.
       setSessionPaused(sessionId, next, activeSeconds(next, at)).catch(error =>
-        console.warn('[session] La reanudación no se pudo guardar.', error),
+        __DEV__ && console.warn('[session] La reanudación no se pudo guardar.', error),
       );
     }
   }, [clock, sessionId]);
@@ -530,7 +530,7 @@ export function useSessionRunner({
       setSaveError(null);
       onLeave();
     } catch (error) {
-      console.warn('[session] No se pudo guardar para después:', describeError(error));
+      __DEV__ && console.warn('[session] No se pudo guardar para después:', describeError(error));
       setSaveErrorDetail(describeError(error));
       setClock(frozen);
       setSaveErrorKind('save');
@@ -567,7 +567,7 @@ export function useSessionRunner({
       setSaveError(null);
       onCompleted(result);
     } catch (error) {
-      console.warn('[session] No se pudo completar la sesión:', describeError(error));
+      __DEV__ && console.warn('[session] No se pudo completar la sesión:', describeError(error));
       setSaveErrorDetail(describeError(error));
       setSaveError(payload);
     } finally {
@@ -642,7 +642,7 @@ export function useSessionRunner({
           reason: variant.reason,
         });
       } catch (error) {
-        console.warn('[session] Variante sin guardar:', describeError(error));
+        __DEV__ && console.warn('[session] Variante sin guardar:', describeError(error));
       }
     },
     [basePlan, sessionId],
@@ -668,7 +668,7 @@ export function useSessionRunner({
           reason: null,
         });
       } catch (error) {
-        console.warn('[session] No se pudo deshacer la variante:', describeError(error));
+        __DEV__ && console.warn('[session] No se pudo deshacer la variante:', describeError(error));
       }
     },
     [basePlan, sessionId],

@@ -6,8 +6,10 @@ import {
   buildPlannedPayload,
   buildSavePayload,
   isRetryableFailure,
+  mapExploreError,
   mapGenerateError,
   parseActivityList,
+  parseExploreResponse,
   parseGenerateResponse,
   parseOutdoorMonth,
   parsePlannedRoutes,
@@ -292,7 +294,39 @@ export const supabaseRouteService: RouteService = {
       // A 200 with an {error} body is also a code of the function.
       throw new RouteServiceError(mapGenerateError(200, data) === 'unknown' ? result.error : mapGenerateError(200, data));
     }
-    return result.route;
+    return result.options;
+  },
+
+  // ── explore-routes ──────────────────────────────────────────────────────
+  async exploreRoutes(params) {
+    const supabase = client();
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session) {
+      throw new RouteServiceError('unauthorized');
+    }
+    const { data, error } = await supabase.functions.invoke('explore-routes', {
+      body: {
+        lat: params.origin.lat,
+        lon: params.origin.lon,
+        sport: params.sport,
+        radius_km: params.radiusKm,
+      },
+    });
+    if (error) {
+      const response = (error as { context?: unknown }).context as
+        | { status?: number; json?: () => Promise<unknown> }
+        | undefined;
+      if (response && typeof response.status === 'number') {
+        const body = await response.json?.().catch(() => null);
+        throw new RouteServiceError(mapExploreError(response.status, body));
+      }
+      throw new RouteServiceError(mapExploreError(null, null));
+    }
+    const parsed = parseExploreResponse(data, params.sport);
+    if (!parsed.ok) {
+      throw new RouteServiceError(parsed.error);
+    }
+    return parsed.result;
   },
 
   // ── Activities ──────────────────────────────────────────────────────────

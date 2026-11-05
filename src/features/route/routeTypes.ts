@@ -27,7 +27,44 @@ export type PlannedRoute = {
   elevationGainM: number;
   kind: RouteKind;
   surface: 'mixed' | 'asphalt' | 'trail';
-  origin: 'ellie' | 'manual';
+  origin: 'ellie' | 'manual' | 'explore';
+  // Explorar: where the route comes from and its stable reference
+  // (save_planned_route does not duplicate the same source + ref).
+  exploreSource?: ExploreSource;
+  exploreRef?: string;
+  // generate-route only: the server's one-line description of the option
+  // ("85 % por calles tranquilas… y casi plano"). Not saved.
+  summary?: string | null;
+};
+
+export type ExploreSource = 'osm' | 'community';
+export type ExploreBadge = 'popular' | 'cycleway' | 'known' | 'track';
+
+// A route of Explorar (explore-routes): a planned route ready to follow or
+// save, plus what the list shows.
+export type ExploreRoute = {
+  route: PlannedRoute;
+  source: ExploreSource;
+  badge: ExploreBadge;
+  // null: the source has no elevation (OSM).
+  elevationGainM: number | null;
+  distanceToStartM: number | null;
+  // Distinct athletes of a community route (0 for OSM).
+  athletesCount: number;
+};
+
+export type ExploreResult = {
+  routes: ExploreRoute[];
+  // "© OpenStreetMap contributors" (shown when there are OSM routes).
+  attribution: string | null;
+  // OpenStreetMap did not answer: only community routes came back.
+  osmUnavailable: boolean;
+};
+
+export type ExploreParams = {
+  sport: RouteSport;
+  origin: LatLng;
+  radiusKm: number;
 };
 
 // A finished activity.

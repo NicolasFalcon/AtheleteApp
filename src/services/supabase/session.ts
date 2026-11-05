@@ -584,7 +584,7 @@ export async function registerSessionPRs(params: {
         },
       });
     } catch (awardError) {
-      console.warn('[session-pr] No se pudo otorgar la recompensa.', awardError);
+      __DEV__ && console.warn('[session-pr] No se pudo otorgar la recompensa.', awardError);
     }
   }
   return inserted.length;

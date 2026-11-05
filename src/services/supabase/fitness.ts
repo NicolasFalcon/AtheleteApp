@@ -523,7 +523,7 @@ export async function completeWorkoutSession(params: {
       params.session.userId,
     );
   } catch (countError) {
-    console.warn(
+    __DEV__ && console.warn(
       '[workout-completion] No se pudo calcular la consistencia semanal.',
       countError,
     );

@@ -46,6 +46,7 @@
 	<array>
 		<string>instagram-stories</string>
 		<string>instagram</string>
+		<string>comgooglemaps</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

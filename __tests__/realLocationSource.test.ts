@@ -23,11 +23,17 @@ describe('toRoutePoint', () => {
 });
 
 describe('update options', () => {
-  it('keep the blue indicator, a 5 m filter and no automatic pause by iOS', () => {
+  it('keeps the iOS recording settings and the Android foreground notification', () => {
     expect(UPDATE_OPTIONS).toEqual({
       distanceInterval: 5,
       showsBackgroundLocationIndicator: true,
       pausesUpdatesAutomatically: false,
+      foregroundService: {
+        notificationTitle: 'ATHELETE está grabando tu ruta',
+        notificationBody: 'Toca para volver a tu actividad.',
+        notificationColor: '#FF5B1F',
+        killServiceOnDestroy: false,
+      },
     });
   });
 });
@@ -36,7 +42,7 @@ describe('RealLocationSource access', () => {
   it('maps the platform states', async () => {
     const api = createFakeLocationApi({ permission: { status: 'undetermined', canAskAgain: true, precise: true } });
     const source = new RealLocationSource(api);
-    expect(await source.getAccess()).toEqual({ permission: 'undetermined', precise: true });
+    expect(await source.getAccess()).toEqual({ permission: 'undetermined', precise: true, canAskAgain: true });
     // Only requestAccess shows the dialog.
     expect((await source.requestAccess()).permission).toBe('granted');
 
@@ -48,7 +54,7 @@ describe('RealLocationSource access', () => {
 
     api.services = true;
     api.permission = { status: 'granted', canAskAgain: true, precise: false };
-    expect(await source.getAccess()).toEqual({ permission: 'granted', precise: false });
+    expect(await source.getAccess()).toEqual({ permission: 'granted', precise: false, canAskAgain: true });
   });
 
   it('does not ask again once the system refuses to', async () => {

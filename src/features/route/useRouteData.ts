@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { RouteActivity, RouteGenerationParams } from '@app/features/route/routeTypes';
+import type { ExploreParams, RouteActivity, RouteGenerationParams } from '@app/features/route/routeTypes';
 import { useAuth } from '@app/hooks/useAuth';
 import { getRouteService } from '@app/services/route/useRouteService';
 
@@ -120,6 +120,31 @@ export function useGeneratedRoute(params: RouteGenerationParams | null) {
   return useQuery({
     queryKey: params ? generateRouteKey(params) : ['route-generate', 'none'],
     queryFn: () => getRouteService().generateRoute(params as RouteGenerationParams),
+    enabled: Boolean(params),
+    staleTime: 30 * 60_000,
+    gcTime: 60 * 60_000,
+    refetchOnMount: false,
+    retry: false,
+  });
+}
+
+// explore-routes by rounded origin (~100 m), sport and radius. Kept 30 min:
+// coming back to Explorar (or changing the distance filter, which is applied
+// here on the phone) does not spend the daily quota again.
+export function exploreRoutesKey(params: ExploreParams) {
+  return [
+    'route-explore',
+    params.sport,
+    Math.round(params.origin.lat * 1000) / 1000,
+    Math.round(params.origin.lon * 1000) / 1000,
+    params.radiusKm,
+  ] as const;
+}
+
+export function useExploreRoutes(params: ExploreParams | null) {
+  return useQuery({
+    queryKey: params ? exploreRoutesKey(params) : ['route-explore', 'none'],
+    queryFn: () => getRouteService().exploreRoutes(params as ExploreParams),
     enabled: Boolean(params),
     staleTime: 30 * 60_000,
     gcTime: 60 * 60_000,

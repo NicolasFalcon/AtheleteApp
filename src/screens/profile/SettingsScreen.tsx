@@ -168,7 +168,7 @@ export function SettingsScreen({ navigation }: Props) {
         await finishSession();
       }
     } catch (error) {
-      console.warn('[account] No se pudo eliminar la cuenta:', error);
+      __DEV__ && console.warn('[account] No se pudo eliminar la cuenta:', error);
       setDeleteOutcome(mapDeleteAccountResponse({ status: null, body: null }));
     } finally {
       setDeleting(false);

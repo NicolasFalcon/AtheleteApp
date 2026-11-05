@@ -31,7 +31,7 @@ export function useUserFavorites() {
       try {
         await migrateLocalFavorites(userId!);
       } catch (error) {
-        console.warn('[favorites] No se pudieron subir los favoritos locales.', error);
+        __DEV__ && console.warn('[favorites] No se pudieron subir los favoritos locales.', error);
       }
       return fetchFavorites(userId!);
     },
@@ -61,7 +61,7 @@ export function useUserFavorites() {
       return { previous };
     },
     onError: (error, vars, context) => {
-      console.warn('[favorites] No se pudo guardar el favorito.', error);
+      __DEV__ && console.warn('[favorites] No se pudo guardar el favorito.', error);
       queryClient.setQueryData(favoritesKey(userId), context?.previous);
       toast.show(
         vars.on

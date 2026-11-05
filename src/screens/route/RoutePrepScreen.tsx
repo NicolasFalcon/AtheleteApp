@@ -35,7 +35,9 @@ import {
 import { RoutePrivacySheet, visibilityLabel } from '@app/features/route/v2/RoutePrivacySheet';
 import { APP_ROUTES } from '@app/constants/routes';
 import { haversine } from '@app/features/route/routeGeo';
-import { ORS_ATTRIBUTION } from '@app/features/route/routeMappers';
+import { ORS_ATTRIBUTION, OSM_ATTRIBUTION } from '@app/features/route/routeMappers';
+import { routeText } from '@app/features/route/routeCopy';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { saveRouteDefaults, useRouteDefaults } from '@app/features/route/useRouteDefaults';
 import { usePlannedRoutes } from '@app/features/route/useRouteData';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -77,6 +79,7 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
   const session = useRouteSession();
   useRouteDefaults();
   const { sport, mode, config, plan } = session;
+  const language = useProfileLanguage();
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [otherOpen, setOtherOpen] = useState(false);
   const [backgroundOpen, setBackgroundOpen] = useState(false);
@@ -197,14 +200,19 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
 
       <BottomPanel style={{ paddingBottom: Math.max(insets.bottom, 16) + 4 }}>
         <View style={styles.tabs}>
-          {(['now', 'plan'] as const).map(key => {
+          {(['now', 'plan', 'explore'] as const).map(key => {
+            // Explorar is its own screen: the tab opens it (the mode stays).
             const active = mode === key;
             return (
               <PressableScale
                 key={key}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
-                onPress={() => routeStore.patch({ mode: key })}
+                onPress={() =>
+                  key === 'explore'
+                    ? navigation.navigate(APP_ROUTES.RouteExplore)
+                    : routeStore.patch({ mode: key })
+                }
                 style={styles.tab}
               >
                 <View
@@ -214,12 +222,18 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
                   ]}
                 />
                 <TextV2 variant="bodyStrong" color={active ? colors.text.primary : colors.text.secondary}>
-                  {key === 'now' ? 'Salir ahora' : 'Planear ruta'}
+                  {key === 'now'
+                    ? 'Salir ahora'
+                    : key === 'plan'
+                      ? 'Planear ruta'
+                      : routeText(language, 'route.tab.explore')}
                 </TextV2>
-                <TextV2 variant="meta" tone="secondary" numberOfLines={2}>
+                <TextV2 variant="meta" tone="secondary" numberOfLines={3}>
                   {key === 'now'
                     ? 'Comienza y deja que GPS registre tu recorrido.'
-                    : 'Define tu recorrido antes de salir.'}
+                    : key === 'plan'
+                      ? 'Define tu recorrido antes de salir.'
+                      : routeText(language, 'route.tab.explore.hint')}
                 </TextV2>
               </PressableScale>
             );
@@ -329,9 +343,9 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
                     El inicio de la ruta está a {formatKm(toStartM)} km de ti.
                   </TextV2>
                 ) : null}
-                {plan?.origin === 'ellie' ? (
+                {plan?.origin === 'ellie' || plan?.exploreSource === 'osm' ? (
                   <TextV2 variant="caption" tone="secondary">
-                    {ORS_ATTRIBUTION}
+                    {plan.origin === 'ellie' ? ORS_ATTRIBUTION : OSM_ATTRIBUTION}
                   </TextV2>
                 ) : null}
                 <View style={styles.headRow}>
@@ -457,15 +471,6 @@ export function RoutePrepScreen({ navigation }: AppScreenProps<'RoutePrep'>) {
               />
             </View>
             <View style={styles.actions}>
-              <Button
-                label="Crear a mano"
-                variant="outline"
-                onPress={() => {
-                  routeStore.patch({ manualPoints: [], manualSelected: null, manualEditing: false });
-                  navigation.navigate(APP_ROUTES.RouteManual);
-                }}
-                style={styles.actionHalf}
-              />
               <EllieActionButton
                 label="Generar ruta"
                 size="lg"
@@ -616,7 +621,7 @@ const styles = StyleSheet.create({
     gap: 14,
     alignItems: 'center',
   },
-  tabs: { flexDirection: 'row', gap: 16, marginBottom: 14 },
+  tabs: { flexDirection: 'row', gap: 12, marginBottom: 14 },
   tab: { flex: 1, gap: 4 },
   tabBar: { height: 2, borderRadius: 1, marginBottom: 6 },
   planCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 18, padding: 10 },

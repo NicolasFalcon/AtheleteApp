@@ -105,7 +105,7 @@ export async function syncHealthSleep(
     persist();
     await invalidateSleep(queryClient);
   } catch (error) {
-    console.warn('[health] No se pudo sincronizar el sueño:', error);
+    __DEV__ && console.warn('[health] No se pudo sincronizar el sueño:', error);
   } finally {
     set({ syncing: false });
   }

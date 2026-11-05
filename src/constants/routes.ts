@@ -61,7 +61,7 @@ export const APP_ROUTES = {
   RouteSoon: 'RouteSoon',
   RoutePrep: 'RoutePrep',
   RouteGen: 'RouteGen',
-  RouteManual: 'RouteManual',
+  RouteExplore: 'RouteExplore',
   RoutePreview: 'RoutePreview',
   RouteSaved: 'RouteSaved',
   RouteActive: 'RouteActive',

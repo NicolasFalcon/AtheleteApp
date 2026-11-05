@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 import type { ActiveRecording } from '@app/features/route/activeRecording';
 import type {
+  ExploreRoute,
   LatLng,
   PlannedRoute,
   RouteActivity,
@@ -34,10 +35,8 @@ export type RouteSession = {
   generated: PlannedRoute | null;
   generationSeed: number;
   draft: PlannedRoute | null;
-  // Hand-drawn points (Crear a mano).
-  manualPoints: LatLng[];
-  manualSelected: number | null;
-  manualEditing: boolean;
+  // The Explorar route opened in the preview (its badge, athletes…).
+  exploring: ExploreRoute | null;
   // Where the person is (from the LocationSource), for generate-route.
   origin: LatLng | null;
   // Privacy of this and the next outings.
@@ -63,9 +62,7 @@ export const INITIAL_SESSION: RouteSession = {
   generated: null,
   generationSeed: 0,
   draft: null,
-  manualPoints: [],
-  manualSelected: null,
-  manualEditing: false,
+  exploring: null,
   origin: null,
   visibility: 'friends',
   hideEndpoints: true,

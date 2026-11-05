@@ -127,7 +127,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     startSession()
       .then(session => setSessionId(session.id))
       .catch(error => {
-        console.warn('[session] No se pudo iniciar.', error);
+        __DEV__ && console.warn('[session] No se pudo iniciar.', error);
         setStartFailed(true);
       })
       .finally(() => {

@@ -299,7 +299,7 @@ export function useEllieConversation({
           if (!(error instanceof EllieStreamError) || !error.fallback) {
             throw error instanceof EllieStreamError ? error.failure : error;
           }
-          console.warn('[ellie] Stream falló; se pide sin stream.', error.failure.code);
+          __DEV__ && console.warn('[ellie] Stream falló; se pide sin stream.', error.failure.code);
           if (painted.size > 0) {
             dispatch({ type: 'discard', ids: [...painted] });
           }
@@ -432,7 +432,7 @@ export function useEllieConversation({
         ]);
         return { routineId: routine.id, replayed };
       } catch (error) {
-        console.warn('[ellie] No se pudo guardar la rutina.', error);
+        __DEV__ && console.warn('[ellie] No se pudo guardar la rutina.', error);
         settle(id, 'error');
         return null;
       }
@@ -518,7 +518,7 @@ export function useEllieConversation({
           });
         })
         .catch(error => {
-          console.warn('[ellie] No se pudo leer la propuesta.', error);
+          __DEV__ && console.warn('[ellie] No se pudo leer la propuesta.', error);
           requested.current.delete(message.id);
           dispatch(
             routine
@@ -551,7 +551,7 @@ export function useEllieConversation({
   const proposalFailure = useCallback(
     (id: string, error: unknown, previous: RoutineCardStatus): ProposalActionResult => {
       const code = error instanceof ProposalError ? error.code : 'unknown';
-      console.warn('[ellie] Acción de propuesta fallida.', code);
+      __DEV__ && console.warn('[ellie] Acción de propuesta fallida.', code);
       // Replaced, saved or active elsewhere: the card has no actions anymore.
       dispatch({ type: 'proposalStatus', id, status: code === 'proposal_not_open' ? 'replaced' : previous });
       if (code === 'unauthorized') {
@@ -567,7 +567,7 @@ export function useEllieConversation({
   const planFailure = useCallback(
     (id: string, error: unknown): ProposalActionResult => {
       const code = error instanceof ProposalError ? error.code : 'unknown';
-      console.warn('[ellie] Acción del plan fallida.', code);
+      __DEV__ && console.warn('[ellie] Acción del plan fallida.', code);
       if (code === 'proposal_not_open') {
         dispatch({ type: 'nutritionStatus', id, status: 'replaced' });
       }
@@ -676,7 +676,7 @@ export function useEllieConversation({
       try {
         await setFoodPreferences(prefs);
       } catch (error) {
-        console.warn('[ellie] No se pudieron guardar las preferencias.', error);
+        __DEV__ && console.warn('[ellie] No se pudieron guardar las preferencias.', error);
         if (error instanceof ProposalError && error.code === 'unauthorized') {
           onUnauthorized?.();
         }

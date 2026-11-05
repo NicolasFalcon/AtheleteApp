@@ -203,7 +203,7 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
       await invalidatePersonalRecordQueries(queryClient, userId);
       prsQuery.refetch().catch(() => {});
     } catch (error) {
-      console.warn('[summary] No se pudieron registrar los récords.', error);
+      __DEV__ && console.warn('[summary] No se pudieron registrar los récords.', error);
       setRegisterError(true);
     } finally {
       setRegistering(false);

@@ -78,7 +78,7 @@ export function Core33ReadyScreen({ navigation, route }: Props) {
       if (error instanceof Core33AlreadyActiveError) {
         setAlreadyActive(true);
       } else {
-        console.warn('[core33] No se pudo empezar el reto:', error);
+        __DEV__ && console.warn('[core33] No se pudo empezar el reto:', error);
         setFailed(true);
       }
       setStarting(false);

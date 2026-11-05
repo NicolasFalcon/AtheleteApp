@@ -39,7 +39,7 @@ export function useWorkoutSession(workout: Workout | null) {
 
     if (userId) {
       invalidateWorkoutQueries(queryClient, userId).catch(error => {
-        console.warn(
+        __DEV__ && console.warn(
           '[workout-session] No se pudieron refrescar todas las superficies.',
           error,
         );

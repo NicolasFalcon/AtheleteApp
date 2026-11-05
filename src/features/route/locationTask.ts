@@ -77,7 +77,7 @@ export function defineLocationTask() {
       handleTaskBody(body as { data?: unknown; error?: unknown });
     });
   } catch (error) {
-    console.warn('[route] expo-task-manager is not available.', error);
+    __DEV__ && console.warn('[route] expo-task-manager is not available.', error);
   }
 }
 

@@ -116,7 +116,7 @@ export function EditProfileScreen({ navigation }: Props) {
       setState('saved');
       setTimeout(() => safeGoBack(navigation, BACK_FALLBACKS), 800);
     } catch (error) {
-      console.warn('[profile] No se pudo guardar el perfil:', error);
+      __DEV__ && console.warn('[profile] No se pudo guardar el perfil:', error);
       setState('error');
       setMessage('No pudimos guardar tus cambios. Revisa tu conexión e inténtalo de nuevo.');
     }

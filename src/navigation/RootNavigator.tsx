@@ -14,7 +14,7 @@ import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
 import { RouteSoonScreen } from '@app/screens/home/RouteSoonScreen';
 import { RouteActiveScreen } from '@app/screens/route/RouteActiveScreen';
 import { RouteGenScreen } from '@app/screens/route/RouteGenScreen';
-import { RouteManualScreen } from '@app/screens/route/RouteManualScreen';
+import { RouteExploreScreen } from '@app/screens/route/RouteExploreScreen';
 import { RoutePrepScreen } from '@app/screens/route/RoutePrepScreen';
 import { RoutePreviewScreen } from '@app/screens/route/RoutePreviewScreen';
 import { RouteResultScreen } from '@app/screens/route/RouteResultScreen';
@@ -196,7 +196,7 @@ export function RootNavigator() {
           <Stack.Screen name={APP_ROUTES.RouteSoon} component={RouteSoonScreen} />
           <Stack.Screen name={APP_ROUTES.RoutePrep} component={RoutePrepScreen} />
           <Stack.Screen name={APP_ROUTES.RouteGen} component={RouteGenScreen} />
-          <Stack.Screen name={APP_ROUTES.RouteManual} component={RouteManualScreen} />
+          <Stack.Screen name={APP_ROUTES.RouteExplore} component={RouteExploreScreen} />
           <Stack.Screen name={APP_ROUTES.RoutePreview} component={RoutePreviewScreen} />
           <Stack.Screen name={APP_ROUTES.RouteSaved} component={RouteSavedScreen} />
           <Stack.Screen

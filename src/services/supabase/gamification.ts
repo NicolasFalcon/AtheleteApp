@@ -114,7 +114,7 @@ export async function awardGamificationEventBestEffort(
   try {
     return await awardGamificationEvent(event);
   } catch (error) {
-    console.warn(
+    __DEV__ && console.warn(
       `[gamification:${source}] No se pudo otorgar la recompensa.`,
       error,
     );

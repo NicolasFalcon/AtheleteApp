@@ -1,5 +1,9 @@
 import { formatDuration, formatPace, formatSpeed } from '@app/features/route/routeFormat';
 import type {
+  ExploreBadge,
+  ExploreResult,
+  ExploreRoute,
+  ExploreSource,
   LatLng,
   PlannedRoute,
   RouteActivity,
@@ -50,6 +54,7 @@ const firstNumber = (...values: unknown[]): number | undefined => {
 const SPORTS: readonly RouteSport[] = ['running', 'cycling'];
 const VISIBILITIES: readonly RouteVisibility[] = ['me', 'friends', 'public'];
 const KINDS: readonly RouteKind[] = ['loop', 'out_and_back', 'point_to_point'];
+const EXPLORE_SOURCES: readonly ExploreSource[] = ['osm', 'community'];
 
 function oneOf<T extends string>(list: readonly T[], value: unknown): T | undefined {
   return typeof value === 'string' && (list as readonly string[]).includes(value)
@@ -570,7 +575,9 @@ export function parsePlannedRoute(value: unknown): PlannedRoute | null {
     elevationGainM: firstNumber(row.elevation_gain_m) ?? 0,
     kind: oneOf(KINDS, row.kind) ?? 'loop',
     surface,
-    origin: row.origin === 'manual' ? 'manual' : 'ellie',
+    origin: row.origin === 'manual' ? 'manual' : row.origin === 'explore' ? 'explore' : 'ellie',
+    exploreSource: oneOf(EXPLORE_SOURCES, row.explore_source ?? row.source),
+    exploreRef: asString(row.explore_ref ?? row.source_ref),
   };
 }
 
@@ -593,7 +600,15 @@ export function buildPlannedPayload(route: PlannedRoute) {
     origin: route.origin,
     distance_m: Math.round(route.distanceM),
     elevation_gain_m: route.elevationGainM > 0 ? Math.round(route.elevationGainM) : null,
+    ...(route.origin === 'explore' && route.exploreSource && route.exploreRef
+      ? { explore_source: route.exploreSource, explore_ref: route.exploreRef }
+      : {}),
   };
+}
+
+// The key that makes an Explorar route unique among the saved ones.
+export function exploreKey(route: Pick<PlannedRoute, 'exploreSource' | 'exploreRef'>): string | null {
+  return route.exploreSource && route.exploreRef ? `${route.exploreSource}:${route.exploreRef}` : null;
 }
 
 // save_planned_route → the saved route; {ok:false,error} → null with the code.
@@ -672,7 +687,7 @@ export function generateErrorCopy(error: GenerateRouteError): string {
     case 'no_route_found':
       return 'No encontramos un recorrido así cerca de ti. Prueba otra distancia o recorrido.';
     case 'rate_limited':
-      return 'Llegaste al límite de rutas generadas por hoy. Vuelve mañana o créala a mano.';
+      return 'Llegaste al límite de rutas generadas por hoy. Vuelve mañana.';
     case 'provider_unavailable':
       return 'El servicio de mapas no responde ahora. Inténtalo en unos minutos.';
     case 'unsupported_kind':
@@ -692,36 +707,173 @@ export function canRetryGenerate(error: GenerateRouteError): boolean {
 }
 
 export type GenerateResult =
-  | { ok: true; route: PlannedRoute }
+  | { ok: true; route: PlannedRoute; options: PlannedRoute[] }
   | { ok: false; error: GenerateRouteError };
 
+function parseGeneratedRoute(
+  value: unknown,
+  request: { sport: RouteSport; kind: RouteKind },
+  name: string,
+  id: string,
+): PlannedRoute | null {
+  const row = asRecord(value);
+  const points = parseLatLngs(row?.polyline);
+  if (!row || points.length < 2) {
+    return null;
+  }
+  const surface = row.surface === 'asphalt' || row.surface === 'trail' ? row.surface : 'mixed';
+  return {
+    id,
+    name,
+    sport: request.sport,
+    points,
+    distanceM: firstNumber(row.distance_m) ?? 0,
+    elevationGainM: firstNumber(row.elevation_gain_m) ?? 0,
+    kind: oneOf(KINDS, row.kind) ?? request.kind,
+    surface,
+    origin: 'ellie',
+    summary: asString(row.summary)?.trim() || null,
+  };
+}
+
+// `options` (up to three, best first) when the server sends them; otherwise
+// routes[0] alone, as before. `route` is always the first option.
 export function parseGenerateResponse(
   body: unknown,
   request: { sport: RouteSport; kind: RouteKind },
   name = 'Ruta generada',
   id = '',
 ): GenerateResult {
-  const first = asRecord(asArray(asRecord(body)?.routes)[0]);
-  const points = parseLatLngs(first?.polyline);
-  if (!first || points.length < 2) {
-    return { ok: false, error: 'no_route_found' };
+  const root = asRecord(body);
+  const options = asArray(root?.options)
+    .slice(0, 3)
+    .flatMap(item => {
+      const route = parseGeneratedRoute(item, request, name, id);
+      return route ? [route] : [];
+    })
+    // Ids unique within the batch (the first keeps `id`).
+    .map((route, index) => (index === 0 ? route : { ...route, id: `${id}-${index + 1}` }));
+  if (options.length === 0) {
+    const first = parseGeneratedRoute(asArray(root?.routes)[0], request, name, id);
+    if (!first) {
+      return { ok: false, error: 'no_route_found' };
+    }
+    options.push(first);
   }
-  const surface = first.surface === 'asphalt' || first.surface === 'trail' ? first.surface : 'mixed';
-  return {
-    ok: true,
-    route: {
-      id,
-      name,
-      sport: request.sport,
-      points,
-      distanceM: firstNumber(first.distance_m) ?? 0,
-      elevationGainM: firstNumber(first.elevation_gain_m) ?? 0,
-      kind: oneOf(KINDS, first.kind) ?? request.kind,
-      surface,
-      origin: 'ellie',
-    },
-  };
+  return { ok: true, route: options[0], options };
 }
 
 export const ORS_ATTRIBUTION =
   '© openrouteservice.org by HeiGIT | Map data © OpenStreetMap contributors';
+
+// ── explore-routes ─────────────────────────────────────────────────────────
+export type ExploreRouteError =
+  | 'rate_limited'
+  | 'provider_unavailable'
+  | 'invalid_params'
+  | 'unauthorized'
+  | 'network'
+  | 'unknown';
+
+const EXPLORE_RATE_CODES = ['rate_limited', 'limit_reached', 'daily_limit', 'quota_exceeded'];
+
+// `status`: HTTP status when the function answered (null: no answer).
+export function mapExploreError(status: number | null, body: unknown): ExploreRouteError {
+  const record = asRecord(body);
+  const code = asString(record?.error) ?? asString(record?.code);
+  if (code && EXPLORE_RATE_CODES.includes(code)) {
+    return 'rate_limited';
+  }
+  if (code === 'provider_unavailable' || code === 'invalid_params' || code === 'unauthorized') {
+    return code;
+  }
+  if (status === null) {
+    return 'network';
+  }
+  if (status === 401 || status === 403) {
+    return 'unauthorized';
+  }
+  if (status === 429) {
+    return 'rate_limited';
+  }
+  if (status === 400 || status === 422) {
+    return 'invalid_params';
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return 'provider_unavailable';
+  }
+  return 'unknown';
+}
+
+const BADGES: Record<string, ExploreBadge> = {
+  popular: 'popular',
+  'ciclovía': 'cycleway',
+  ciclovia: 'cycleway',
+  'ruta conocida': 'known',
+  pista: 'track',
+};
+
+function parseExploreRoute(value: unknown, fallbackSport: RouteSport): ExploreRoute | null {
+  const row = asRecord(value);
+  const points = parseLatLngs(row?.points ?? row?.polyline);
+  const source = oneOf(EXPLORE_SOURCES, row?.explore_source ?? row?.source);
+  const ref = asString(row?.explore_ref ?? row?.source_ref);
+  if (!row || !source || !ref || points.length < 2) {
+    return null;
+  }
+  const surface = row.surface === 'asphalt' || row.surface === 'trail' ? row.surface : 'mixed';
+  const elevation = firstNumber(row.elevation_gain_m) ?? null;
+  const badge =
+    BADGES[(asString(row.badge) ?? '').trim().toLowerCase()] ?? (source === 'community' ? 'popular' : 'known');
+  return {
+    route: {
+      id: asString(row.id) ?? `${source}:${ref}`,
+      name: asString(row.name)?.trim() || 'Ruta',
+      sport: oneOf(SPORTS, row.sport) ?? fallbackSport,
+      points,
+      distanceM: firstNumber(row.distance_m) ?? 0,
+      elevationGainM: elevation ?? 0,
+      kind: oneOf(KINDS, row.kind) ?? 'point_to_point',
+      surface,
+      origin: 'explore',
+      exploreSource: source,
+      exploreRef: ref,
+    },
+    source,
+    badge,
+    elevationGainM: elevation,
+    distanceToStartM: firstNumber(row.distance_to_start_m) ?? null,
+    athletesCount: Math.max(0, Math.round(firstNumber(row.athletes_count) ?? 0)),
+  };
+}
+
+export type ExploreParse = { ok: true; result: ExploreResult } | { ok: false; error: ExploreRouteError };
+
+// The unified answer of explore-routes. An {ok:false}/{error} body is an
+// error; `code: "provider_unavailable"` with routes = OSM missing (only
+// community); with no routes at all it is the error.
+export function parseExploreResponse(body: unknown, sport: RouteSport): ExploreParse {
+  const root = asRecord(body);
+  if (!root || root.ok === false || typeof root.error === 'string') {
+    return { ok: false, error: mapExploreError(200, body) };
+  }
+  const routes = asArray(root.routes).flatMap(item => {
+    const route = parseExploreRoute(item, sport);
+    return route ? [route] : [];
+  });
+  const osmUnavailable = root.code === 'provider_unavailable';
+  if (osmUnavailable && routes.length === 0) {
+    return { ok: false, error: 'provider_unavailable' };
+  }
+  const hasOsm = routes.some(item => item.source === 'osm');
+  return {
+    ok: true,
+    result: {
+      routes,
+      attribution: hasOsm ? (asString(root.attribution) ?? OSM_ATTRIBUTION) : null,
+      osmUnavailable,
+    },
+  };
+}
+
+export const OSM_ATTRIBUTION = '© OpenStreetMap contributors';

@@ -456,7 +456,7 @@ export async function toggleCore33Habit(params: {
         markCore33Completed(params.userId),
         resetCore33InviteCounter(params.userId),
       ]).catch(profileError =>
-        console.warn('[core33] No se pudo actualizar el perfil.', profileError),
+        __DEV__ && console.warn('[core33] No se pudo actualizar el perfil.', profileError),
       );
       result.challengeCompleted = true;
     }

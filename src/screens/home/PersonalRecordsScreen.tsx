@@ -145,7 +145,7 @@ export function PersonalRecordsScreen({ navigation, route }: Props) {
         toast.show('Récord guardado');
       }
     } catch (error) {
-      console.warn('[records] No se pudo guardar el récord.', error);
+      __DEV__ && console.warn('[records] No se pudo guardar el récord.', error);
       setSaveError('No pudimos guardar el récord. Inténtalo otra vez.');
     }
   };

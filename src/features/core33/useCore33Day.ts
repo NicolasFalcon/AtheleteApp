@@ -141,7 +141,7 @@ export function useCore33Day(options: { onChallengeCompleted?: () => void } = {}
           return settle();
         })
         .catch(async error => {
-          console.warn('[core33] No se pudo guardar el hábito:', error);
+          __DEV__ && console.warn('[core33] No se pudo guardar el hábito:', error);
           const day = [...(logsRef.current[date] ?? [])];
           day[index] = previous;
           logsRef.current = { ...logsRef.current, [date]: day };

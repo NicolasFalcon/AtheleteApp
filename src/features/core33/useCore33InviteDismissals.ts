@@ -36,7 +36,7 @@ export function useCore33InviteDismissals() {
         await write();
         await refreshProfile();
       } catch (error) {
-        console.warn('[core33] No se pudo guardar "Ahora no".', error);
+        __DEV__ && console.warn('[core33] No se pudo guardar "Ahora no".', error);
         toast.show('No pudimos guardarlo. Inténtalo otra vez.', {
           tone: 'error',
         });
@@ -67,7 +67,7 @@ export function useCore33InviteDismissals() {
       }
       await AsyncStorage.removeItem(legacyKey(userId));
     })().catch(error =>
-      console.warn('[core33] No se pudo migrar el "Ahora no" local.', error),
+      __DEV__ && console.warn('[core33] No se pudo migrar el "Ahora no" local.', error),
     );
     // Runs once per user.
     // eslint-disable-next-line react-hooks/exhaustive-deps

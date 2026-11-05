@@ -1,4 +1,6 @@
 import type {
+  ExploreParams,
+  ExploreResult,
   PlannedRoute,
   RouteActivity,
   RouteGenerationParams,
@@ -18,9 +20,14 @@ export interface RouteService {
   renameRoute(id: string, name: string): Promise<void>;
   deleteRoute(id: string): Promise<void>;
 
-  // "Generar ruta" con ELLIE: one route per call; `seed` = "Otra opción".
+  // "Generar ruta" con ELLIE: up to three options per call (best first, never
+  // empty); another `seed` = "Otra opción" (another batch).
   // Fails with a `RouteServiceError` whose code is a `GenerateRouteError`.
-  generateRoute(params: RouteGenerationParams): Promise<PlannedRoute>;
+  generateRoute(params: RouteGenerationParams): Promise<PlannedRoute[]>;
+
+  // Explorar: known (OpenStreetMap) and popular (community) routes near the
+  // person. Fails with a `RouteServiceError` whose code is an `ExploreRouteError`.
+  exploreRoutes(params: ExploreParams): Promise<ExploreResult>;
 
   // Activities. `saveActivity` is idempotent by client_id; with no network it
   // is kept in a local queue and comes back with `pending: true`. A rejection

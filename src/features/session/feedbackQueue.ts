@@ -91,7 +91,7 @@ export function flushFeedbackQueue(userId: string): Promise<{ stoppedByNetwork: 
           }
           continue;
         }
-        console.warn('[feedback] Descartado por el servidor:', error);
+        __DEV__ && console.warn('[feedback] Descartado por el servidor:', error);
       }
       // Sent, or refused for good: out of the queue (unless replaced since).
       await serial(async () =>

@@ -100,7 +100,7 @@ export function RegisterPrScreen({ navigation, route }: Props) {
       }
       setOpen(false);
     } catch (saveError) {
-      console.warn('[records] No se pudo guardar el récord.', saveError);
+      __DEV__ && console.warn('[records] No se pudo guardar el récord.', saveError);
       setError('No pudimos guardar el récord. Inténtalo otra vez.');
     }
   };

@@ -8,7 +8,7 @@ import { routeStore } from '@app/features/route/routeStore';
 import type { RoutePoint } from '@app/features/route/routeTypes';
 
 // Permission state and where the person is, for the Ruta screens that need it
-// (Salir ahora, Generar, Crear a mano). The position comes from the shared
+// (Salir ahora, Generar). The position comes from the shared
 // `locationStore`: the last known one at once (approximate), a reused one for
 // 3 min after leaving Ruta, and the foreground search while the screen is
 // focused; it stops when the screen loses focus (the recording has its own

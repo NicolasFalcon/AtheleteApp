@@ -236,7 +236,7 @@ export type AppStackParamList = {
   RouteSoon: undefined;
   RoutePrep: undefined;
   RouteGen: undefined;
-  RouteManual: undefined;
+  RouteExplore: undefined;
   RoutePreview: undefined;
   RouteSaved: undefined;
   RouteActive: undefined;
