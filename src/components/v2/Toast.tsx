@@ -8,7 +8,7 @@ import {
   useState,
   type PropsWithChildren,
 } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check, X } from 'lucide-react-native';
@@ -23,6 +23,8 @@ export type ToastOptions = {
   // Distance from the bottom of the screen, for screens with a fixed footer
   // (Compartir): the toast sits above its buttons instead of covering them.
   bottomOffset?: number;
+  // A tappable word after the message ("Ver semana"); it closes the toast.
+  action?: { label: string; onPress: () => void };
 };
 
 type ToastState = {
@@ -31,6 +33,7 @@ type ToastState = {
   withTabBar: boolean;
   tone: 'success' | 'error';
   bottomOffset: number | null;
+  action: ToastOptions['action'] | null;
 };
 
 type ToastContextValue = {
@@ -68,6 +71,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
         withTabBar: options?.withTabBar ?? false,
         tone: options?.tone ?? 'success',
         bottomOffset: options?.bottomOffset ?? null,
+        action: options?.action ?? null,
       });
       timer.current = setTimeout(() => {
         timer.current = null;
@@ -91,12 +95,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      {toast ? <ToastPill key={toast.id} toast={toast} /> : null}
+      {toast ? <ToastPill key={toast.id} toast={toast} onAction={hide} /> : null}
     </ToastContext.Provider>
   );
 }
 
-function ToastPill({ toast }: { toast: ToastState }) {
+function ToastPill({ toast, onAction }: { toast: ToastState; onAction: () => void }) {
   const { colors, layout, shadow, radius, motion } = useThemeV2();
   const insets = useSafeAreaInsets();
   const bottom =
@@ -107,7 +111,7 @@ function ToastPill({ toast }: { toast: ToastState }) {
       : insets.bottom + 16;
 
   return (
-    <View pointerEvents="none" style={[styles.host, { bottom }]}>
+    <View pointerEvents={toast.action ? 'box-none' : 'none'} style={[styles.host, { bottom }]}>
       <Animated.View
         accessibilityLiveRegion="polite"
         accessibilityRole="alert"
@@ -135,9 +139,24 @@ function ToastPill({ toast }: { toast: ToastState }) {
           variant="label"
           color={colors.cta.primaryText}
           numberOfLines={1}
+          style={styles.message}
         >
           {toast.message}
         </TextV2>
+        {toast.action ? (
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={8}
+            onPress={() => {
+              onAction();
+              toast.action?.onPress();
+            }}
+          >
+            <TextV2 variant="label" color={colors.ember.base}>
+              {toast.action.label}
+            </TextV2>
+          </Pressable>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -167,8 +186,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    maxWidth: '90%',
+    maxWidth: '92%',
   },
+  message: { flexShrink: 1 },
   check: {
     width: 28,
     height: 28,

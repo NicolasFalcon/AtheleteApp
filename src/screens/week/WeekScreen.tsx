@@ -86,7 +86,7 @@ const DEFAULT_HABITS = ['Movimiento', 'Hidratación', 'Mente'];
 // con ELLIE". A missed session is proposed by ELLIE and confirmed by the
 // user. "Planificar con ELLIE" opens WeekEllie; "Hazla tú" empties the days
 // from today.
-export function WeekScreen({ navigation }: Props) {
+export function WeekScreen({ navigation, route }: Props) {
   const { colors } = useThemeV2();
   const { profile } = useAuth();
   const insets = useSafeAreaInsets();
@@ -95,12 +95,14 @@ export function WeekScreen({ navigation }: Props) {
   const toast = useToast();
   const language = useProfileLanguage();
   // ‹ › weeks: null = the current week (as always); a Monday = another week.
-  const [weekStart, setWeekStart] = useState<string | null>(null);
+  const [weekStart, setWeekStart] = useState<string | null>(route.params?.weekStart ?? null);
   const localToday = getLocalDateKey();
   const currentStart = addDays(localToday, -weekdayIndex(localToday));
   const shownStart = weekStart ?? currentStart;
   const isCurrentWeek = shownStart === currentStart;
   const query = useWeekPlan(true, weekStart);
+  // The day whose card opens first (a card of ELLIE points to it).
+  const openDate = route.params?.date ?? null;
   const change = useWeekChange();
   const home = useHomeFeed();
   const library = useRoutineList('all', { exhaust: true });
@@ -213,9 +215,9 @@ export function WeekScreen({ navigation }: Props) {
       return;
     }
     scrolledToToday.current = true;
-    const todayIndex = Math.max(0, days.findIndex(day => day.date === week.today));
+    const todayIndex = Math.max(0, days.findIndex(day => day.date === (openDate ?? week.today)));
     setTimeout(() => goCard(todayIndex, false), 60);
-  }, [days, goCard, week]);
+  }, [days, goCard, openDate, week]);
 
   useEffect(
     () => () => Object.values(minuteTimers.current).forEach(clearTimeout),

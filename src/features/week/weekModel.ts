@@ -249,6 +249,11 @@ export function addDays(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
+// The Monday of the week a date is in.
+export function weekStartOf(date: string): string {
+  return addDays(date, -weekdayIndex(date));
+}
+
 // 0 = Monday … 6 = Sunday.
 export function weekdayIndex(date: string): number {
   return (toUtcNoon(date).getUTCDay() + 6) % 7;

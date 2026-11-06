@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -39,6 +39,20 @@ import {
   RoutineProposalSheet,
 } from '@app/features/ellie/v2/RoutineProposalParts';
 import {
+  RoutineLibraryCard,
+  WeekPlanAddedCard,
+} from '@app/features/ellie/v2/LibraryCardParts';
+import { useAddToWeek } from '@app/features/week/v2/AddToWeekSheet';
+import { addToWeekText } from '@app/features/week/addToWeekCopy';
+import { weekStartOf } from '@app/features/week/weekModel';
+import { invalidateWeek } from '@app/hooks/useWeekPlan';
+import { invalidateWorkoutQueries } from '@app/lib/queryInvalidation';
+import { routinesService } from '@app/services/routines/routinesService';
+import {
+  fetchEffectiveWorkoutSession,
+  startWorkoutSession,
+} from '@app/services/supabase/fitness';
+import {
   NutritionPrefsCard,
   NutritionProposalCard,
   NutritionProposalSheet,
@@ -51,7 +65,12 @@ import {
   getFoodPreferences,
   type PlanEdits,
 } from '@app/services/ellie/nutritionProposals';
-import { NO_EDITS, type RoutineEdits } from '@app/services/ellie/ellieProposals';
+import {
+  NO_EDITS,
+  ProposalError,
+  unplanRoutineForDay,
+  type RoutineEdits,
+} from '@app/services/ellie/ellieProposals';
 import { isRetryable } from '@app/features/ellie/ellieCopy';
 import {
   EllieVoice,
@@ -79,7 +98,11 @@ import { draftFromAnalysis, toSaveInput } from '@app/features/nutrition/mealDraf
 import { mealRegistrar } from '@app/features/nutrition/mealRegistrar';
 import { PhotoSourceSheet } from '@app/features/vision/v2/PhotoSourceSheet';
 import { usePhotoAttachment } from '@app/features/vision/usePhotoAttachment';
-import type { MealCardMessage } from '@app/features/ellie/chatModel';
+import type {
+  MealCardMessage,
+  RoutineLibraryMessage,
+  WeekPlanAddedMessage,
+} from '@app/features/ellie/chatModel';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'EllieChat'>;
@@ -147,6 +170,8 @@ export function EllieChatScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
+  const queryClient = useQueryClient();
+  const addToWeek = useAddToWeek();
   const { profile, signOut } = useAuth();
   const language = useProfileLanguage();
   const params = route.params;
@@ -266,6 +291,57 @@ export function EllieChatScreen({ navigation, route }: Props) {
   const adjustRoutine = (proposalId: string) => {
     chat.adjustDraft(proposalId);
     input.current?.focus();
+  };
+
+  // Empezar (routine_library): the session of that routine, as from Entrenos —
+  // the pending one if there is, else a new one — and then the session screen.
+  const [startingId, setStartingId] = useState<string | null>(null);
+  const startLibrary = async (message: RoutineLibraryMessage) => {
+    const userId = profile?.id;
+    if (startingId || !userId) {
+      return;
+    }
+    setStartingId(message.id);
+    try {
+      const workout = await routinesService.getRoutine(message.library.routineId);
+      const pending = await fetchEffectiveWorkoutSession(userId, workout.id);
+      if (!pending) {
+        await startWorkoutSession({ userId, workout });
+      }
+      invalidateWorkoutQueries(queryClient, userId).catch(() => undefined);
+      closeSheets();
+      navigation.navigate(APP_ROUTES.WorkoutSession, { workoutId: workout.id });
+    } catch {
+      toast.show(addToWeekText(language, 'library.error.start'), { tone: 'error' });
+    } finally {
+      setStartingId(null);
+    }
+  };
+
+  // Deshacer (week_plan_added): unplan the day; the card becomes "Quitada del…".
+  const [undoingId, setUndoingId] = useState<string | null>(null);
+  const undoWeekPlan = async (message: WeekPlanAddedMessage) => {
+    if (undoingId) {
+      return;
+    }
+    setUndoingId(message.id);
+    try {
+      await unplanRoutineForDay(message.added.date);
+      chat.weekPlanRemoved(message.id);
+    } catch (error) {
+      toast.show(
+        addToWeekText(
+          language,
+          error instanceof ProposalError && error.code === 'past_day'
+            ? 'weekAdded.error.past_day'
+            : 'weekAdded.error.generic',
+        ),
+        { tone: 'error' },
+      );
+    } finally {
+      setUndoingId(null);
+      invalidateWeek(queryClient).catch(() => undefined);
+    }
   };
 
   const SAVE_FAILED = 'No se pudo guardar. Intenta de nuevo.';
@@ -484,6 +560,12 @@ export function EllieChatScreen({ navigation, route }: Props) {
           onOpen={() => setSheetId(message.id)}
           onSave={() => saveFromCard(message.id)}
           onAdjust={() => adjustRoutine(message.proposalId)}
+          onAddToWeek={() =>
+            addToWeek.open({
+              name: message.proposal?.title ?? '',
+              proposalId: message.proposalId,
+            })
+          }
           onQuickAdjust={text => {
             closeSheets();
             chat.send(text, undefined, null, { adjustProposalId: message.proposalId });
@@ -492,6 +574,43 @@ export function EllieChatScreen({ navigation, route }: Props) {
             navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Workouts })
           }
           onReload={() => chat.reloadProposal(message.id)}
+        />
+      );
+    }
+    if (message.kind === 'routineLibrary') {
+      return (
+        <RoutineLibraryCard
+          key={message.id}
+          card={message}
+          starting={startingId === message.id}
+          onStart={() => {
+            startLibrary(message).catch(() => undefined);
+          }}
+          onAddToWeek={() =>
+            addToWeek.open({ name: message.library.name, routineId: message.library.routineId })
+          }
+          onView={() =>
+            navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: message.library.routineId })
+          }
+          onAdjust={() => sendText(addToWeekText(language, 'library.adjust'))}
+        />
+      );
+    }
+    if (message.kind === 'weekPlanAdded') {
+      return (
+        <WeekPlanAddedCard
+          key={message.id}
+          card={message}
+          undoing={undoingId === message.id}
+          onViewWeek={() =>
+            navigation.navigate(APP_ROUTES.Week, {
+              weekStart: weekStartOf(message.added.date),
+              date: message.added.date,
+            })
+          }
+          onUndo={() => {
+            undoWeekPlan(message).catch(() => undefined);
+          }}
         />
       );
     }
@@ -734,6 +853,8 @@ export function EllieChatScreen({ navigation, route }: Props) {
           discardPlanFromSheet().catch(() => undefined);
         }}
       />
+
+      {addToWeek.sheet}
 
       <PhotoSourceSheet
         open={photoMenu}

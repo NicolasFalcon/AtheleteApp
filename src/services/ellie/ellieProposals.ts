@@ -1,5 +1,5 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
-import { focusFromTargetGroups } from '@app/features/workouts/routineFocus';
+import { focusFromTargetGroups, parseRoutineFocus } from '@app/features/workouts/routineFocus';
 import {
   parseNutritionProposal,
   type NutritionProposal,
@@ -23,13 +23,19 @@ export type ProposalCardType =
   | 'nutrition_plan_proposal'
   | 'nutrition_prefs_request'
   // Before a routine, when a discomfort is active and not confirmed.
-  | 'discomfort_check';
+  | 'discomfort_check'
+  // prop-2: an existing routine (official or the user's), and the receipt of
+  // a routine added to a day of the week.
+  | 'routine_library'
+  | 'week_plan_added';
 
 export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'routine_proposal',
   'nutrition_plan_proposal',
   'nutrition_prefs_request',
   'discomfort_check',
+  'routine_library',
+  'week_plan_added',
 ];
 
 export const isProposalCardType = (value: unknown): value is ProposalCardType =>
@@ -255,6 +261,80 @@ export function parseRoutineProposal(
   };
 }
 
+// ── routine_library (prop-2 §2.1): an existing routine, no ellie_proposals row ──
+export type LibrarySource = 'official' | 'user';
+
+export type RoutineLibrary = {
+  routineId: string;
+  source: LibrarySource;
+  name: string;
+  categoryName: string | null;
+  focus: RoutineFocus | null;
+  minutes: number;
+  level: string;
+  // From the exercises' muscle groups (the payload has no muscles list).
+  muscles: string[];
+  reasoning: string;
+  readinessNote: string | null;
+  warmup: ProposalStep[];
+  main: ProposalExercise[];
+  cooldown: ProposalStep[];
+};
+
+export function parseRoutineLibrary(payloadValue: unknown): RoutineLibrary | null {
+  const payload = rec(payloadValue);
+  const routineId = str(payload?.routine_id);
+  if (!payload || !routineId) {
+    return null;
+  }
+  const rows = list(payload.exercises);
+  const block = (name: string) => rows.filter(row => (str(row.block) ?? 'main') === name);
+  const step = (row: Raw): ProposalStep => {
+    const sets = num(row.sets);
+    const reps = num(row.reps);
+    return { ...parseStep(row), detail: sets && reps ? `${sets} × ${reps}` : null };
+  };
+  const main = block('main').map(parseExercise).filter(item => item.exerciseId);
+  const muscles = Array.from(new Set(main.map(item => item.muscleGroup).filter(Boolean)));
+  return {
+    routineId,
+    source: payload.source === 'user' ? 'user' : 'official',
+    name: str(payload.name) ?? 'Rutina',
+    categoryName: str(rec(payload.category)?.name),
+    focus: parseRoutineFocus(payload.focus),
+    minutes: num(payload.minutes) ?? 0,
+    level: levelLabel(str(payload.level) ?? 'intermedio'),
+    muscles,
+    reasoning: str(payload.reasoning) ?? '',
+    readinessNote: str(payload.readiness_note),
+    warmup: block('warmup').map(step),
+    main,
+    cooldown: block('cooldown').map(step),
+  };
+}
+
+// ── week_plan_added (prop-2 §2.2) ───────────────────────────────────────────
+export type WeekPlanAdded = {
+  date: string;
+  routineId: string | null;
+  name: string;
+  replaced: boolean;
+};
+
+export function parseWeekPlanAdded(payloadValue: unknown): WeekPlanAdded | null {
+  const payload = rec(payloadValue);
+  const date = str(payload?.date);
+  if (!payload || !date) {
+    return null;
+  }
+  return {
+    date,
+    routineId: str(payload.routine_id),
+    name: str(payload.name) ?? '',
+    replaced: payload.replaced === true,
+  };
+}
+
 // discomfort_check's payload: `{ zones, chips }`.
 export type DiscomfortCheck = { zones: string[]; chips: string[] };
 
@@ -377,6 +457,10 @@ export type ProposalErrorCode =
   // replace it) · the plan does not pass the server's checks.
   | 'plan_active_exists'
   | 'plan_invalid'
+  // plan_routine_for_day / unplan_routine_for_day (prop-2).
+  | 'day_has_routine'
+  | 'past_day'
+  | 'routine_not_found'
   | 'offline'
   | 'unknown';
 
@@ -389,14 +473,24 @@ const KNOWN: readonly ProposalErrorCode[] = [
   'unauthorized',
   'plan_active_exists',
   'plan_invalid',
+  'day_has_routine',
+  'past_day',
+  'routine_not_found',
 ];
 
 export class ProposalError extends Error {
   readonly code: ProposalErrorCode;
-  constructor(code: ProposalErrorCode, message?: string | null) {
+  // day_has_routine: the routine the day already has.
+  readonly existing: { routineId: string | null; name: string } | null;
+  constructor(
+    code: ProposalErrorCode,
+    message?: string | null,
+    existing: { routineId: string | null; name: string } | null = null,
+  ) {
     super(message ?? code);
     this.name = 'ProposalError';
     this.code = code;
+    this.existing = existing;
   }
 }
 
@@ -435,7 +529,12 @@ export async function call(name: string, args: Raw): Promise<Raw> {
     const nested = rec(body.error);
     const raw = str(body.error) ?? str(nested?.code);
     const code = KNOWN.find(item => item === raw) ?? 'unknown';
-    throw new ProposalError(code, str(nested?.message) ?? raw);
+    const found = rec(body.existing) ?? rec(nested?.existing);
+    throw new ProposalError(
+      code,
+      str(nested?.message) ?? raw,
+      found ? { routineId: str(found.routine_id), name: str(found.name) ?? '' } : null,
+    );
   }
   return body;
 }
@@ -472,4 +571,32 @@ export async function startRoutineProposal(
 
 export async function discardProposal(id: string): Promise<void> {
   await call('discard_proposal', { p_id: id });
+}
+
+// plan_routine_for_day (prop-2): exactly one reference (a library routine or
+// an open proposal) and a client id, so a retry never plans twice. A day that
+// has a routine fails with day_has_routine (`existing`) until replace is true.
+export async function planRoutineForDay(args: {
+  date: string;
+  routineId?: string | null;
+  proposalId?: string | null;
+  replace?: boolean;
+  clientId: string;
+}): Promise<{ date: string; routineId: string | null; name: string }> {
+  const body = await call('plan_routine_for_day', {
+    p_date: args.date,
+    p_routine_id: args.routineId ?? null,
+    p_proposal_id: args.proposalId ?? null,
+    p_replace: args.replace ?? false,
+    p_client_id: args.clientId,
+  });
+  return {
+    date: str(body.date) ?? args.date,
+    routineId: str(body.routine_id),
+    name: str(body.name) ?? '',
+  };
+}
+
+export async function unplanRoutineForDay(date: string): Promise<void> {
+  await call('unplan_routine_for_day', { p_date: date });
 }

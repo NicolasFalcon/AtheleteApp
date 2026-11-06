@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowLeft,
+  CalendarPlus,
   ChevronRight,
   Heart,
   MoreHorizontal,
@@ -58,6 +59,8 @@ import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { useRoutine, useRoutineMutations } from '@app/hooks/useRoutines';
 import { useWorkoutSession } from '@app/hooks/useWorkoutSession';
+import { useAddToWeek } from '@app/features/week/v2/AddToWeekSheet';
+import { addToWeekText } from '@app/features/week/addToWeekCopy';
 import { coachText } from '@app/features/coach/coachCopy';
 import { dayLetter, firstName, ISO_DAYS, isoWeekday } from '@app/features/coach/coachModel';
 import { CoachAvatar, CoachTag } from '@app/features/coach/v2/CoachParts';
@@ -87,6 +90,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
   const routineQuery = useRoutine(route.params.workoutId);
   const favorites = useFavoriteWorkouts();
   const mutations = useRoutineMutations();
+  const addToWeek = useAddToWeek();
   const [imageBroken, setImageBroken] = useState(false);
   const workout = routineQuery.data ?? null;
   const { workoutSession, startSession, isStartingSession } =
@@ -414,6 +418,14 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
                   />
                 ) : null}
                 <IconButton
+                  icon={CalendarPlus}
+                  variant="glass"
+                  accessibilityLabel={addToWeekText(language, 'addToWeek.action')}
+                  onPress={() =>
+                    addToWeek.open({ name: workout.title, routineId: workout.id })
+                  }
+                />
+                <IconButton
                   icon={Heart}
                   variant="glass"
                   filled={favorite}
@@ -550,6 +562,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
           onPress={start}
         />
       </GlassSurface>
+      {addToWeek.sheet}
     </View>
   );
 }

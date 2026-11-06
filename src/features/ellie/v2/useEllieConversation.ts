@@ -36,6 +36,7 @@ import {
   useEllieUsage,
 } from '@app/hooks/useEllieConversations';
 import { createUuid } from '@app/lib/uuid';
+import { invalidateWeek } from '@app/hooks/useWeekPlan';
 import { saveEllieNutritionPlan } from '@app/services/supabase/ellie-actions';
 import { invalidateNutritionPlanQueries } from '@app/lib/queryInvalidation';
 import { invalidateRoutineLists, routineKeys } from '@app/hooks/useRoutines';
@@ -230,10 +231,17 @@ export function useEllieConversation({
       reply.message.tool && reply.cards.length === 0
         ? parseTool(reply.message.tool, reply.message.id, reply.message.content)
         : null;
-    if (parsed) {
+    // The simple plan cards (workout / nutrition) only exist to show old
+    // messages of the history: a live answer shows just its text. A photo of a
+    // meal is not one of them.
+    if (parsed && parsed.card.kind === 'meal') {
       dispatch({ type: 'tool', id: `assistant-${id}`, intro: parsed.intro, card: parsed.card });
-    } else if (reply.message.content) {
-      dispatch({ type: 'delta', id: reply.message.id || `assistant-${id}`, delta: reply.message.content });
+    } else if (parsed?.intro || reply.message.content) {
+      dispatch({
+        type: 'delta',
+        id: reply.message.id || `assistant-${id}`,
+        delta: parsed?.intro || reply.message.content,
+      });
     }
     // A replayed answer may carry its card only as tool_data.proposal_id.
     const cards =
@@ -244,9 +252,13 @@ export function useEllieConversation({
       const message = proposalToMessage(card, reply.message.id || `assistant-${id}`);
       if (message) {
         dispatch({ type: 'proposal', card: message, parentId: parentOf(message, extra) });
+        // A day just planned by ELLIE: the cached week is older than the card.
+        if (message.kind === 'weekPlanAdded') {
+          invalidateWeek(queryClient).catch(() => undefined);
+        }
       }
     });
-  }, []);
+  }, [queryClient]);
 
   const run = useCallback(
     async (
@@ -288,6 +300,10 @@ export function useEllieConversation({
               if (message) {
                 painted.add(message.id);
                 dispatch({ type: 'proposal', card: message, parentId: parentOf(message, extra) });
+                // A day just planned by ELLIE: the cached week is older than the card.
+                if (message.kind === 'weekPlanAdded') {
+                  invalidateWeek(queryClient).catch(() => undefined);
+                }
               }
             },
           });
@@ -312,7 +328,7 @@ export function useEllieConversation({
         fail(id, error);
       }
     },
-    [afterReply, clientContext, fail, paintReply],
+    [afterReply, clientContext, fail, paintReply, queryClient],
   );
 
   const send = useCallback(
@@ -778,6 +794,7 @@ export function useEllieConversation({
     startProposal,
     discardProposal,
     reloadProposal,
+    weekPlanRemoved: (id: string) => dispatch({ type: 'weekPlanRemoved', id }),
     submitPrefs,
     reopenPrefs,
     activatePlanProposal,

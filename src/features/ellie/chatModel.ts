@@ -5,7 +5,11 @@ import type {
   EllieGeneratedWorkout,
 } from '@app/services/supabase/ellie-actions';
 import { plainMarkdown } from '@app/features/ellie/markdown';
-import type { RoutineProposal } from '@app/services/ellie/ellieProposals';
+import type {
+  RoutineLibrary,
+  RoutineProposal,
+  WeekPlanAdded,
+} from '@app/services/ellie/ellieProposals';
 import type { FoodPrefs, NutritionProposal } from '@app/services/ellie/nutritionProposals';
 import type { DiscomfortReply } from '@app/features/ellie/discomfortModel';
 
@@ -149,11 +153,31 @@ export type DiscomfortCheckMessage = {
   answer: DiscomfortReply | null;
 };
 
+// routine_library: an existing routine as a card (no proposal behind it).
+export type RoutineLibraryMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'routineLibrary';
+  library: RoutineLibrary;
+};
+
+// week_plan_added: the receipt of a routine added to a day. "Deshacer" turns
+// it into "Quitada del {día}" (removed).
+export type WeekPlanAddedMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'weekPlanAdded';
+  added: WeekPlanAdded;
+  removed: boolean;
+};
+
 export type ProposalMessage =
   | RoutineProposalMessage
   | NutritionProposalMessage
   | NutritionPrefsMessage
-  | DiscomfortCheckMessage;
+  | DiscomfortCheckMessage
+  | RoutineLibraryMessage
+  | WeekPlanAddedMessage;
 
 export type CardMessage = NutritionCardMessage | WorkoutCardMessage | MealCardMessage;
 export type ChatMessage =
@@ -165,7 +189,9 @@ export type ChatMessage =
   | RoutineProposalMessage
   | NutritionProposalMessage
   | NutritionPrefsMessage
-  | DiscomfortCheckMessage;
+  | DiscomfortCheckMessage
+  | RoutineLibraryMessage
+  | WeekPlanAddedMessage;
 
 export type ChatState = {
   messages: ChatMessage[];
@@ -193,6 +219,7 @@ export type ChatAction =
   // open routine card.
   | { type: 'proposal'; card: ProposalMessage; parentId?: string | null }
   | { type: 'discomfortAnswered'; id: string; answer: DiscomfortReply }
+  | { type: 'weekPlanRemoved'; id: string }
   | { type: 'proposalLoaded'; id: string; proposal: RoutineProposal | null; status: RoutineCardStatus }
   | { type: 'proposalStatus'; id: string; status: RoutineCardStatus }
   | {
@@ -396,6 +423,15 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ],
       };
     }
+    case 'weekPlanRemoved':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'weekPlanAdded'
+            ? { ...message, removed: true }
+            : message,
+        ),
+      };
     case 'proposalLoaded':
       return {
         ...state,

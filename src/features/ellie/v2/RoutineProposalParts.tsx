@@ -4,6 +4,7 @@ import Animated, { FadeInUp, ZoomIn } from 'react-native-reanimated';
 import Video from 'react-native-video';
 import {
   Bookmark,
+  CalendarPlus,
   Check,
   ChevronDown,
   ChevronRight,
@@ -28,6 +29,7 @@ import {
 } from '@app/components/v2';
 import { RoutineCover } from '@app/components/v2/RoutineCover';
 import { focusWord } from '@app/features/workouts/routineFocus';
+import { addToWeekText } from '@app/features/week/addToWeekCopy';
 import { useAuth } from '@app/hooks/useAuth';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { MEDIA_PLACEHOLDER, MEDIA_PLACEHOLDER_THUMB } from '@app/features/workouts/workoutAssets';
@@ -105,7 +107,7 @@ function ChangeTag({ tag }: { tag: ProposalChangeTag }) {
 
 // Muscles filled, equipment outlined (secondary text in the card, primary in
 // the sheet).
-function Pills({ items, outlined, strong }: { items: string[]; outlined?: boolean; strong?: boolean }) {
+export function Pills({ items, outlined, strong }: { items: string[]; outlined?: boolean; strong?: boolean }) {
   const { colors } = useThemeV2();
   const tone = useProposalColors();
   return (
@@ -130,7 +132,7 @@ function Pills({ items, outlined, strong }: { items: string[]; outlined?: boolea
 }
 
 // Warm-up / cool-down in one row: icon in a muted 40 pt box.
-function StepsRow({
+export function StepsRow({
   icon: Icon,
   label,
   steps,
@@ -160,7 +162,7 @@ function StepsRow({
 
 // A row with its thumbnail. Card: 40 pt, 14/600 + 12. Sheet: 44 pt,
 // 16/600 + 13, padded inside its block so the dividers run edge to edge.
-function ExerciseLine({
+export function ExerciseLine({
   name,
   detail,
   image,
@@ -215,6 +217,7 @@ export function RoutineProposalCard({
   onOpen,
   onSave,
   onAdjust,
+  onAddToWeek,
   onQuickAdjust,
   onOpenWorkouts,
   onReload,
@@ -223,6 +226,7 @@ export function RoutineProposalCard({
   onOpen: () => void;
   onSave: () => void;
   onAdjust: () => void;
+  onAddToWeek: () => void;
   onQuickAdjust: (text: string) => void;
   onOpenWorkouts: () => void;
   onReload: () => void;
@@ -367,6 +371,7 @@ export function RoutineProposalCard({
           </View>
 
           {open ? (
+            <>
             <View style={styles.actions}>
               <Button
                 label="Ver y aprobar"
@@ -395,6 +400,15 @@ export function RoutineProposalCard({
                 <SlidersHorizontal size={18} color={colors.text.primary} strokeWidth={1.8} />
               </PressableScale>
             </View>
+            <Button
+              label={addToWeekText(language, 'addToWeek.action')}
+              variant="outline"
+              size="md"
+              icon={CalendarPlus}
+              disabled={status === 'saving'}
+              onPress={onAddToWeek}
+            />
+            </>
           ) : status === 'saved' ? (
             <View style={styles.done}>
               <Animated.View

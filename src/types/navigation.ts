@@ -243,7 +243,9 @@ export type AppStackParamList = {
     localBestStreak: number;
   };
   EllieChat: EllieChatRouteParams | undefined;
-  Week: undefined;
+  // weekStart: a Monday (YYYY-MM-DD) to open Tu semana on that week; date: the
+  // day whose card it opens on.
+  Week: { weekStart?: string; date?: string } | undefined;
   Sleep: undefined;
   Breathe: undefined;
   WeekEllie: undefined;

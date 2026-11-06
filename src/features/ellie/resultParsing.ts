@@ -15,7 +15,9 @@ import {
 import {
   isProposalCardType,
   parseDiscomfortCheck,
+  parseRoutineLibrary,
   parseRoutineProposal,
+  parseWeekPlanAdded,
   storedCards,
   type ProposalCard,
 } from '@app/services/ellie/ellieProposals';
@@ -185,6 +187,17 @@ export function proposalToMessage(card: ProposalCard, fallbackId: string): Propo
   }
   if (card.type === 'nutrition_prefs_request') {
     return { id, role: 'assistant', kind: 'nutritionPrefs', prefs: null, answered: false };
+  }
+  // prop-2: these two have no proposal_id; their payload is the card.
+  if (card.type === 'routine_library') {
+    const library = parseRoutineLibrary(card.payload);
+    return library ? { id: `${fallbackId}-${card.type}-${library.routineId}`, role: 'assistant', kind: 'routineLibrary', library } : null;
+  }
+  if (card.type === 'week_plan_added') {
+    const added = parseWeekPlanAdded(card.payload);
+    return added
+      ? { id: `${fallbackId}-${card.type}-${added.date}`, role: 'assistant', kind: 'weekPlanAdded', added, removed: false }
+      : null;
   }
   if (!card.proposalId) {
     return null;
