@@ -272,7 +272,7 @@ function StudentRow({
             </TextV2>
             <View style={styles.progress}>
               <ProgressLine ratio={planned > 0 ? done / planned : 0} ember={inactive} />
-              <TextV2 variant="metaStrong">{t('coach.list.sessions', { done, planned })}</TextV2>
+              <TextV2 variant="metaStrong">{t(planned === 1 ? 'coach.list.sessions.one' : 'coach.list.sessions', { done, planned })}</TextV2>
             </View>
             {inactive ? (
               <Notice strong label={t('coach.list.inactive', { n: student.daysInactive ?? 7 })} />

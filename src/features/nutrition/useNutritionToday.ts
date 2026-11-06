@@ -26,6 +26,12 @@ import {
   type SupplementInput,
   type SupplementMoment,
 } from '@app/services/supabase/nutritionDay';
+import {
+  applySwap,
+  fetchNutritionPlan,
+  swapPlanMeal,
+  type ActivePlan,
+} from '@app/services/supabase/nutritionPlan';
 
 export const nutritionDayKey = (userId: string | undefined, date: string) =>
   ['nutrition-day', userId ?? 'anon', date] as const;
@@ -215,4 +221,52 @@ export function useSupplementMutations() {
   const save = useMutation({ mutationFn: (input: SupplementInput) => upsertSupplement(input), onSettled: settle });
   const remove = useMutation({ mutationFn: (id: string) => deleteSupplement(id), onSettled: settle });
   return { save, remove };
+}
+
+// ── Plan y Compras (get_nutrition_plan) ─────────────────────────────────────
+// The local Monday of the week of `date` (Friday 6 nov → 2026-11-02).
+export function localWeekStart(date: string = getLocalDateKey()): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const value = new Date(y, m - 1, d, 12);
+  value.setDate(value.getDate() - ((value.getDay() + 6) % 7));
+  return getLocalDateKey(value);
+}
+
+export const nutritionPlanKey = (userId: string | undefined, weekStart: string) =>
+  ['nutrition-plan', userId ?? 'anon', weekStart] as const;
+
+export function useNutritionPlan(enabled = true) {
+  const { profile } = useAuth();
+  const weekStart = localWeekStart();
+  const query = useQuery({
+    queryKey: nutritionPlanKey(profile?.id, weekStart),
+    enabled: enabled && Boolean(profile?.id),
+    staleTime: 60_000,
+    queryFn: () => fetchNutritionPlan(weekStart, nutritionTz()),
+  });
+  return { ...query, weekStart };
+}
+
+// "Cambiar" in Plan: that meal, that day only. The answer (meal + shopping)
+// updates the cached plan in place, without reloading it; only if the
+// server did not send the meal is the plan read again. The day (Hoy) is
+// refreshed, since its planned meal may be the one that changed.
+export function useSwapPlanMeal() {
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  return useMutation({
+    mutationFn: ({ date: _date, ...params }: Parameters<typeof swapPlanMeal>[0] & { date: string }) =>
+      swapPlanMeal(params),
+    onSuccess: (result, variables) => {
+      const key = nutritionPlanKey(profile?.id, localWeekStart(variables.date));
+      if (!result.meal) {
+        queryClient.invalidateQueries({ queryKey: key }).catch(() => undefined);
+        return;
+      }
+      queryClient.setQueryData<ActivePlan | null>(key, current =>
+        current ? applySwap(current, variables.date, variables.slot, result) : current,
+      );
+    },
+    onSettled: () => invalidateNutritionDay(queryClient, profile?.id),
+  });
 }

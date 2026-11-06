@@ -23,6 +23,7 @@ import {
   useThemeV2,
   useToast,
   CoverImage,
+  DisplayNumber,
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
@@ -42,10 +43,12 @@ import {
   respondErrorMessage,
   weekBarHeight,
 } from '@app/features/social/challengeModel';
+import { countText } from '@app/features/social/countCopy';
 import { officialBadgeIcon } from '@app/features/social/officialBadge';
-import { formatThousands, timeAgo } from '@app/features/social/postModel';
+import { timeAgo } from '@app/features/social/postModel';
 import { firstName } from '@app/features/social/socialModel';
 import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -62,6 +65,7 @@ const WEEKDAYS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 export function SocialChallengeScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
+  const language = useProfileLanguage();
   const toast = useToast();
   const service = useSocialService();
   const { challengeId } = route.params;
@@ -226,7 +230,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
                 <OfficialBadge label="OFICIAL ATHELETE · RETO DE LA SEMANA" />
                 <TextV2 style={styles.officialTitle}>{challenge.title}</TextV2>
                 <TextV2 variant="meta" color="#A8A6A1">
-                  {`${data.participants_total ? `${formatThousands(data.participants_total)} atletas participando · ` : ''}${daysLeftLabel(challenge.ends_at, challenge.duration_days, now)}`}
+                  {`${data.participants_total ? `${countText(language, 'athletes.participating', data.participants_total)} · ` : ''}${daysLeftLabel(challenge.ends_at, challenge.duration_days, now)}`}
                 </TextV2>
               </View>
             </View>
@@ -236,7 +240,9 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
                 <>
                   <View style={styles.officialFigure}>
                     <View style={styles.bigRow}>
-                      <TextV2 style={styles.bigNumber}>{formatChallengeValue(challenge.metric, data.mine?.progress ?? 0)}</TextV2>
+                      <DisplayNumber size={56} weight="600" tracking={-1.7} color="#FFFFFF" fit style={styles.bigNumber}>
+                        {formatChallengeValue(challenge.metric, data.mine?.progress ?? 0)}
+                      </DisplayNumber>
                       <TextV2 variant="section" color="#8C8A85">{` / ${formatChallengeValue(challenge.metric, challenge.goal)}`}</TextV2>
                     </View>
                     <View style={[styles.bar8, { backgroundColor: 'rgba(255,255,255,.12)' }]}>
@@ -362,7 +368,7 @@ export function SocialChallengeScreen({ navigation, route }: Props) {
           state === 'waiting' || state === 'invited'
             ? `${challenge.duration_days} días`
             : daysLeftLabel(challenge.ends_at, challenge.duration_days, now)
-        } · ${data.board.length} participantes · acumulativo`
+        } · ${countText(language, 'participants.count', data.board.length)} · acumulativo`
       : '';
 
   return (
@@ -550,7 +556,7 @@ const styles = StyleSheet.create({
   officialBody: { paddingTop: 22, gap: 32 },
   officialFigure: { gap: 12 },
   bigRow: { flexDirection: 'row', alignItems: 'baseline' },
-  bigNumber: { fontSize: 56, fontWeight: '600', letterSpacing: -1.7, lineHeight: 58, color: '#FFFFFF' },
+  bigNumber: { flexShrink: 1 },
   bar8: { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 4 },
   week: { flexDirection: 'row', gap: 8, alignItems: 'flex-end', height: 72 },

@@ -5,7 +5,9 @@
 
 export type ShareLanguage = 'es' | 'en';
 export type StickerVariant = 'full' | 'min';
-export type StickerTone = 'light' | 'dark' | 'glass';
+// 'clear' (Sin fondo): no plate at all, only the content in white with a
+// soft shadow, exported as a PNG with real transparency.
+export type StickerTone = 'light' | 'dark' | 'glass' | 'clear';
 export type ZoneKey = 'chest' | 'back' | 'shoulders' | 'arms' | 'core' | 'legs' | 'glutes';
 
 // The 7 segments of the muscle bar, in the order of "Por zona".
@@ -53,6 +55,8 @@ export function stickerDate(date: Date, language: ShareLanguage): string {
   return `${date.getDate()} ${MONTHS[language][date.getMonth()]}`;
 }
 
+// The duration of the share screen: the header and the sticker both use
+// clockText(durationSec), so "0:35" is "0:35" in both places.
 // 42:08 or 1:05:12
 export function clockText(totalSec: number): string {
   const s = Math.max(0, Math.round(totalSec));
@@ -169,7 +173,8 @@ export function stickerSize(data: StickerData, variant: StickerVariant): { width
   if (data.kind === 'route') {
     return { width: 300, height: 400 };
   }
-  return { width: 300, height: data.record ? 368 : 326 };
+  // With a record: room for its chip on two lines (long exercise names).
+  return { width: 300, height: data.record ? 382 : 326 };
 }
 
 export const COMBINED = { width: 1080, height: 1920, stickerCenterY: 1150, fullWidth: 720, minWidth: 560 };
@@ -222,6 +227,13 @@ export const SHARE_COPY = {
       light: 'Fondo claro · para fotos oscuras',
       dark: 'Fondo oscuro · para fotos claras',
       glass: 'Translúcido · para tonos medios',
+      clear: 'Solo contenido · para cualquier foto',
+    } as Record<StickerTone, string>,
+    toneNames: {
+      light: 'Claro',
+      dark: 'Oscuro',
+      glass: 'Translúcido',
+      clear: 'Sin fondo',
     } as Record<StickerTone, string>,
     stories: 'Historias de Instagram',
     download: 'Descargar',
@@ -263,6 +275,13 @@ export const SHARE_COPY = {
       light: 'Light background · for dark photos',
       dark: 'Dark background · for light photos',
       glass: 'Translucent · for mid tones',
+      clear: 'Content only · for any photo',
+    } as Record<StickerTone, string>,
+    toneNames: {
+      light: 'Light',
+      dark: 'Dark',
+      glass: 'Translucent',
+      clear: 'No background',
     } as Record<StickerTone, string>,
     stories: 'Instagram Stories',
     download: 'Download',

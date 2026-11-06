@@ -5,6 +5,7 @@ import { useRouteSession } from '@app/features/route/routeStore';
 import { useRouteActivity } from '@app/features/route/useRouteData';
 import { formatDuration, formatKg } from '@app/features/session/sessionModel';
 import {
+  clockText,
   improvementOf,
   kmText,
   pickRecord,
@@ -13,7 +14,18 @@ import {
   type StickerData,
 } from '@app/features/share/shareModel';
 import { useExercises } from '@app/hooks/useCatalog';
-import { detectSessionPRs, fetchSessionDetail, type DetectedPR } from '@app/services/supabase/session';
+import {
+  detectSessionPRs,
+  fetchSessionDetail,
+  fetchSessionRecords,
+  type DetectedPR,
+} from '@app/services/supabase/session';
+
+// "YYYY-MM-DD" → that local day at noon (no zone shift of the date).
+function localDay(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d, 12);
+}
 
 export type ShareTarget = { kind: 'workout'; sessionId: string } | { kind: 'route'; activityId: string };
 
@@ -67,7 +79,23 @@ export function useShareData(target: ShareTarget, language: ShareLanguage) {
     queryFn: () => detectSessionPRs(sessionId as string),
   });
   const detail = detailQuery.data ?? null;
-  const records = useMemo(() => prsQuery.data ?? [], [prsQuery.data]);
+  // A past session (Tu semana · historial): its records are already saved,
+  // so detect_session_prs no longer returns them. Saved + still detected,
+  // one per set, so the sticker shows that session's records, not today's.
+  const setIds = useMemo(
+    () => (detail?.sets ?? []).map(set => set.id).filter((id): id is string => Boolean(id)),
+    [detail],
+  );
+  const savedQuery = useQuery({
+    queryKey: ['session-saved-prs', sessionId, setIds.length],
+    enabled: Boolean(sessionId) && setIds.length > 0,
+    queryFn: () => fetchSessionRecords(setIds),
+  });
+  const records = useMemo(() => {
+    const detected = prsQuery.data ?? [];
+    const seen = new Set(detected.map(record => record.sessionSetId));
+    return [...detected, ...(savedQuery.data ?? []).filter(record => !seen.has(record.sessionSetId))];
+  }, [prsQuery.data, savedQuery.data]);
   const exercises = useExercises([...(detail?.session.completedExercises ?? []), ...records.map(r => r.exerciseId)]);
 
   const routeSession = useRouteSession();
@@ -106,7 +134,9 @@ export function useShareData(target: ShareTarget, language: ShareLanguage) {
     }));
     return {
       kind: 'workout',
-      date: ended ? new Date(ended) : new Date(),
+      // The day of the session (workout_sessions.date: local day it started or
+      // was last resumed), not the end: 23:30 → 00:20 shows the day it began.
+      date: session.date ? localDay(session.date) : ended ? new Date(ended) : new Date(),
       title: session.workoutTitle,
       durationSec,
       volumeKg: detail.volumeKg,
@@ -117,10 +147,11 @@ export function useShareData(target: ShareTarget, language: ShareLanguage) {
     };
   }, [activity, detail, exercises.byId, records, target.kind]);
 
-  // "Total Body Dumbbell · 42 min" / "Carrera de tarde · 8,42 km"
+  // "Total Body Dumbbell · 42:08" / "Carrera de tarde · 8,42 km": the same
+  // duration and rounding as the sticker (clockText of durationSec).
   const context = data
     ? data.kind === 'workout'
-      ? `${data.title} · ${Math.max(1, Math.round(data.durationSec / 60))} min`
+      ? `${data.title} · ${clockText(data.durationSec)}`
       : `${data.title} · ${kmText(data.distanceM, language)} km`
     : '';
 

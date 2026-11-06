@@ -108,6 +108,9 @@ export type NutritionDay = {
   water: { glasses: number; target: number; ml: number };
   supplements: SupplementsDay | null;
   plan: { active: boolean; weekNumber: number | null };
+  // targets_outdated: the plan's saved targets differ more than 5 % from
+  // the current calculation (Hoy shows "Tus objetivos cambiaron").
+  targetsOutdated: boolean;
 };
 
 export type FoodItem = {
@@ -150,11 +153,15 @@ export type NutritionErrorCode =
 export class NutritionError extends Error {
   code: NutritionErrorCode;
   detail: string | null;
-  constructor(code: NutritionErrorCode, detail: string | null = null) {
+  // The code exactly as the server sent it (invalid_input, plan_not_active…),
+  // for calls whose codes need their own message. null: not an ok:false.
+  serverCode: string | null;
+  constructor(code: NutritionErrorCode, detail: string | null = null, serverCode: string | null = null) {
     super(detail ?? code);
     this.name = 'NutritionError';
     this.code = code;
     this.detail = detail;
+    this.serverCode = serverCode;
   }
 }
 
@@ -190,7 +197,7 @@ function errorCode(raw: string | null): NutritionErrorCode {
   }
 }
 
-async function call(name: string, args: Raw): Promise<Raw> {
+export async function call(name: string, args: Raw): Promise<Raw> {
   const client = getSupabaseClient() as unknown as {
     rpc: (
       rpc: string,
@@ -217,7 +224,7 @@ async function call(name: string, args: Raw): Promise<Raw> {
   if (body.ok !== true) {
     const nested = rec(body.error);
     const raw = str(body.error) ?? str(nested?.code);
-    throw new NutritionError(errorCode(raw), str(nested?.message) ?? raw);
+    throw new NutritionError(errorCode(raw), str(nested?.message) ?? raw, raw);
   }
   return body;
 }
@@ -235,7 +242,34 @@ const SLOT_ALIASES: Record<string, NutritionSlot> = {
   snacks: 'snacks',
   snack: 'snacks',
   merienda: 'snacks',
+  // Plans of 5 meals (nut-1 week[].meals[].slot): the mid-morning meal goes
+  // with the snacks, never dropped.
+  media_manana: 'snacks',
+  mid_morning: 'snacks',
 };
+
+// Several server moments can land on the same section (comida + almuerzo,
+// merienda + snacks, media_manana + snacks). Hoy shows ONE section per slot
+// and used to keep only the first of them: the other entries were counted in
+// "N registros" but never shown. They are merged into one moment.
+function mergeMoments(moments: NutritionMoment[]): NutritionMoment[] {
+  const bySlot = new Map<NutritionSlot, NutritionMoment>();
+  moments.forEach(moment => {
+    const current = bySlot.get(moment.slot);
+    if (!current) {
+      bySlot.set(moment.slot, { ...moment, entries: [...moment.entries] });
+      return;
+    }
+    bySlot.set(moment.slot, {
+      slot: moment.slot,
+      kcal: current.kcal + moment.kcal,
+      entries: [...current.entries, ...moment.entries],
+      planned: current.planned ?? moment.planned,
+      tag: current.tag ?? moment.tag,
+    });
+  });
+  return [...bySlot.values()];
+}
 
 const slotOf = (value: unknown): NutritionSlot | null => SLOT_ALIASES[String(value ?? '').toLowerCase()] ?? null;
 
@@ -406,9 +440,11 @@ export function parseNutritionDay(body: Raw): NutritionDay {
     targets,
     consumed: macrosOf(body.consumed),
     remaining: macrosOf(body.remaining),
-    moments: arr(body.moments)
-      .map(parseMoment)
-      .filter((m): m is NutritionMoment => m !== null),
+    moments: mergeMoments(
+      arr(body.moments)
+        .map(parseMoment)
+        .filter((m): m is NutritionMoment => m !== null),
+    ),
     water: {
       glasses: n0(water.glasses),
       target: n0(water.target) || targets.water.glasses,
@@ -416,6 +452,7 @@ export function parseNutritionDay(body: Raw): NutritionDay {
     },
     supplements: parseSupplementsDay(body.supplements),
     plan: { active: bool(plan.active), weekNumber: num(plan.week_number) },
+    targetsOutdated: body.targets_outdated === true,
   };
 }
 

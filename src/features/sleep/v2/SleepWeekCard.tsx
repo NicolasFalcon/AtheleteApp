@@ -1,8 +1,11 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight } from 'lucide-react-native';
-import { PressableScale, TextV2 } from '@app/components/v2';
-import { hoursLabel, weekSlots, type SleepOverview } from '@app/features/sleep/sleepModel';
+import { DisplayNumber, PressableScale, TextV2 } from '@app/components/v2';
+import { sleepText } from '@app/features/sleep/sleepCopy';
+import { consistencyPct, sleepDurationParts, weekSlots, type SleepOverview } from '@app/features/sleep/sleepModel';
+import { ValueSpans } from '@app/features/sleep/v2/SleepParts';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 
 // Progreso · "Sueño · 7 noches" (handoff v2.15 §25.2 entry, Progress.dc.html):
 // average, consistency and the 7 bars, "Recuperación N" when estimated, and
@@ -17,8 +20,10 @@ const C = {
 };
 
 export function SleepWeekCard({ overview, onOpen }: { overview: SleepOverview; onOpen: () => void }) {
+  const language = useProfileLanguage();
   const slots = weekSlots(overview);
   const last = slots[slots.length - 1]?.date;
+  const consistency = consistencyPct(overview);
   return (
     <PressableScale accessibilityRole="button" accessibilityLabel="Ver sueño y recuperación" onPress={onOpen} style={styles.card}>
       <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -45,19 +50,22 @@ export function SleepWeekCard({ overview, onOpen }: { overview: SleepOverview; o
       </View>
       <View style={styles.stats}>
         <View style={styles.stat}>
-          <TextV2 color={C.white} style={styles.value}>
-            {hoursLabel(overview.avg7Min)}
-          </TextV2>
+          <DisplayNumber size={40} weight="800" tracking={-2} color={C.white} fit minimumFontScale={0.6}>
+            {overview.avg7Min === null ? '—' : <ValueSpans parts={sleepDurationParts(overview.avg7Min)} unitColor={C.secondary} unitSize={17} />}
+          </DisplayNumber>
           <TextV2 variant="caption" color={C.secondary}>
             Promedio
           </TextV2>
         </View>
         <View style={styles.stat}>
-          <TextV2 color={C.white} style={styles.value}>
-            {overview.consistencyMin === null ? '—' : `± ${Math.round(overview.consistencyMin)}`}
-          </TextV2>
+          <DisplayNumber size={40} weight="800" tracking={-2} color={C.white} fit minimumFontScale={0.6}>
+            {consistency === null ? '—' : `${consistency} %`}
+          </DisplayNumber>
           <TextV2 variant="caption" color={C.secondary}>
-            Consistencia (min)
+            {sleepText(language, 'sleep.consistency.label')}
+          </TextV2>
+          <TextV2 variant="micro" color={C.secondary} style={styles.hint} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {sleepText(language, 'sleep.consistency.hint')}
           </TextV2>
         </View>
       </View>
@@ -110,8 +118,8 @@ const styles = StyleSheet.create({
   eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.recovery },
   stats: { flexDirection: 'row', gap: 28 },
-  stat: { gap: 2 },
-  value: { fontSize: 40, lineHeight: 40, fontWeight: '800', letterSpacing: -2 },
+  stat: { flexShrink: 1, minWidth: 0, gap: 2 },
+  hint: { fontWeight: '400', letterSpacing: 0, opacity: 0.8 },
   gap6: { gap: 6 },
   bars: { height: 72, flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
   bar: { flex: 1, borderRadius: 7 },

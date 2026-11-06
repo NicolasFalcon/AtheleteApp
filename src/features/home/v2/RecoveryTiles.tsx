@@ -15,7 +15,7 @@ import { PressableScale, TextV2 } from '@app/components/v2';
 import {
   LOAD_WORDS,
   QUALITY_WORDS,
-  hoursLabel,
+  sleepDuration,
   isRecent,
   type SleepOverview,
 } from '@app/features/sleep/sleepModel';
@@ -38,7 +38,7 @@ export function sleepTileLine(overview: SleepOverview | null): { value: string; 
   if (!overview || !night || !isRecent(night.nightDate, overview.date)) {
     return null;
   }
-  const value = hoursLabel(night.durationMin, true);
+  const value = sleepDuration(night.durationMin);
   if (night.source === 'apple_health') {
     return {
       value,
@@ -82,7 +82,7 @@ export function RecoveryTiles({
           <View style={styles.foot}>
             {line ? (
               <View style={styles.gap5}>
-                <TextV2 color={C.white} style={styles.sleepValue}>
+                <TextV2 color={C.white} style={styles.sleepValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   {line.value}
                 </TextV2>
                 <View style={styles.noteRow}>

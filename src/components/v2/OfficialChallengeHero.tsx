@@ -4,8 +4,9 @@ import { CoverImage } from '@app/components/v2/CoverImage';
 import { PressableScale } from '@app/components/v2/PressableScale';
 import { TextV2 } from '@app/components/v2/TextV2';
 import { useThemeV2 } from '@app/components/v2/useThemeV2';
-import { formatThousands } from '@app/features/social/postModel';
 import { progressPct } from '@app/features/social/challengeModel';
+import { countText } from '@app/features/social/countCopy';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 
 // Cover of the official challenge: an app asset (the real `cover_path` comes
 // with the challenge). TODO(social-wire): `social_challenges.cover_path`.
@@ -61,6 +62,7 @@ export function OfficialChallengeHero({
   onPress,
 }: OfficialChallengeHeroProps) {
   const { scene, colors } = useThemeV2();
+  const language = useProfileLanguage();
 
   return (
     <PressableScale
@@ -111,7 +113,7 @@ export function OfficialChallengeHero({
         ) : (
           <View style={styles.join}>
             <TextV2 variant="meta" color={scene.onDark.secondary} style={styles.left}>
-              {`${participants ? `${formatThousands(participants)} atletas · ` : ''}+${points} puntos`}
+              {`${participants ? `${countText(language, 'athletes.count', participants)} · ` : ''}+${points} puntos`}
             </TextV2>
             <View style={[styles.joinButton, { backgroundColor: scene.cta.onScene }]}>
               <TextV2 variant="metaStrong" color={scene.cta.onSceneText}>

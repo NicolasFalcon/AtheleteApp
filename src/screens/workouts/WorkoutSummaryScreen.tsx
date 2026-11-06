@@ -3,7 +3,7 @@ import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import { Check, Trophy } from 'lucide-react-native';
+import { Check, Star, Trophy } from 'lucide-react-native';
 import {
   Button,
   EllieSurface,
@@ -38,9 +38,18 @@ import { invalidatePersonalRecordQueries } from '@app/lib/queryInvalidation';
 import {
   detectSessionPRs,
   fetchSessionDetail,
+  fetchSessionFeedback,
+  fetchSessionRecords,
   registerSessionPRs,
+  SessionFeedbackReadError,
   type DetectedPR,
+  type SessionFeedbackRead,
+  type SessionRatingRead,
 } from '@app/services/supabase/session';
+import { EFFORT_OPTIONS, ZONE_OPTIONS } from '@app/features/session/restMessages';
+import { useDayHistoryText, type DayHistoryT } from '@app/features/week/dayHistoryCopy';
+import { safeGoBack } from '@app/navigation/safeGoBack';
+import type { LoggedSet } from '@app/features/session/sessionModel';
 import { ALL_BADGES } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -85,6 +94,24 @@ function prText(
   }
 }
 
+// One set as the summary lists it: "60 kg × 10", "12 reps", "0:45", "400 m".
+function setText(set: LoggedSet): string | null {
+  const kg = set.weightKg !== null && set.weightKg > 0 ? formatKg(set.weightKg) : null;
+  if (kg && set.reps) {
+    return `${kg} × ${set.reps}`;
+  }
+  if (set.reps) {
+    return `${set.reps} reps`;
+  }
+  if (set.durationSec) {
+    return formatDuration(set.durationSec);
+  }
+  if (set.distanceM) {
+    return `${set.distanceM} m`;
+  }
+  return kg;
+}
+
 function prValue(record: DetectedPR): string {
   return (
     prText(record.prType, {
@@ -118,10 +145,17 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const { profile } = useAuth();
   const userId = profile?.id;
   const { sessionId, newBadges: badgeIds = [] } = route.params;
-  const newBadges = badgeIds;
+  // From a past day of Tu semana: no celebration-time extras (rating, ELLIE,
+  // "Registrar récord"); the saved records instead of the detected ones.
+  const history = route.params.mode === 'history';
+  const { t } = useDayHistoryText();
+  const newBadges = history ? [] : badgeIds;
   const ellie = useEllieData();
   // ELLIE's line must already count this session.
   useEffect(() => {
+    if (history) {
+      return;
+    }
     ellie.overviewQuery.refetch().catch(() => {});
     // Once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -137,7 +171,36 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   });
   const prsQuery = useQuery({
     queryKey: ['session-prs', sessionId],
+    enabled: !history,
     queryFn: () => detectSessionPRs(sessionId),
+  });
+  const setIds = useMemo(
+    () =>
+      (detailQuery.data?.sets ?? [])
+        .map(set => set.id)
+        .filter((id): id is string => Boolean(id)),
+    [detailQuery.data],
+  );
+  // Answers to the rest messages (sfb-1). A failed read is shown, not hidden.
+  const feedbackQuery = useQuery({
+    queryKey: ['session-feedback', sessionId],
+    enabled: history,
+    retry: 1,
+    queryFn: () => fetchSessionFeedback(sessionId),
+  });
+  useEffect(() => {
+    if (feedbackQuery.error) {
+      const error = feedbackQuery.error;
+      console.warn(
+        `[summary] workout_session_feedback failed (${error instanceof SessionFeedbackReadError ? error.code : 'unknown'})`,
+        error,
+      );
+    }
+  }, [feedbackQuery.error]);
+  const savedRecordsQuery = useQuery({
+    queryKey: ['session-saved-prs', sessionId, setIds.length],
+    enabled: history && setIds.length > 0,
+    queryFn: () => fetchSessionRecords(setIds),
   });
 
   // "¿Cómo estuvo la sesión?" (§28.13 · rate_session): sent through the
@@ -174,13 +237,24 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
     navigation.navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Home });
   };
 
-  const records = useMemo(() => prsQuery.data ?? [], [prsQuery.data]);
-  // Names of the exercises with a new record (get_exercise, on the phone).
+  const records = useMemo(() => (history ? [] : prsQuery.data ?? []), [history, prsQuery.data]);
+  const savedRecords = useMemo(() => savedRecordsQuery.data ?? [], [savedRecordsQuery.data]);
+  // Names of the session's exercises and of its records (get_exercise, on
+  // the phone).
   const { names } = useExerciseNames(
-    useMemo(() => records.map(record => record.exerciseId), [records]),
+    useMemo(
+      () => [
+        ...records.map(record => record.exerciseId),
+        ...savedRecords.map(record => record.exerciseId),
+        ...Object.values(detailQuery.data?.exerciseByPosition ?? {}),
+      ],
+      [detailQuery.data, records, savedRecords],
+    ),
   );
   const exerciseName = useCallback(
-    (exerciseId: string) => names[exerciseId] ?? 'Ejercicio',
+    (exerciseId: string | null) => (exerciseId ? names[exerciseId] : null) ?? t('summary.exercise.fallback'),
+    // t depends on the language only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [names],
   );
   const badge = useMemo(
@@ -251,6 +325,34 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
     });
     const volume = detail.volumeKg;
     const setsCount = detail.sets.length;
+    // Exercises with their work sets, in the session's order.
+    const warmups = new Set(detail.warmupSetIds);
+    const positions = Array.from(new Set(detail.sets.map(set => set.position))).sort((a, b) => a - b);
+    const feedback = history ? feedbackQuery.data ?? [] : [];
+    const sessionExerciseIds = new Set(
+      Object.values(detail.exerciseByPosition).filter((id): id is string => Boolean(id)),
+    );
+    const exercises = positions
+      .map(position => {
+        const sets = detail.sets.filter(set => set.position === position && !(set.id && warmups.has(set.id)));
+        const exerciseId = detail.exerciseByPosition[position] ?? null;
+        return {
+          position,
+          name: exerciseName(exerciseId),
+          lines: sets.map(setText).filter((line): line is string => Boolean(line)),
+          count: sets.length,
+          feedback: exerciseId ? feedback.filter(item => item.exerciseId === exerciseId) : [],
+        };
+      })
+      .filter(exercise => exercise.count > 0);
+    // Answers about the session in general (or an exercise not in the list).
+    const generalFeedback = feedback.filter(item => !item.exerciseId || !sessionExerciseIds.has(item.exerciseId));
+    const feedbackError =
+      history && feedbackQuery.error
+        ? feedbackQuery.error instanceof SessionFeedbackReadError
+          ? feedbackQuery.error.code
+          : 'unknown'
+        : null;
     sheet = (
       <>
         <View style={styles.trio}>
@@ -269,6 +371,67 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
           <View style={[styles.trioDivider, { backgroundColor: colors.divider }]} />
           <TrioItem value={String(setsCount)} label={setsCount === 1 ? 'Serie' : 'Series'} />
         </View>
+
+        {exercises.length > 0 ? (
+          <View style={styles.exercises}>
+            <Eyebrow>{t('summary.exercises')}</Eyebrow>
+            {exercises.map(exercise => (
+              <View key={exercise.position} style={[styles.exerciseRow, { borderBottomColor: colors.divider }]}>
+                <View style={styles.exerciseHead}>
+                  <TextV2 variant="bodyStrong" style={styles.flexShrink}>
+                    {exercise.name}
+                  </TextV2>
+                  <TextV2 variant="meta" tone="secondary">
+                    {exercise.count === 1 ? t('summary.sets.one') : t('summary.sets.other', { n: exercise.count })}
+                  </TextV2>
+                </View>
+                {exercise.lines.length > 0 ? (
+                  <TextV2 variant="meta" tone="secondary">
+                    {exercise.lines.join(' · ')}
+                  </TextV2>
+                ) : null}
+                {exercise.feedback.map(item => (
+                  <FeedbackLine key={item.id} item={item} t={t} />
+                ))}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {generalFeedback.length > 0 ? (
+          <View style={styles.exercises}>
+            <Eyebrow>{t('summary.feedback.general')}</Eyebrow>
+            {generalFeedback.map(item => (
+              <FeedbackLine key={item.id} item={item} t={t} />
+            ))}
+          </View>
+        ) : null}
+
+        {feedbackError ? (
+          <TextV2 variant="meta" color={colors.ember.textOnDark}>
+            {t('summary.feedback.error', { code: feedbackError })}
+          </TextV2>
+        ) : null}
+
+        {history && savedRecords.length > 0 ? (
+          <View style={styles.exercises}>
+            <Eyebrow>{t('summary.records')}</Eyebrow>
+            {savedRecords.map(record => (
+              <View key={record.sessionSetId} style={[styles.prRow, { borderBottomColor: colors.divider }]}>
+                <View style={[styles.recordDot, { backgroundColor: colors.ember.base }]}>
+                  <Trophy size={14} color="#FFFFFF" strokeWidth={2.2} />
+                </View>
+                <TextV2 variant="bodyStrong" style={styles.flex1}>
+                  {exerciseName(record.exerciseId)}
+                </TextV2>
+                <TextV2 variant="bodyStrong">{prValue(record)}</TextV2>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* The final rating, read only (history). No block without rating. */}
+        {history ? <RatingReadOnly rating={detail.rating} t={t} /> : null}
 
         {badge ? (
           <View style={[styles.badgeRow, { borderColor: colors.divider }]}>
@@ -305,6 +468,7 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
           </View>
         ) : null}
 
+        {history ? null : (
         <View style={[styles.ratingRow, { borderColor: colors.divider }]}>
           <SessionRating
             rating={rating}
@@ -317,8 +481,9 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
             onNoteDone={() => rating !== null && sendRating(rating, ratingNote)}
           />
         </View>
+        )}
 
-        {ellie.heroInsight?.text ? (
+        {!history && ellie.heroInsight?.text ? (
           <EllieSurface
             message={ellie.heroInsight.text}
             eyebrow=""
@@ -333,7 +498,11 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
   const exercisesLine = detail
     ? `${detail.session.workoutTitle} · ${detail.session.completedExercises.length} de ${detail.session.totalExercises} ejercicios`
     : '';
-  const canRegister = records.length > 0 && !registeredCount;
+  const canRegister = !history && records.length > 0 && !registeredCount;
+  // "Ver rutina" only while the routine still exists (the summary itself
+  // comes from the session, so a deleted routine does not hide it).
+  const routineId = detail?.session.workoutId || null;
+  const canViewRoutine = Boolean(routineId && routineQuery.data);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -374,7 +543,7 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
               <Check size={34} color="#FFFFFF" strokeWidth={2.4} />
             </View>
             <TextV2 variant="title24" color="#FFFFFF" align="center">
-              Entreno completado
+              {t('summary.history.title')}
             </TextV2>
             <TextV2 variant="label" color="#A8A6A1" align="center" style={styles.heroLine}>
               {exercisesLine}
@@ -401,7 +570,11 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
           },
         ]}
       >
-        <Button label="Listo" onPress={done} />
+        {history ? (
+          <Button label={t('summary.close')} onPress={() => safeGoBack(navigation, [ROOT_ROUTES.MainTabs])} />
+        ) : (
+          <Button label="Listo" onPress={done} />
+        )}
         <View style={styles.secondaryRow}>
           <PressableScale
             accessibilityRole="button"
@@ -409,8 +582,17 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
             onPress={() => navigation.navigate(APP_ROUTES.Share, { kind: 'workout', sessionId })}
             style={[styles.prButton, styles.secondaryHalf, { boxShadow: `inset 0 0 0 1px ${colors.outline.strong}` }]}
           >
-            <TextV2 variant="bodyStrong">Compartir</TextV2>
+            <TextV2 variant="bodyStrong">{t('summary.share')}</TextV2>
           </PressableScale>
+          {history && canViewRoutine && routineId ? (
+            <PressableScale
+              accessibilityRole="button"
+              onPress={() => navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: routineId })}
+              style={[styles.prButton, styles.secondaryHalf, { boxShadow: `inset 0 0 0 1px ${colors.outline.strong}` }]}
+            >
+              <TextV2 variant="bodyStrong">{t('summary.viewRoutine')}</TextV2>
+            </PressableScale>
+          ) : null}
           {canRegister ? (
             <PressableScale
               accessibilityRole="button"
@@ -471,6 +653,64 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
           ) : null}
         </View>
       </Sheet>
+    </View>
+  );
+}
+
+// The final 1–5 rating of a past session, read only: five stars and the
+// note. Nothing when the session was never rated.
+function RatingReadOnly({ rating, t }: { rating: SessionRatingRead | null; t: DayHistoryT }) {
+  const { colors } = useThemeV2();
+  if (!rating) {
+    return null;
+  }
+  return (
+    <View style={styles.exercises}>
+      <Eyebrow>{t('summary.rating')}</Eyebrow>
+      <View style={styles.stars} accessible accessibilityLabel={t('summary.rating.a11y', { n: rating.value })}>
+        {[1, 2, 3, 4, 5].map(value => (
+          <Star
+            key={value}
+            size={22}
+            strokeWidth={1.8}
+            color={value <= rating.value ? colors.ember.base : colors.outline.strong}
+            fill={value <= rating.value ? colors.ember.base : 'transparent'}
+          />
+        ))}
+      </View>
+      {rating.note ? (
+        <TextV2 variant="body" tone="secondary">
+          {rating.note}
+        </TextV2>
+      ) : null}
+    </View>
+  );
+}
+
+// One answer: "Sensación · Duro" or "Molestia · Rodilla — nota". The labels
+// are the session screen's (EFFORT_OPTIONS / ZONE_OPTIONS, sfb-1 values).
+function FeedbackLine({ item, t }: { item: SessionFeedbackRead; t: DayHistoryT }) {
+  const { colors } = useThemeV2();
+  const text =
+    item.kind === 'effort'
+      ? `${t('summary.feedback.effort')} · ${EFFORT_OPTIONS.find(option => option.value === item.effort)?.label ?? '—'}`
+      : [
+          `${t('summary.feedback.discomfort')} · ${ZONE_OPTIONS.find(option => option.value === item.bodyZone)?.label ?? '—'}`,
+          item.note,
+        ]
+          .filter(Boolean)
+          .join(' — ');
+  return (
+    <View style={styles.feedbackLine}>
+      <View
+        style={[
+          styles.feedbackDot,
+          { backgroundColor: item.kind === 'discomfort' ? colors.ember.base : colors.text.tertiary },
+        ]}
+      />
+      <TextV2 variant="meta" tone="secondary" style={styles.flex1}>
+        {text}
+      </TextV2>
     </View>
   );
 }
@@ -557,6 +797,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   emberDot: { width: 6, height: 6, borderRadius: 3 },
+  flex1: { flex: 1 },
+  flexShrink: { flexShrink: 1 },
+  exercises: { gap: 4 },
+  exerciseRow: { paddingVertical: 12, gap: 4, borderBottomWidth: StyleSheet.hairlineWidth },
+  exerciseHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 12 },
+  stars: { flexDirection: 'row', gap: 6 },
+  feedbackLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  feedbackDot: { width: 6, height: 6, borderRadius: 3, marginTop: 7 },
+  recordDot: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   secondaryRow: { flexDirection: 'row', gap: 8 },
   secondaryHalf: { flex: 1 },
   prList: { gap: 4, paddingBottom: 8 },

@@ -1,6 +1,8 @@
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { TextV2 } from '@app/components/v2';
+import { Isologo } from '@app/components/v2/Isologo';
+import { LaunchWordmark } from '@app/components/v2/LaunchWordmark';
 import {
   SHARE_COPY,
   ZONE_ORDER,
@@ -21,10 +23,27 @@ import {
 // same in both themes; it depends on the photo and the background chosen.
 // Rendered at 1× pt; the export captures it at 3×.
 const EMBER = '#FF5B1F';
+// Official logo colours (design/launch-screen/.../svg/athelete-*-ink|bone.svg).
+const LOGO_INK = '#121212';
+const LOGO_BONE = '#F2F0EC';
+// Aspect of the official wordmark (viewBox 710 × 58).
+const WORDMARK_ASPECT = 58 / 710;
 
 export const TONES: Record<
   StickerTone,
-  { bg: string; fg: string; sec: string; div: string; off: string; prBg: string; prFg: string; shadow: string; textShadow: boolean }
+  {
+    bg: string;
+    fg: string;
+    sec: string;
+    div: string;
+    off: string;
+    prBg: string;
+    prFg: string;
+    shadow: string | null;
+    textShadow: false | 'soft' | 'strong';
+    // Official logo: ink on the light sticker, bone on everything else.
+    logo: string;
+  }
 > = {
   light: {
     bg: 'rgba(247,246,243,.96)',
@@ -36,6 +55,7 @@ export const TONES: Record<
     prFg: '#B8380A',
     shadow: '0 10px 30px rgba(0,0,0,.18)',
     textShadow: false,
+    logo: LOGO_INK,
   },
   dark: {
     bg: 'rgba(20,19,18,.94)',
@@ -47,6 +67,7 @@ export const TONES: Record<
     prFg: '#FF8A5C',
     shadow: '0 10px 30px rgba(0,0,0,.3), inset 0 0 0 0.5px rgba(255,255,255,.08)',
     textShadow: false,
+    logo: LOGO_BONE,
   },
   glass: {
     bg: 'rgba(20,19,18,.42)',
@@ -57,9 +78,29 @@ export const TONES: Record<
     prBg: 'rgba(255,91,31,.9)',
     prFg: '#FFFFFF',
     shadow: 'inset 0 0 0 0.5px rgba(255,255,255,.22)',
-    textShadow: true,
+    textShadow: 'soft',
+    logo: LOGO_BONE,
+  },
+  // Sin fondo: no plate, no border, no shadow box. White content with a soft
+  // dark text shadow so it reads on any photo.
+  clear: {
+    bg: 'transparent',
+    fg: '#FFFFFF',
+    sec: 'rgba(255,255,255,.9)',
+    div: 'rgba(255,255,255,.4)',
+    off: 'rgba(255,255,255,.35)',
+    prBg: 'rgba(255,91,31,.9)',
+    prFg: '#FFFFFF',
+    shadow: null,
+    textShadow: 'strong',
+    logo: '#FFFFFF',
   },
 };
+
+// The plate of a tone: background and shadow, nothing at all for 'clear'.
+function plateOf(t: (typeof TONES)[StickerTone]) {
+  return t.bg === 'transparent' ? null : { backgroundColor: t.bg, ...(t.shadow ? { boxShadow: t.shadow } : null) };
+}
 
 export function ShareSticker({
   data,
@@ -74,13 +115,14 @@ export function ShareSticker({
 }) {
   const t = TONES[tone];
   const size = stickerSize(data, variant);
-  const shade = t.textShadow ? styles.textShadow : null;
+  const shade = t.textShadow === 'strong' ? styles.textShadowStrong : t.textShadow ? styles.textShadow : null;
+  const plate = plateOf(t);
 
   if (variant === 'min') {
     const figure = minFigure(data, language);
     return (
-      <View style={[styles.plate, size, styles.min, { backgroundColor: t.bg, boxShadow: t.shadow }]}>
-        <Isologo size={44} stroke={2.5} fontSize={20} color={t.fg} weight="500" />
+      <View style={[styles.plate, size, styles.min, plate]}>
+        <Isologo size={44} color={t.logo} />
         <View style={styles.minFigure}>
           <TextV2 color={t.fg} style={[styles.minValue, shade]}>
             {figure.value}
@@ -97,13 +139,11 @@ export function ShareSticker({
   const copy = SHARE_COPY[language];
   const trio = stickerTrio(data, language);
   return (
-    <View style={[styles.plate, size, styles.full, { backgroundColor: t.bg, boxShadow: t.shadow }]}>
+    <View style={[styles.plate, size, styles.full, plate]}>
       <View style={styles.head}>
-        <View style={styles.brand}>
-          <Isologo size={26} stroke={2} fontSize={12} color={t.fg} weight="600" />
-          <TextV2 color={t.fg} style={[styles.wordmark, shade]}>
-            ATHELETE
-          </TextV2>
+        <View style={styles.brand} accessible accessibilityRole="image" accessibilityLabel="Athelete">
+          <Isologo size={26} color={t.logo} />
+          <LaunchWordmark width={WORDMARK_W} color={t.logo} />
         </View>
         <TextV2 color={t.sec} style={[styles.date, shade]}>
           {stickerDate(data.date, language)}
@@ -133,7 +173,15 @@ export function ShareSticker({
                 <Svg width={13} height={13} viewBox="0 0 24 24">
                   <Path d="M7 17 17 7M9 7h8v8" stroke={t.prFg} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
                 </Svg>
-                <TextV2 color={t.prFg} numberOfLines={1} style={styles.recordText}>
+                {/* Long names ("Sentadilla a Ponerse de pie"): two lines and a
+                    slightly smaller size before any ellipsis. */}
+                <TextV2
+                  color={t.prFg}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                  style={styles.recordText}
+                >
                   {`${copy.record} · ${data.record.text}`}
                 </TextV2>
               </View>
@@ -216,28 +264,8 @@ function Trio({
   );
 }
 
-// Ring with "Λ" (the isologo, 26.2 / 26.4).
-export function Isologo({
-  size,
-  stroke,
-  fontSize,
-  color,
-  weight,
-}: {
-  size: number;
-  stroke: number;
-  fontSize: number;
-  color: string;
-  weight: '500' | '600';
-}) {
-  return (
-    <View style={[styles.iso, { width: size, height: size, borderRadius: size / 2, borderWidth: stroke, borderColor: color }]}>
-      <TextV2 color={color} style={{ fontSize, lineHeight: fontSize * 1.1, fontWeight: weight }}>
-        Λ
-      </TextV2>
-    </View>
-  );
-}
+// Width of the official wordmark next to the isologo in the sticker head.
+const WORDMARK_W = 84;
 
 const BOX = { width: 256, height: 150, pad: 8 };
 
@@ -277,10 +305,12 @@ export function tracePath(points: { lat: number; lon: number }[]): string | null
     .join(' ');
 }
 
-// Fondo de marca (26.6): #141312, an Ember light top left, the isologo ring
-// cut at the bottom right and the wordmark. The same in both themes.
+// Fondo de marca (26.6): #141312, an Ember light top left, the official
+// isologo cut at the bottom right and the official wordmark (bone, the dark
+// version of the logo). The same in both themes.
 export function BrandBackground({ width, height }: { width: number; height: number }) {
   const ring = width * 0.9;
+  const wordmarkWidth = width * 0.3;
   return (
     <View style={[styles.brandBg, { width, height }]}>
       <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
@@ -291,22 +321,19 @@ export function BrandBackground({ width, height }: { width: number; height: numb
           </RadialGradient>
         </Defs>
         <Rect width={width} height={height} fill="url(#brandLight)" />
-        <Circle
-          cx={width * 0.95}
-          cy={height * 0.98}
-          r={ring / 2}
-          stroke="#FFFFFF"
-          strokeOpacity={0.045}
-          strokeWidth={width * 0.07}
-          fill="none"
-        />
       </Svg>
-      <TextV2
-        color="rgba(255,255,255,.4)"
-        style={[styles.brandWordmark, { top: width * 0.06, left: width * 0.06, fontSize: Math.max(8, width * 0.03) }]}
+      <View
+        pointerEvents="none"
+        style={[styles.brandMark, { left: width * 0.95 - ring / 2, top: height * 0.98 - ring / 2, opacity: 0.06 }]}
       >
-        ATHELETE
-      </TextV2>
+        <Isologo size={ring} color={LOGO_BONE} />
+      </View>
+      <View
+        pointerEvents="none"
+        style={[styles.brandMark, { top: width * 0.06, left: width * 0.06, height: wordmarkWidth * WORDMARK_ASPECT, opacity: 0.4 }]}
+      >
+        <LaunchWordmark width={wordmarkWidth} color={LOGO_BONE} />
+      </View>
     </View>
   );
 }
@@ -320,11 +347,11 @@ const styles = StyleSheet.create({
   minUnit: { fontSize: 15, fontWeight: '600' },
   minDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: EMBER, boxShadow: '0 0 0 4px rgba(255,91,31,.2)' },
   textShadow: { textShadowColor: 'rgba(0,0,0,.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  // Sin fondo: soft and wide, low opacity, so white text reads on light photos.
+  textShadowStrong: { textShadowColor: 'rgba(0,0,0,.35)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 6 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  wordmark: { fontSize: 11, fontWeight: '700', letterSpacing: 3.52 },
   date: { fontSize: 11, fontWeight: '600', letterSpacing: 0.88 },
-  iso: { alignItems: 'center', justifyContent: 'center' },
   gap4: { gap: 4 },
   gap7: { gap: 7 },
   eyebrow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -344,7 +371,8 @@ const styles = StyleSheet.create({
   recordRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   record: {
     flexShrink: 1,
-    height: 28,
+    minHeight: 28,
+    paddingVertical: 5,
     paddingLeft: 9,
     paddingRight: 12,
     borderRadius: 14,
@@ -352,11 +380,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
   },
-  recordText: { fontSize: 12, fontWeight: '600', flexShrink: 1 },
+  recordText: { fontSize: 12, lineHeight: 15, fontWeight: '600', flexShrink: 1 },
   moreRecords: { fontSize: 12, fontWeight: '600' },
   segments: { flexDirection: 'row', gap: 3 },
   segment: { flex: 1, height: 5, borderRadius: 3 },
   zones: { fontSize: 12, fontWeight: '500' },
   brandBg: { backgroundColor: '#141312', overflow: 'hidden' },
-  brandWordmark: { position: 'absolute', fontWeight: '700', letterSpacing: 3 },
+  brandMark: { position: 'absolute' },
 });

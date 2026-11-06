@@ -1,20 +1,26 @@
-import type { ReactNode } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { Fragment, type ReactNode } from 'react';
+import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Defs, Line, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { ArrowRight, ChevronLeft, Heart, Minus, Plus } from 'lucide-react-native';
-import { AuraMark, PressableScale, TextV2 } from '@app/components/v2';
-import { HOME_PHOTOS } from '@app/features/home/v2/homePhotos';
+import { AuraMark, DisplayNumber, PressableScale, TextV2 } from '@app/components/v2';
+import { sleepHero } from '@app/assets/images';
+import { sleepText } from '@app/features/sleep/sleepCopy';
 import { DAY_NAMES, weekdayIndex } from '@app/features/week/weekModel';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import {
   QUALITY_WORDS,
   WAKE_FEELINGS,
   clock,
-  hoursLabel,
+  consistencyPct,
+  deltaLabel,
   isLateBedtime,
   minutesFrom22,
-  splitMinutes,
+  sleepBarLabel,
+  sleepDuration,
+  sleepDurationParts,
   weekSlots,
+  type DurationPart,
   type SleepNight,
   type SleepOverview,
   type SleepStage,
@@ -51,6 +57,22 @@ const STAGE_ROWS: { stage: SleepStage; label: string; color: string }[] = [
 ];
 
 // ── Hero ────────────────────────────────────────────────────────────────────
+// Space the content keeps under the safe area for the back button row
+// (14 offset + 44 button + 16 breathing room).
+const HERO_TOP_BAR = 74;
+// Width / height of the hero photo, so it can fill the hero's height at its
+// own proportions and be anchored to the right.
+const SLEEP_HERO_RATIO = (() => {
+  const { width, height } = Image.resolveAssetSource(sleepHero);
+  return width && height ? width / height : 1;
+})();
+// Framing of the photo (moon upper right, clouds behind the score), tuned on
+// a 402 pt wide screen (iPhone 17 Pro). The offsets scale with the screen
+// width so the moon keeps the same place on smaller and larger phones.
+const PHOTO_BASE_WIDTH = 402;
+const PHOTO_TOP = -160;
+const PHOTO_RIGHT = -220;
+
 export function SleepHero({
   height,
   topInset,
@@ -66,9 +88,20 @@ export function SleepHero({
   onBack: () => void;
   children: ReactNode;
 }) {
+  const { width: screenWidth } = useWindowDimensions();
+  const photoScale = screenWidth / PHOTO_BASE_WIDTH;
+  const photoFrame = { top: PHOTO_TOP * photoScale, right: PHOTO_RIGHT * photoScale };
   return (
-    <View style={[styles.hero, { height }]}>
-      <Image source={HOME_PHOTOS.mobility} resizeMode="cover" style={[StyleSheet.absoluteFill, styles.heroPhoto]} />
+    // No fixed height and no clipping: `height` is a minimum and the hero
+    // grows when the score, headline and text need more room.
+    <View style={[styles.hero, { minHeight: height, paddingTop: topInset + HERO_TOP_BAR }]}>
+      {/* The photo gets its own clipping layer: on iOS a `cover` image draws
+          past its bounds, and the hero itself must not clip (it grows). */}
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.heroPhotoClip]}>
+        {/* Anchored to the hero's bottom and pushed past its top and right
+            edges (photoFrame) so the moon sits upper right. */}
+        <Image source={sleepHero} resizeMode="cover" style={[styles.heroPhoto, photoFrame]} />
+      </View>
       <View style={[StyleSheet.absoluteFill, styles.duotone]} />
       {glow ? (
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -81,11 +114,21 @@ export function SleepHero({
           <Rect width="100%" height="100%" fill="url(#heroGlow)" />
         </Svg>
       ) : null}
+      {/* Legibility of the score and "LISTO PARA CARGAR.": dark from the
+          bottom (the app background) up to transparent. */}
       <LinearGradient
         pointerEvents="none"
-        colors={['rgba(11,14,18,.55)', 'rgba(11,14,18,0)', 'rgba(11,14,18,.45)', 'rgba(11,14,18,.96)', NIGHT.bg]}
-        locations={[0, 0.24, 0.5, 0.86, 1]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 0, y: 0 }}
+        colors={[NIGHT.bg, 'rgba(11,14,18,.85)', 'rgba(11,14,18,.35)', 'rgba(11,14,18,0)']}
+        locations={[0, 0.14, 0.4, 0.7]}
         style={StyleSheet.absoluteFill}
+      />
+      {/* Light scrim under the status bar, back button and badge. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(11,14,18,.55)', 'rgba(11,14,18,0)']}
+        style={[styles.heroTopScrim, { height: topInset + HERO_TOP_BAR + 40 }]}
       />
       <View style={[styles.heroTop, { top: topInset + 14 }]}>
         <PressableScale accessibilityRole="button" accessibilityLabel="Atrás" onPress={onBack} style={styles.glassRound}>
@@ -164,27 +207,51 @@ export function EstimateTag() {
   );
 }
 
-// "7 h 42 min" at the given size.
+// The big figure: always "9 h 00 min" (sleepDurationParts full), at the
+// given size.
 export function Duration({ minutes, size }: { minutes: number; size: number }) {
-  const { h, m } = splitMinutes(minutes);
   const unit = Math.round(size * 0.31);
   return (
     <View style={styles.duration}>
-      <TextV2 color={NIGHT.white} style={[styles.big, { fontSize: size, lineHeight: size * 0.95 }]}>
-        {String(h)}
-      </TextV2>
-      <TextV2 color={NIGHT.secondary} style={[styles.unit, { fontSize: unit }]}>
-        h
-      </TextV2>
-      <TextV2 color={NIGHT.white} style={[styles.big, styles.ml6, { fontSize: size, lineHeight: size * 0.95 }]}>
-        {String(m).padStart(2, '0')}
-      </TextV2>
-      <TextV2 color={NIGHT.secondary} style={[styles.unit, { fontSize: unit }]}>
-        min
-      </TextV2>
+      {sleepDurationParts(minutes, { full: true }).map((part, index) => (
+        <Fragment key={part.unit}>
+          <DisplayNumber
+            size={size}
+            weight="800"
+            tracking={-2.5}
+            color={NIGHT.white}
+            style={index > 0 ? styles.durationMinutes : null}
+          >
+            {part.value}
+          </DisplayNumber>
+          <TextV2 color={NIGHT.secondary} style={[styles.unit, { fontSize: unit }]}>
+            {part.unit}
+          </TextV2>
+        </Fragment>
+      ))}
     </View>
   );
 }
+
+// A figure with small units inline, inside one DisplayNumber so `fit`
+// shrinks numbers and units together: "9 h 15 min", "+2 h", "85 %".
+export function ValueSpans({ parts, unitColor, unitSize }: { parts: ValuePart[]; unitColor: string; unitSize: number }) {
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 ? ' ' : ''}
+          {part.value}
+          {part.unit ? (
+            <Text style={[styles.inlineUnit, { color: unitColor, fontSize: unitSize }]}>{` ${part.unit}`}</Text>
+          ) : null}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+export type ValuePart = { value: string; unit?: DurationPart['unit'] | '%' };
 
 // ── Anoche · sueño ──────────────────────────────────────────────────────────
 export function NightSection({
@@ -194,6 +261,7 @@ export function NightSection({
   label: string;
   night: { durationMin: number; bedtimeAt: string; wakeAt: string; stages: SleepNight['stages'] };
 }) {
+  const language = useProfileLanguage();
   const stages = night.stages;
   const start = new Date(night.bedtimeAt).getTime();
   const end = new Date(night.wakeAt).getTime();
@@ -268,7 +336,7 @@ export function NightSection({
                     {row.label}
                   </TextV2>
                   <TextV2 color={NIGHT.text} style={styles.stageValue}>
-                    {hoursLabel(minutesOf[stage])}
+                    {sleepDuration(minutesOf[stage])}
                   </TextV2>
                   <TextV2 variant="caption" color={NIGHT.tertiary}>
                     {`${total ? Math.round((minutesOf[stage] / total) * 100) : 0} %`}
@@ -280,7 +348,7 @@ export function NightSection({
         </>
       ) : (
         <TextV2 variant="meta" color={NIGHT.secondary}>
-          Las fases solo se ven en la última noche con Apple Watch.
+          {sleepText(language, 'sleep.stages.empty')}
         </TextV2>
       )}
     </View>
@@ -288,8 +356,17 @@ export function NightSection({
 }
 
 // ── 7 noches ────────────────────────────────────────────────────────────────
-const BAR_HEIGHT = 168;
+// Vertical budget of the chart, top to bottom: a fixed band for the value
+// label of the tallest bar ("9:30"), the plot itself (bars scale on this
+// height only) and the weekday letters. No label can leave the chart area.
+const LABEL_SPACE = 24; // captionStrong line (16) + 8 gap to the bar
+const PLOT_HEIGHT = 144;
+const DAY_SPACE = 26;
+const CHART_HEIGHT = LABEL_SPACE + PLOT_HEIGHT + DAY_SPACE;
 const BAR_MAX_MIN = 540;
+const GOAL_MIN = 480;
+// Stats row → chart area: at least 24 pt (section gap 16 + 8).
+const STATS_TO_CHART = 24;
 
 export function WeekBars({
   overview,
@@ -300,8 +377,10 @@ export function WeekBars({
   selected: string | null;
   onSelect: (date: string) => void;
 }) {
+  const language = useProfileLanguage();
   const slots = weekSlots(overview);
-  const delta = overview.deltaVsPrevWeekMin;
+  const consistency = consistencyPct(overview);
+  const delta = overview.deltaVsPrevWeekMin === null ? null : deltaLabel(overview.deltaVsPrevWeekMin);
   return (
     <View style={styles.gap16}>
       <SectionTitle
@@ -317,45 +396,52 @@ export function WeekBars({
         7 noches
       </SectionTitle>
       <View style={styles.stats}>
-        <Stat value={hoursLabel(overview.avg7Min)} label="Promedio" />
         <Stat
-          value={overview.consistencyMin === null ? '—' : `± ${Math.round(overview.consistencyMin)}`}
-          unit={overview.consistencyMin === null ? undefined : 'min'}
-          label="Consistencia"
+          parts={overview.avg7Min === null ? [{ value: '—' }] : sleepDurationParts(overview.avg7Min)}
+          label="Promedio"
         />
         <Stat
-          value={delta === null ? '—' : `${delta >= 0 ? '+' : '−'}${Math.abs(Math.round(delta))}`}
-          unit={delta === null ? undefined : 'min'}
+          wide
+          parts={consistency === null ? [{ value: '—' }] : [{ value: String(consistency), unit: '%' }]}
+          label={sleepText(language, 'sleep.consistency.label')}
+          hint={sleepText(language, 'sleep.consistency.hint')}
+        />
+        <Stat
+          parts={delta === null ? [{ value: '—' }] : delta.parts}
           label="vs semana pasada"
-          tone={NIGHT.recoveryLight}
+          tone={delta?.negative ? NIGHT.emberText : NIGHT.recoveryLight}
         />
       </View>
       <View style={styles.bars}>
-        <View style={[styles.goalLine, { bottom: 26 + BAR_HEIGHT * (480 / BAR_MAX_MIN) }]} />
+        <View style={[styles.goalLine, { bottom: DAY_SPACE + PLOT_HEIGHT * (GOAL_MIN / BAR_MAX_MIN) }]} />
         {slots.map(slot => {
           const on = slot.date === selected;
           const minutes = slot.night?.durationMin ?? 0;
-          const pct = Math.min(1, minutes / BAR_MAX_MIN) * 100;
+          const barHeight = slot.night
+            ? Math.max(4, Math.round(Math.min(1, minutes / BAR_MAX_MIN) * PLOT_HEIGHT))
+            : 0;
           const fill = on ? NIGHT.recovery : minutes < 420 ? 'rgba(110,143,179,.16)' : 'rgba(110,143,179,.3)';
           return (
             <PressableScale
               key={slot.date}
               accessibilityRole="button"
-              accessibilityLabel={`${slot.letter}: ${slot.night ? hoursLabel(minutes) : 'sin datos'}`}
+              accessibilityLabel={`${slot.letter}: ${slot.night ? sleepDuration(minutes) : 'sin datos'}`}
               disabled={!slot.night}
               onPress={() => onSelect(slot.date)}
               style={styles.barCol}
             >
-              <TextV2 variant="captionStrong" align="center" color={on ? NIGHT.white : NIGHT.tertiary}>
-                {slot.night ? hoursLabel(minutes).replace(' h ', ':') : ''}
+              <TextV2
+                variant="captionStrong"
+                align="center"
+                color={on ? NIGHT.white : NIGHT.tertiary}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+                style={styles.barLabel}
+              >
+                {slot.night ? sleepBarLabel(minutes) : ''}
               </TextV2>
-              <View
-                style={[
-                  styles.bar,
-                  { height: `${Math.max(slot.night ? 4 : 0, pct)}%`, backgroundColor: fill },
-                  on ? styles.barOn : null,
-                ]}
-              />
+              <View style={[styles.bar, { height: barHeight, backgroundColor: fill }, on ? styles.barOn : null]} />
               <TextV2
                 variant="caption"
                 align="center"
@@ -372,22 +458,44 @@ export function WeekBars({
   );
 }
 
-function Stat({ value, unit, label, tone = NIGHT.text }: { value: string; unit?: string; label: string; tone?: string }) {
+function Stat({
+  parts,
+  label,
+  hint,
+  wide = false,
+  tone = NIGHT.text,
+}: {
+  parts: ValuePart[];
+  label: string;
+  hint?: string;
+  // The column with the hint gets a bit more of the row.
+  wide?: boolean;
+  tone?: string;
+}) {
+  // Every line stays on one line ("9 h 15 min", "vs semana pasada"): the text
+  // shrinks a little on narrow phones instead of wrapping.
   return (
-    <View style={styles.stat}>
+    <View style={[styles.stat, wide ? styles.statWide : null]}>
       <View style={styles.statValue}>
-        <TextV2 color={tone} style={styles.statNumber}>
-          {value}
-        </TextV2>
-        {unit ? (
-          <TextV2 variant="body" color={NIGHT.secondary} style={styles.fs15}>
-            {unit}
-          </TextV2>
-        ) : null}
+        <DisplayNumber size={32} weight="800" tracking={-1.28} color={tone} fit minimumFontScale={0.6} style={styles.statNumber}>
+          <ValueSpans parts={parts} unitColor={NIGHT.secondary} unitSize={15} />
+        </DisplayNumber>
       </View>
-      <TextV2 variant="caption" color={NIGHT.secondary}>
+      <TextV2 variant="caption" color={NIGHT.secondary} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
         {label}
       </TextV2>
+      {hint ? (
+        <TextV2
+          variant="micro"
+          color={NIGHT.tertiary}
+          style={styles.statHint}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
+          {hint}
+        </TextV2>
+      ) : null}
     </View>
   );
 }
@@ -515,9 +623,9 @@ function SignalTile({
         {label}
       </TextV2>
       <View style={styles.statValue}>
-        <TextV2 color={NIGHT.text} style={styles.signalValue}>
+        <DisplayNumber size={28} weight="800" tracking={-1.12} color={NIGHT.text}>
           {value}
-        </TextV2>
+        </DisplayNumber>
         {unit ? (
           <TextV2 variant="caption" color={NIGHT.secondary}>
             {unit}
@@ -613,9 +721,9 @@ export function TimeCard({
       <TextV2 variant="caption" color={NIGHT.secondary}>
         {label}
       </TextV2>
-      <TextV2 color={NIGHT.text} style={styles.timeValue}>
+      <DisplayNumber size={42} weight="800" tracking={-2.1} color={NIGHT.text}>
         {value}
-      </TextV2>
+      </DisplayNumber>
       <View style={styles.timeButtons}>
         <PressableScale accessibilityRole="button" accessibilityLabel="15 min antes" onPress={onMinus} style={styles.timeButton}>
           <Minus size={20} color={NIGHT.text} strokeWidth={2.2} />
@@ -749,7 +857,6 @@ const styles = StyleSheet.create({
   flex4: { flex: 4 },
   bold: { fontWeight: '700' },
   dimmed: { opacity: 0.35 },
-  ml6: { marginLeft: 6 },
   fs11: { fontSize: 11 },
   fs13: { fontSize: 13 },
   fs14: { fontSize: 14 },
@@ -758,9 +865,21 @@ const styles = StyleSheet.create({
   gap14: { gap: 14 },
   gap16: { gap: 16 },
   gap18: { gap: 18 },
-  hero: { overflow: 'hidden', backgroundColor: NIGHT.hero },
-  heroPhoto: { opacity: 0.55 },
-  duotone: { backgroundColor: NIGHT.duotone, opacity: 0.55 },
+  hero: {
+    backgroundColor: NIGHT.hero,
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+  },
+  heroTopScrim: { position: 'absolute', top: 0, left: 0, right: 0 },
+  heroPhotoClip: { overflow: 'hidden' },
+  heroPhoto: {
+    position: 'absolute',
+    bottom: 0,
+    minWidth: '100%',
+    aspectRatio: SLEEP_HERO_RATIO,
+  },
+  duotone: { backgroundColor: NIGHT.duotone, opacity: 0.2 },
   heroTop: {
     position: 'absolute',
     left: 16,
@@ -787,7 +906,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   badgeText: { fontSize: 12, fontWeight: '500' },
-  heroBottom: { position: 'absolute', left: 20, right: 20, bottom: 28, gap: 14 },
+  heroBottom: { gap: 14 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: NIGHT.recovery },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
@@ -819,9 +938,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   estimateText: { fontSize: 10, letterSpacing: 0.8 },
-  duration: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
-  big: { fontWeight: '800', letterSpacing: -2.5 },
-  unit: { fontWeight: '600', paddingBottom: 6 },
+  // "9 h 00 min": units tight to their number, a little more air before
+  // the minutes so "9 h" and "00 min" still read as two groups.
+  duration: { flexDirection: 'row', alignItems: 'baseline', gap: 2 },
+  durationMinutes: { marginLeft: 6 },
+  unit: { fontWeight: '600' },
+  // Units nested in a DisplayNumber: no display tracking, regular weight.
+  inlineUnit: { fontWeight: '600', letterSpacing: 0 },
   hypno: { flexDirection: 'row', gap: 10 },
   hypnoLabels: { width: 64, height: 132, justifyContent: 'space-between', paddingVertical: 3 },
   hypnoChart: { flex: 1, height: 132 },
@@ -832,13 +955,23 @@ const styles = StyleSheet.create({
   stageValue: { fontSize: 17, fontWeight: '700', letterSpacing: -0.34 },
   goal: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   goalDash: { width: 14, borderTopWidth: 1, borderStyle: 'dashed', borderTopColor: NIGHT.tertiary },
-  stats: { flexDirection: 'row', gap: 28 },
-  stat: { gap: 2 },
+  stats: { flexDirection: 'row', gap: 12 },
+  stat: { flex: 1, minWidth: 0, gap: 2 },
+  statWide: { flex: 1.35 },
+  statNumber: { flexShrink: 1 },
   statValue: { flexDirection: 'row', alignItems: 'baseline', gap: 3 },
-  statNumber: { fontSize: 32, lineHeight: 34, fontWeight: '800', letterSpacing: -1.28 },
-  bars: { height: 196, flexDirection: 'row', gap: 8, alignItems: 'flex-end', paddingBottom: 26 },
+  statHint: { fontWeight: '400', letterSpacing: 0 },
+  bars: {
+    height: CHART_HEIGHT,
+    marginTop: STATS_TO_CHART - 16,
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-end',
+    paddingBottom: DAY_SPACE,
+  },
   goalLine: { position: 'absolute', left: 0, right: 0, borderTopWidth: 1, borderStyle: 'dashed', borderTopColor: '#3A4553' },
-  barCol: { flex: 1, height: BAR_HEIGHT, justifyContent: 'flex-end', gap: 6 },
+  barCol: { flex: 1, height: LABEL_SPACE + PLOT_HEIGHT, justifyContent: 'flex-end' },
+  barLabel: { height: LABEL_SPACE, paddingBottom: LABEL_SPACE - 16, includeFontPadding: false },
   bar: { borderRadius: 10 },
   barOn: { boxShadow: '0 10px 26px rgba(110,143,179,.4)' },
   barDay: { position: 'absolute', left: 0, right: 0, bottom: -24 },
@@ -862,7 +995,6 @@ const styles = StyleSheet.create({
     gap: 10,
     boxShadow: 'inset 0 0 0 0.5px rgba(255,255,255,.06)',
   },
-  signalValue: { fontSize: 28, lineHeight: 30, fontWeight: '800', letterSpacing: -1.12 },
   ellie: {
     marginHorizontal: -20,
     paddingVertical: 22,
@@ -892,7 +1024,6 @@ const styles = StyleSheet.create({
     gap: 12,
     boxShadow: 'inset 0 0 0 0.5px rgba(255,255,255,.06)',
   },
-  timeValue: { fontSize: 42, lineHeight: 42, fontWeight: '800', letterSpacing: -2.1 },
   timeButtons: { flexDirection: 'row', gap: 6 },
   timeButton: {
     flex: 1,

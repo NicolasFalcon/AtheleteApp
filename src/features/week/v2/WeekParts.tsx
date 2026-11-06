@@ -22,9 +22,11 @@ import {
   AuraMark,
   PressableScale,
   TextV2,
+  haptics,
   useThemeV2,
   type AppImageSource,
 } from '@app/components/v2';
+import { useDayHistoryText } from '@app/features/week/dayHistoryCopy';
 import { workoutTypeLabel } from '@app/features/home/v2/homeLabels';
 import {
   DAY_LETTERS,
@@ -52,6 +54,14 @@ import type { ProfileGender } from '@app/types/auth';
 
 // Bottom of the day tag row of a header (top 16 + tag 26).
 const HEADER_TAGS_BOTTOM = 42;
+const HEADER_HEIGHT = 250;
+// Routine header: room the cover word needs between the tags and the texts
+// (RoutineCover 'wide': line at band top, capitals 25 pt below, 64 pt Anton
+// with cap height 0.859, 16 pt margins) plus the texts' bottom inset (18).
+// With a two-line title the fixed 250 pt left the word below its 44 pt
+// minimum and the overlay dropped it ("FUERZA" on some days, nothing on
+// others); the header now grows so the word always fits at full size.
+const WORD_BAND = HEADER_TAGS_BOTTOM + 16 + 25 + Math.ceil(64 * 0.859) + 16 + 18;
 
 // Dark headers (photo and rest) are dark in both themes.
 const DARK = {
@@ -305,7 +315,14 @@ export function DayCard({
   note,
   actions,
   guideAnchors = false,
+  onOpen,
+  onCore33,
 }: {
+  // A past day: the whole card opens its summary (session, routine not done
+  // or the day). Today and the days ahead keep their own actions.
+  onOpen?: () => void;
+  // The Core 33 block opens that day of the tracker.
+  onCore33?: () => void;
   // Today's card carries the anchors of the Tu semana guide.
   guideAnchors?: boolean;
   day: WeekDay;
@@ -321,15 +338,37 @@ export function DayCard({
   actions: DayCardActions;
 }) {
   const { colors } = useThemeV2();
+  const { t } = useDayHistoryText();
   const work = isWorkDay(day);
   const isToday = day.date === today;
+  const Card = onOpen ? PressableScale : View;
 
   return (
-    <View style={[styles.card, { width, backgroundColor: colors.surface.raised }]}>
+    <Card
+      {...(onOpen
+        ? {
+            accessibilityRole: 'button' as const,
+            accessibilityHint: t('day.viewSummary'),
+            onPress: () => {
+              haptics.light();
+              onOpen();
+            },
+          }
+        : null)}
+      style={[styles.card, { width, backgroundColor: colors.surface.raised }]}
+    >
       <DayHeader day={day} today={today} regenerating={regenerating} onPick={actions.onPick} editable={editable} />
       <View style={styles.cardBody}>
         {habits ? (
-          <View style={styles.gap10}>
+          <PressableScale
+            accessibilityRole="button"
+            disabled={!onCore33}
+            onPress={() => {
+              haptics.light();
+              onCore33?.();
+            }}
+            style={styles.gap10}
+          >
             <View style={styles.coreHead}>
               <TextV2 variant="eyebrow" color={colors.text.secondary}>
                 {`Core 33 · Día ${habits.day}`}
@@ -351,18 +390,20 @@ export function DayCard({
                   >
                     {habit.done ? <Check size={11} color="#FFFFFF" strokeWidth={3} /> : null}
                   </View>
+                  {/* One per line, the whole name (up to 2 lines), never cut
+                      in a horizontal row. */}
                   <TextV2
-                    variant="caption"
-                    numberOfLines={1}
+                    variant="body"
+                    numberOfLines={2}
                     color={habit.done ? colors.text.primary : colors.text.secondary}
-                    style={styles.flexShrink}
+                    style={[styles.flexShrink, styles.fs14]}
                   >
                     {habit.name}
                   </TextV2>
                 </View>
               ))}
             </View>
-          </View>
+          </PressableScale>
         ) : null}
 
         {editable && work ? (
@@ -431,9 +472,30 @@ export function DayCard({
             {note}
           </TextV2>
         ) : null}
+
+        {onOpen ? (
+          <View style={styles.viewSummary}>
+            <TextV2 variant="metaStrong" color={colors.text.secondary}>
+              {t('day.viewSummary')}
+            </TextV2>
+            <ChevronRight size={16} color={colors.text.secondary} strokeWidth={2} />
+          </View>
+        ) : null}
       </View>
-    </View>
+    </Card>
   );
+}
+
+// "FUERZA" twice: the cover word and the eyebrow below it. Compared without
+// case or accents; when they match the eyebrow is left out.
+function sameWord(a: string | null | undefined, b: string | null | undefined): boolean {
+  const norm = (value: string) =>
+    value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toUpperCase();
+  return Boolean(a && b && norm(a) === norm(b));
 }
 
 function DayHeader({
@@ -452,17 +514,23 @@ function DayHeader({
   const { colors } = useThemeV2();
   const cover = useRoutineCoverContext();
   const [width, setWidth] = useState(0);
-  const [textsTop, setTextsTop] = useState<number | null>(null);
+  const [textsHeight, setTextsHeight] = useState<number | null>(null);
   const isToday = day.date === today;
   const label = dayLabel(day.date, today);
 
   if (isWorkDay(day) && day.routine) {
     const routine = day.routine;
     // The routine's cover (§28.16): the word in the band between the tags
-    // and the texts at the bottom.
+    // and the texts at the bottom. Never shorter than 250 pt; taller when the
+    // texts (two-line title) would squeeze the word out.
+    const height = textsHeight === null ? HEADER_HEIGHT : Math.max(HEADER_HEIGHT, WORD_BAND + textsHeight);
+    const textsTop = textsHeight === null ? null : height - 18 - textsHeight;
+    const word = routineFocusWord(routine, cover.language);
+    const typeText = routineTypeText(routine);
+    const showType = !sameWord(word, typeText);
     return (
       <View
-        style={[styles.header, styles.photoBase]}
+        style={[styles.header, styles.photoBase, { height }]}
         onLayout={event => setWidth(event.nativeEvent.layout.width)}
       >
         <AppImage
@@ -478,7 +546,7 @@ function DayHeader({
           <RoutineCoverOverlay
             format="wide"
             width={width}
-            word={routineFocusWord(routine, cover.language)}
+            word={word}
             band={{ top: HEADER_TAGS_BOTTOM + 16, bottom: textsTop - 16 }}
           />
         ) : null}
@@ -506,20 +574,22 @@ function DayHeader({
         ) : null}
         <View
           style={styles.headerBottom}
-          onLayout={event => setTextsTop(event.nativeEvent.layout.y)}
+          onLayout={event => setTextsHeight(event.nativeEvent.layout.height)}
         >
           {day.source === 'coach' ? (
             <View style={styles.coachRow}>
               <CoachTag label={coachText(cover.language, 'coach.tag')} />
-              <TextV2 variant="eyebrow" color={DARK.eyebrow}>
-                {routineTypeText(routine)}
-              </TextV2>
+              {showType ? (
+                <TextV2 variant="eyebrow" color={DARK.eyebrow}>
+                  {typeText}
+                </TextV2>
+              ) : null}
             </View>
-          ) : (
+          ) : showType ? (
             <TextV2 variant="eyebrow" color={DARK.eyebrow}>
-              {routineTypeText(routine)}
+              {typeText}
             </TextV2>
-          )}
+          ) : null}
           <TextV2 numberOfLines={2} color={DARK.white} style={styles.headTitle}>
             {routine.title}
           </TextV2>
@@ -887,7 +957,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     boxShadow: '0 1px 2px rgba(0,0,0,.04), 0 12px 28px rgba(0,0,0,.07)',
   },
-  header: { height: 250, overflow: 'hidden' },
+  header: { height: HEADER_HEIGHT, overflow: 'hidden' },
   photoBase: { backgroundColor: '#141312' },
   photoRegen: { opacity: 0.25 },
   emptyHeader: { borderTopLeftRadius: 28, borderTopRightRadius: 28 },
@@ -925,9 +995,10 @@ const styles = StyleSheet.create({
   regen: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 12 },
   cardBody: { padding: 18, gap: 16 },
   coreHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  habits: { flexDirection: 'row', gap: 6 },
-  habit: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  habitDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  habits: { gap: 8 },
+  habit: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  habitDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 0 },
+  viewSummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
   duration: {
     flexDirection: 'row',
     alignItems: 'center',

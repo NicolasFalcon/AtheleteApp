@@ -20,6 +20,9 @@ export type ToastOptions = {
   withTabBar?: boolean;
   // 'error': a failed action (X instead of the Ember check).
   tone?: 'success' | 'error';
+  // Distance from the bottom of the screen, for screens with a fixed footer
+  // (Compartir): the toast sits above its buttons instead of covering them.
+  bottomOffset?: number;
 };
 
 type ToastState = {
@@ -27,6 +30,7 @@ type ToastState = {
   message: string;
   withTabBar: boolean;
   tone: 'success' | 'error';
+  bottomOffset: number | null;
 };
 
 type ToastContextValue = {
@@ -63,6 +67,7 @@ export function ToastProvider({ children }: PropsWithChildren) {
         message,
         withTabBar: options?.withTabBar ?? false,
         tone: options?.tone ?? 'success',
+        bottomOffset: options?.bottomOffset ?? null,
       });
       timer.current = setTimeout(() => {
         timer.current = null;
@@ -94,9 +99,12 @@ export function ToastProvider({ children }: PropsWithChildren) {
 function ToastPill({ toast }: { toast: ToastState }) {
   const { colors, layout, shadow, radius, motion } = useThemeV2();
   const insets = useSafeAreaInsets();
-  const bottom = toast.withTabBar
-    ? layout.tabBarBottom + layout.tabBarHeight + 12
-    : insets.bottom + 16;
+  const bottom =
+    toast.bottomOffset !== null
+      ? toast.bottomOffset
+      : toast.withTabBar
+      ? layout.tabBarBottom + layout.tabBarHeight + 12
+      : insets.bottom + 16;
 
   return (
     <View pointerEvents="none" style={[styles.host, { bottom }]}>

@@ -26,6 +26,7 @@ import {
   type GamificationAwardResult,
 } from '@app/services/supabase/gamification';
 import type { PRType, WorkoutSession } from '@app/shared';
+import type { BodyZone, Effort } from '@app/features/session/restMessages';
 import type { Database } from '@app/types/supabase';
 
 // Workout Session v2 · per-set persistence (BACKEND_SUMMARY §1 "Series por
@@ -53,7 +54,31 @@ export type SessionDetail = {
   clock: SessionClockFields;
   volumeKg: number | null;
   sets: LoggedSet[];
+  // Library exercise of each position (sets only carry the position), and
+  // the warm-up sets (left out of the exercise list of the summary).
+  exerciseByPosition: Record<number, string | null>;
+  warmupSetIds: string[];
+  // Final 1–5 rating (sfb-1: workout_sessions.rating, rating_note,
+  // rated_at). null when the session was never rated.
+  rating: SessionRatingRead | null;
 };
+
+export type SessionRatingRead = { value: number; note: string | null; ratedAt: string | null };
+
+// rating / rating_note / rated_at are not in the generated Database types
+// yet, so they are read from the raw row.
+function ratingOf(row: SessionRow): SessionRatingRead | null {
+  const raw = row as unknown as { rating?: unknown; rating_note?: unknown; rated_at?: unknown };
+  const value = typeof raw.rating === 'number' && raw.rating >= 1 && raw.rating <= 5 ? Math.round(raw.rating) : null;
+  if (value === null) {
+    return null;
+  }
+  return {
+    value,
+    note: typeof raw.rating_note === 'string' && raw.rating_note.trim() ? raw.rating_note.trim() : null,
+    ratedAt: typeof raw.rated_at === 'string' ? raw.rated_at : null,
+  };
+}
 
 function clockFromRow(row: SessionRow): SessionClockFields {
   return {
@@ -83,12 +108,172 @@ export async function fetchSessionDetail(
     throw setsResult.error;
   }
   const row = sessionResult.data as SessionRow;
+  const setRows = (setsResult.data ?? []) as SetRow[];
+  const exerciseByPosition: Record<number, string | null> = {};
+  setRows.forEach(set => {
+    const position = fromDbPosition(set.exercise_position);
+    exerciseByPosition[position] = exerciseByPosition[position] ?? set.exercise_id;
+  });
   return {
     session: mapWorkoutSession(row),
     clock: clockFromRow(row),
     volumeKg: row.volume_kg,
-    sets: mapSetRows((setsResult.data ?? []) as SetRow[]),
+    sets: mapSetRows(setRows),
+    exerciseByPosition,
+    warmupSetIds: setRows.filter(set => set.is_warmup).map(set => set.id),
+    rating: ratingOf(row),
   };
+}
+
+// Answers to the rest messages of a session (sfb-1, workout_session_feedback):
+// how it felt (effort) and discomforts (body_zone + note). exerciseId null:
+// about the session in general. A failed read throws with its code (RLS:
+// 42501) so the summary can say it instead of hiding the block.
+export type SessionFeedbackRead = {
+  id: string;
+  exerciseId: string | null;
+  kind: 'effort' | 'discomfort';
+  effort: Effort | null;
+  bodyZone: BodyZone | null;
+  note: string | null;
+  createdAt: string;
+};
+
+export class SessionFeedbackReadError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'SessionFeedbackReadError';
+    this.code = code;
+  }
+}
+
+const EFFORTS: readonly Effort[] = ['facil', 'bien', 'duro', 'al_limite'];
+const ZONES: readonly BodyZone[] = ['hombro', 'rodilla', 'espalda', 'codo', 'otra'];
+
+export async function fetchSessionFeedback(sessionId: string): Promise<SessionFeedbackRead[]> {
+  // The table is not in the generated Database types yet.
+  const client = getClient() as unknown as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          order: (
+            column: string,
+            options: { ascending: boolean },
+          ) => Promise<{ data: unknown; error: { code?: string; message?: string } | null }>;
+        };
+      };
+    };
+  };
+  const { data, error } = await client
+    .from('workout_session_feedback')
+    .select('id, exercise_id, kind, effort, body_zone, note, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    throw new SessionFeedbackReadError(error.code ?? 'unknown', error.message ?? 'No se pudo leer el feedback.');
+  }
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+  return rows
+    .filter(row => row.kind === 'effort' || row.kind === 'discomfort')
+    .map(row => ({
+      id: String(row.id),
+      exerciseId: typeof row.exercise_id === 'string' ? row.exercise_id : null,
+      kind: row.kind as 'effort' | 'discomfort',
+      effort: EFFORTS.find(value => value === row.effort) ?? null,
+      bodyZone: ZONES.find(value => value === row.body_zone) ?? null,
+      note: typeof row.note === 'string' && row.note.trim() ? row.note.trim() : null,
+      createdAt: String(row.created_at ?? ''),
+    }));
+}
+
+// Completed sessions of one LOCAL day, ordered by start time.
+// workout_sessions.date is the user's local day (getLocalDateKey, never
+// null): set on insert and, on completion, to the local day of ended_at.
+// It is also what get_week_plan uses for a "done" day, so the card and the
+// sessions found here always agree.
+export type DaySession = {
+  id: string;
+  workoutId: string | null;
+  title: string;
+  startedAt: string | null;
+  durationMin: number;
+};
+
+export async function fetchDaySessions(userId: string, date: string): Promise<DaySession[]> {
+  const client = getClient();
+  const { data, error } = await client
+    .from('workout_sessions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .eq('date', date);
+  if (error) {
+    throw error;
+  }
+  return ((data ?? []) as SessionRow[])
+    .map(row => {
+      const session = mapWorkoutSession(row);
+      return {
+        id: row.id,
+        workoutId: session.workoutId || null,
+        title: session.workoutTitle,
+        startedAt: row.started_at ?? null,
+        durationMin: session.duration,
+      };
+    })
+    .sort((a, b) => (a.startedAt ?? '').localeCompare(b.startedAt ?? ''));
+}
+
+// Local day of the user's first completed session (null: none yet). Tu
+// semana goes back no further than its week.
+export async function fetchFirstSessionDate(userId: string): Promise<string | null> {
+  const client = getClient();
+  const { data, error } = await client
+    .from('workout_sessions')
+    .select('date')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('date', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return (data as { date: string } | null)?.date ?? null;
+}
+
+// Records already saved for a session (personal_records by session_set_id):
+// the summary of a past session and Compartir read them here, since
+// detect_session_prs only returns marks not registered yet. The previous
+// mark is not stored, so previous_* stay null.
+export async function fetchSessionRecords(sessionSetIds: string[]): Promise<DetectedPR[]> {
+  if (sessionSetIds.length === 0) {
+    return [];
+  }
+  const client = getClient();
+  const { data, error } = await client
+    .from('personal_records')
+    .select('session_set_id, exercise_id, pr_type, value_weight, value_reps, value_duration_sec, value_distance_m')
+    .in('session_set_id', sessionSetIds);
+  if (error) {
+    throw error;
+  }
+  return (data ?? [])
+    .filter(row => row.session_set_id)
+    .map(row => ({
+      sessionSetId: String(row.session_set_id),
+      exerciseId: row.exercise_id,
+      prType: row.pr_type as PRType,
+      valueWeight: row.value_weight,
+      valueReps: row.value_reps,
+      valueDurationSec: row.value_duration_sec,
+      valueDistanceM: row.value_distance_m,
+      previousWeight: null,
+      previousReps: null,
+      previousDurationSec: null,
+      previousDistanceM: null,
+    }));
 }
 
 // The user's work sets of one library exercise, newest first (Exercise
@@ -442,7 +627,11 @@ export async function completeSession(
     duration: Math.max(1, Math.round(payload.activeSec / 60)),
     calories_burned: payload.caloriesBurned,
     completed_exercises: payload.completedExercises,
-    date: getLocalDateKey(new Date(payload.endedAt)),
+    // `date` is NOT written here. The day of a session is the local day it
+    // started or was last resumed, and those are the only two writers of
+    // `date`: the insert (start day, fitness.ts) and reopenSession (the day
+    // it is resumed). Completing keeps it, so 23:30 → 00:20 stays on the
+    // day it began and a session resumed on Wednesday counts for Wednesday.
   });
   const session = mapWorkoutSession(row);
   const weekCount = await completedThisWeek(session.userId);

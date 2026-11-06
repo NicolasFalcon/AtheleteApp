@@ -15,11 +15,13 @@ export type MacroColumnProps = {
   pct: number; // 0–100
   // The protein of Calorías: wider, Ember fill, "· prioridad" (design §23.3).
   priority?: boolean;
+  // Fill of a non-priority macro (carbs, fat). Without it, the ink fill.
+  fillColor?: string;
 };
 
 // Macro column (Nutrición): a 120 pt box that fills from the bottom with the
 // share of the goal, the percentage inside and the figure under it.
-export function MacroColumn({ label, value, goal, pct, priority = false }: MacroColumnProps) {
+export function MacroColumn({ label, value, goal, pct, priority = false, fillColor }: MacroColumnProps) {
   const { colors, mode } = useThemeV2();
   const height = useSharedValue(0);
 
@@ -42,7 +44,11 @@ export function MacroColumn({ label, value, goal, pct, priority = false }: Macro
           <View
             style={[
               StyleSheet.absoluteFill,
-              priority ? { backgroundColor: colors.ember.base } : styles.ink,
+              priority
+                ? { backgroundColor: colors.ember.base }
+                : fillColor
+                ? { backgroundColor: fillColor }
+                : styles.ink,
             ]}
           />
         </Animated.View>
