@@ -12,3 +12,5 @@ export const atheleteWearEditorial = require('./3.jpeg');
 export const visualOnboardingTrainAnywhere = require('./visual-onboarding/train-anywhere.png');
 export const visualOnboardingTrackProgress = require('./visual-onboarding/track-progress.png');
 export const visualOnboardingReachGoals = require('./visual-onboarding/reach-goals.png');
+// Sueño hero (SleepHero).
+export const sleepHero = require('./sleep-hero.png');

@@ -2,6 +2,7 @@ import { GuideAnchor, useGuide } from '@app/features/guides/GuideAnchor';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
+  PanResponder,
   ScrollView,
   StyleSheet,
   View,
@@ -10,6 +11,13 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { haptics } from '@app/components/v2';
+import { getLocalDateKey } from '@app/lib/date';
+import { DaySessionsSheet, DaySummarySheet } from '@app/features/week/v2/DayHistorySheets';
+import { dayHistoryText } from '@app/features/week/dayHistoryCopy';
+import { fetchDaySessions, fetchFirstSessionDate, type DaySession } from '@app/services/supabase/session';
 import {
   BackButton,
   Button,
@@ -37,6 +45,7 @@ import {
   routineTypeText,
 } from '@app/features/week/v2/WeekParts';
 import {
+  addDays,
   dayLabel,
   dayMinutes,
   dayName,
@@ -49,6 +58,7 @@ import {
   weekRangeLabel,
   weekRoutineFrom,
   weekSummaryLine,
+  weekdayIndex,
   type WeekDay,
 } from '@app/features/week/weekModel';
 import { routineErrorCopy } from '@app/features/workouts/routineErrors';
@@ -84,7 +94,13 @@ export function WeekScreen({ navigation }: Props) {
   const cardWidth = width - SIDE * 2;
   const toast = useToast();
   const language = useProfileLanguage();
-  const query = useWeekPlan();
+  // ‹ › weeks: null = the current week (as always); a Monday = another week.
+  const [weekStart, setWeekStart] = useState<string | null>(null);
+  const localToday = getLocalDateKey();
+  const currentStart = addDays(localToday, -weekdayIndex(localToday));
+  const shownStart = weekStart ?? currentStart;
+  const isCurrentWeek = shownStart === currentStart;
+  const query = useWeekPlan(true, weekStart);
   const change = useWeekChange();
   const home = useHomeFeed();
   const library = useRoutineList('all', { exhaust: true });
@@ -102,9 +118,75 @@ export function WeekScreen({ navigation }: Props) {
   const [minutesOverride, setMinutesOverride] = useState<Record<string, number>>({});
   const [movedMiss, setMovedMiss] = useState<{ title: string; date: string } | null>(null);
   const minuteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Past days: several sessions of a day, and the day summary sheet.
+  const queryClient = useQueryClient();
+  const [daySessions, setDaySessions] = useState<{ date: string; sessions: DaySession[] } | null>(null);
+  const [summaryDate, setSummaryDate] = useState<string | null>(null);
+  const opening = useRef(false);
+
+  // Back to the week of the first session, at most 52 weeks; ahead, only up
+  // to the current week.
+  const firstSession = useQuery({
+    queryKey: ['first-session-date', profile?.id],
+    enabled: Boolean(profile?.id),
+    staleTime: 30 * 60 * 1000,
+    queryFn: () => fetchFirstSessionDate(profile!.id),
+  });
+  const firstDate = firstSession.data ?? null;
+  const oldest = (() => {
+    const limit = addDays(currentStart, -52 * 7);
+    if (!firstDate) {
+      return currentStart;
+    }
+    const firstStart = addDays(firstDate, -weekdayIndex(firstDate));
+    return firstStart > limit ? firstStart : limit;
+  })();
+  const canPrev = shownStart > oldest;
+  const canNext = shownStart < currentStart;
   const scrolledToToday = useRef(false);
 
   const days = useMemo(() => week?.days ?? [], [week]);
+
+  const changeWeek = useCallback(
+    (delta: -1 | 1) => {
+      if ((delta < 0 && !canPrev) || (delta > 0 && !canNext)) {
+        return;
+      }
+      haptics.light();
+      const next = addDays(shownStart, delta * 7);
+      setWeekStart(next === currentStart ? null : next);
+      setIndex(0);
+      setMoveFrom(null);
+      setMovedMiss(null);
+      scrolledToToday.current = false;
+    },
+    [canNext, canPrev, currentStart, shownStart],
+  );
+  const backToCurrent = () => {
+    haptics.light();
+    setWeekStart(null);
+    setIndex(0);
+    setMoveFrom(null);
+    scrolledToToday.current = false;
+  };
+
+  // Swiping the row of days left / right changes the week; taps on a day are
+  // untouched (the swipe only claims a clearly horizontal move).
+  const changeWeekRef = useRef(changeWeek);
+  changeWeekRef.current = changeWeek;
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) =>
+          Math.abs(gesture.dx) > 14 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
+        onPanResponderRelease: (_, gesture) => {
+          if (Math.abs(gesture.dx) > 50) {
+            changeWeekRef.current(gesture.dx > 0 ? -1 : 1);
+          }
+        },
+      }),
+    [],
+  );
   // Guía de Tu semana (25.4), once the week is on screen.
   const scrollRef = useRef<ScrollView>(null);
   useGuide('week', { scrollRef, enabled: Boolean(week) });
@@ -315,6 +397,41 @@ export function WeekScreen({ navigation }: Props) {
   };
   const movedTo = (day: WeekDay) => days.find(item => item.movedFrom === day.date)?.date ?? null;
 
+  // A past day: its completed sessions (local day, by start time) decide.
+  // One → its summary (historial); several → the list; none → the routine
+  // that was planned ("No completada") or the day summary.
+  const openPastDay = async (day: WeekDay) => {
+    if (!profile?.id || opening.current) {
+      return;
+    }
+    opening.current = true;
+    try {
+      const sessions = await queryClient.fetchQuery({
+        queryKey: ['day-sessions', profile.id, day.date],
+        staleTime: 60 * 1000,
+        queryFn: () => fetchDaySessions(profile.id, day.date),
+      });
+      if (sessions.length === 1) {
+        navigation.navigate(APP_ROUTES.WorkoutSummary, { sessionId: sessions[0].id, mode: 'history' });
+      } else if (sessions.length > 1) {
+        setDaySessions({ date: day.date, sessions });
+      } else if (day.kind === 'session' && day.routine) {
+        navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: day.routine.id, missedOn: day.date });
+      } else {
+        setSummaryDate(day.date);
+      }
+    } catch (error) {
+      __DEV__ && console.warn('[week] No se pudo abrir el día:', error);
+      toast.show(dayHistoryText(language, 'day.error'), { tone: 'error' });
+    } finally {
+      opening.current = false;
+    }
+  };
+
+  // Core 33 block: a past day opens that day read only; today, the tracker.
+  const openCore33 = (day: WeekDay) =>
+    navigation.navigate(APP_ROUTES.Core33, day.date < today ? { date: day.date } : undefined);
+
   const pickerDay = days.find(day => day.date === pickerDate) ?? null;
   const missText = week ? missedText(week) : null;
   const moving = moveFrom ? days.find(day => day.date === moveFrom) ?? null : null;
@@ -337,20 +454,68 @@ export function WeekScreen({ navigation }: Props) {
     />
   );
 
+  // "SEMANA 45 · 2 – 8 nov" with ‹ › on both sides and, away from the
+  // current week, "Volver a esta semana". Known before the week loads.
+  const weekNav = (
+    <View style={styles.gap4}>
+      <View style={styles.navRow}>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={dayHistoryText(language, 'week.prev')}
+          accessibilityState={{ disabled: !canPrev }}
+          disabled={!canPrev}
+          onPress={() => changeWeek(-1)}
+          style={[styles.navArrow, { backgroundColor: colors.surface.muted }, canPrev ? null : styles.navOff]}
+        >
+          <ChevronLeft size={20} color={colors.text.primary} strokeWidth={2} />
+        </PressableScale>
+        <View style={styles.navTexts}>
+          <TextV2 variant="eyebrow" color={colors.text.secondary}>
+            {dayHistoryText(language, 'week.title', { n: isoWeekNumber(shownStart) })}
+          </TextV2>
+          <TextV2 style={styles.range}>{weekRangeLabel(shownStart)}</TextV2>
+        </View>
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={dayHistoryText(language, 'week.next')}
+          accessibilityState={{ disabled: !canNext }}
+          disabled={!canNext}
+          onPress={() => changeWeek(1)}
+          style={[styles.navArrow, { backgroundColor: colors.surface.muted }, canNext ? null : styles.navOff]}
+        >
+          <ChevronRight size={20} color={colors.text.primary} strokeWidth={2} />
+        </PressableScale>
+      </View>
+      {!isCurrentWeek ? (
+        <PressableScale
+          accessibilityRole="button"
+          onPress={backToCurrent}
+          style={[styles.backChip, { backgroundColor: colors.surface.muted }]}
+        >
+          <TextV2 variant="metaStrong">{dayHistoryText(language, 'week.backToCurrent')}</TextV2>
+        </PressableScale>
+      ) : null}
+    </View>
+  );
+
   if (!week) {
+    // First load or another week still loading: the header stays, the days
+    // and the card show a skeleton (never a full-screen spinner).
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg }]}>
         <StatusBarV2 />
         {header}
-        <View style={styles.state}>
+        <View style={styles.top}>
+          {weekNav}
           {query.isError ? (
             <BlockError message="No pudimos cargar tu semana." onRetry={() => query.refetch()} />
           ) : (
             <SkeletonGroup>
-              <Skeleton height={14} width="30%" />
-              <Skeleton height={34} width="60%" />
-              <Skeleton height={74} />
-              <Skeleton height={420} />
+              <View style={styles.gap14}>
+                <Skeleton height={14} width="70%" />
+                <Skeleton height={74} />
+                <Skeleton height={420} radius={28} />
+              </View>
             </SkeletonGroup>
           )}
         </View>
@@ -369,16 +534,14 @@ export function WeekScreen({ navigation }: Props) {
       >
         <View style={styles.top}>
           <View style={styles.gap4}>
-            <TextV2 variant="eyebrow" color={colors.text.secondary}>
-              {`Semana ${isoWeekNumber(week.weekStart)}`}
-            </TextV2>
-            <TextV2 style={styles.range}>{weekRangeLabel(week.weekStart)}</TextV2>
+            {weekNav}
             <TextV2 variant="body" color={colors.text.secondary} style={styles.fs14}>
               {weekSummaryLine(week)}
             </TextV2>
           </View>
 
           <GuideAnchor id="week.days">
+            <View {...swipe.panHandlers}>
             <WeekPills
               days={days}
               today={today}
@@ -386,6 +549,7 @@ export function WeekScreen({ navigation }: Props) {
               moveFrom={moveFrom}
               onPressDay={pressPill}
             />
+            </View>
           </GuideAnchor>
 
           {moving ? (
@@ -404,7 +568,7 @@ export function WeekScreen({ navigation }: Props) {
             </View>
           ) : null}
 
-          {missText && week.missed ? (
+          {!isCurrentWeek ? null : missText && week.missed ? (
             <MissedBand
               text={missText}
               canMove={Boolean(week.missed.proposedDate)}
@@ -445,6 +609,8 @@ export function WeekScreen({ navigation }: Props) {
                 startLabel={resumable && resumable.workoutId === day.routine?.id ? 'Retomar' : 'Empezar'}
                 note={day.date < today ? pastNote(day, movedTo(day)) : null}
                 guideAnchors={day.date === today}
+                onOpen={day.date < today ? () => openPastDay(day).catch(() => undefined) : undefined}
+                onCore33={day.date <= today ? () => openCore33(day) : undefined}
                 actions={{
                   onPick: () => setPickerDate(day.date),
                   onMove: () => setMoveFrom(day.date),
@@ -467,11 +633,14 @@ export function WeekScreen({ navigation }: Props) {
           }}
         />
 
-        <GuideAnchor id="week.plan">
-          <PlanSection onEllie={() => navigation.navigate(APP_ROUTES.WeekEllie)} onManual={() => setConfirm('manual')} />
-        </GuideAnchor>
+        {/* Planning acts on the current week only. */}
+        {isCurrentWeek ? (
+          <GuideAnchor id="week.plan">
+            <PlanSection onEllie={() => navigation.navigate(APP_ROUTES.WeekEllie)} onManual={() => setConfirm('manual')} />
+          </GuideAnchor>
+        ) : null}
 
-        {week.plan ? (
+        {isCurrentWeek && week.plan ? (
           <View style={styles.planToggle}>
             <Button
               label={week.plan.active ? 'Desactivar el plan de esta semana' : 'Activar el plan de esta semana'}
@@ -547,6 +716,27 @@ export function WeekScreen({ navigation }: Props) {
           </View>
         ) : null}
       </Sheet>
+
+      <DaySessionsSheet
+        open={daySessions !== null}
+        title={daySessions ? dayLabel(daySessions.date, today) : ''}
+        sessions={daySessions?.sessions ?? []}
+        onClose={() => setDaySessions(null)}
+        onOpenSession={sessionId => {
+          setDaySessions(null);
+          navigation.navigate(APP_ROUTES.WorkoutSummary, { sessionId, mode: 'history' });
+        }}
+      />
+
+      <DaySummarySheet
+        date={summaryDate}
+        title={summaryDate ? dayLabel(summaryDate, today) : ''}
+        onClose={() => setSummaryDate(null)}
+        onCore33={date => {
+          setSummaryDate(null);
+          navigation.navigate(APP_ROUTES.Core33, { date });
+        }}
+      />
     </View>
   );
 }
@@ -559,11 +749,16 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   flex1: { flex: 1 },
   gap4: { gap: 4 },
+  gap14: { gap: 14 },
   fs14: { fontSize: 14 },
-  state: { padding: SIDE },
   headerOrb: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   top: { paddingHorizontal: SIDE, paddingTop: 8, gap: 20 },
-  range: { fontSize: 30, lineHeight: 32, fontWeight: '600', letterSpacing: -0.9 },
+  range: { fontSize: 30, lineHeight: 36, fontWeight: '600', letterSpacing: -0.9 },
+  navRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  navTexts: { flex: 1, gap: 2 },
+  navOff: { opacity: 0.35 },
+  navArrow: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  backChip: { alignSelf: 'flex-start', height: 32, paddingHorizontal: 14, borderRadius: 16, justifyContent: 'center', marginTop: 6 },
   moving: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: -6 },
   cancel: { height: 44, paddingHorizontal: 4, justifyContent: 'center' },
   track: { paddingHorizontal: SIDE, paddingTop: 18, paddingBottom: 24, alignItems: 'flex-start' },

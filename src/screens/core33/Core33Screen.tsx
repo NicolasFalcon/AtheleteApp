@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Award, MoreHorizontal } from 'lucide-react-native';
+import { Award, Lock, MoreHorizontal } from 'lucide-react-native';
 import {
   BackButton,
   Button,
@@ -35,6 +35,8 @@ import {
 } from '@app/features/core33/v2/Core33Parts';
 import { useCore33 } from '@app/hooks/useCore33';
 import { safeGoBack } from '@app/navigation/safeGoBack';
+import { useDayHistoryText } from '@app/features/week/dayHistoryCopy';
+import { getLocalDateKey } from '@app/lib/date';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -46,7 +48,7 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // cells, the streaks and "Hoy" with the three habits (tap to mark, tap again
 // to undo). Completing day 33 shows the celebration; the challenge can be
 // left from the menu (with confirmation) to choose another.
-export function Core33Screen({ navigation }: Props) {
+export function Core33Screen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const toast = useToast();
@@ -68,6 +70,15 @@ export function Core33Screen({ navigation }: Props) {
       })
     : null;
   const art = challenge ? challengeOfHabits(challenge.habits) : null;
+  // A past day (from Tu semana): its habits with their state, read only.
+  // Without `date` (or with today) the screen works as always.
+  const { t } = useDayHistoryText();
+  const pastDate =
+    route.params?.date && route.params.date < getLocalDateKey() ? route.params.date : null;
+  const pastView =
+    challenge && pastDate
+      ? buildCore33DayView({ challenge, habitLogs: logs, today: new Date(`${pastDate}T12:00:00`) })
+      : null;
 
   const loading = day.stateQuery.isLoading;
   const failed = Boolean(day.stateQuery.error);
@@ -184,6 +195,36 @@ export function Core33Screen({ navigation }: Props) {
         </SceneScope>
 
         <View style={[styles.sheet, { backgroundColor: colors.bg, paddingHorizontal: layout.gutter }]}>
+          {pastView ? (
+            <>
+              <View style={styles.sheetHead}>
+                <TextV2 variant="section">{t('core33.dayTitle', { n: pastView.day })}</TextV2>
+                <TextV2 variant="meta" tone="secondary">{`${pastView.doneCount} de ${pastView.habits.length}`}</TextV2>
+              </View>
+              <View style={[styles.closedNotice, { backgroundColor: colors.surface.muted }]}>
+                <Lock size={16} color={colors.text.secondary} strokeWidth={2} />
+                <View style={styles.closedTexts}>
+                  <TextV2 variant="bodyStrong">{t('core33.closedDay')}</TextV2>
+                  <TextV2 variant="meta" tone="secondary">
+                    {t('core33.closedDay.hint')}
+                  </TextV2>
+                </View>
+              </View>
+              <View style={styles.habits}>
+                {pastView.habits.map(habit => (
+                  <HabitButton
+                    key={habit.index}
+                    pillar={habit.pillar}
+                    text={habit.text}
+                    done={habit.done}
+                    disabled
+                    onPress={() => undefined}
+                  />
+                ))}
+              </View>
+            </>
+          ) : (
+          <>
           <View style={styles.sheetHead}>
             <TextV2 variant="section">{view.todayTitle}</TextV2>
             <TextV2 variant="meta" tone="secondary">{`${view.doneCount} de ${view.habits.length}`}</TextV2>
@@ -203,7 +244,9 @@ export function Core33Screen({ navigation }: Props) {
               />
             ))}
           </View>
-          {view.completed ? (
+          </>
+          )}
+          {view.completed && !pastView ? (
             <View style={[styles.done, { borderTopColor: colors.divider }]}>
               <TextV2 variant="bodyL">
                 Terminaste este compromiso. Puedes descansar unos días o elegir el siguiente cuando quieras.
@@ -278,6 +321,8 @@ export function Core33Screen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  closedNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 16 },
+  closedTexts: { flex: 1, gap: 2 },
   screen: { flex: 1 },
   flex: { flex: 1 },
   plainTop: { paddingBottom: 8 },

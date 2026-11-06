@@ -56,7 +56,7 @@ export function generateWeeklySummary(params: {
   );
   const suggestion =
     remaining > 0
-      ? `Intenta completar ${remaining} sesiones más esta semana.`
+      ? `Intenta completar ${remaining} ${remaining === 1 ? 'sesión' : 'sesiones'} más esta semana.`
       : '¡Gran semana! Considera una sesión de recuperación o movilidad.';
 
   return {

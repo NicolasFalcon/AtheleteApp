@@ -3,7 +3,7 @@ import { Image, Linking, ScrollView, StyleSheet, View, useWindowDimensions } fro
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, ClipPath, Defs, G, Path, Rect } from 'react-native-svg';
 import { Camera, Download, Image as ImageIcon, Share2, Users, X } from 'lucide-react-native';
 import {
   BackButton,
@@ -27,6 +27,7 @@ import { invalidateSocialContent } from '@app/features/social/useSocial';
 import {
   captureScene,
   captureSticker,
+  logShareError,
   photoLuminance,
   saveToPhotos,
   shareMore,
@@ -58,6 +59,9 @@ type Props = AppScreenProps<'Share'>;
 type PhotoSource = 'camera' | 'gallery' | 'none';
 
 const TONES_KEY = '@athelete/share-tones';
+// Four swatches next to Completo / Mínimo: 32 pt dots in 40 pt rings, so
+// the segmented control keeps its room on an iPhone SE.
+const SWATCH = 32;
 const PREVIEW = { width: 198, height: 352 };
 // The combined image is drawn at 360 × 640 pt and captured at 1080 × 1920.
 const SCENE = { width: COMBINED.width / 3, height: COMBINED.height / 3 };
@@ -65,6 +69,7 @@ const SWATCHES: { tone: StickerTone; label: string }[] = [
   { tone: 'light', label: 'light' },
   { tone: 'dark', label: 'dark' },
   { tone: 'glass', label: 'glass' },
+  { tone: 'clear', label: 'clear' },
 ];
 
 // Compartir en Instagram (handoff v2.16 §26 · SHARE_01–09): the 9:16
@@ -136,7 +141,17 @@ export function ShareScreen({ navigation, route }: Props) {
     AsyncStorage.setItem(TONES_KEY, JSON.stringify(saved)).catch(() => undefined);
   };
 
-  const fail = () => toast.show(copy.error, { tone: 'error' });
+  // Fixed footer: Historias (56) + gap (8) + row (44) + bottom padding + 12
+  // top. Toasts sit above it so they never cover Descargar.
+  const footerHeight = 56 + 8 + 44 + Math.max(insets.bottom, 16) + 24;
+  const toastAbove = { bottomOffset: footerHeight + 12 };
+
+  const fail = (error?: unknown) => {
+    if (error !== undefined) {
+      logShareError(error);
+    }
+    toast.show(copy.error, { tone: 'error', ...toastAbove });
+  };
 
   const combined = () => captureScene(sceneRef);
 
@@ -151,7 +166,7 @@ export function ShareScreen({ navigation, route }: Props) {
         captureScene(backgroundRef),
         captureSticker(stickerRef, stickerSize(data, variant)),
       ]);
-      toast.show(copy.opening);
+      toast.show(copy.opening, toastAbove);
       const result = await shareToStories({ background, sticker });
       if (result === 'unavailable') {
         toast.hide();
@@ -159,8 +174,8 @@ export function ShareScreen({ navigation, route }: Props) {
       } else if (result === 'failed') {
         fail();
       }
-    } catch {
-      fail();
+    } catch (error) {
+      fail(error);
     } finally {
       setBusy(null);
     }
@@ -173,14 +188,17 @@ export function ShareScreen({ navigation, route }: Props) {
       const result = await saveToPhotos(uri);
       if (result === 'saved') {
         setSheet(null);
-        toast.show(copy.saved);
+        toast.show(copy.saved, toastAbove);
       } else if (result === 'denied') {
+        // No "inténtalo otra vez": the sheet explains it and opens Ajustes.
         setSheet('photosDenied');
       } else {
+        // saveToPhotos already logged the permission / save step.
         fail();
       }
-    } catch {
-      fail();
+    } catch (error) {
+      // Capture step (ShareStepError 'capture').
+      fail(error);
     } finally {
       setBusy(null);
     }
@@ -191,8 +209,9 @@ export function ShareScreen({ navigation, route }: Props) {
     try {
       setSheet(null);
       await shareMore(await combined());
-    } catch {
-      // Cancelled or failed: nothing to tell.
+    } catch (error) {
+      // Cancelling does not throw (failOnCancel: false): this is a real error.
+      logShareError(error);
     } finally {
       setBusy(null);
     }
@@ -217,7 +236,7 @@ export function ShareScreen({ navigation, route }: Props) {
       .then(result => {
         setCommunityOpen(false);
         invalidateSocialContent(queryClient);
-        toast.show(publishedToast(result.created, language));
+        toast.show(publishedToast(result.created, language), toastAbove);
         navigation.navigate(APP_ROUTES.SocialPost, { postId: result.postId });
       })
       .catch((error): 'guidelines_required' | void => {
@@ -228,7 +247,7 @@ export function ShareScreen({ navigation, route }: Props) {
         setCommunityOpen(false);
         toast.show(
           code === 'route_private' ? copy.routePrivate : createPostErrorCopy(code as CreatePostError, language).message,
-          { tone: 'error' },
+          { tone: 'error', ...toastAbove },
         );
       })
       .finally(() => setBusy(null));
@@ -238,7 +257,6 @@ export function ShareScreen({ navigation, route }: Props) {
   const ink = mode === 'dark' ? '#F2F0EC' : colors.cta.primary;
   const inkText = mode === 'dark' ? '#121212' : colors.cta.primaryText;
   const pill = mode === 'dark' ? '#2A2826' : colors.surface.muted;
-  const footerHeight = 56 + 8 + 44 + Math.max(insets.bottom, 16) + 24;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -340,7 +358,7 @@ export function ShareScreen({ navigation, route }: Props) {
                 <PressableScale
                   key={item.tone}
                   accessibilityRole="radio"
-                  accessibilityLabel={copy.tones[item.tone]}
+                  accessibilityLabel={`${copy.toneNames[item.tone]}. ${copy.tones[item.tone]}`}
                   accessibilityState={{ selected: on }}
                   onPress={() => chooseTone(item.tone)}
                   style={[styles.swatchRing, on ? { borderColor: colors.text.primary } : styles.swatchRingOff]}
@@ -526,9 +544,31 @@ function Scene({
 }
 
 function Swatch({ tone }: { tone: StickerTone }) {
+  if (tone === 'clear') {
+    // Sin fondo: the transparency checkerboard.
+    const cells = [0, 1, 2, 3, 4, 5];
+    return (
+      <Svg width={SWATCH} height={SWATCH} viewBox="0 0 36 36">
+        <Defs>
+          <ClipPath id="swatchClear">
+            <Circle cx={18} cy={18} r={17.5} />
+          </ClipPath>
+        </Defs>
+        <G clipPath="url(#swatchClear)">
+          <Rect width={36} height={36} fill="#FFFFFF" />
+          {cells.flatMap(row =>
+            cells
+              .filter(col => (row + col) % 2 === 0)
+              .map(col => <Rect key={`${row}-${col}`} x={col * 6} y={row * 6} width={6} height={6} fill="#CFCDC8" />),
+          )}
+        </G>
+        <Circle cx={18} cy={18} r={17.5} stroke="rgba(18,18,18,.18)" strokeWidth={1} fill="none" />
+      </Svg>
+    );
+  }
   if (tone === 'glass') {
     return (
-      <Svg width={36} height={36} viewBox="0 0 36 36">
+      <Svg width={SWATCH} height={SWATCH} viewBox="0 0 36 36">
         <Circle cx={18} cy={18} r={18} fill="#CFCDC8" />
         <Path d="M30.7 5.3 A18 18 0 0 1 5.3 30.7 Z" fill="#6E6C68" />
       </Svg>
@@ -580,10 +620,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
   },
-  stickerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  swatchRing: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  stickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  swatchRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   swatchRingOff: { borderColor: 'transparent' },
-  swatch: { width: 36, height: 36, borderRadius: 18 },
+  swatch: { width: SWATCH, height: SWATCH, borderRadius: SWATCH / 2 },
   swatchLight: { backgroundColor: '#F7F6F3', boxShadow: 'inset 0 0 0 1px rgba(18,18,18,.12)' },
   swatchDark: { backgroundColor: '#141312' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 12, paddingHorizontal: 20, gap: 8 },

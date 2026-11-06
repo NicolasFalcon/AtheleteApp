@@ -155,7 +155,7 @@ export function parseFoodPrefs(value: unknown): FoodPrefs | null {
   };
 }
 
-function parseIngredient(row: Raw): PlanIngredient {
+export function parseIngredient(row: Raw): PlanIngredient {
   return { name: str(row.name) ?? '', qty: num(row.qty), unit: str(row.unit) ?? '' };
 }
 
@@ -170,7 +170,8 @@ function parseEquivalent(row: Raw): PlanEquivalent {
   };
 }
 
-function parseMeal(row: Raw): PlanMeal {
+// Also the meals of the active plan (get_nutrition_plan · days[].meals).
+export function parseMeal(row: Raw): PlanMeal {
   return {
     ...parseEquivalent(row),
     name: str(row.name) ?? 'Comida',

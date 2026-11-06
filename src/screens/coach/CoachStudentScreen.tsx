@@ -52,6 +52,7 @@ import { InviteSheet } from '@app/features/coach/v2/InviteSheet';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { parseRoutineFocus } from '@app/features/workouts/routineFocus';
 import { getLocalDateKey } from '@app/lib/date';
+import { sleepDuration } from '@app/features/sleep/sleepModel';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
 import type {
@@ -419,7 +420,7 @@ function WeekBlock({ detail, t, language }: { detail: CoachStudentDetail; t: Coa
         <Legend color={colors.surface.muted} label={t('coach.detail.legend.missed')} />
         <TextV2 variant="bodyStrong" style={styles.legendCount}>
           {[
-            t('coach.detail.sessions', { done, planned }),
+            t(planned === 1 ? 'coach.detail.sessions.one' : 'coach.detail.sessions', { done, planned }),
             missed > 0 ? plural(t, 'coach.detail.missed.one', 'coach.detail.missed.other', missed) : null,
           ]
             .filter(Boolean)
@@ -663,7 +664,9 @@ function BodyBlock({ detail, t, name }: { detail: CoachStudentDetail; t: CoachT;
             </TextV2>
             {body.sleep?.avgHours != null ? (
               <>
-                <TextV2 style={antonStyle(fonts.display, 36)}>{`${body.sleep.avgHours.toFixed(1)} h`}</TextV2>
+                <TextV2 style={antonStyle(fonts.display, 36)} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  {sleepDuration(body.sleep.avgHours * 60)}
+                </TextV2>
                 <TextV2 variant="meta" tone="secondary">
                   {t('coach.detail.sleep.avg')}
                 </TextV2>

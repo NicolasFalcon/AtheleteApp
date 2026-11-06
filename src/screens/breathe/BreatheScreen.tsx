@@ -26,6 +26,7 @@ import { useFeedbackPrefs } from '@app/lib/feedbackPrefs';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import { sleepService } from '@app/services/sleep/sleepService';
 import type { AppScreenProps } from '@app/types/navigation';
+import { displayNumberStyle } from '@app/components/v2';
 
 type Props = AppScreenProps<'Breathe'>;
 type Stage = 'intro' | 'run' | 'done';
@@ -460,8 +461,17 @@ const styles = StyleSheet.create({
   bottom: { position: 'absolute', left: 24, right: 24, gap: 14, zIndex: 2 },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.recovery },
-  introTitle: { fontSize: 56, lineHeight: 50, fontWeight: '800', letterSpacing: -3.08 },
-  doneTitle: { fontSize: 96, lineHeight: 80, fontWeight: '800', letterSpacing: -6.24 },
+  // Line height ≥ 1.1 × size: below it iOS clips the top of the first line
+  // ("UN MOMENTO"); paddingTop leaves room for the ascenders.
+  introTitle: {
+    fontSize: 56,
+    lineHeight: Math.ceil(56 * 1.1),
+    paddingTop: 4,
+    fontWeight: '800',
+    letterSpacing: -3.08,
+    includeFontPadding: false,
+  },
+  doneTitle: { fontWeight: '800', ...displayNumberStyle(96, -6.24) },
   lead: { fontSize: 17, lineHeight: 24 },
   whiteButton: {
     marginTop: 14,

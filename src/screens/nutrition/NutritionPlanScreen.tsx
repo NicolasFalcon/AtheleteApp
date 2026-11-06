@@ -32,8 +32,13 @@ import {
 import {
   useMarkSupplement,
   useMealEntryMutations,
+  useNutritionPlan,
   useNutritionToday,
+  useSwapPlanMeal,
 } from '@app/features/nutrition/useNutritionToday';
+import { useNutritionPlanText } from '@app/features/nutrition/nutritionPlanCopy';
+import { PlanTab, ShoppingTab, TargetsOutdatedNotice } from '@app/features/nutrition/v2/plan/PlanParts';
+import { swapErrorKind } from '@app/services/supabase/nutritionPlan';
 import { QuickKcalSheet, type QuickKcalResult } from '@app/features/nutrition/v2/QuickKcalSheet';
 import { LogMealSheet } from '@app/features/nutrition/v2/today/LogMealSheet';
 import { goalLabel } from '@app/features/profile/profileModel';
@@ -83,7 +88,7 @@ const TABS: { key: Tab; label: string }[] = [
 // (the server computes targets, what is left, water and adherence; the app
 // only shows them): the ring, the macros, the meals by moment, hydration and
 // supplements, with "Registrar comida" fixed at the bottom. Plan and Compras
-// arrive with N2.
+// read get_nutrition_plan of this week (days[], shopping[]).
 export function NutritionPlanScreen({ navigation }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -112,6 +117,12 @@ export function NutritionPlanScreen({ navigation }: Props) {
   const myCoach = useMyCoach();
   const { respondNutrition } = useCoachMutations();
   const [coachBusy, setCoachBusy] = useState<'accept' | 'later' | null>(null);
+  // Plan y Compras: the active plan of this week (local Monday).
+  const { t: planT } = useNutritionPlanText();
+  const planQuery = useNutritionPlan(tab !== 'today');
+  const swap = useSwapPlanMeal();
+  const [swapping, setSwapping] = useState<string | null>(null);
+  const [swapNotice, setSwapNotice] = useState<{ key: string; text: string } | null>(null);
 
   const day = today.data ?? null;
   const date = today.date;
@@ -307,6 +318,7 @@ export function NutritionPlanScreen({ navigation }: Props) {
   ) : (
     <>
       {coachBlock}
+      {day.targetsOutdated ? <TargetsOutdatedNotice t={planT} onNewPlan={() => createPlan()} /> : null}
       <TodayRing day={day} onCreatePlan={() => createPlan()} />
       <MacroTanks day={day} />
       <View style={styles.meals}>
@@ -343,7 +355,7 @@ export function NutritionPlanScreen({ navigation }: Props) {
 
   const createPlan = () => openEllieChat(ELLIE_ASKS.nutritionPlan);
 
-  // Plan without an active plan (the plan itself arrives with N2).
+  // Plan without an active plan.
   const planEmpty = (
     <View style={styles.empty}>
       <AuraMark size={56} />
@@ -385,6 +397,81 @@ export function NutritionPlanScreen({ navigation }: Props) {
     </View>
   );
 
+  // Plan / Compras: skeleton, error with retry (never the empty state for a
+  // failure), the empty state only without a plan, else the plan.
+  const activePlan = planQuery.data ?? null;
+  const planSkeleton = (
+    <SkeletonGroup>
+      <View style={styles.skeleton}>
+        <Skeleton height={60} radius={16} />
+        <Skeleton height={70} radius={18} />
+        <Skeleton height={220} radius={24} />
+      </View>
+    </SkeletonGroup>
+  );
+  const planState = planQuery.isError ? (
+    <BlockError
+      message={planT(tab === 'shopping' ? 'shopping.error' : 'plan.error')}
+      onRetry={() => planQuery.refetch().catch(() => undefined)}
+    />
+  ) : planQuery.isLoading ? (
+    planSkeleton
+  ) : null;
+  const planBody =
+    planState ??
+    (activePlan ? (
+      <PlanTab
+        plan={activePlan}
+        today={date}
+        t={planT}
+        swapping={swapping}
+        onNewPlan={() => createPlan()}
+        swapNotice={swapNotice}
+        onSwap={(planDay, meal, equivalentIndex) => {
+          const key = `${planDay.date}:${meal.slot}`;
+          setSwapping(key);
+          setSwapNotice(null);
+          swap.mutate(
+            {
+              planId: activePlan.plan.id,
+              date: planDay.date,
+              weekday: planDay.weekday,
+              slot: meal.slot,
+              // 0-based server index of the equivalent chosen.
+              equivalentIndex: meal.equivalentIndexes[equivalentIndex] ?? equivalentIndex,
+            },
+            {
+              onSuccess: () => toast.show(planT('plan.swapped')),
+              onError: error => {
+                const kind = swapErrorKind(error);
+                const message = planT(
+                  kind === 'invalid_input'
+                    ? 'swap.invalidInput'
+                    : kind === 'plan_not_active'
+                    ? 'swap.planNotActive'
+                    : kind === 'not_found'
+                    ? 'swap.notFound'
+                    : 'plan.swapError',
+                );
+                // An old plan (targets_outdated) can carry equivalents of
+                // another time of day: the message comes with "Crear plan
+                // nuevo", inline under that meal (a toast has no link).
+                if (kind === 'invalid_input' && activePlan.targetsOutdated) {
+                  setSwapNotice({ key, text: message });
+                } else {
+                  toast.show(message, { tone: 'error' });
+                }
+              },
+              onSettled: () => setSwapping(null),
+            },
+          );
+        }}
+      />
+    ) : (
+      planEmpty
+    ));
+  const shoppingBody = planState ?? (activePlan ? <ShoppingTab items={activePlan.shopping} t={planT} /> : shoppingEmpty);
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       <StatusBarV2 />
@@ -403,7 +490,7 @@ export function NutritionPlanScreen({ navigation }: Props) {
         }}
       >
         <Segmented options={TABS} value={tab} onChange={setTab} />
-        {tab === 'today' ? todayBody : tab === 'plan' ? planEmpty : shoppingEmpty}
+        {tab === 'today' ? todayBody : tab === 'plan' ? planBody : shoppingBody}
       </ScrollView>
 
       {tab !== 'shopping' ? (

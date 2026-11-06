@@ -12,18 +12,25 @@ export const weekKeys = {
   all: ['week'] as const,
   current: (userId: string | undefined, day: string, tz: string) =>
     ['week', 'current', userId ?? 'guest', day, tz] as const,
+  // Another week (Tu semana · ‹ ›), by its Monday.
+  of: (userId: string | undefined, weekStart: string, tz: string) =>
+    ['week', 'of', userId ?? 'guest', weekStart, tz] as const,
 };
 
-export function useWeekPlan(enabled = true) {
+// `weekStart` (a Monday): that week. Without it, the current week as always.
+// Weeks already loaded stay cached for the whole app session (a past week
+// only changes through the session summary, which invalidates weekKeys.all).
+export function useWeekPlan(enabled = true, weekStart?: string | null) {
   const { profile } = useAuth();
   const userId = profile?.id;
   const tz = deviceTimezone();
   const day = getLocalDateKey();
   return useQuery({
-    queryKey: weekKeys.current(userId, day, tz ?? ''),
+    queryKey: weekStart ? weekKeys.of(userId, weekStart, tz ?? '') : weekKeys.current(userId, day, tz ?? ''),
     enabled: Boolean(userId) && enabled,
-    staleTime: 30 * 1000,
-    queryFn: () => weekPlanService.getWeekPlan({ tz }),
+    staleTime: weekStart ? 5 * 60 * 1000 : 30 * 1000,
+    gcTime: weekStart ? Infinity : undefined,
+    queryFn: () => weekPlanService.getWeekPlan(weekStart ? { tz, weekStart } : { tz }),
   });
 }
 

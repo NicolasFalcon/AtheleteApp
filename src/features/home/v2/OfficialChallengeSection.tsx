@@ -2,9 +2,10 @@ import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { ArrowRight } from 'lucide-react-native';
-import { HexMedal, PersonAvatar, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
+import { HexMedal, PersonAvatar, PressableScale, TextV2, displayNumberStyle, useThemeV2 } from '@app/components/v2';
 import { officialBadgeIcon } from '@app/features/social/officialBadge';
-import { formatThousands } from '@app/features/home/homePriority';
+import { countText } from '@app/features/social/countCopy';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import type { HomeChallengeCard } from '@app/features/home/homeChallengeSection';
 
 // Cover of the official challenge: the signed `cover_path` photo, or an app
@@ -16,6 +17,11 @@ const COVER_ASPECT = 900 / 601;
 const HEIGHT = 300;
 const RADIUS = 28;
 const GUTTER = 20;
+// Right column (badge above the CTA): fixed width, so the figure column on
+// the left always ends COLUMN_GAP before it and the "12" never runs under
+// the badge, from iPhone SE to Pro Max.
+const SIDE_W = 84;
+const COLUMN_GAP = 16;
 // Placeholder athletes of "N atletas dentro" (the official challenge only
 // exposes a total, no names).
 const ATHLETES = [
@@ -49,13 +55,14 @@ function Athlete({ source, first }: { source: number; first?: boolean }) {
 //   "N atletas dentro" and the CTA towards the official challenges.
 export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSectionProps) {
   const { colors } = useThemeV2();
+  const language = useProfileLanguage();
   const { width: screenWidth } = useWindowDimensions();
   const width = screenWidth - 2 * GUTTER;
   const joined = card.state === 'joined';
   const reward = card.reward;
   const athletes =
     card.participants !== null && card.participants > 0
-      ? `${formatThousands(card.participants)} atletas dentro`
+      ? countText(language, 'athletes.inside', card.participants)
       : null;
   const friend = card.friend;
   // object-fit: cover, centred (the woman is at the middle of the photo).
@@ -137,9 +144,9 @@ export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSec
           {reward.points ? (
             <TextV2 style={styles.rewardPoints}>{`+${reward.points} pts`}</TextV2>
           ) : null}
-          {reward.badgeId ? (
-            <TextV2 style={styles.rewardBadge}>
-              {reward.badgeName ? `Badge ${reward.badgeName}` : 'Badge'}
+          {reward.badgeName ? (
+            <TextV2 style={styles.rewardBadge} numberOfLines={2}>
+              {reward.badgeName}
             </TextV2>
           ) : null}
         </View>
@@ -149,17 +156,23 @@ export function OfficialChallengeSection({ card, onPress }: OfficialChallengeSec
         <View style={styles.figureRow}>
           <View style={styles.figureText}>
             <View style={styles.numberRow}>
-              <TextV2 style={styles.number}>
+              <TextV2 style={styles.number} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
                 {joined ? card.progressText : card.goalText}
               </TextV2>
-              {joined ? <TextV2 style={styles.goal}>{`/ ${card.goalText}`}</TextV2> : null}
+              {joined ? (
+                <TextV2 style={styles.goal} numberOfLines={1}>
+                  {`/ ${card.goalText}`}
+                </TextV2>
+              ) : null}
             </View>
             <TextV2 style={styles.title} numberOfLines={2}>
               {card.label}
             </TextV2>
           </View>
-          <View style={[styles.cta, { backgroundColor: colors.ember.base }]}>
-            <ArrowRight size={22} color="#FFFFFF" strokeWidth={2} />
+          <View style={styles.ctaColumn}>
+            <View style={[styles.cta, { backgroundColor: colors.ember.base }]}>
+              <ArrowRight size={22} color="#FFFFFF" strokeWidth={2} />
+            </View>
           </View>
         </View>
 
@@ -241,32 +254,35 @@ const styles = StyleSheet.create({
   dot: { width: 7, height: 7, borderRadius: 4 },
   eyebrow: { fontSize: 12, fontWeight: '700', letterSpacing: 1.4, color: '#FFFFFF' },
   days: { fontWeight: '500' },
-  reward: { position: 'absolute', right: 24, top: 60, alignItems: 'center', gap: 6 },
+  reward: { position: 'absolute', right: 24, top: 60, width: SIDE_W, alignItems: 'center', gap: 6 },
   rewardPoints: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
   rewardBadge: {
     fontSize: 11,
     lineHeight: 14,
     color: '#C9C6C0',
     textAlign: 'center',
-    maxWidth: 84,
+    maxWidth: SIDE_W,
   },
   bottom: { position: 'absolute', left: 24, right: 24, bottom: 26, gap: 14 },
   figureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    gap: 16,
+    gap: COLUMN_GAP,
   },
-  figureText: { flex: 1, minWidth: 0 },
+  figureText: { flex: 1, flexShrink: 1, minWidth: 0 },
+  ctaColumn: { width: SIDE_W, alignItems: 'center' },
   numberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
+  // Safe line box (no clipped tops / last digit), pulled back with a
+  // negative margin so the card keeps the design's tight 70 pt pitch.
   number: {
-    fontSize: 76,
-    lineHeight: 70,
     fontWeight: '700',
-    letterSpacing: -3.8,
     color: '#FFFFFF',
+    flexShrink: 1,
+    ...displayNumberStyle(76, -3.8),
+    marginVertical: (70 - Math.ceil(76 * 1.2)) / 2,
   },
-  goal: { fontSize: 24, fontWeight: '500', color: '#C9C6C0' },
+  goal: { fontSize: 24, fontWeight: '500', color: '#C9C6C0', flexShrink: 0 },
   title: {
     fontSize: 28,
     lineHeight: 32,

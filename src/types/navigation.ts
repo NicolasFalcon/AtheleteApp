@@ -35,6 +35,9 @@ export type OnboardingStackParamList = {
 
 export type WorkoutDetailRouteParams = {
   workoutId: Workout['id'];
+  // Tu semana · a past day where this routine was planned and not done:
+  // "No completada" notice and "Hacerla hoy" (YYYY-MM-DD of that day).
+  missedOn?: string;
 };
 
 export type WorkoutSessionRouteParams = {
@@ -48,6 +51,9 @@ export type WorkoutSummaryRouteParams = {
   sessionId: string;
   // Badges unlocked by workout_completed (from the completion response).
   newBadges?: string[];
+  // 'history': opened from a past day of Tu semana. No rating, no ELLIE, no
+  // "Registrar récord"; records come from personal_records.
+  mode?: 'finish' | 'history';
 };
 
 export type ExerciseDetailRouteParams = {
@@ -206,7 +212,8 @@ export type AppStackParamList = {
   NotificationSettings: undefined;
   Achievements: undefined;
   Notifications: undefined;
-  Core33: undefined;
+  // date (YYYY-MM-DD): a past day, read only. Without it, today as always.
+  Core33: { date?: string } | undefined;
   Core33Intro: undefined;
   Core33Explore: undefined;
   Core33Detail: { challengeId: Core33ChallengeId };

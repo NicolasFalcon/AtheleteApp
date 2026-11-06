@@ -64,6 +64,8 @@ import { CoachAvatar, CoachTag } from '@app/features/coach/v2/CoachParts';
 import { getLocalDateKey } from '@app/lib/date';
 import { resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
 import { safeGoBack } from '@app/navigation/safeGoBack';
+import { dayHistoryText } from '@app/features/week/dayHistoryCopy';
+import { dayLabel } from '@app/features/week/weekModel';
 import { getWorkoutAccess, type Workout, type WorkoutExercise } from '@app/shared';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -90,6 +92,8 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
   const { workoutSession, startSession, isStartingSession } =
     useWorkoutSession(workout);
   const back = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
+  // Tu semana · a past day where this routine was planned and not done.
+  const missedOn = route.params.missedOn ?? null;
 
   // Zone and equipment of each exercise (get_exercise, kept on the phone):
   // only the "Trabaja" / "Necesitas" pills wait for them.
@@ -194,6 +198,8 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
         }`
       : status === 'completed'
       ? 'Ver sesión'
+      : missedOn
+      ? dayHistoryText(language, 'routine.doToday')
       : 'Empezar entreno';
 
   // Only an official routine with a photo of its own keeps it; every other
@@ -440,6 +446,20 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
             },
           ]}
         >
+          {missedOn ? (
+            <View style={[styles.missed, { backgroundColor: colors.surface.muted }]}>
+              <View style={[styles.missedDot, { backgroundColor: colors.ember.base }]} />
+              <View style={styles.missedTexts}>
+                <TextV2 variant="bodyStrong">{dayHistoryText(language, 'routine.missed')}</TextV2>
+                <TextV2 variant="meta" tone="secondary">
+                  {dayHistoryText(language, 'routine.missed.text', {
+                    day: dayLabel(missedOn, getLocalDateKey()).toLowerCase(),
+                  })}
+                </TextV2>
+              </View>
+            </View>
+          ) : null}
+
           {workout.description ? (
             <TextV2 variant="bodyL" style={styles.description}>
               {workout.description}
@@ -663,6 +683,9 @@ function Shell({
 }
 
 const styles = StyleSheet.create({
+  missed: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: 18 },
+  missedDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
+  missedTexts: { flex: 1, gap: 2 },
   screen: {
     flex: 1,
   },

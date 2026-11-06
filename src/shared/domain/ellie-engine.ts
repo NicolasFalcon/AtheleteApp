@@ -174,7 +174,7 @@ export function generateSmartInsights(ctx: EllieFullContext): EllieInsight[] {
     );
     insights.push({
       id: 'no-workout-today',
-      text: `Aún no has entrenado hoy. Te faltan ${remaining} sesiones para cumplir tu objetivo semanal.`,
+      text: `Aún no has entrenado hoy. ${remaining === 1 ? 'Te falta 1 sesión' : `Te faltan ${remaining} sesiones`} para cumplir tu objetivo semanal.`,
       type: 'workout',
       priority: 1,
     });

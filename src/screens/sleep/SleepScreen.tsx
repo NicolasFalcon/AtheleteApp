@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PressableScale, Skeleton, SkeletonGroup, StatusBarV2, TextV2, useToast } from '@app/components/v2';
+import { DisplayNumber, PressableScale, Skeleton, SkeletonGroup, StatusBarV2, TextV2, useToast } from '@app/components/v2';
 import { APP_ROUTES, ROOT_ROUTES } from '@app/constants/routes';
 import { HealthInviteSheet } from '@app/features/health/HealthInviteSheet';
 import {
@@ -21,7 +21,7 @@ import {
   RECOVERY_HEADLINES,
   clock,
   feelingLabel,
-  hoursLabel,
+  sleepDuration,
   inBedMinutes,
   isRecent,
   isTired,
@@ -212,7 +212,7 @@ export function SleepScreen({ navigation }: Props) {
               <SectionTitle
                 right={
                   <TextV2 variant="meta" color={NIGHT.secondary}>
-                    {`${hoursLabel(inBedMinutes(form.bed, form.wake))} en cama`}
+                    {`${sleepDuration(inBedMinutes(form.bed, form.wake))} en cama`}
                   </TextV2>
                 }
               >
@@ -407,9 +407,9 @@ function HealthView({
         {recovery ? (
           <>
             <View style={styles.scoreRow}>
-              <TextV2 color={NIGHT.white} style={styles.score}>
+              <DisplayNumber size={148} weight="800" tracking={-9.6} color={NIGHT.white}>
                 {String(recovery.score)}
-              </TextV2>
+              </DisplayNumber>
               <TextV2 color={NIGHT.secondary} style={styles.outOf}>
                 / 100
               </TextV2>
@@ -461,10 +461,9 @@ const styles = StyleSheet.create({
   fs15: { fontSize: 15 },
   howTitle: { fontSize: 60, lineHeight: 56, fontWeight: '800', letterSpacing: -3 },
   heroText: { fontSize: 15, lineHeight: 22, maxWidth: 320 },
-  headline: { fontSize: 30, lineHeight: 29, fontWeight: '800', letterSpacing: -1.05 },
-  scoreRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, marginTop: -4 },
-  score: { fontSize: 148, lineHeight: 120, fontWeight: '800', letterSpacing: -9.6 },
-  outOf: { fontSize: 20, fontWeight: '600', paddingBottom: 8 },
+  headline: { fontSize: 30, lineHeight: 34, fontWeight: '800', letterSpacing: -1.05, includeFontPadding: false },
+  scoreRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  outOf: { fontSize: 20, fontWeight: '600' },
   edit: { height: 44, justifyContent: 'center' },
   legalPull: { marginTop: -20 },
 });

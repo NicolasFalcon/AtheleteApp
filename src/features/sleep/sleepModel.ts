@@ -178,13 +178,46 @@ export function splitMinutes(total: number): { h: number; m: number } {
   return { h: Math.floor(rounded / 60), m: rounded % 60 };
 }
 
-// "7 h 42", or "7h 24m" (Inicio tile).
-export function hoursLabel(total: number | null, compact = false): string {
+// ── Sleep duration: the one format of the app ───────────────────────────────
+// "9 h 15 min" in ES and EN (both languages share the units), so no language
+// argument. Small texts drop what is zero: "9 h", "45 min". `full` keeps both
+// parts with zero-padded minutes for the big Sueño figure: "9 h 00 min".
+export type DurationPart = { value: string; unit: 'h' | 'min' };
+
+export function sleepDurationParts(total: number, { full = false }: { full?: boolean } = {}): DurationPart[] {
+  const { h, m } = splitMinutes(total);
+  if (full) {
+    return [
+      { value: String(h), unit: 'h' },
+      { value: pad(m), unit: 'min' },
+    ];
+  }
+  if (h === 0) {
+    return [{ value: String(m), unit: 'min' }];
+  }
+  return m === 0
+    ? [{ value: String(h), unit: 'h' }]
+    : [
+        { value: String(h), unit: 'h' },
+        { value: String(m), unit: 'min' },
+      ];
+}
+
+// "9 h 15 min", "9 h", "45 min"; "—" without data.
+export function sleepDuration(total: number | null, options?: { full?: boolean }): string {
   if (total === null) {
     return '—';
   }
+  return sleepDurationParts(total, options)
+    .map(part => `${part.value} ${part.unit}`)
+    .join(' ');
+}
+
+// Value label above a bar of the 7-night chart ("9:30"). Not a sentence: a
+// bar is ~45 pt wide, too narrow for "9 h 30 min".
+export function sleepBarLabel(total: number): string {
   const { h, m } = splitMinutes(total);
-  return compact ? `${h}h ${pad(m)}m` : `${h} h ${pad(m)}`;
+  return `${h}:${pad(m)}`;
 }
 
 export const QUALITY_WORDS = ['Muy mala', 'Mala', 'Regular', 'Buena', 'Excelente'];
@@ -212,7 +245,7 @@ export const RECOVERY_HEADLINES: Record<SleepRecovery['headlineCode'], string> =
 
 export function recoveryText(overview: SleepOverview): string {
   const night = overview.lastNight;
-  const slept = night ? `Dormiste ${hoursLabel(night.durationMin)}.` : '';
+  const slept = night ? `Dormiste ${sleepDuration(night.durationMin)}.` : '';
   const advice =
     overview.recovery?.level === 'high'
       ? 'Hoy puedes entrenar a intensidad completa.'
@@ -255,6 +288,74 @@ export function weekSlots(overview: SleepOverview): {
       night: overview.nights7.find(night => night.nightDate === date) ?? null,
     };
   });
+}
+
+// ── Consistencia (7 noches) ─────────────────────────────────────────────────
+// get_sleep_overview only returns `consistency_min` (a ± spread in minutes),
+// not a share of nights, so the percentage is computed here from nights7.
+export const CONSISTENCY_WINDOW_MIN = 30;
+export const CONSISTENCY_MIN_NIGHTS = 3;
+
+const DAY_MIN = 1440;
+
+// Distance between two clock times on the 24 h circle (23:50 ↔ 00:10 = 20).
+function clockDistance(a: number, b: number): number {
+  const diff = Math.abs(a - b) % DAY_MIN;
+  return Math.min(diff, DAY_MIN - diff);
+}
+
+// Mean of clock times on the 24 h circle, so 23:30 and 00:30 average to
+// 00:00 and not to 12:00.
+function clockMean(values: number[]): number {
+  let x = 0;
+  let y = 0;
+  for (const value of values) {
+    const angle = (value / DAY_MIN) * 2 * Math.PI;
+    x += Math.cos(angle);
+    y += Math.sin(angle);
+  }
+  const angle = Math.atan2(y, x);
+  return (((angle / (2 * Math.PI)) * DAY_MIN) % DAY_MIN + DAY_MIN) % DAY_MIN;
+}
+
+// % of the nights of the last 7 days whose bedtime AND wake-up time are both
+// within ±30 min of their own 7-night average. Rounded to an integer; null
+// with fewer than 3 nights (not enough to talk about a schedule).
+export function consistencyPct(overview: SleepOverview): number | null {
+  const nights = weekSlots(overview)
+    .map(slot => slot.night)
+    .filter((night): night is NonNullable<typeof night> => {
+      if (!night) {
+        return false;
+      }
+      return (
+        !Number.isNaN(new Date(night.bedtimeAt).getTime()) &&
+        !Number.isNaN(new Date(night.wakeAt).getTime())
+      );
+    });
+  if (nights.length < CONSISTENCY_MIN_NIGHTS) {
+    return null;
+  }
+  const beds = nights.map(night => minutesOfDay(night.bedtimeAt));
+  const wakes = nights.map(night => minutesOfDay(night.wakeAt));
+  const bedMean = clockMean(beds);
+  const wakeMean = clockMean(wakes);
+  const inside = nights.filter(
+    (_, i) =>
+      clockDistance(beds[i], bedMean) <= CONSISTENCY_WINDOW_MIN &&
+      clockDistance(wakes[i], wakeMean) <= CONSISTENCY_WINDOW_MIN,
+  ).length;
+  return Math.round((inside / nights.length) * 100);
+}
+
+// "vs semana pasada" in the same duration format, always signed: "+2 h",
+// "−1 h 30 min", "+45 min". `negative` drives the alert colour.
+export function deltaLabel(deltaMin: number): { parts: DurationPart[]; negative: boolean } {
+  const rounded = Math.round(deltaMin);
+  const negative = rounded < 0;
+  const parts = sleepDurationParts(Math.abs(rounded));
+  parts[0] = { ...parts[0], value: `${negative ? '−' : '+'}${parts[0].value}` };
+  return { parts, negative };
 }
 
 // A bedtime after midnight is a "late night" (Ember dot in Horario).

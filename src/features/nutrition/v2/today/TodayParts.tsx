@@ -144,7 +144,15 @@ export function TodayRing({ day, onCreatePlan }: { day: NutritionDay; onCreatePl
 
 // The macro columns (§23.3): the protein wider in Ember with "· prioridad";
 // "+N g" under the one that went past its goal.
+// Carbs and fat used to fill with the ink #1C1A18, the same grey as the box
+// in Dark (no visible fill). Each gets its own existing token: Recovery
+// Blue for carbs, soft Ember (ember.textOnDark) for fat; protein stays Ember.
 export function MacroTanks({ day }: { day: NutritionDay }) {
+  const { colors } = useThemeV2();
+  const fills: Record<string, string | undefined> = {
+    carbs: colors.recovery.base,
+    fat: colors.ember.textOnDark,
+  };
   return (
     <View style={styles.tanks}>
       {macroTanks(day).map(tank => (
@@ -155,6 +163,7 @@ export function MacroTanks({ day }: { day: NutritionDay }) {
             goal={tank.goal}
             pct={Math.round(tank.fill * 100)}
             priority={tank.key === 'protein'}
+            fillColor={fills[tank.key]}
           />
           {tank.excess ? (
             <TextV2 variant="metaStrong" tone={tank.key === 'protein' ? 'ember' : 'secondary'}>

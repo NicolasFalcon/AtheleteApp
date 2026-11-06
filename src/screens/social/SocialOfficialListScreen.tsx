@@ -4,6 +4,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Bell, Check } from 'lucide-react-native';
 import {
+  DisplayNumber,
   HexMedal,
   PressableScale,
   StatusBarV2,
@@ -23,10 +24,13 @@ import {
 } from '@app/features/social/challengeModel';
 import type { ChallengeSummary } from '@app/features/social/challengeTypes';
 import { officialBadgeIcon } from '@app/features/social/officialBadge';
-import { formatThousands } from '@app/features/social/postModel';
+import { countText } from '@app/features/social/countCopy';
 import { useSocialResource, useSocialService } from '@app/features/social/useSocial';
+import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { safeGoBack } from '@app/navigation/safeGoBack';
 import type { AppScreenProps } from '@app/types/navigation';
+import { displayNumberStyle } from '@app/components/v2';
 
 type Props = AppScreenProps<'SocialOfficialList'>;
 
@@ -52,7 +56,7 @@ type Card = {
   start: { mon: string; day: string } | null;
 };
 
-function cardOf(summary: ChallengeSummary, now: Date): Card {
+function cardOf(summary: ChallengeSummary, now: Date, language: EllieLanguage): Card {
   const { challenge, meta } = summary;
   const figure = bigFigure({
     metric: challenge.metric,
@@ -77,7 +81,7 @@ function cardOf(summary: ChallengeSummary, now: Date): Card {
     }),
     badgeIcon: meta?.badge?.icon ?? null,
     days: daysLeftLabel(challenge.ends_at, challenge.duration_days, now),
-    who: total !== null && total > 0 ? `${formatThousands(total)} atletas` : null,
+    who: total !== null && total > 0 ? countText(language, 'athletes.count', total) : null,
     joined: summary.mine?.status === 'active' || summary.mine?.status === 'completed',
     cover: meta?.coverUrl ? { uri: meta.coverUrl } : null,
     start: startDateParts(challenge.starts_at),
@@ -179,6 +183,7 @@ function JoinButton({
 export function SocialOfficialListScreen({ navigation }: Props) {
   const { colors } = useThemeV2();
   const insets = useSafeAreaInsets();
+  const language = useProfileLanguage();
   const { width } = useWindowDimensions();
   const toast = useToast();
   const service = useSocialService();
@@ -187,8 +192,8 @@ export function SocialOfficialListScreen({ navigation }: Props) {
 
   const back = () => safeGoBack(navigation, BACK_FALLBACKS);
   const now = new Date();
-  const list = (challenges.data?.officialList ?? []).map(item => cardOf(item, now));
-  const upcoming = (challenges.data?.official_upcoming ?? []).map(item => cardOf(item, now));
+  const list = (challenges.data?.officialList ?? []).map(item => cardOf(item, now, language));
+  const upcoming = (challenges.data?.official_upcoming ?? []).map(item => cardOf(item, now, language));
   const [featured, ...more] = list;
   const blocks = composeOfficialBlocks(more);
 
@@ -271,9 +276,9 @@ export function SocialOfficialListScreen({ navigation }: Props) {
                 <TextV2 style={styles.pillText}>OFICIAL ATHELETE · RETO DE LA SEMANA</TextV2>
               </View>
               <View>
-                <TextV2 style={styles.heroBig} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+                <DisplayNumber size={112} tracking={-6.7} color="#FFFFFF" fit minimumFontScale={0.5}>
                   {featured.big}
-                </TextV2>
+                </DisplayNumber>
                 <TextV2 style={styles.heroUnit} numberOfLines={2}>
                   {featured.unit}
                 </TextV2>
@@ -318,7 +323,7 @@ export function SocialOfficialListScreen({ navigation }: Props) {
             </View>
             {blocks.map(block => {
               if (block.kind === 'wide') {
-                const card = cardOf(block.item.summary, now);
+                const card = cardOf(block.item.summary, now, language);
                 return (
                   <PressableScale
                     key={card.id}
@@ -336,9 +341,9 @@ export function SocialOfficialListScreen({ navigation }: Props) {
                     <TextV2 style={styles.wideDays}>{card.days}</TextV2>
                     <View style={styles.wideBottom}>
                       <View style={styles.bigRow}>
-                        <TextV2 style={styles.wideBig} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+                        <DisplayNumber size={80} tracking={-4} color="#FFFFFF" fit minimumFontScale={0.5} style={styles.wideBig}>
                           {card.big}
-                        </TextV2>
+                        </DisplayNumber>
                         <TextV2 style={styles.wideUnit}>{card.unit}</TextV2>
                       </View>
                       <TextV2 style={styles.wideSub}>{card.title}</TextV2>
@@ -362,8 +367,8 @@ export function SocialOfficialListScreen({ navigation }: Props) {
                   </PressableScale>
                 );
               }
-              const first = cardOf(block.item.summary, now);
-              const second = block.other ? cardOf(block.other.summary, now) : null;
+              const first = cardOf(block.item.summary, now, language);
+              const second = block.other ? cardOf(block.other.summary, now, language) : null;
               return (
                 <View key={first.id} style={styles.pairBlock}>
                   {[first, second].flatMap(card => (card ? [card] : [])).map(card => (
@@ -377,9 +382,9 @@ export function SocialOfficialListScreen({ navigation }: Props) {
                           style={StyleSheet.absoluteFill}
                         />
                         <View style={styles.pairFigure}>
-                          <TextV2 style={styles.pairBig} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+                          <DisplayNumber size={72} tracking={-3.6} color="#FFFFFF" fit minimumFontScale={0.5}>
                             {card.big}
-                          </TextV2>
+                          </DisplayNumber>
                           <TextV2 style={styles.pairUnit}>{card.unit}</TextV2>
                         </View>
                       </PressableScale>
@@ -506,7 +511,6 @@ const styles = StyleSheet.create({
   },
   pillDot: { width: 6, height: 6, borderRadius: 3 },
   pillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.9, color: '#FFFFFF' },
-  heroBig: { fontSize: 112, lineHeight: 100, fontWeight: '700', letterSpacing: -6.7, color: '#FFFFFF' },
   heroUnit: { fontSize: 34, lineHeight: 36, fontWeight: '700', letterSpacing: -0.85, color: '#FFFFFF' },
   rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rewardText: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
@@ -533,7 +537,7 @@ const styles = StyleSheet.create({
   wideDays: { position: 'absolute', left: 20, top: 20, fontSize: 13, fontWeight: '600', color: '#E4E2DD' },
   wideBottom: { position: 'absolute', left: 20, right: 20, bottom: 20, gap: 12 },
   bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  wideBig: { fontSize: 80, lineHeight: 72, fontWeight: '700', letterSpacing: -4, color: '#FFFFFF', flexShrink: 1 },
+  wideBig: { flexShrink: 1 },
   wideUnit: { fontSize: 28, fontWeight: '700', letterSpacing: -0.56, color: '#FFFFFF' },
   wideSub: { fontSize: 20, lineHeight: 24, fontWeight: '600', color: '#FFFFFF' },
   wideDesc: { fontSize: 14, lineHeight: 20, color: '#C9C6C0', maxWidth: 290 },
@@ -543,7 +547,6 @@ const styles = StyleSheet.create({
   pairRow: { flexDirection: 'row', gap: 12, height: 360 },
   pairPhoto: { flex: 1, borderRadius: 28, overflow: 'hidden', backgroundColor: INK },
   pairFigure: { position: 'absolute', left: 16, right: 16, bottom: 16 },
-  pairBig: { fontSize: 72, lineHeight: 64, fontWeight: '700', letterSpacing: -3.6, color: '#FFFFFF' },
   pairUnit: { fontSize: 18, fontWeight: '700', letterSpacing: -0.18, color: '#FFFFFF' },
   pairText: { flex: 1, justifyContent: 'space-between', paddingTop: 6, paddingBottom: 4 },
   pairDays: { fontSize: 13, fontWeight: '600' },
@@ -556,7 +559,7 @@ const styles = StyleSheet.create({
   next: { width: 248, height: 372, borderRadius: 26, overflow: 'hidden', backgroundColor: INK },
   nextDate: { position: 'absolute', left: 18, top: 18 },
   nextMon: { fontSize: 12, fontWeight: '700', letterSpacing: 1.2, color: '#C9C6C0' },
-  nextDay: { fontSize: 44, lineHeight: 46, fontWeight: '700', letterSpacing: -1.7, color: '#FFFFFF' },
+  nextDay: { fontWeight: '700', color: '#FFFFFF', ...displayNumberStyle(44, -1.7) },
   nextBottom: { position: 'absolute', left: 18, right: 18, bottom: 18, gap: 6 },
   nextTitle: { fontSize: 20, lineHeight: 24, fontWeight: '600', color: '#FFFFFF' },
   nextDesc: { fontSize: 13, color: '#C9C6C0' },

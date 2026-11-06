@@ -8,6 +8,7 @@ export * from '@app/components/v2/CapsuleGrid';
 export * from '@app/components/v2/Celebration';
 export * from '@app/components/v2/ChoiceTile';
 export * from '@app/components/v2/DayCapsules';
+export * from '@app/components/v2/DisplayNumber';
 export * from '@app/components/v2/DisplayTitle';
 export * from '@app/components/v2/EllieComposer';
 export * from '@app/components/v2/AuraMark';
