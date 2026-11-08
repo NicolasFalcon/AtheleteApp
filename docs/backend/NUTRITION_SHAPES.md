@@ -8,11 +8,13 @@ Fuente: rediseño de Nutrición (Hoy · Plan · Compras, suplementos, peso y có
 ## 0. Antes de cambiar nada: reporte de lo existente
 
 Antes de tocar nada, Lovable reporta las tablas, RPC y Edge Functions actuales de:
+
 - registro de comidas (foto, kcal rápidas), hidratación y planes de nutrición de ELLIE;
 - objetivo de kcal mostrado hoy;
 - datos del perfil (sexo, fecha de nacimiento, altura, peso, objetivo, días de entreno).
 
 **Reglas:**
+
 - Reutilizar y extender lo existente cuando encaje.
 - No borrar nada que use la app actual.
 
@@ -23,6 +25,7 @@ compute_nutrition_targets(p_date date, p_tz text) returns jsonb   -- SECURITY DE
 ```
 
 **Entradas** (desde el perfil y los registros):
+
 - sexo (`hombre` | `mujer` | `otro`), edad, altura en cm;
 - peso: el último registrado, o el del perfil si no hay ninguno;
 - `% de grasa`, opcional;
@@ -78,8 +81,8 @@ compute_nutrition_targets(p_date date, p_tz text) returns jsonb   -- SECURITY DE
   "training_adjust": { "enabled": false, "train_kcal": null, "rest_kcal": null } }
 ```
 
-- Con un plan activo, `source = "plan"` y los objetivos salen de la semana del plan.
-- Sin plan, los objetivos salen de esta fórmula.
+- Con un plan activo de ELLIE, `source = "plan"` y los objetivos del día salen de esta misma fórmula; `week` conserva las comidas y solo determina el tipo de día. Las asignaciones aceptadas de coach conservan sus objetivos propios.
+- Sin plan nutricional, los objetivos salen de esta fórmula. Los días por semana se leen de `profiles.training_days_per_week`; si falta un valor válido, se usan 3 días (valor por defecto del perfil). Si existe un plan de entrenamiento `active` o `paused`, una sesión `pending`, `done` o `substituted` en la fecha determina `day_type = training` y su ausencia determina `rest`, por encima del tipo guardado en el plan de comidas. Sin plan de entrenamiento se conserva la semana planificada como fuente de `day_type`.
 
 ## 2. Preferencias de alimentación
 
@@ -109,6 +112,7 @@ nutrition_plans (
 
 - **Un solo plan `active` por usuario,** con un índice parcial único.
 - Los borradores (`draft`) los crea ELLIE (ver `ELLIE_PROPOSALS_SHAPES`).
+- Cada equivalente conserva el mismo `slot` que la comida original, queda dentro de ±5 % de sus kcal y tiene proteína similar (±10 % o 5 g, lo que sea mayor). El servidor lo genera y `nut_validate_week` lo verifica.
 
 ### `activate_nutrition_plan(p_plan_id, p_edits jsonb, p_confirm_replace boolean)`
 
@@ -129,6 +133,7 @@ nutrition_plans (
 ### `get_nutrition_plan(p_week_start date, p_tz)`
 
 Devuelve el plan activo: semana, objetivos por día, `shopping`, y qué comidas se registraron desde el plan.
+`plan.targets`, `days[].targets` y `days[].kcal` reflejan el cálculo actual. `targets_outdated: true` indica que los objetivos guardados o `week[].kcal` difieren más de 5 %; las comidas guardadas no se modifican. La app puede ofrecer recrear el plan.
 
 ### `swap_plan_meal(p_plan_id, p_weekday, p_slot, p_equivalent_index)`
 
@@ -139,7 +144,7 @@ Cambia una comida del plan activo en la pestaña Plan, solo para ese día. Recal
 ### `get_nutrition_day(p_date, p_tz)`
 
 ```jsonc
-{ "ok": true, "date": "…", "day_type": "training",
+{ "ok": true, "date": "…", "day_type": "training", "targets_outdated": false,
   "targets": { …compute_nutrition_targets… },
   "consumed": { "kcal": 1240, "p": 91, "c": 116, "g": 45 },
   "remaining": { "kcal": 1877, "p": 46, "c": 312, "g": 49 },     // negativo = se pasó
@@ -167,6 +172,7 @@ Cambia una comida del plan activo en la pestaña Plan, solo para ese día. Recal
 - `toggle_favorite_food(p_entry_id | p_item)`.
 
 **Edge Function `parse-meal-text`:**
+
 - Recibe un texto ("2 huevos y una arepa con queso") y devuelve `items[]` con porciones y macros **estimados**, marcados `estimate: true`. No guarda nada: la app confirma y llama a `log_meal_entry`.
 - Usa el modelo rápido, con un timeout de 15 s y reembolso de la cuota en `ai_timeout`, igual que la visión.
 
@@ -188,11 +194,12 @@ nutrition_recalibrations (id, user_id, created_at, period_start, period_end, obs
   - Incluye `last_weight` y `days_since_last`.
 
 **Recalibración (job semanal, o perezosa al llamar a `get_nutrition_plan`):**
+
 - **Requisito:** al menos 4 registros de peso en los últimos 14 días. Si no se cumple, no se propone nada.
 - **Cálculo:** si el ritmo observado se desvía más de 0,15 kg/semana del objetivo, se propone un ajuste de ±100 a 200 kcal, como máximo el ±10 %. Nunca baja del mínimo de seguridad.
 - Se crea una recalibración `pending`, y la tarjeta de la app muestra el texto que corresponda: "Subiste 0,1 kg/sem (objetivo 0,25). Ajustamos a 2.750 kcal (+150)."
 - `respond_recalibration(p_id, p_action 'apply'|'keep')`:
-  - `apply` actualiza los objetivos del plan activo (o un `kcal_offset` del perfil si no hay plan);
+  - `apply` actualiza `profiles.nutrition_kcal_offset`, que alimenta la fórmula tanto con plan activo como sin plan;
   - `keep` la descarta.
 - Las recalibraciones pendientes caducan a los 7 días.
 
@@ -208,6 +215,7 @@ supplement_logs (id, user_id, supplement_id, local_date date, moment text, taken
 ```
 
 **RPC:**
+
 - `upsert_supplement(...)`, `delete_supplement(id)` y `list_supplements()`.
 - `get_supplements_day(p_date, p_tz)`:
   - por momento, cada suplemento con su estado: `taken` (con hora), `pending` o `upcoming`;
@@ -217,6 +225,7 @@ supplement_logs (id, user_id, supplement_id, local_date date, moment text, taken
   - Si `counts_as_meal` y se marca, también registra la comida en `snacks` con sus macros. Si se desmarca, la elimina.
 
 **Recordatorios (con el `push_outbox` existente):**
+
 - Hay un push por cada momento y hora local, solo con `remind = true`. Agrupa los suplementos de ese momento: "Mañana · Multivitamínico y Omega 3".
 - Respeta las horas de silencio.
 - No se envía si todos los suplementos de ese momento ya están marcados.
@@ -250,6 +259,7 @@ food_products (barcode text pk, name text, brand text, image_url text,
 ## 8. Integración con ELLIE (ctx-1)
 
 `get_athlete_context`:
+
 - toma `today.nutrition` de `get_nutrition_day`, con `target_source = plan | profile_estimate`;
 - añade `today.supplements` (tomados y pendientes por momento) y `profile.weight_trend` (`rate_kg_wk` y `days_since_last`);
 - `plans.nutrition` = `{ id, week_number, adjust_by_training }`;
@@ -276,3 +286,21 @@ food_products (barcode text pk, name text, brand text, image_url text,
 2. Las tablas creadas o modificadas, con su RLS. Como siempre, las escrituras van solo por RPC.
 3. La firma final de cada RPC y Edge Function, con un JSON real de `compute_nutrition_targets` y de `get_nutrition_day` para la cuenta de prueba.
 4. El resultado de los escenarios 1 a 12.
+
+---
+
+## 11. Implementación (estado aplicado)
+
+Migraciones 0038–0042. Reutiliza `nutrition_meals` (+ trigger que deriva `daily_nutrition_logs`), `nutrition_plans` (columnas aditivas: status, week jsonb, snapshot de objetivos, proposal_id), `profiles` (timezone, datos corporales), `ellie_consume_quota`/refund, cola push existente (`social_notifications → push_outbox → send-push`).
+
+Tablas nuevas (RLS: solo lectura del dueño; escritura solo por RPC): `weight_logs`, `nutrition_recalibrations`, `food_preferences`, `food_favorites`, `user_supplements`, `supplement_logs`. Sin políticas (solo servidor): `supplement_reminders`, `food_products` (lectura vía `lookup_barcode`).
+
+Desvíos conocidos:
+
+- `get_nutrition_day(_date)` antiguo sigue existiendo con sus claves `goal`/`totals`; ahora calcula `goal` con nut-f1 y también devuelve `targets` y `targets_outdated`. El nuevo es `get_nutrition_day(p_date, p_tz)`. Devuelve `photo_path` (la app firma la URL como hoy), no `photo_url`.
+- `nutrition_plans` y `profiles` conservan sus políticas de escritura antiguas para no romper la app actual (anotado en BACKEND_TODO). Un plan antiguo activo cuenta como `source: plan`.
+- Tendencia de peso: media móvil exponencial + pendiente por mínimos cuadrados (kg/semana).
+- Redondeo: carbohidratos = resto de kcal tras proteína y grasa (escenario 1 da 431 g, no 428). Con ajuste por entreno la suma semanal queda a ±0,1 % de base×7 por redondeo diario.
+- `nutrition_plan_create_draft` es solo servidor; ELLIE aún no genera borradores de plan por sí misma.
+- Suplementos: aviso cada 5 min (288 ejecuciones/día) agrupado por momento, deduplicado `supp:<fecha>:<momento>`, respeta silencio; si todos se marcan tomados antes del envío, el aviso pendiente se cancela. Categoría APNs `SUPPLEMENT_REMINDER`: la app define las acciones TAKEN / SNOOZE_30 y llama a `mark_supplement(..., 'notification')` o `snooze_supplement_reminder`.
+- Edge Functions `parse-meal-text` y `parse-nutrition-label`: JWT obligatorio, cupo compartido de ELLIE/visión con devolución si falla; la foto de etiqueta se borra al terminar.
