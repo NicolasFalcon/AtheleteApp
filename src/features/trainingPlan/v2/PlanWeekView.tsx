@@ -23,7 +23,6 @@ import {
 import {
   beforeStart,
   nextSession,
-  pauseWeeks,
   planContext,
   planDayViews,
   segmentBlocks,
@@ -36,6 +35,7 @@ import {
 import { isDeloadWeek } from '@app/features/trainingPlan/trainingPlanModel';
 import { useResumeTrainingPlan } from '@app/features/trainingPlan/usePlanViews';
 import { PlanPills, PlanSessionRow } from '@app/features/trainingPlan/v2/PlanDayParts';
+import { PlanAdjustmentsStack } from '@app/features/trainingPlan/v2/PlanAdjustmentCard';
 import { PlanError, PlanLoading } from '@app/features/trainingPlan/v2/PlanStates';
 import { AntonText, PlanEyebrow } from '@app/features/trainingPlan/v2/PlanParts';
 import { sessionTypeCover } from '@app/features/trainingPlan/v2/planCovers';
@@ -122,8 +122,8 @@ export function PlanWeekView({
   const pausedHere = planState.state === 'paused' && weekStart === range.current;
   const phaseLabel = isDeload ? t('week.descarga') : header?.phase ? t(phaseKey(header.phase)) : '';
   const rangeText = weekRangeText(language, weekStart);
-  const sub = beforeStart(planState) && weekIndex === 1 && detail.startDate
-    ? t('phase.starts', { date: longDate(language, detail.startDate) })
+  const sub = beforeStart(planState) && weekIndex === 1 && planState.startDate
+    ? t('phase.starts', { date: longDate(language, planState.startDate) })
     : header?.blockIndex
       ? t('phase.sub', {
           b: header.blockIndex,
@@ -165,6 +165,7 @@ export function PlanWeekView({
 
   return (
     <>
+      <PlanAdjustmentsStack />
       <View style={styles.phase}>
         <View style={styles.phaseHead}>
           <View style={styles.phaseTexts}>
@@ -249,7 +250,7 @@ export function PlanWeekView({
               {t('pause.title', { date: shortDate(language, planState.pausedUntil) })}
             </TextV2>
             <TextV2 variant="label" color={colors.text.secondary} style={styles.regular}>
-              {t(pauseWeeks(today, planState.pausedUntil) === 1 ? 'pause.body.one' : 'pause.body.two', {
+              {t(planState.pauseWeeks === 2 ? 'pause.body.two' : 'pause.body.one', {
                 end: planState.endDate ? shortDate(language, planState.endDate) : '',
               })}
             </TextV2>

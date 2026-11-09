@@ -67,6 +67,17 @@ async function send(item: QueuedFeedback): Promise<void> {
 
 let flushing: Promise<{ stoppedByNetwork: boolean }> | null = null;
 
+// Screens that depend on feedback already on the server (the plan's "Próxima
+// vez" changes with the effort and the rating) hear when a replay finished.
+const flushListeners = new Set<() => void>();
+
+export function onFeedbackFlushed(listener: () => void): () => void {
+  flushListeners.add(listener);
+  return () => {
+    flushListeners.delete(listener);
+  };
+}
+
 // Sends the queue in order. Retryable failures keep the item (and stop at a
 // network failure); any other answer from the server drops it.
 export function flushFeedbackQueue(userId: string): Promise<{ stoppedByNetwork: boolean }> {
@@ -104,6 +115,7 @@ export function flushFeedbackQueue(userId: string): Promise<{ stoppedByNetwork: 
     return { stoppedByNetwork };
   })().finally(() => {
     flushing = null;
+    flushListeners.forEach(listener => listener());
   });
   return flushing;
 }

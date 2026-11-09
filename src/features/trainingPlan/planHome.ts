@@ -46,6 +46,8 @@ export type PlanHeroInfo = {
   ctaLabel: string;
   paused: boolean;
   routineId: string | null;
+  // The plan session to open (31.7); null: only the routine is known.
+  planSessionId: string | null;
 };
 
 export function planHeroInfo(input: PlanHomeInput): PlanHeroInfo | null {
@@ -61,6 +63,7 @@ export function planHeroInfo(input: PlanHomeInput): PlanHeroInfo | null {
     minutes: view?.minutes ?? null,
     exercises: view?.exerciseCount ?? null,
     routineId: view?.routineId ?? null,
+    planSessionId: view?.planSessionId ?? null,
   };
   if (ctx.paused && ctx.pausedUntil) {
     return {

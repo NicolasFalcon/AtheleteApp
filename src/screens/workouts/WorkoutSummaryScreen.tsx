@@ -31,6 +31,7 @@ import { useRoutine } from '@app/hooks/useRoutines';
 import { enqueueFeedback } from '@app/features/session/feedbackQueue';
 import { formatDuration, formatKg } from '@app/features/session/sessionModel';
 import { SessionRating } from '@app/features/session/v2/SessionRating';
+import { PlanOutcomeBlock } from '@app/features/trainingPlan/v2/PlanOutcome';
 import { useAuth } from '@app/hooks/useAuth';
 import { useEllieData } from '@app/hooks/useEllieData';
 import { useExerciseNames } from '@app/hooks/useCatalog';
@@ -429,6 +430,10 @@ export function WorkoutSummaryScreen({ navigation, route }: Props) {
             ))}
           </View>
         ) : null}
+
+        {/* A session of the training plan: its "Próxima vez" (31.7), also in the
+            history of a past day. */}
+        {detail.planSessionId ? <PlanOutcomeBlock workoutSessionId={sessionId} /> : null}
 
         {/* The final rating, read only (history). No block without rating. */}
         {history ? <RatingReadOnly rating={detail.rating} t={t} /> : null}

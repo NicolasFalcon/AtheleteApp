@@ -47,6 +47,7 @@ import {
   RoutineLibraryCard,
   WeekPlanAddedCard,
 } from '@app/features/ellie/v2/LibraryCardParts';
+import { PlanAdjustmentChatCard } from '@app/features/trainingPlan/v2/PlanAdjustmentCard';
 import { useAddToWeek } from '@app/features/week/v2/AddToWeekSheet';
 import { addToWeekText } from '@app/features/week/addToWeekCopy';
 import { weekStartOf } from '@app/features/week/weekModel';
@@ -176,7 +177,6 @@ export function EllieChatScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const addToWeek = useAddToWeek();
   const { profile, signOut } = useAuth();
   const language = useProfileLanguage();
   const params = route.params;
@@ -192,6 +192,18 @@ export function EllieChatScreen({ navigation, route }: Props) {
       signOut().catch(() => undefined);
     },
   });
+  // "Agregar a semana" from a card: the chat then shows its confirmation card
+  // ("Agregada al {día}", "Sustituye a {sesión} en tu plan").
+  const addToWeek = useAddToWeek(added =>
+    chat.weekPlanAdded({
+      date: added.date,
+      routineId: null,
+      name: added.name,
+      replaced: added.substitutes !== null,
+      substitutes: added.substitutes,
+      planOn: added.planOn,
+    }),
+  );
   const conversations = useEllieConversations();
   const deleteConversation = useDeleteEllieConversation();
   const { state } = chat;
@@ -618,6 +630,16 @@ export function EllieChatScreen({ navigation, route }: Props) {
             navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: message.library.routineId })
           }
           onAdjust={() => sendText(addToWeekText(language, 'library.adjust'))}
+        />
+      );
+    }
+    if (message.kind === 'planAdjustment') {
+      return (
+        <PlanAdjustmentChatCard
+          key={message.id}
+          adjustment={message.adjustment}
+          answered={message.answered}
+          onAnswered={action => chat.planAdjustmentAnswered(message.id, action)}
         />
       );
     }

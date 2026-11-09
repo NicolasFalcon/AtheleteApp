@@ -12,6 +12,7 @@ import type {
 } from '@app/services/ellie/ellieProposals';
 import type { FoodPrefs, NutritionProposal } from '@app/services/ellie/nutritionProposals';
 import type { DiscomfortReply } from '@app/features/ellie/discomfortModel';
+import type { AdjustmentAction, PlanAdjustment } from '@app/services/supabase/trainingPlanSession';
 import type { TrainingPlanProposal } from '@app/services/supabase/trainingPlan';
 import type { TrainingPlanCardStatus } from '@app/features/trainingPlan/v2/TrainingPlanProposalCard';
 
@@ -188,7 +189,18 @@ export type TrainingPlanProposalMessage = {
   startDate: string | null;
 };
 
+// plan_adjustment (31.8): the card of an adjustment of the training plan; the
+// buttons give way to the confirmation once answered (`answered`).
+export type PlanAdjustmentMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'planAdjustment';
+  adjustment: PlanAdjustment;
+  answered: AdjustmentAction | null;
+};
+
 export type ProposalMessage =
+  | PlanAdjustmentMessage
   | RoutineProposalMessage
   | TrainingPlanProposalMessage
   | NutritionProposalMessage
@@ -210,7 +222,8 @@ export type ChatMessage =
   | DiscomfortCheckMessage
   | RoutineLibraryMessage
   | WeekPlanAddedMessage
-  | TrainingPlanProposalMessage;
+  | TrainingPlanProposalMessage
+  | PlanAdjustmentMessage;
 
 export type ChatState = {
   messages: ChatMessage[];
@@ -239,6 +252,7 @@ export type ChatAction =
   | { type: 'proposal'; card: ProposalMessage; parentId?: string | null }
   | { type: 'discomfortAnswered'; id: string; answer: DiscomfortReply }
   | { type: 'weekPlanRemoved'; id: string }
+  | { type: 'planAdjustmentAnswered'; id: string; action: AdjustmentAction }
   | { type: 'proposalLoaded'; id: string; proposal: RoutineProposal | null; status: RoutineCardStatus }
   | { type: 'proposalStatus'; id: string; status: RoutineCardStatus }
   | {
@@ -452,6 +466,15 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ],
       };
     }
+    case 'planAdjustmentAnswered':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'planAdjustment'
+            ? { ...message, answered: action.action }
+            : message,
+        ),
+      };
     case 'weekPlanRemoved':
       return {
         ...state,

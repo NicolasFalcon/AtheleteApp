@@ -34,7 +34,9 @@ export type ProposalCardType =
   | 'week_plan_added'
   // tp-1.2: the training plan of 1 to 3 months (ellie_proposals.kind =
   // 'training_plan').
-  | 'training_plan_proposal';
+  | 'training_plan_proposal'
+  // tp-1.2 §8: an adjustment of the training plan (31.8) in the chat.
+  | 'plan_adjustment';
 
 export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'routine_proposal',
@@ -43,6 +45,7 @@ export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'discomfort_check',
   'routine_library',
   'week_plan_added',
+  'plan_adjustment',
   'training_plan_proposal',
 ];
 
@@ -327,6 +330,11 @@ export type WeekPlanAdded = {
   routineId: string | null;
   name: string;
   replaced: boolean;
+  // The session of the training plan it replaced ("Sustituye a … en tu
+  // plan"); null: none. Only the app's own confirmation sets it.
+  substitutes?: string | null;
+  // A plan is on: "El resto de tu semana no cambia". Only set by the app.
+  planOn?: boolean;
 };
 
 export function parseWeekPlanAdded(payloadValue: unknown): WeekPlanAdded | null {
@@ -476,6 +484,8 @@ export type ProposalErrorCode =
   | 'plan_invalid'
   // plan_routine_for_day / unplan_routine_for_day (prop-2).
   | 'day_has_routine'
+  // tp-1.2: the day holds a session of the training plan.
+  | 'day_has_plan_session'
   | 'past_day'
   | 'routine_not_found'
   | 'offline'
@@ -491,6 +501,7 @@ const KNOWN: readonly ProposalErrorCode[] = [
   'plan_active_exists',
   'plan_invalid',
   'day_has_routine',
+  'day_has_plan_session',
   'past_day',
   'routine_not_found',
 ];
@@ -499,15 +510,19 @@ export class ProposalError extends Error {
   readonly code: ProposalErrorCode;
   // day_has_routine: the routine the day already has.
   readonly existing: { routineId: string | null; name: string } | null;
+  // day_has_plan_session: `{ plan_session_id, title, session_type }`, flat.
+  readonly planSession: { id: string | null; title: string; type: string | null } | null;
   constructor(
     code: ProposalErrorCode,
     message?: string | null,
     existing: { routineId: string | null; name: string } | null = null,
+    planSession: { id: string | null; title: string; type: string | null } | null = null,
   ) {
     super(message ?? code);
     this.name = 'ProposalError';
     this.code = code;
     this.existing = existing;
+    this.planSession = planSession;
   }
 }
 
@@ -551,6 +566,13 @@ export async function call(name: string, args: Raw): Promise<Raw> {
       code,
       str(nested?.message) ?? raw,
       found ? { routineId: str(found.routine_id), name: str(found.name) ?? '' } : null,
+      code === 'day_has_plan_session'
+        ? {
+            id: str(body.plan_session_id),
+            title: str(body.title) ?? '',
+            type: str(body.session_type),
+          }
+        : null,
     );
   }
   return body;

@@ -366,7 +366,7 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   // The plan's session on the hero: Empezar / Ver sesión open the routine's
-  // detail (the session with its weight is part 3); Retomar plan resumes it.
+  // session detail with its recommended weights (31.7); Retomar plan resumes it.
   const heroPlanInfo = plan.on ? planHeroInfo(planInput) : null;
   const heroPlan: HeroPlan | null = heroPlanInfo
     ? {
@@ -384,6 +384,8 @@ export function HomeScreen({ navigation }: Props) {
             resumePlan.resume().then(ok => {
               toast.show(planText.t(ok ? 'pause.resumed' : 'pause.error'), ok ? undefined : { tone: 'error' });
             });
+          } else if (heroPlanInfo.planSessionId) {
+            navigation.navigate(APP_ROUTES.PlanSession, { planSessionId: heroPlanInfo.planSessionId });
           } else if (heroPlanInfo.routineId) {
             navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: heroPlanInfo.routineId });
           } else {

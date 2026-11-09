@@ -1,6 +1,7 @@
 import {
   formatSetsReps,
   recommendationFor,
+  type PlanExerciseTarget,
   type SetsRepsUnit,
   type WorkoutExercise,
   type WorkoutSession,
@@ -66,7 +67,15 @@ export type PlannedExercise = {
   // replaces and why.
   originalExerciseId?: string | null;
   variantReason?: string | null;
+  // The plan's target (recommended kg, RIR, last time) in a plan session.
+  plan?: PlanExerciseTarget;
 };
+
+// The plan's target while the exercise is the planned one: a variant has
+// another exercise, so the recommended weight no longer applies to it.
+export function activePlan(exercise: PlannedExercise): PlanExerciseTarget | null {
+  return exercise.plan && !exercise.originalExerciseId ? exercise.plan : null;
+}
 
 // `recommendedFor` gives the library's recommended_sets_reps of an exercise:
 // it fills in a routine row that has neither reps nor time.
@@ -80,7 +89,7 @@ export function buildPlan(
     let amount: number | null = exercise.duration
       ? exercise.duration
       : exercise.reps ?? null;
-    let amountMax = amount;
+    let amountMax = exercise.repsMax && amount !== null ? exercise.repsMax : amount;
     let perSide = false;
 
     if (amount === null && exercise.exerciseId && recommendedFor) {
@@ -112,6 +121,7 @@ export function buildPlan(
       reps: unit === 'reps' ? amount : null,
       durationSec: unit === 'sec' ? amount : null,
       distanceM: unit === 'm' ? amount : null,
+      plan: exercise.plan,
     };
   });
 }
@@ -193,6 +203,15 @@ export function suggestedSet(
   lastWeightKg?: number | null,
 ): { reps: number | null; weightKg: number | null } {
   const previous = setsFor(logs, exercise.position).pop();
+  const plan = activePlan(exercise);
+  if (plan) {
+    // A plan session: the recommended weight (not the last one used); when
+    // calibrating, or for bodyweight, the field starts empty.
+    return {
+      reps: previous?.reps ?? exercise.reps,
+      weightKg: previous?.weightKg ?? (plan.calibrate ? null : plan.recommendedKg),
+    };
+  }
   return {
     reps: previous?.reps ?? exercise.reps,
     weightKg:

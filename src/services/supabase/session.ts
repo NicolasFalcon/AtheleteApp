@@ -61,6 +61,9 @@ export type SessionDetail = {
   // Final 1–5 rating (sfb-1: workout_sessions.rating, rating_note,
   // rated_at). null when the session was never rated.
   rating: SessionRatingRead | null;
+  // workout_sessions.plan_session_id: the session of the training plan this
+  // one came from (null: a routine session).
+  planSessionId: string | null;
 };
 
 export type SessionRatingRead = { value: number; note: string | null; ratedAt: string | null };
@@ -86,6 +89,12 @@ function clockFromRow(row: SessionRow): SessionClockFields {
     pausedTotalSec: row.paused_total_sec ?? 0,
     pausedAt: row.paused_at ? new Date(row.paused_at).getTime() : null,
   };
+}
+
+// plan_session_id is not in the generated Database types yet.
+function planSessionIdOf(row: SessionRow): string | null {
+  const raw = (row as unknown as { plan_session_id?: unknown }).plan_session_id;
+  return typeof raw === 'string' && raw !== '' ? raw : null;
 }
 
 export async function fetchSessionDetail(
@@ -122,6 +131,7 @@ export async function fetchSessionDetail(
     exerciseByPosition,
     warmupSetIds: setRows.filter(set => set.is_warmup).map(set => set.id),
     rating: ratingOf(row),
+    planSessionId: planSessionIdOf(row),
   };
 }
 

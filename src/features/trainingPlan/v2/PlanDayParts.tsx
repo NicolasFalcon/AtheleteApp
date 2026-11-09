@@ -13,6 +13,7 @@ import {
   DAY_LETTERS,
   dayName,
   longDate,
+  weekdayOf,
   sessionTypeKey,
   shortDate,
   useTrainingPlanText,
@@ -27,7 +28,7 @@ import type { ColorsV2 } from '@app/theme/v2';
 const capitalize = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 
 const struck = (state: PlanDayState) =>
-  state === 'missed' || state === 'substituted' || state === 'skipped';
+  state === 'missed' || state === 'substituted' || state === 'skipped' || state === 'moved';
 
 // The check on a done mark: dark on the light colours, white on the blue and
 // the ink ones (a done test is ink: white check; in Dark it is ivory).
@@ -77,7 +78,7 @@ export function DayMark({
       </View>
     );
   }
-  if (state === 'missed' || state === 'skipped' || state === 'substituted') {
+  if (state === 'missed' || state === 'skipped' || state === 'substituted' || state === 'moved') {
     const Icon = state === 'substituted' ? Repeat : X;
     return (
       <View style={[styles.mark, base, { backgroundColor: colors.surface.muted }]}>
@@ -221,8 +222,10 @@ export function PlanSessionRow({
         ? t('state.today')
         : state === 'pending'
           ? t('state.pending')
-          : t(`state.${state}` as 'state.done');
-  const stateColor = state === 'missed' || state === 'today' ? colors.plan.emT : colors.text.secondary;
+          : t(state === 'moved' ? 'state.movedOut' : (`state.${state}` as 'state.done'));
+  // A moved day reads like a missed one.
+  const stateColor =
+    state === 'missed' || state === 'moved' || state === 'today' ? colors.plan.emT : colors.text.secondary;
   return (
     <PressableScale
       accessibilityRole="button"
@@ -267,6 +270,11 @@ export function PlanSessionRow({
               {t('row.by', { name: view.substitutedBy })}
             </TextV2>
           </View>
+        ) : null}
+        {state === 'moved' && view.movedTo ? (
+          <TextV2 variant="caption" color={colors.text.secondary}>
+            {t('state.movedTo', { day: `${weekdayOf(language, view.movedTo)} ${dayNumber(view.movedTo)}` })}
+          </TextV2>
         ) : null}
         {view.movedFrom && state !== 'done' ? (
           <TextV2 variant="caption" color={colors.text.secondary}>

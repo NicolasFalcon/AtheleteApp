@@ -21,6 +21,9 @@ import {
   type SessionVariantReason,
 } from '@app/features/session/variantModel';
 import { routineErrorCopy } from '@app/features/workouts/routineErrors';
+import { withPlanTargets } from '@app/features/trainingPlan/planSessionModel';
+import { usePlanSession } from '@app/features/trainingPlan/usePlanSession';
+import { invalidateTrainingPlan } from '@app/features/trainingPlan/useTrainingPlanState';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { invalidateRoutineLists, routineKeys } from '@app/hooks/useRoutines';
 import { invalidateWeek, weekKeys } from '@app/hooks/useWeekPlan';
@@ -78,11 +81,22 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
   // The routine is read once: saving a variant in it (or in a copy) must not
   // rebuild the session that is running.
   const [workout, setWorkout] = useState<Workout | null>(null);
+  // A session of the training plan: the plan's targets (recommended kg, rep
+  // range, RIR, last time) go onto its exercises before the runner starts. If
+  // they cannot be read the session still runs, as the routine says.
+  const planSessionId = route.params.planSessionId;
+  const planQuery = usePlanSession(planSessionId);
   useEffect(() => {
-    if (!workout && routineQuery.data) {
-      setWorkout(routineQuery.data);
+    if (workout || !routineQuery.data) {
+      return;
     }
-  }, [routineQuery.data, workout]);
+    if (planSessionId && planQuery.isLoading) {
+      return;
+    }
+    setWorkout(
+      planQuery.data ? withPlanTargets(routineQuery.data, planQuery.data) : routineQuery.data,
+    );
+  }, [planQuery.data, planQuery.isLoading, planSessionId, routineQuery.data, workout]);
   const toast = useToast();
   const language = useProfileLanguage();
   // Variants (25.6): the sheet, the reason and where "Guardar en la rutina"
@@ -157,6 +171,10 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
     (result: CompletionResult) => {
       allowLeave.current = true;
       refreshSurfaces();
+      // The plan moves on after each session (weights, the week, its state).
+      if (planSessionId) {
+        invalidateTrainingPlan(queryClient).catch(() => undefined);
+      }
       teardownRef.current('completed').finally(() => {
         navigation.replace(APP_ROUTES.WorkoutSummary, {
           sessionId: result.session.id,
@@ -164,7 +182,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
         });
       });
     },
-    [navigation, refreshSurfaces],
+    [navigation, planSessionId, queryClient, refreshSurfaces],
   );
 
   const runner = useSessionRunner({

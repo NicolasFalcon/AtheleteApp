@@ -1,5 +1,6 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
 import { isSessionType, type SessionType } from '@app/components/v2/SessionTypeChip';
+import { parseMovedOut, type MovedOut } from '@app/features/week/weekModel';
 
 // Plan de entrenamiento de 1 a 3 meses (docs/backend/TRAINING_PLAN_SHAPES.md,
 // tp-1.2): the plan's state, the proposal card of ellie-chat, the preview
@@ -35,13 +36,13 @@ export type PlanPhase = 'base' | 'desarrollo' | 'pico';
 const PHASES: readonly PlanPhase[] = ['base', 'desarrollo', 'pico'];
 
 // ── Parsing helpers ─────────────────────────────────────────────────────────
-type Raw = Record<string, unknown>;
+export type Raw = Record<string, unknown>;
 
-const rec = (value: unknown): Raw | null =>
+export const rec = (value: unknown): Raw | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Raw) : null;
-const str = (value: unknown): string | null =>
+export const str = (value: unknown): string | null =>
   typeof value === 'string' && value.trim() !== '' ? value : null;
-const num = (value: unknown): number | null => {
+export const num = (value: unknown): number | null => {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
@@ -50,14 +51,14 @@ const num = (value: unknown): number | null => {
   }
   return null;
 };
-const list = (value: unknown): Raw[] =>
+export const list = (value: unknown): Raw[] =>
   Array.isArray(value) ? value.map(rec).filter((item): item is Raw => item !== null) : [];
-const strings = (value: unknown): string[] =>
+export const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item !== '') : [];
 const numbers = (value: unknown): number[] =>
   Array.isArray(value) ? value.map(num).filter((item): item is number => item !== null) : [];
 // A YYYY-MM-DD date (a timestamp keeps only its day).
-const day = (value: unknown): string | null => {
+export const day = (value: unknown): string | null => {
   const text = str(value);
   return text && /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : null;
 };
@@ -89,7 +90,13 @@ export type TrainingPlanState = {
   weeks: number | null;
   blockIndex: number | null;
   phase: PlanPhase | null;
+  // First day of the plan ("Empieza el …"; the plan may not have started).
+  startDate: string | null;
+  // Paused: the first local day of the pause, the day it ends and how many
+  // weeks it moves the plan (1 or 2). All null outside a pause.
+  pausedFrom: string | null;
   pausedUntil: string | null;
+  pauseWeeks: 1 | 2 | null;
   endDate: string | null;
   readOnly: boolean;
   // entitlement.multi_week (§10). Today always true: no paywall.
@@ -104,7 +111,10 @@ export const NO_TRAINING_PLAN: TrainingPlanState = {
   weeks: null,
   blockIndex: null,
   phase: null,
+  startDate: null,
+  pausedFrom: null,
   pausedUntil: null,
+  pauseWeeks: null,
   endDate: null,
   readOnly: false,
   multiWeek: true,
@@ -122,7 +132,10 @@ export function parseTrainingPlanState(body: Raw): TrainingPlanState {
     weeks: num(body.weeks),
     blockIndex: num(body.block_index),
     phase: phaseOf(body.phase),
+    startDate: day(body.start_date),
+    pausedFrom: day(body.paused_from),
     pausedUntil: day(body.paused_until),
+    pauseWeeks: num(body.pause_weeks) === 2 ? 2 : num(body.pause_weeks) === 1 ? 1 : null,
     endDate: day(body.end_date),
     readOnly: body.read_only === true,
     multiWeek: entitlement?.multi_week !== false,
@@ -385,7 +398,7 @@ function errorFrom(body: Raw): TrainingPlanError {
   });
 }
 
-async function call(name: string, args: Raw): Promise<Raw> {
+export async function call(name: string, args: Raw): Promise<Raw> {
   const client = getSupabaseClient() as unknown as {
     rpc: (
       rpc: string,
@@ -610,30 +623,32 @@ export async function fetchTrainingPlanDetail(planId?: string | null): Promise<T
 }
 
 // ── get_training_plan_month (§7 · 31.5) ────────────────────────────────────
-// The contract: "semanas del mes con week_index, kind y por día { date,
-// session_type?, status?, in_pause?, added_routine? }". The week list may
-// come as `weeks` (each with its `days`) or the days as a flat list: both are
-// read, and a week is also matched to a day by its dates.
+// `{ ok, plan, month, weeks: [{ week_index, kind, start_date, days: [{ date,
+// session_type, status, moved, in_pause, added_routine, moved_out }] }] }`.
+// The days come inside their week; `in_pause` marks the free days of a pause.
 export type MonthDayStatus = 'done' | 'missed' | 'pending' | 'substituted' | 'skipped' | null;
 
 export type PlanMonthDay = {
   date: string;
   type: SessionType | null;
   status: MonthDayStatus;
+  // The session came here from another day.
+  moved: boolean;
   inPause: boolean;
   addedRoutine: boolean;
-  // The plan week it belongs to, when the answer says so.
-  weekIndex: number | null;
+  // The plan session that left this day for another (null: none).
+  movedOut: MovedOut | null;
+  // The plan week it belongs to.
+  weekIndex: number;
 };
 
 export type PlanMonthWeek = {
   weekIndex: number;
   kind: PlanWeekKind;
   startDate: string | null;
-  endDate: string | null;
 };
 
-export type PlanMonth = { weeks: PlanMonthWeek[]; days: PlanMonthDay[]; recognized: boolean };
+export type PlanMonth = { weeks: PlanMonthWeek[]; days: PlanMonthDay[] };
 
 export function monthStatusOf(value: unknown): MonthDayStatus {
   const text = typeof value === 'string' ? value.toLowerCase() : '';
@@ -653,48 +668,41 @@ export function monthStatusOf(value: unknown): MonthDayStatus {
 }
 
 export function parsePlanMonth(body: Raw): PlanMonth {
-  const rows = Array.isArray(body.weeks) ? list(body.weeks) : [];
-  const flat = Array.isArray(body.days) ? list(body.days) : [];
   const weeks: PlanMonthWeek[] = [];
   const days: PlanMonthDay[] = [];
-  const readDay = (row: Raw, weekIndex: number | null) => {
-    const date = day(row.date);
-    if (!date) {
+  list(body.weeks).forEach(row => {
+    const weekIndex = num(row.week_index);
+    if (weekIndex === null) {
       return;
     }
-    const added = row.added_routine;
-    days.push({
-      date,
-      type: isSessionType(row.session_type) ? row.session_type : null,
-      status: monthStatusOf(row.status),
-      inPause: row.in_pause === true,
-      addedRoutine: added !== null && added !== undefined && added !== false,
-      weekIndex: num(row.week_index) ?? weekIndex,
+    weeks.push({
+      weekIndex,
+      kind: weekKindOf(row.kind) ?? 'carga',
+      startDate: day(row.start_date),
     });
-  };
-  rows.forEach(row => {
-    const weekIndex = num(row.week_index);
-    if (weekIndex !== null) {
-      weeks.push({
+    list(row.days).forEach(item => {
+      const date = day(item.date);
+      if (!date) {
+        return;
+      }
+      days.push({
+        date,
+        type: isSessionType(item.session_type) ? item.session_type : null,
+        status: monthStatusOf(item.status),
+        moved: item.moved === true,
+        inPause: item.in_pause === true,
+        addedRoutine: item.added_routine !== null && item.added_routine !== undefined && item.added_routine !== false,
+        movedOut: parseMovedOut(item.moved_out),
         weekIndex,
-        kind: weekKindOf(row.kind) ?? 'carga',
-        startDate: day(row.start_date),
-        endDate: day(row.end_date),
       });
-    }
-    list(row.days).forEach(item => readDay(item, weekIndex));
+    });
   });
-  flat.forEach(item => readDay(item, null));
-  return { weeks, days, recognized: rows.length > 0 || flat.length > 0 };
+  return { weeks, days };
 }
 
 // `month`: any date of the month; the RPC takes its first day.
 export async function fetchTrainingPlanMonth(month: string): Promise<PlanMonth> {
-  const result = parsePlanMonth(await call('get_training_plan_month', { p_month: `${month.slice(0, 7)}-01` }));
-  if (__DEV__ && !result.recognized) {
-    console.warn('[training-plan] get_training_plan_month: no `weeks` or `days` in the answer.');
-  }
-  return result;
+  return parsePlanMonth(await call('get_training_plan_month', { p_month: `${month.slice(0, 7)}-01` }));
 }
 
 // ── resume_training_plan(p_client_id) ──────────────────────────────────────

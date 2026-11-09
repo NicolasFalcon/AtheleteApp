@@ -30,6 +30,7 @@ import { CoachStudentsScreen } from '@app/screens/coach/CoachStudentsScreen';
 import { MyCoachScreen } from '@app/screens/coach/MyCoachScreen';
 import { TrainingPlanCreateScreen } from '@app/screens/trainingPlan/TrainingPlanCreateScreen';
 import { TrainingPlanPreviewScreen } from '@app/screens/trainingPlan/TrainingPlanPreviewScreen';
+import { PlanSessionScreen } from '@app/screens/trainingPlan/PlanSessionScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -440,6 +441,7 @@ export function RootNavigator() {
             options={{ ...FULL_SCREEN_OPTIONS, presentation: 'modal' }}
           />
           <Stack.Screen name={APP_ROUTES.TrainingPlanPreview} component={TrainingPlanPreviewScreen} />
+          <Stack.Screen name={APP_ROUTES.PlanSession} component={PlanSessionScreen} />
         </Stack.Group>
       ) : null}
     </Stack.Navigator>

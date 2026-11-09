@@ -70,7 +70,7 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
   const [weekStart, setWeekStart] = useState<string | null>(route.params?.weekStart ?? null);
   const [month, setMonth] = useState<string | null>(null);
 
-  const startDate = detail.data?.startDate ?? null;
+  const startDate = state.data?.startDate ?? null;
   const endDate = state.data?.endDate ?? detail.data?.endDate ?? null;
   const range = useMemo(() => planWeekRange(startDate, endDate, today), [startDate, endDate, today]);
   const months = useMemo(() => monthRange(startDate, endDate, today), [startDate, endDate, today]);
@@ -82,7 +82,9 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
   // A day of Semana.
   const openDay = (view: PlanDayView) => {
     const action = planDayAction(view, today);
-    if (action.kind === 'routine') {
+    if (action.kind === 'planSession') {
+      navigation.navigate(APP_ROUTES.PlanSession, { planSessionId: action.planSessionId });
+    } else if (action.kind === 'routine') {
       openRoutine(action.routineId);
     } else if (action.kind === 'past') {
       pastDay.open(view.date, view.routineId).catch(() => undefined);
@@ -92,7 +94,7 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
   // A day of Mes: the month carries no routine, so a day that opens one reads
   // its week (cached) and then does what Semana does.
   const openCell = async (date: string, cellState: PlanDayState) => {
-    if (cellState === 'pause' || cellState === 'rest' || cellState === 'empty') {
+    if (cellState === 'pause' || cellState === 'rest' || cellState === 'empty' || cellState === 'moved') {
       return;
     }
     if (date < today && cellState !== 'substituted') {

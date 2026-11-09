@@ -57,6 +57,18 @@ export type RoutineFocus = (typeof ROUTINE_FOCUS_VALUES)[number];
 // Computed by the backend from workout_templates.source.
 export type RoutineOrigin = 'official' | 'editorial' | 'ellie' | 'user';
 
+// The training plan's target for an exercise of a plan session (tp-1.2 ·
+// get_plan_session): the runner shows it and preloads the recommended kg.
+export type PlanExerciseTarget = {
+  repMin: number | null;
+  repMax: number | null;
+  rir: number | null;
+  // null: bodyweight (calibrate false) or still to calibrate (calibrate true).
+  recommendedKg: number | null;
+  calibrate: boolean;
+  lastTime: { kg: number | null; reps: number } | null;
+};
+
 export type WorkoutExercise = {
   id: string;
   exerciseId?: string | null;
@@ -70,12 +82,16 @@ export type WorkoutExercise = {
   isUnilateral?: boolean;
   sets?: number;
   reps?: number;
+  // Top of a rep range ("6–9"); `reps` is the bottom.
+  repsMax?: number;
   duration?: number;
   restTime: number;
   notes?: string;
   // template_exercises.planned_weight_kg: starting kg of a set when the user
   // has no history for the exercise (no editing UI yet).
   plannedWeightKg?: number;
+  // Set only in a session of the training plan.
+  plan?: PlanExerciseTarget;
 };
 
 export type Workout = {

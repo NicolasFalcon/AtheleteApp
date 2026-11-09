@@ -114,4 +114,6 @@ export const APP_ROUTES = {
   // Plan de entrenamiento (v2.21 §31).
   TrainingPlanCreate: 'TrainingPlanCreate',
   TrainingPlanPreview: 'TrainingPlanPreview',
+  // Sesión del plan con peso recomendado (v2.21 §31.7).
+  PlanSession: 'PlanSession',
 } as const;

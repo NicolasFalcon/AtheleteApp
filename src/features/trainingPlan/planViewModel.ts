@@ -28,7 +28,8 @@ import { isDeloadWeek } from '@app/features/trainingPlan/trainingPlanModel';
 // ── Day states (31.0 table) ─────────────────────────────────────────────────
 // done · missed · today (pending, today) · pending · substituted · skipped ·
 // added (a routine on a rest day of the plan) · pause (a free day of the
-// pause) · rest (no session) · empty.
+// pause) · moved (its session was moved to another day: read like a missed
+// one, saying where it went) · rest (no session) · empty.
 export type PlanDayState =
   | 'done'
   | 'missed'
@@ -38,19 +39,28 @@ export type PlanDayState =
   | 'skipped'
   | 'added'
   | 'pause'
+  | 'moved'
   | 'rest'
   | 'empty';
 
 export type PlanContext = {
   today: string;
   paused: boolean;
+  // The pause: its first day and the day the plan comes back.
+  pausedFrom: string | null;
   pausedUntil: string | null;
 };
 
-// The days of a pause: from today up to (not including) the return date.
-// Sessions done before the pause are not moved, so past days never are.
+// The days of a pause: from paused_from up to (not including) the return
+// date, as the server says.
 export function isInPause(date: string, ctx: PlanContext): boolean {
-  return ctx.paused && Boolean(ctx.pausedUntil) && date >= ctx.today && date < (ctx.pausedUntil as string);
+  return (
+    ctx.paused &&
+    ctx.pausedFrom !== null &&
+    ctx.pausedUntil !== null &&
+    date >= ctx.pausedFrom &&
+    date < ctx.pausedUntil
+  );
 }
 
 export type PlanDayView = {
@@ -64,8 +74,12 @@ export type PlanDayView = {
   routineId: string | null;
   exerciseCount: number | null;
   substitutedBy: string | null;
+  // The plan session of the day (opens the session with its weights, 31.7).
+  planSessionId: string | null;
   // Moved here from another day (still pending).
   movedFrom: string | null;
+  // Its session was moved out of this day to that one (state 'moved').
+  movedTo: string | null;
   restLabel: string | null;
 };
 
@@ -98,7 +112,9 @@ export function planDayView(day: WeekDay, ctx: PlanContext): PlanDayView {
     routineId: day.routine?.id ?? null,
     exerciseCount: day.routine?.exerciseCount ?? null,
     substitutedBy: session?.substitutedByName ?? null,
+    planSessionId: session?.id ?? null,
     movedFrom: session?.moved ? session.originalDate : null,
+    movedTo: null,
     restLabel: day.restLabel ?? null,
   };
   if (isInPause(day.date, ctx)) {
@@ -109,6 +125,17 @@ export function planDayView(day: WeekDay, ctx: PlanContext): PlanDayView {
   }
   if (day.kind === 'session' && day.routine) {
     return { ...base, state: day.status === 'done' ? 'done' : 'added', added: true };
+  }
+  // The day a session left: "Movida", not a rest day.
+  if (day.movedOut) {
+    return {
+      ...base,
+      state: 'moved',
+      type: day.movedOut.type,
+      title: day.movedOut.title,
+      movedTo: day.movedOut.toDate,
+      added: false,
+    };
   }
   return { ...base, state: day.kind === 'rest' ? 'rest' : 'empty', added: false };
 }
@@ -124,6 +151,8 @@ export function planDayViews(week: WeekPlan, ctx: PlanContext): PlanDayView[] {
 export type PlanDayAction =
   | { kind: 'none' }
   | { kind: 'routine'; routineId: string }
+  // Today or ahead, a session of the plan: opens its detail (31.7).
+  | { kind: 'planSession'; planSessionId: string }
   | { kind: 'past' };
 
 export function planDayAction(view: PlanDayView, today: string): PlanDayAction {
@@ -133,11 +162,14 @@ export function planDayAction(view: PlanDayView, today: string): PlanDayAction {
   if (view.state === 'substituted' && view.routineId) {
     return { kind: 'routine', routineId: view.routineId };
   }
-  if (view.state === 'rest' || view.state === 'empty') {
+  if (view.state === 'rest' || view.state === 'empty' || view.state === 'moved') {
     return { kind: 'none' };
   }
   if (view.date < today) {
     return { kind: 'past' };
+  }
+  if (view.planSessionId && !view.added) {
+    return { kind: 'planSession', planSessionId: view.planSessionId };
   }
   return view.routineId ? { kind: 'routine', routineId: view.routineId } : { kind: 'none' };
 }
@@ -150,7 +182,10 @@ export function weekSessions(views: PlanDayView[]): PlanDayView[] {
 // "Sesiones · x de y hechas": the plan sessions only (an added routine is not
 // part of the plan's count).
 export function sessionsCount(views: PlanDayView[]): { done: number; total: number } {
-  const planned = views.filter(view => !view.added && view.state !== 'rest' && view.state !== 'empty' && view.state !== 'pause');
+  // A moved one counts where it went, not where it left.
+  const planned = views.filter(
+    view => !view.added && view.state !== 'rest' && view.state !== 'empty' && view.state !== 'pause' && view.state !== 'moved',
+  );
   return { done: planned.filter(view => view.state === 'done').length, total: planned.length };
 }
 
@@ -183,18 +218,6 @@ export function segmentTone(segment: WeekTrainingPlan['segments'][number]): Segm
     return 'ink';
   }
   return isDeloadWeek(segment.kind) ? 'deload' : 'upcoming';
-}
-
-// 1 or 2 weeks of pause, from what is left of it (the server stores the
-// total in the dates only).
-export function pauseWeeks(today: string, pausedUntil: string): 1 | 2 {
-  const left = Math.max(0, Math.round((dayNumberOf(pausedUntil) - dayNumberOf(today))));
-  return left > 7 ? 2 : 1;
-}
-
-function dayNumberOf(date: string): number {
-  const [y, m, d] = date.split('-').map(Number);
-  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
 }
 
 // The plan's weeks as the screen navigates them: from the week of the start
@@ -256,6 +279,9 @@ export function monthDayState(day: PlanMonthDay | undefined, today: string): Pla
     return 'pause';
   }
   if (!day.type) {
+    if (day.movedOut) {
+      return 'moved';
+    }
     return day.addedRoutine ? (day.status === 'done' ? 'done' : 'added') : 'rest';
   }
   switch (day.status) {
@@ -280,8 +306,8 @@ export type MonthRow = {
   allPaused: boolean;
 };
 
-// The month's rows with their week (S5…) and kind. The week of a row is the
-// one the answer lists for any of its days, or whose dates cover it.
+// The month's rows with their week (S5…) and kind. The answer carries the
+// days inside their week, so a row takes the week of any of its days.
 export function monthRows(month: string, data: PlanMonth | undefined, today: string): MonthRow[] {
   const byDate = new Map((data?.days ?? []).map(day => [day.date, day]));
   return monthGrid(month).map(row => {
@@ -289,19 +315,11 @@ export function monthRows(month: string, data: PlanMonth | undefined, today: str
       const day = byDate.get(cell.date);
       return { ...cell, day, state: monthDayState(day, today) };
     });
-    const dates = row.map(cell => cell.date);
-    const known = cells.map(cell => cell.day?.weekIndex).find(index => index !== null && index !== undefined);
-    const weeks = data?.weeks ?? [];
-    const week =
-      weeks.find(item => known !== undefined && item.weekIndex === known) ??
-      weeks.find(item =>
-        item.startDate && item.endDate
-          ? dates.some(date => date >= (item.startDate as string) && date <= (item.endDate as string))
-          : false,
-      );
+    const known = cells.map(cell => cell.day?.weekIndex).find(index => index !== undefined);
+    const week = (data?.weeks ?? []).find(item => item.weekIndex === known);
     return {
       cells,
-      weekIndex: week?.weekIndex ?? known ?? null,
+      weekIndex: known ?? null,
       kind: week?.kind ?? null,
       allPaused: cells.every(cell => cell.state === 'pause'),
     };
@@ -518,9 +536,14 @@ export function hasPendingPlanSession(week: WeekPlan | null | undefined, ctx: Pl
 
 export function planContext(
   today: string,
-  state: Pick<TrainingPlanState, 'state' | 'pausedUntil'> | null | undefined,
+  state: Pick<TrainingPlanState, 'state' | 'pausedFrom' | 'pausedUntil'> | null | undefined,
   header?: Pick<WeekTrainingPlan, 'pausedUntil'> | null,
 ): PlanContext {
   const paused = state?.state === 'paused';
-  return { today, paused, pausedUntil: paused ? state?.pausedUntil ?? header?.pausedUntil ?? null : null };
+  return {
+    today,
+    paused,
+    pausedFrom: paused ? state?.pausedFrom ?? null : null,
+    pausedUntil: paused ? state?.pausedUntil ?? header?.pausedUntil ?? null : null,
+  };
 }

@@ -63,7 +63,9 @@ import {
   type ProposalErrorCode,
   type ProposalStatus,
   type RoutineEdits,
+  type WeekPlanAdded,
 } from '@app/services/ellie/ellieProposals';
+import type { AdjustmentAction } from '@app/services/supabase/trainingPlanSession';
 
 export const defaultGreeting = (name?: string | null) =>
   `Hola${name ? `, ${name}` : ''}. ¿En qué te ayudo hoy?`;
@@ -825,6 +827,14 @@ export function useEllieConversation({
     discardProposal,
     reloadProposal,
     weekPlanRemoved: (id: string) => dispatch({ type: 'weekPlanRemoved', id }),
+    planAdjustmentAnswered: (id: string, action: AdjustmentAction) =>
+      dispatch({ type: 'planAdjustmentAnswered', id, action }),
+    // A routine added to a day from a card of the chat: the confirmation card.
+    weekPlanAdded: (added: WeekPlanAdded) =>
+      dispatch({
+        type: 'proposal',
+        card: { id: `local-week-plan-${createUuid()}`, role: 'assistant', kind: 'weekPlanAdded', added, removed: false },
+      }),
     // Plan de entrenamiento: activated (with its start date) or no longer open.
     trainingPlanStatus: (id: string, status: TrainingPlanCardStatus, startDate?: string | null) =>
       dispatch({ type: 'trainingPlanStatus', id, status, startDate }),

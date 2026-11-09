@@ -45,7 +45,10 @@ import {
   isMediaImageSource,
   type AppImageSource,
 } from '@app/components/v2';
+import { useTrainingPlanText } from '@app/features/trainingPlan/trainingPlanCopy';
+import { kgValue, lastTimeLine, repsRange } from '@app/features/trainingPlan/planSessionModel';
 import {
+  activePlan,
   formatClock,
   formatCountdown,
   formatDuration,
@@ -639,6 +642,7 @@ function CurrentCard({
           </TextV2>
         </View>
       </View>
+      <PlanTarget exercise={exercise} />
       <View style={styles.cardBottom}>
         <View style={styles.metrics}>
           {fixedAmount ? (
@@ -679,6 +683,55 @@ function CurrentCard({
         >
           <Check size={26} color={C.white} strokeWidth={2.2} style={styles.checkIcon} />
         </PressableScale>
+      </View>
+    </View>
+  );
+}
+
+// A session of the training plan (31.7): the recommended weight in big
+// figures, the reps and RIR of the target and "Última vez". While calibrating
+// there is no weight: it asks to pick one with 2 reps in reserve.
+function PlanTarget({ exercise }: { exercise: PlannedExercise }) {
+  const { t } = useTrainingPlanText();
+  const plan = activePlan(exercise);
+  if (!plan) {
+    return null;
+  }
+  const big = plan.calibrate
+    ? t('runner.calibrate')
+    : plan.recommendedKg === null
+      ? t('runner.bodyweight')
+      : `${kgValue(plan.recommendedKg)} kg`;
+  const reps = repsRange({ repMin: plan.repMin, repMax: plan.repMax });
+  const target = reps
+    ? plan.rir !== null
+      ? t('runner.target', { reps, rir: plan.rir })
+      : t('runner.targetNoRir', { reps })
+    : null;
+  return (
+    <View style={styles.planBlock}>
+      <View style={styles.planLeft}>
+        <TextV2 variant="eyebrow" color={C.emberText}>
+          {t('runner.recommended').toUpperCase()}
+        </TextV2>
+        <TextV2 variant="title28" color={C.white} style={styles.planBig}>
+          {big}
+        </TextV2>
+        {plan.calibrate ? (
+          <TextV2 variant="caption" color={C.meta}>
+            {t('runner.calibrateHint')}
+          </TextV2>
+        ) : null}
+      </View>
+      <View style={styles.planRight}>
+        {target ? (
+          <TextV2 variant="bodyStrong" color={C.body} align="right">
+            {target}
+          </TextV2>
+        ) : null}
+        <TextV2 variant="caption" color={C.meta} align="right">
+          {lastTimeLine({ lastTime: plan.lastTime }, t)}
+        </TextV2>
       </View>
     </View>
   );
@@ -1388,6 +1441,17 @@ const styles = StyleSheet.create({
   variantTagText: { fontSize: 11, letterSpacing: 0.66 },
   cardTitle: { position: 'absolute', left: 18, right: 18, bottom: 10, gap: 3 },
   cardName: { lineHeight: 26 },
+  planBlock: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 12,
+    paddingHorizontal: 18,
+  },
+  planLeft: { flex: 1, gap: 2 },
+  planBig: { fontWeight: '700', letterSpacing: -0.6 },
+  planRight: { flexShrink: 1, maxWidth: '50%', gap: 4, alignItems: 'flex-end' },
   cardBottom: {
     paddingTop: 14,
     paddingHorizontal: 18,

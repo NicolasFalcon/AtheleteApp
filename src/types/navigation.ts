@@ -44,6 +44,9 @@ export type WorkoutSessionRouteParams = {
   workoutId: Workout['id'];
   // A specific session (e.g. one saved for later on another day).
   sessionId?: string;
+  // A session of the training plan (start_plan_session): the runner shows
+  // each exercise's recommended weight, reps and RIR (31.7).
+  planSessionId?: string;
 };
 
 // Resumen de cierre (SESSION_07).
@@ -255,6 +258,7 @@ export type AppStackParamList = {
   // bar) and the detail of a proposal before activating it.
   TrainingPlanCreate: undefined;
   TrainingPlanPreview: { proposalId: string };
+  PlanSession: { planSessionId: string };
   Sleep: undefined;
   Breathe: undefined;
   WeekEllie: undefined;

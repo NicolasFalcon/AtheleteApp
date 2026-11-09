@@ -47,6 +47,15 @@ export type PlanSessionInfo = {
   substitutedByName: string | null;
 };
 
+// A session of the plan that was moved out of this day (the original day):
+// `moved_out` of get_week_plan and get_training_plan_month.
+export type MovedOut = {
+  planSessionId: string | null;
+  toDate: string;
+  title: string;
+  type: PlanSessionType | null;
+};
+
 export type WeekDay = {
   date: string;
   kind: WeekDayKind;
@@ -64,6 +73,8 @@ export type WeekDay = {
   // on its rest days.
   planSession?: PlanSessionInfo | null;
   restLabel?: string | null;
+  // The plan session that left this day for another (null: none).
+  movedOut?: MovedOut | null;
 };
 
 export type WeekFocus = 'strength' | 'hypertrophy' | 'endurance' | 'mixed';
@@ -204,6 +215,21 @@ export function parsePlanSession(raw: unknown): PlanSessionInfo | null {
   };
 }
 
+// `{ plan_session_id, to_date, title, session_type }` or null.
+export function parseMovedOut(raw: unknown): MovedOut | null {
+  const row = asRecord(raw);
+  const toDate = str(row?.to_date);
+  if (!row || !toDate) {
+    return null;
+  }
+  return {
+    planSessionId: str(row.plan_session_id),
+    toDate: toDate.slice(0, 10),
+    title: str(row.title) ?? '',
+    type: PLAN_TYPES.find(item => item === row.session_type) ?? null,
+  };
+}
+
 export function parseWeekTrainingPlan(raw: unknown): WeekTrainingPlan | null {
   const row = asRecord(raw);
   const planId = str(row?.plan_id);
@@ -267,6 +293,7 @@ export function parseWeekDay(raw: unknown): WeekDay {
     assignmentId: str(row.assignment_id),
     planSession: parsePlanSession(row.plan_session),
     restLabel: str(row.rest_label),
+    movedOut: parseMovedOut(row.moved_out),
   };
 }
 

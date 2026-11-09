@@ -98,7 +98,7 @@ training_plan_adjustments (
   id uuid pk, plan_id uuid,
   kind text check (kind in ('variant_stall','deload_early','missed_session','repeat_week','discomfort')),
   status text check (status in ('open','approved','rejected','applied','reverted','expired')),
-  payload jsonb,                                       -- antes → después, sesiones afectadas, motivo
+  payload jsonb,                                       -- forma exacta por kind en §7.1
   created_at timestamptz, responded_at timestamptz
 )
 
@@ -271,16 +271,331 @@ Todas devuelven `{ ok, … }` o `{ ok:false, error:"code", … }` (formato plano
 
 **Lectura**
 
-- `get_training_plan_state()` → `{ ok, state: 'none'|'active'|'paused'|'completed', plan_id?, name?, week_index?, weeks?, block_index?, phase?, paused_until?, end_date?, read_only?, entitlement: { multi_week: true } }`.
+- `get_training_plan_state()` → `{ ok, state: 'none'|'active'|'paused'|'completed', plan_id?, name?, start_date?, week_index?, weeks?, block_index?, phase?, paused_from?, paused_until?, pause_weeks?, end_date?, read_only?, entitlement: { multi_week: true } }`. En pausa, `paused_from` es el primer día local y `pause_weeks` es `1` o `2`; fuera de pausa estos dos campos son `null`.
 - `get_week_plan(...)` (ampliada): si la semana pertenece a un plan, agrega `plan: { plan_id, name, week_index, weeks, block_index, phase, week_kind, paused_until?, segments: [{ week_index, kind, state: 'done'|'current'|'upcoming' }] }` y, por día, `plan_session: { id, session_type, title, minutes, status, substituted_by_name?, original_date? }`. Los días sin sesión dentro del plan activo son `kind: 'rest'` con `rest_label: 'Descanso en tu plan'`, no `empty`. Sin plan, responde como hoy.
-- `get_training_plan_month(p_month date)` → semanas del mes con `week_index`, `kind` y por día `{ date, session_type?, status?, in_pause?, added_routine? }`.
+- `get_training_plan_month(p_month date)` → `{ ok, plan: { plan_id, name } | null, month, weeks }`. Cada semana tiene `{ week_index, kind, start_date, days }`; cada día trae exactamente `{ date, session_type, status, moved, in_pause, added_routine, moved_out }`. `moved_out` es `null` o `{ plan_session_id, to_date, title, session_type }`. Sin plan: `{ "ok":true, "plan":null, "month":"YYYY-MM-01", "weeks":[] }`.
+
+Ejemplo concreto de `get_training_plan_month('2026-11-01')` con una sesión movida del 16 al 17:
+
+```json
+{
+  "ok": true,
+  "plan": {
+    "plan_id": "a3ca515b-fcdf-4179-9503-b5c6c73689c5",
+    "name": "Fuerza progresiva"
+  },
+  "month": "2026-11-01",
+  "weeks": [
+    {
+      "week_index": 1,
+      "kind": "calibracion",
+      "start_date": "2026-11-16",
+      "days": [
+        {
+          "date": "2026-11-16",
+          "session_type": null,
+          "status": null,
+          "moved": null,
+          "in_pause": false,
+          "added_routine": null,
+          "moved_out": {
+            "plan_session_id": "f2aba720-d441-452c-bd8e-42cf3c8d9bf1",
+            "to_date": "2026-11-17",
+            "title": "Cuerpo completo A · Pesado",
+            "session_type": "pesado"
+          }
+        },
+        {
+          "date": "2026-11-17",
+          "session_type": "pesado",
+          "status": "pending",
+          "moved": true,
+          "in_pause": false,
+          "added_routine": null,
+          "moved_out": null
+        },
+        {
+          "date": "2026-11-18",
+          "session_type": null,
+          "status": null,
+          "moved": null,
+          "in_pause": false,
+          "added_routine": null,
+          "moved_out": null
+        },
+        {
+          "date": "2026-11-19",
+          "session_type": "volumen",
+          "status": "pending",
+          "moved": false,
+          "in_pause": false,
+          "added_routine": null,
+          "moved_out": null
+        },
+        {
+          "date": "2026-11-20",
+          "session_type": null,
+          "status": null,
+          "moved": null,
+          "in_pause": false,
+          "added_routine": null,
+          "moved_out": null
+        },
+        {
+          "date": "2026-11-21",
+          "session_type": null,
+          "status": null,
+          "moved": null,
+          "in_pause": false,
+          "added_routine": null,
+          "moved_out": null
+        },
+        {
+          "date": "2026-11-22",
+          "session_type": null,
+          "status": null,
+          "moved": null,
+          "in_pause": false,
+          "added_routine": null,
+          "moved_out": null
+        }
+      ]
+    }
+  ]
+}
+```
+
 - `get_training_plan(p_plan_id default activo)` → cabecera, bloques con sus barras (`load` relativa por semana), `progress_pct` (hechas ÷ total), `adherence_pct` (hechas ÷ hechas + perdidas; excluye pendientes y sustituidas), `sessions_done`, `sessions_total`, `goal_target`, y `anchors: [{ exercise_id, name, e1rm_by_week: [{ week_index, e1rm }], projection, delta_kg }]`. `e1rm_by_week` solo contiene valores no nulos cuando existen series reales de esa semana; las semanas futuras llevan `e1rm: null` y la carga planificada vive separada en `projection`.
 - `get_training_plan_preview(p_proposal_id)` → las semanas completas para revisar antes de activar (31.3), con `replaces: [{ date, name }]` si hay sesiones planificadas a mano en esas fechas.
-- `get_plan_session(p_plan_session_id)` → detalle (31.7): portada por tipo, `week_index`, fecha, tipo, banners (`calibration`, `deload`), y por ejercicio `{ exercise_id, name, image, sets, rep_min, rep_max, rir, rest_s, recommended_kg, calibrate, is_anchor, last_time: { sets, reps, kg } | null }`.
+- `get_plan_session(p_plan_session_id)` → detalle (31.7): portada por tipo, `week_index`, fecha, tipo, banners (`calibration`, `deload`), y por ejercicio `{ exercise_id, name, image, sets, rep_min, rep_max, rir, rest_s, recommended_kg, calibrate, is_anchor, last_time: { sets, reps, kg } | null }`. `last_time` usa exclusivamente la última sesión `completed` que tenga series efectivas de ese ejercicio: `sets` es la cantidad de series no calentamiento de esa sesión y `kg`/`reps` pertenecen a una misma mejor serie (mayor e1RM Epley; para peso corporal, más repeticiones). Nunca agrega todo el historial.
 - `get_plan_session_outcome(p_workout_session_id)` → por ejercicio `{ exercise_id, name, next_kg, next_reps?, next_variant_id?, next_variant_name?, change: 'up'|'same'|'down'|'reps_up'|'variant', reason }` y una frase de resumen.
 - `list_plan_adjustments(p_plan_id default activo)` → las abiertas y las aplicadas recientes.
 - `get_training_plan_review(p_week_index default la última)` → 31.9: lo hecho (sesiones, series, volumen), lo que mejoró (1RM y récords), ajustes automáticos aplicados y propuestas abiertas.
 - `get_training_plan_report(p_plan_id)` → 31.10: adherencia, sesiones, récords, meta, antes y después por ancla y propuesta del siguiente plan.
+
+### 7.1 Formas exactas de ajustes
+
+`list_plan_adjustments(p_plan_id uuid default null)` devuelve un objeto, no el array directamente. Si `p_plan_id` es `null`, elige el plan `active` o `paused` más reciente del usuario. Cada elemento contiene todas las columnas de `training_plan_adjustments`, incluido `plan_id`. Incluye todos los `open` y, durante 30 días desde su creación, los estados `applied`, `approved` y `reverted`; no incluye `rejected` ni `expired`.
+
+Todos los payloads, incluidos los ajustes creados antes de esta revisión, contienen la base `{ week_index, reason, before, after, sessions }`. `before` y `after` son snapshots cortos listos para mostrar; `sessions` es un snapshot y no cambia después cuando se responde el ajuste.
+
+`variant_stall`:
+
+```json
+{
+  "week_index": 3,
+  "reason": "e1rm_flat_3",
+  "before": "Press de banca con barra",
+  "after": "Press inclinado con mancuernas",
+  "sessions": [
+    {
+      "plan_session_id": "116fc95f-8a27-4ec9-88c0-853ed3ba516e",
+      "date": "2026-11-24",
+      "title": "Torso · Pesado",
+      "session_type": "pesado"
+    }
+  ],
+  "exercise_id": "6abcb354-fad3-446f-8099-51141708a15f",
+  "exercise_name": "Press de banca con barra",
+  "name": "Press de banca con barra",
+  "to_exercise_id": "edc924d0-4787-4a53-952e-f1ea31af9657",
+  "to_exercise_name": "Press inclinado con mancuernas",
+  "to_name": "Press inclinado con mancuernas",
+  "from_week_index": 3
+}
+```
+
+La variante se elige server-side con el mismo patrón de movimiento, nivel, equipamiento y filtros de seguridad del plan. `from_week_index` indica desde qué semana se propone.
+
+`deload_early`:
+
+```json
+{
+  "week_index": 3,
+  "reason": "effort_limit_2",
+  "before": "Semana 3 · Carga",
+  "after": "Semana 3 · Descarga",
+  "sessions": [
+    {
+      "plan_session_id": "116fc95f-8a27-4ec9-88c0-853ed3ba516e",
+      "date": "2026-11-24",
+      "title": "Torso · Pesado",
+      "session_type": "pesado"
+    }
+  ],
+  "target_week_index": 3
+}
+```
+
+Cuando el motivo es recuperación baja, `reason` vale `recovery_low_3` y también conserva `threshold: 40`.
+
+`missed_session`:
+
+```json
+{
+  "week_index": 2,
+  "reason": "session_missed",
+  "before": "Torso · Volumen · 2026-11-07",
+  "after": "Mover a 2026-11-09",
+  "sessions": [
+    {
+      "plan_session_id": "285d88e5-aa93-40aa-a3d7-93965a0d785b",
+      "date": "2026-11-07",
+      "title": "Torso · Volumen",
+      "session_type": "volumen"
+    }
+  ],
+  "plan_session_id": "285d88e5-aa93-40aa-a3d7-93965a0d785b",
+  "date": "2026-11-07",
+  "title": "Torso · Volumen",
+  "move_to_date": "2026-11-09"
+}
+```
+
+`repeat_week`:
+
+```json
+{
+  "week_index": 2,
+  "reason": "missed_sessions",
+  "before": "Semana 2 · fin 2027-01-31",
+  "after": "Repetir semana 2 · fin 2027-02-07",
+  "sessions": [
+    {
+      "plan_session_id": "285d88e5-aa93-40aa-a3d7-93965a0d785b",
+      "date": "2026-11-07",
+      "title": "Torso · Volumen",
+      "session_type": "volumen"
+    }
+  ],
+  "missed": 2,
+  "original_end_date": "2027-01-31",
+  "new_end_date": "2027-02-07"
+}
+```
+
+`sessions` contiene las sesiones pendientes que se desplazarían desde esa semana, no solo las perdidas.
+
+`discomfort`:
+
+```json
+{
+  "week_index": 3,
+  "reason": "discomfort",
+  "before": "Press militar con barra",
+  "after": "Press en máquina",
+  "sessions": [
+    {
+      "plan_session_id": "116fc95f-8a27-4ec9-88c0-853ed3ba516e",
+      "date": "2026-11-24",
+      "title": "Torso · Pesado",
+      "session_type": "pesado"
+    }
+  ],
+  "body_zone": "hombro",
+  "feedback_id": "260d0a82-62fb-4d55-babb-46cc01c65406",
+  "until_date": "2026-11-24",
+  "changes": [
+    {
+      "plan_session_id": "116fc95f-8a27-4ec9-88c0-853ed3ba516e",
+      "position": 2,
+      "from_exercise_id": "84d4485d-e089-465b-87ca-105603f16c4a",
+      "from_name": "Press militar con barra",
+      "to_exercise_id": "01587d44-0d59-40ac-885b-1eaf9b6b4a87",
+      "to_name": "Press en máquina"
+    }
+  ]
+}
+```
+
+`respond_plan_adjustment(p_adjustment_id uuid, p_action text, p_client_id text)` requiere un `p_client_id` no vacío de hasta 100 caracteres. Las combinaciones con efecto específico son:
+
+| `kind`           | Acciones                                        |
+| ---------------- | ----------------------------------------------- |
+| `variant_stall`  | `approve`, `reject`, `ack`                      |
+| `deload_early`   | `approve`, `reject`, `ack`                      |
+| `missed_session` | `move_today`, `skip`, `reject`, `ack`           |
+| `repeat_week`    | `approve`, `reject`, `ack`                      |
+| `discomfort`     | `revert` cuando está `applied`, `ack`, `reject` |
+
+`reject` y `ack` son aceptadas técnicamente para cualquier `kind`. `ack` cambia un ajuste `open` a `approved`; si ya estaba `applied`, conserva `applied`. `revert` es la única acción que deshace los reemplazos por molestia. Aprobar `variant_stall` hoy solo cierra la propuesta: no cambia el ejercicio porque su payload aún no contiene una variante destino.
+
+Respuesta nueva:
+
+```json
+{
+  "ok": true,
+  "adjustment_id": "3a2bfcbb-74e4-4cac-baae-65dbb40d8474",
+  "action": "ack",
+  "replayed": false
+}
+```
+
+Repetir el mismo `p_client_id` devuelve la misma respuesta con `"replayed": true`. En un `discomfort`, la diferencia entre aplicado y aún no visto (`responded_at: null`) y aplicado con “Entendido” (`responded_at` con fecha) se determina únicamente con `responded_at`; no existe `acknowledged`, `response` ni otro campo propio, y `status` permanece `applied`:
+
+```json
+{
+  "id": "3a2bfcbb-74e4-4cac-baae-65dbb40d8474",
+  "kind": "discomfort",
+  "status": "applied",
+  "responded_at": "2026-11-09T14:25:01.882Z"
+}
+```
+
+### 7.2 Plantilla oculta de una sesión
+
+`start_plan_session` devuelve `workout.id = training_plan_sessions.template_id`. Ese UUID se puede pasar directamente a `get_routine(id)`: la plantilla está archivada para que no aparezca en `list_routines`, pero `get_routine` la permite porque `created_by` es el usuario autenticado. Es el mismo contrato de lectura que usa la plantilla de `start_routine_proposal`.
+
+Ejemplo JSON válido y completo de la respuesta (el array `exercises` tendrá todos los ejercicios de la sesión):
+
+```json
+{
+  "ok": true,
+  "routine": {
+    "id": "3e944460-d4c2-4873-b0a2-71b7302f0349",
+    "title": "Torso · Pesado",
+    "description": "Sesión del plan Fuerza progresiva",
+    "type": "strength",
+    "difficulty": "advanced",
+    "duration": 60,
+    "calories": 0,
+    "target_muscles": [],
+    "routine_category": "tren_superior",
+    "origin": "ellie",
+    "is_mine": true,
+    "can_edit": false,
+    "archived": true,
+    "external_key": null,
+    "image_url": null,
+    "library_categories": [],
+    "thumb_key": "movekit/thumbs/barbell-bench-press.webp",
+    "created_at": "2026-11-09T13:44:10.311Z",
+    "updated_at": "2026-11-09T13:44:10.311Z",
+    "exercises": [
+      {
+        "id": "984fa14f-3ae1-4268-be26-c60ac68841b0",
+        "exercise_id": "6abcb354-fad3-446f-8099-51141708a15f",
+        "block": "main",
+        "position": 2,
+        "name": "Press de banca con barra",
+        "sets": 4,
+        "reps": 6,
+        "reps_min": 3,
+        "reps_max": 6,
+        "per_side": false,
+        "duration": null,
+        "rest_time": 180,
+        "notes": null,
+        "planned_weight_kg": 85,
+        "thumb_key": "movekit/thumbs/barbell-bench-press.webp",
+        "tracking_metrics": ["weight", "reps"],
+        "is_unilateral": false,
+        "alternatives": []
+      }
+    ]
+  }
+}
+```
 
 **Escritura**
 
@@ -304,8 +619,8 @@ Todas devuelven `{ ok, … }` o `{ ok:false, error:"code", … }` (formato plano
 - **Intención:** "plan de N semanas / meses", "ármame el mes", "quiero un plan para…", y el mensaje estructurado `training_plan_request`. Solo hay un camino: siempre emite `training_plan_proposal`, nunca un plan en texto.
 - **Ajustar:** los chips y el texto libre generan una nueva versión de la misma propuesta.
 - **Contexto (ctx-1):** agrega `training_plan: { state, name, week_index, weeks, phase, week_kind, today_session?: { title, session_type, recommended }, open_adjustments: n }`. ELLIE puede explicar el plan, la sesión de hoy y los pesos, y responder ajustes desde el chat ("pausa mi plan una semana" → confirma y llama la RPC).
-- **Agregar a semana con plan:** si el día tiene sesión del plan, ELLIE responde con el texto de 31.4 y una tarjeta con Reemplazar / Elegir otro día.
-- **Tarjetas de ajuste** (31.8) y **revisión semanal** (31.9) también se pueden mostrar en el chat: `plan_adjustment` y `plan_review`.
+- **Agregar a semana con plan:** cuando `plan_routine_for_day(..., p_replace:false)` devuelve `day_has_plan_session`, ELLIE responde “Ese día ya tiene una sesión de tu plan. ¿Reemplazarla?” y emite `week_plan_conflict`. Su payload contiene `{ date, routine_id? | proposal_id?, routine_name, plan_session: { id, title, session_type } }`. La app ejecuta Reemplazar llamando directamente la misma RPC con `p_replace:true`; Elegir otro día no escribe nada. La forma completa está en `ELLIE_CARDS_FLOW.md`.
+- **Tarjetas de ajuste (estado actual de tp-1.2):** `ProposalCard` reserva los tipos `plan_adjustment` y `plan_review`, pero `ellie-chat` no construye ni emite ninguno de los dos. Por tanto, `plan_adjustment` no tiene todavía un payload de tarjeta estable ni un JSON real de salida. La app debe leer los ajustes mediante `list_plan_adjustments` hasta que se implemente el emisor.
 
 ## 9. Integración con lo existente
 
@@ -337,6 +652,9 @@ Todas devuelven `{ ok, … }` o `{ ok:false, error:"code", … }` (formato plano
 12. Domingo 19:00 hora local → revisión creada y push enviada una sola vez.
 13. Fin del plan → `completed`, reporte disponible y `get_week_plan` vuelve a la semana normal.
 14. `has_entitlement` en `false` → `premium_required` al activar.
+15. Dos sesiones históricas del mismo ejercicio → `get_plan_session.last_time.sets` cuenta solo la última y `kg`/`reps` salen de una misma mejor serie; `get_routine(start_plan_session.workout.id)` devuelve la plantilla oculta. Smoke: `docs/backend/examples/training_plan_last_time_tp1_2_smoke.sql`.
+16. Insertar los cinco `kind` con sus payloads históricos mínimos → el trigger agrega la base común, propone la variante y calcula fechas/sesiones. Smoke: `docs/backend/examples/training_plan_adjustments_tp1_2_smoke.sql`.
+17. Agregar desde ELLIE una rutina a un día con `plan_session_id` → mensaje de 31.4 y tarjeta `week_plan_conflict`; el replay conserva la tarjeta.
 
 ## 12. Entregables
 

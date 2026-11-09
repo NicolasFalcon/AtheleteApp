@@ -153,6 +153,8 @@ export function WorkoutsScreen({ navigation, route }: Props) {
             resumePlan.resume().then(ok => {
               toast.show(planText.t(ok ? 'pause.resumed' : 'pause.error'), ok ? undefined : { tone: 'error' });
             });
+          } else if (heroInfo.planSessionId) {
+            navigation.navigate(APP_ROUTES.PlanSession, { planSessionId: heroInfo.planSessionId });
           } else if (heroInfo.routineId) {
             navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: heroInfo.routineId });
           }

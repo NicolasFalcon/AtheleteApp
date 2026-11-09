@@ -9,6 +9,7 @@ Versión: `prop-2` · Backend contract. Las tarjetas llegan en `cards[]` o como 
 | Crear, armar o pedir una rutina para hoy                       | `routine_proposal`        | Motor de rutinas; nunca el chat general |
 | Buscar/recomendar/elegir una existente o nombrar una categoría | `routine_library`         | `search_routines` + `get_routine`       |
 | Confirmar que una rutina se agregó a un día                    | `week_plan_added`         | `plan_routine_for_day`                  |
+| El día ya tiene una sesión del plan                            | `week_plan_conflict`      | `plan_routine_for_day`                  |
 | Crear o ajustar plan nutricional                               | `nutrition_plan_proposal` | Motor nutricional                       |
 | Faltan preferencias nutricionales                              | `nutrition_prefs_request` | Servidor                                |
 | Hay una molestia por confirmar                                 | `discomfort_check`        | Servidor                                |
@@ -59,6 +60,44 @@ Payload: `{ date, routine_id, name, replaced, actions }`.
 ]
 ```
 
+### `week_plan_conflict`
+
+Se emite cuando ELLIE intenta agregar la tarjeta de rutina más reciente y `plan_routine_for_day(..., p_replace:false)` devuelve `day_has_plan_session`. El texto del mensaje es: “Ese día ya tiene una sesión de tu plan. ¿Reemplazarla?”.
+
+Payload para una rutina existente:
+
+```json
+{
+  "date": "2026-11-10",
+  "routine_id": "79f81173-7b3d-40b0-b925-ee0360f8a377",
+  "routine_name": "Torso con mancuernas",
+  "plan_session": {
+    "id": "116fc95f-8a27-4ec9-88c0-853ed3ba516e",
+    "title": "Torso · Pesado",
+    "session_type": "pesado"
+  }
+}
+```
+
+Si la rutina todavía es una propuesta, omite `routine_id` y lleva `proposal_id`:
+
+```json
+{
+  "date": "2026-11-11",
+  "proposal_id": "15a71dfa-886d-4a42-8475-5c3f82472a07",
+  "routine_name": "Empuje breve",
+  "plan_session": {
+    "id": "068fe5cb-d690-4f57-a6e4-b7f90cc17e93",
+    "title": "Pierna · Volumen",
+    "session_type": "volumen"
+  }
+}
+```
+
+- **Reemplazar:** la app llama directamente a `plan_routine_for_day` con la misma `date`, `routine_id` o `proposal_id`, un `p_client_id` nuevo y `p_replace:true`. La sesión del plan pasa a `substituted`.
+- **Elegir otro día:** cierra la tarjeta y vuelve al selector; no llama una RPC ni modifica la semana.
+- La tarjeta no reemplaza por sí sola y no guarda una confirmación pendiente en ELLIE.
+
 ### Plan nutricional
 
 - `nutrition_prefs_request`: abre la captura de preferencias y termina en `set_food_preferences`.
@@ -71,7 +110,7 @@ Payload: `{ date, routine_id, name, replaced, actions }`.
 - ELLIE toma la tarjeta de rutina más reciente de la conversación. Si no existe, pregunta cuál.
 - `day_has_routine` no reemplaza nada: ELLIE guarda una confirmación pendiente y pregunta. Solo una respuesta afirmativa llama de nuevo con `p_replace=true`.
 - `past_day`, `proposal_not_open` y `routine_not_found` se muestran como error de acción; no se emite `week_plan_added`.
-- El replay por `client_message_id` reconstruye `routine_library` y `week_plan_added` desde `chat_messages.tool_data`.
+- El replay por `client_message_id` reconstruye `routine_library`, `week_plan_added` y `week_plan_conflict` desde `chat_messages.tool_data`.
 
 ## Detalle de ejercicios
 

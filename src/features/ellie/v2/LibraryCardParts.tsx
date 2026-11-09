@@ -228,8 +228,19 @@ export function WeekPlanAddedCard({
           </TextV2>
           <TextV2 variant="meta" color={colors.text.secondary} numberOfLines={2}>
             {added.name || weekdayLabel(language, added.date)}
-            {active && added.replaced ? ` · ${addToWeekText(language, 'weekAdded.replaced')}` : ''}
+            {active && added.replaced && !added.substitutes
+              ? ` · ${addToWeekText(language, 'weekAdded.replaced')}`
+              : ''}
           </TextV2>
+          {active && added.substitutes ? (
+            <TextV2 variant="meta" color={colors.text.secondary} numberOfLines={2}>
+              {addToWeekText(language, 'weekAdded.substitutes', { name: added.substitutes })}
+            </TextV2>
+          ) : active && added.planOn ? (
+            <TextV2 variant="meta" color={colors.text.secondary} numberOfLines={2}>
+              {addToWeekText(language, 'weekAdded.restUnchanged')}
+            </TextV2>
+          ) : null}
         </View>
       </View>
       {state === 'removed' ? null : (
