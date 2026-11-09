@@ -121,7 +121,34 @@ training_plan_recovery_daily (
 
 ## 4. Generación
 
-**Entrada:** la app envía a `ellie-chat` un mensaje estructurado `{ type: 'training_plan_request', goal, weeks, days_of_week, session_minutes, goal_target?, style_category? }` (desde la hoja Crear plan). También se puede pedir en lenguaje natural ("ármame un plan de 3 meses para ganar fuerza"): si falta algo, ELLIE pregunta solo eso. El objetivo por defecto viene del perfil.
+**Entrada:** la app envía a `ellie-chat` un mensaje estructurado en la clave raíz `training_plan_request` (no dentro de `message`). `message` sigue siendo un string obligatorio para el historial. Forma recomendada desde Crear plan:
+
+```json
+{
+  "conversation_id": null,
+  "client_message_id": "uuid-o-id-idempotente",
+  "message": "Crear plan de entrenamiento",
+  "mode": "generate_training_plan",
+  "cards_v2": true,
+  "stream": false,
+  "training_plan_request": {
+    "type": "training_plan_request",
+    "goal": "gain_strength",
+    "weeks": 8,
+    "days_of_week": [1, 2, 4, 6],
+    "session_minutes": 60,
+    "goal_target": {
+      "exercise_slug": "barbell-bench-press",
+      "kind": "kg",
+      "target": 100,
+      "start_estimate": 85
+    },
+    "style_category": null
+  }
+}
+```
+
+`goal_target.exercise_slug` acepta exclusivamente `barbell-bench-press`, `barbell-squat`, `barbell-deadlift` o `pull-ups`; el servidor valida el catálogo, agrega `exercise_id` y conserva el slug en el plan. También se puede pedir en lenguaje natural ("ármame un plan de 3 meses para ganar fuerza"): si falta algo, ELLIE pregunta solo eso. El objetivo por defecto viene del perfil.
 
 **Duración recomendada:** 12 semanas para ganar músculo, ganar fuerza y rendimiento; 8 semanas para perder grasa.
 
@@ -257,7 +284,9 @@ Todas devuelven `{ ok, … }` o `{ ok:false, error:"code", … }` (formato plano
 
 **Escritura**
 
-- `activate_training_plan(p_proposal_id, p_client_id, p_confirm_replace boolean default false)`: activa el draft y materializa las sesiones en la semana. Errores: `week_has_sessions` (con `sessions: [{ date, name, source, coach_name? }]`), `plan_active_exists` (con el plan actual; con `p_confirm_replace` el anterior pasa a `replaced`), `proposal_not_open`, `premium_required`.
+- `activate_training_plan(p_proposal_id, p_client_id, p_confirm_replace boolean default false)`: activa el draft y materializa las sesiones en la semana. Errores: `week_has_sessions` (con `sessions: [{ date, name, source, coach_name? }]`), `plan_active_exists` con forma exacta `{ "ok": false, "error": "plan_active_exists", "plan": { "plan_id": "uuid", "name": "string" } }` (con `p_confirm_replace=true` el anterior pasa a `replaced`), `proposal_not_open`, `premium_required`.
+
+- `get_goal_target_estimates()` → `{ ok:true, items:[{ exercise_slug, e1rm_kg, max_reps }] }`, siempre en el orden banca, sentadilla, peso muerto y dominadas. `e1rm_kg` y `max_reps` son nullable; usa sesiones `completed` de las últimas 8 semanas, excluye calentamientos y calcula e1RM con la misma fórmula Epley del plan.
 - `start_plan_session(p_plan_session_id, p_client_id)` → `{ ok, session_id, workout }`, igual que `start_routine_proposal`, con `plan_session_id` en la sesión.
 - `respond_plan_adjustment(p_adjustment_id, p_action, p_client_id)`, con `p_action` en `approve | reject | move_today | skip | revert | ack`.
 - `pause_training_plan(p_weeks smallint, p_client_id)` (1 o 2): corre las sesiones pendientes y la fecha de fin. Errores: `pause_limit`, `plan_not_active`.
