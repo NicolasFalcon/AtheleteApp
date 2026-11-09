@@ -28,6 +28,8 @@ import { CoachJoinScreen } from '@app/screens/coach/CoachJoinScreen';
 import { CoachStudentScreen } from '@app/screens/coach/CoachStudentScreen';
 import { CoachStudentsScreen } from '@app/screens/coach/CoachStudentsScreen';
 import { MyCoachScreen } from '@app/screens/coach/MyCoachScreen';
+import { TrainingPlanCreateScreen } from '@app/screens/trainingPlan/TrainingPlanCreateScreen';
+import { TrainingPlanPreviewScreen } from '@app/screens/trainingPlan/TrainingPlanPreviewScreen';
 import { useCallback, useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
@@ -430,6 +432,14 @@ export function RootNavigator() {
           <Stack.Screen name={APP_ROUTES.CoachJoin} component={CoachJoinScreen} />
           <Stack.Screen name={APP_ROUTES.CoachConsent} component={CoachConsentScreen} />
           <Stack.Screen name={APP_ROUTES.MyCoach} component={MyCoachScreen} />
+          {/* Plan de entrenamiento (v2.21 §31). */}
+          <Stack.Screen
+            name={APP_ROUTES.TrainingPlanCreate}
+            component={TrainingPlanCreateScreen}
+            // A sheet below the status bar (31.1), like Nueva publicación.
+            options={{ ...FULL_SCREEN_OPTIONS, presentation: 'modal' }}
+          />
+          <Stack.Screen name={APP_ROUTES.TrainingPlanPreview} component={TrainingPlanPreviewScreen} />
         </Stack.Group>
       ) : null}
     </Stack.Navigator>

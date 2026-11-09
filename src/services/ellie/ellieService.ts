@@ -61,6 +61,12 @@ export type EllieSendInput = {
   adjustProposalId?: string | null;
   // The answer to a discomfort_check card.
   discomfortAnswer?: DiscomfortAnswer | null;
+  // Crear plan (TRAINING_PLAN_SHAPES tp-1.2 §4): the structured message
+  // `{ type: 'training_plan_request', goal, weeks, days_of_week,
+  // session_minutes, goal_target?, style_category? }`. The contract does not
+  // name its key in the body; it travels as `training_plan_request`, next to
+  // `message`, which carries the same choice in words.
+  trainingPlanRequest?: Record<string, unknown> | null;
 };
 
 // discomfort_answer: the zone and whether it is still there.
@@ -318,6 +324,7 @@ function requestBody(input: EllieSendInput, stream: boolean) {
     client_context: input.clientContext ?? null,
     ...(input.adjustProposalId ? { adjust_proposal_id: input.adjustProposalId } : {}),
     ...(input.discomfortAnswer ? { discomfort_answer: input.discomfortAnswer } : {}),
+    ...(input.trainingPlanRequest ? { training_plan_request: input.trainingPlanRequest } : {}),
   };
 }
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ListChecks, Plus } from 'lucide-react-native';
+import { FEATURES } from '@app/lib/config/features';
 import {
   AuraMark,
   BackButton,
@@ -81,7 +82,8 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 const TABS: { key: Tab; label: string }[] = [
   { key: 'today', label: 'Hoy' },
   { key: 'plan', label: 'Plan' },
-  { key: 'shopping', label: 'Compras' },
+  // Compras is hidden behind FEATURES.nutritionShopping.
+  ...(FEATURES.nutritionShopping ? [{ key: 'shopping' as const, label: 'Compras' }] : []),
 ];
 
 // Nutrición v2 (nut-1): Hoy · Plan · Compras. Hoy reads get_nutrition_day
@@ -367,7 +369,7 @@ export function NutritionPlanScreen({ navigation }: Props) {
         {[
           'Kcal y macros para cada día, con más energía los días que entrenas.',
           'Comidas por momento, cada una con alternativas equivalentes.',
-          'La lista de la compra de la semana, lista para copiar.',
+          ...(FEATURES.nutritionShopping ? ['La lista de la compra de la semana, lista para copiar.'] : []),
         ].map((line, index) => (
           <View key={line} style={[styles.step, { borderTopColor: colors.divider }]}>
             <TextV2 variant="bodyL" tone={index === 0 ? 'ember' : 'primary'} style={styles.stepNum}>

@@ -43,6 +43,7 @@ export * from '@app/components/v2/Scrim';
 export * from '@app/components/v2/SearchField';
 export * from '@app/components/v2/SectionHeader';
 export * from '@app/components/v2/Segmented';
+export * from '@app/components/v2/SessionTypeChip';
 export * from '@app/components/v2/SegmentMeter';
 export * from '@app/components/v2/Sheet';
 export * from '@app/components/v2/Skeleton';

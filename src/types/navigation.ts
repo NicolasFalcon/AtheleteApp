@@ -164,6 +164,9 @@ export type EllieChatRouteParams = {
   source?: string;
   // Open with the "Conversaciones" list (ELLIE cover · history button).
   showConversations?: boolean;
+  // Plan de entrenamiento · Ajustar from the detail (31.3): back to the chat
+  // with that proposal's adjust chips open. `at` makes each tap a new param.
+  planAdjust?: { proposalId: string; at: number };
 };
 
 export type CommunitySegment = 'feed' | 'retos' | 'amigos';
@@ -244,8 +247,14 @@ export type AppStackParamList = {
   };
   EllieChat: EllieChatRouteParams | undefined;
   // weekStart: a Monday (YYYY-MM-DD) to open Tu semana on that week; date: the
-  // day whose card it opens on.
-  Week: { weekStart?: string; date?: string } | undefined;
+  // day whose card it opens on. view: what "Ver semana" decided from the
+  // training plan's state (31.4); 'plan' opens the current week until the
+  // plan view exists (part 2).
+  Week: { weekStart?: string; date?: string; view?: 'current' | 'plan' } | undefined;
+  // Plan de entrenamiento (v2.21 §31): Crear plan (a sheet below the status
+  // bar) and the detail of a proposal before activating it.
+  TrainingPlanCreate: undefined;
+  TrainingPlanPreview: { proposalId: string };
   Sleep: undefined;
   Breathe: undefined;
   WeekEllie: undefined;

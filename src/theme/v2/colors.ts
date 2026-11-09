@@ -76,6 +76,22 @@ export type ColorsV2 = {
     onPhoto: string;
   };
   scrim: readonly [string, string];
+  // Plan de entrenamiento (v2.21 §31.0). ty*: colour of each session type
+  // (chips carry #121212 text, except test, which uses tyXText). rbS / rbT:
+  // deload rows and banners and their titles. emS / emT: soft Ember and its
+  // text (calibration, replacement notice), as in §30.
+  plan: {
+    tyP: string;
+    tyV: string;
+    tyT: string;
+    tyD: string;
+    tyX: string;
+    tyXText: string;
+    rbS: string;
+    rbT: string;
+    emS: string;
+    emT: string;
+  };
   chart: {
     muted: string;
   };
@@ -161,6 +177,18 @@ export const lightColorsV2: ColorsV2 = {
     onPhoto: alpha.glassOnPhoto,
   },
   scrim: shared.scrim,
+  plan: {
+    tyP: palette.planHeavy,
+    tyV: palette.planVolume,
+    tyT: palette.planTechnique,
+    tyD: palette.planDeload,
+    tyX: palette.ink,
+    tyXText: palette.white,
+    rbS: alpha.planDeloadBg,
+    rbT: palette.planDeloadText,
+    emS: alpha.planEmberSoft,
+    emT: palette.emberDeep,
+  },
   chart: {
     muted: palette.chartMuted,
   },
@@ -233,6 +261,18 @@ export const darkColorsV2: ColorsV2 = {
     onPhoto: alpha.glassOnPhoto,
   },
   scrim: shared.scrim,
+  plan: {
+    tyP: palette.planHeavy,
+    tyV: palette.planVolumeDark,
+    tyT: palette.planTechniqueDark,
+    tyD: palette.planDeload,
+    tyX: palette.ivory,
+    tyXText: palette.ink,
+    rbS: alpha.planDeloadBgDark,
+    rbT: palette.planDeloadTextDark,
+    emS: alpha.planEmberSoftDark,
+    emT: palette.emberTextOnDark,
+  },
   chart: {
     muted: palette.darkOutlineControl,
   },

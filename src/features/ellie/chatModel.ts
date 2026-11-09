@@ -12,6 +12,8 @@ import type {
 } from '@app/services/ellie/ellieProposals';
 import type { FoodPrefs, NutritionProposal } from '@app/services/ellie/nutritionProposals';
 import type { DiscomfortReply } from '@app/features/ellie/discomfortModel';
+import type { TrainingPlanProposal } from '@app/services/supabase/trainingPlan';
+import type { TrainingPlanCardStatus } from '@app/features/trainingPlan/v2/TrainingPlanProposalCard';
 
 // ELLIE · conversación v2: pure state of the chat (messages, send states,
 // generative cards, errors) so the screen and the hook only wire it.
@@ -171,8 +173,24 @@ export type WeekPlanAddedMessage = {
   removed: boolean;
 };
 
+// training_plan_proposal (tp-1.2 · v2.21 §31.2): the plan of 1 to 3 months.
+// Activating happens on the card (or the detail); `startDate` is the date
+// the activation answered with.
+export type TrainingPlanProposalMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'trainingPlanProposal';
+  proposalId: string;
+  version: number;
+  adjustLabel: string | null;
+  proposal: TrainingPlanProposal | null;
+  status: TrainingPlanCardStatus;
+  startDate: string | null;
+};
+
 export type ProposalMessage =
   | RoutineProposalMessage
+  | TrainingPlanProposalMessage
   | NutritionProposalMessage
   | NutritionPrefsMessage
   | DiscomfortCheckMessage
@@ -191,7 +209,8 @@ export type ChatMessage =
   | NutritionPrefsMessage
   | DiscomfortCheckMessage
   | RoutineLibraryMessage
-  | WeekPlanAddedMessage;
+  | WeekPlanAddedMessage
+  | TrainingPlanProposalMessage;
 
 export type ChatState = {
   messages: ChatMessage[];
@@ -229,6 +248,13 @@ export type ChatAction =
       status: NutritionCardStatus;
     }
   | { type: 'nutritionStatus'; id: string; status: NutritionCardStatus }
+  | {
+      type: 'trainingPlanLoaded';
+      id: string;
+      proposal: TrainingPlanProposal | null;
+      status: TrainingPlanCardStatus;
+    }
+  | { type: 'trainingPlanStatus'; id: string; status: TrainingPlanCardStatus; startDate?: string | null }
   // Listo of the questions card (null: Cambiar, asking again).
   | { type: 'prefsAnswered'; id: string; prefs: FoodPrefs | null }
   // A stream that failed: what it painted goes away before asking again.
@@ -416,7 +442,10 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         streaming: state.thinking,
         messages: [
-          ...((card.kind === 'routineProposal' || card.kind === 'nutritionProposal') && card.version > 1
+          ...((card.kind === 'routineProposal' ||
+            card.kind === 'nutritionProposal' ||
+            card.kind === 'trainingPlanProposal') &&
+          card.version > 1
             ? replaceParent(others, card.kind, action.parentId ?? null)
             : others),
           card,
@@ -480,6 +509,34 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
             : message,
         ),
       };
+    case 'trainingPlanLoaded':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'trainingPlanProposal'
+            ? {
+                ...message,
+                proposal: action.proposal,
+                status: action.status,
+                version: action.proposal?.version ?? message.version,
+                adjustLabel: action.proposal?.adjustLabel ?? message.adjustLabel,
+              }
+            : message,
+        ),
+      };
+    case 'trainingPlanStatus':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'trainingPlanProposal'
+            ? {
+                ...message,
+                status: action.status,
+                startDate: action.startDate !== undefined ? action.startDate : message.startDate,
+              }
+            : message,
+        ),
+      };
     case 'prefsAnswered':
       return {
         ...state,
@@ -514,10 +571,12 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 // took the latest open card of the same kind.
 function replaceParent(
   messages: ChatMessage[],
-  kind: 'routineProposal' | 'nutritionProposal',
+  kind: 'routineProposal' | 'nutritionProposal' | 'trainingPlanProposal',
   parentId: string | null,
 ): ChatMessage[] {
-  const isOpen = (message: ChatMessage): message is RoutineProposalMessage | NutritionProposalMessage =>
+  const isOpen = (
+    message: ChatMessage,
+  ): message is RoutineProposalMessage | NutritionProposalMessage | TrainingPlanProposalMessage =>
     message.kind === kind && (message.status === 'open' || message.status === 'saving');
   const target = parentId ?? [...messages].reverse().find(isOpen)?.id ?? null;
   return messages.map(message =>

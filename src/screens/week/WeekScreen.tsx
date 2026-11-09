@@ -68,6 +68,8 @@ import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { useRoutineList } from '@app/hooks/useRoutines';
 import { useWeekChange, useWeekPlan } from '@app/hooks/useWeekPlan';
 import { safeGoBack } from '@app/navigation/safeGoBack';
+import { PlanEntryCard } from '@app/features/trainingPlan/v2/PlanParts';
+import { useTrainingPlanState } from '@app/features/trainingPlan/useTrainingPlanState';
 import { weekPlanService } from '@app/services/routines/weekPlanService';
 import type { AppScreenProps } from '@app/types/navigation';
 
@@ -106,6 +108,10 @@ export function WeekScreen({ navigation, route }: Props) {
   const change = useWeekChange();
   const home = useHomeFeed();
   const library = useRoutineList('all', { exhaust: true });
+  // Plan de entrenamiento (31.4): Crear plan above "Planificar la semana"
+  // without a plan, Plan terminado once it ended, nothing while active or
+  // paused. `route.params.view` ('plan') waits for the plan view (part 2).
+  const trainingPlan = useTrainingPlanState();
   const week = query.data ?? null;
   const today = week?.today ?? '';
 
@@ -637,6 +643,14 @@ export function WeekScreen({ navigation, route }: Props) {
 
         {/* Planning acts on the current week only. */}
         {isCurrentWeek ? (
+          <PlanEntryCard
+            plan={trainingPlan.data}
+            finished
+            onCreate={() => navigation.navigate(APP_ROUTES.TrainingPlanCreate)}
+            style={styles.planEntry}
+          />
+        ) : null}
+        {isCurrentWeek ? (
           <GuideAnchor id="week.plan">
             <PlanSection onEllie={() => navigation.navigate(APP_ROUTES.WeekEllie)} onManual={() => setConfirm('manual')} />
           </GuideAnchor>
@@ -766,5 +780,6 @@ const styles = StyleSheet.create({
   track: { paddingHorizontal: SIDE, paddingTop: 18, paddingBottom: 24, alignItems: 'flex-start' },
   separator: { width: GAP },
   planToggle: { paddingHorizontal: SIDE, paddingTop: 12, alignItems: 'center' },
+  planEntry: { marginHorizontal: SIDE, marginBottom: 18 },
   pickNote: { paddingVertical: 14 },
 });

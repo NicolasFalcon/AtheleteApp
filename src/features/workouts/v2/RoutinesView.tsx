@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import {
   routineCoverSource,
@@ -63,6 +64,8 @@ export type RoutinesViewProps = {
   // "Mis rutinas" with no routines opens Nueva rutina.
   onCreateRoutine: () => void;
   onSearch: () => void;
+  // Under "Tu próxima sesión" (v2.21 §31.4: the Crear plan card).
+  afterHero?: ReactNode;
 };
 
 const GROUP_TITLE_KEYS = {
@@ -89,6 +92,7 @@ export function RoutinesView({
   onOpenCollection,
   onCreateRoutine,
   onSearch,
+  afterHero = null,
 }: RoutinesViewProps) {
   const { layout } = useThemeV2();
   const cover = useRoutineCoverContext();
@@ -156,6 +160,8 @@ export function RoutinesView({
           />
         </PressableScale>
       ) : null}
+
+      {afterHero}
 
       <View style={styles.searchBlock}>
         <SearchField

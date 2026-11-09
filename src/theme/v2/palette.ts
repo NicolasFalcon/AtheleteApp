@@ -80,6 +80,16 @@ export const palette = {
   haloRim: '#3A3430',
   haloArcHot: '#FFAA6E',
 
+  // Plan de entrenamiento (v2.21 §31.0): colour of each session type.
+  planHeavy: '#FF5B1F', // tyP · pesado (Ember)
+  planVolume: '#FFC4AA', // tyV · volumen (Ember suave)
+  planVolumeDark: '#C9785A',
+  planTechnique: '#B4B1AB', // tyT · técnico (neutro)
+  planTechniqueDark: '#8C8984',
+  planDeload: '#6E8FB3', // tyD · descarga (Recovery Blue)
+  planDeloadText: '#3F6187', // rbT · títulos sobre rbS
+  planDeloadTextDark: '#A9C1DC',
+
   // Studio background of MoveKit videos
   studio: ['#FAFAF8', '#F0EFEC', '#E7E5E1'] as const,
   studioAlt: '#ECEBE7',
@@ -94,6 +104,12 @@ export const alpha = {
     'rgba(255,91,31,.35)',
   ] as const,
   recoveryTintBgDark: 'rgba(110,143,179,.18)',
+  // Plan de entrenamiento (v2.21 §31.0): rbS · rows and banners of a deload
+  // week; emS · soft Ember (calibration, replacement notice).
+  planDeloadBg: 'rgba(110,143,179,.14)',
+  planDeloadBgDark: 'rgba(110,143,179,.2)',
+  planEmberSoft: 'rgba(255,91,31,.1)',
+  planEmberSoftDark: 'rgba(255,91,31,.16)',
   recoveryGlow: 'rgba(110,143,179,.28)',
   borderOnDark: 'rgba(255,255,255,.06)',
   borderOnDarkStrong: 'rgba(255,255,255,.10)',

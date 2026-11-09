@@ -5,6 +5,10 @@ import {
   type NutritionProposal,
 } from '@app/services/ellie/nutritionProposals';
 import type { RoutineFocus } from '@app/shared/domain/types';
+import {
+  parseTrainingPlanProposal,
+  type TrainingPlanProposal,
+} from '@app/services/supabase/trainingPlan';
 import { muscleLabel } from '@app/services/catalog/catalogService';
 import {
   bodyPartLabels,
@@ -27,7 +31,10 @@ export type ProposalCardType =
   // prop-2: an existing routine (official or the user's), and the receipt of
   // a routine added to a day of the week.
   | 'routine_library'
-  | 'week_plan_added';
+  | 'week_plan_added'
+  // tp-1.2: the training plan of 1 to 3 months (ellie_proposals.kind =
+  // 'training_plan').
+  | 'training_plan_proposal';
 
 export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'routine_proposal',
@@ -36,6 +43,7 @@ export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'discomfort_check',
   'routine_library',
   'week_plan_added',
+  'training_plan_proposal',
 ];
 
 export const isProposalCardType = (value: unknown): value is ProposalCardType =>
@@ -345,9 +353,10 @@ export function parseDiscomfortCheck(payloadValue: unknown): DiscomfortCheck {
 
 // get_proposal's row: `{ proposal: { id, kind, version, adjust_label, payload, status } }`.
 export type StoredProposal = {
-  kind: 'routine' | 'nutrition_plan';
+  kind: 'routine' | 'nutrition_plan' | 'training_plan';
   routine: RoutineProposal | null;
   nutrition: NutritionProposal | null;
+  training: TrainingPlanProposal | null;
   status: ProposalStatus;
   version: number;
 };
@@ -359,7 +368,8 @@ export function parseStoredProposal(id: string, body: unknown): StoredProposal |
   }
   const status = STATUSES.find(item => item === row.status) ?? 'open';
   const version = num(row.version) ?? 1;
-  const kind = row.kind === 'nutrition_plan' ? 'nutrition_plan' : 'routine';
+  const kind =
+    row.kind === 'nutrition_plan' || row.kind === 'training_plan' ? row.kind : 'routine';
   return {
     kind,
     status,
@@ -375,6 +385,13 @@ export function parseStoredProposal(id: string, body: unknown): StoredProposal |
     nutrition:
       kind === 'nutrition_plan'
         ? parseNutritionProposal(str(row.id) ?? id, row.payload, {
+            version,
+            adjustLabel: str(row.adjust_label),
+          })
+        : null,
+    training:
+      kind === 'training_plan'
+        ? parseTrainingPlanProposal(str(row.id) ?? id, row.payload, {
             version,
             adjustLabel: str(row.adjust_label),
           })

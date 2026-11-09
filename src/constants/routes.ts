@@ -111,4 +111,7 @@ export const APP_ROUTES = {
   CoachJoin: 'CoachJoin',
   CoachConsent: 'CoachConsent',
   MyCoach: 'MyCoach',
+  // Plan de entrenamiento (v2.21 §31).
+  TrainingPlanCreate: 'TrainingPlanCreate',
+  TrainingPlanPreview: 'TrainingPlanPreview',
 } as const;
