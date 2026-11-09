@@ -36,6 +36,7 @@ import {
   useEllieUsage,
 } from '@app/hooks/useEllieConversations';
 import { createUuid } from '@app/lib/uuid';
+import type { TrainingPlanCardStatus } from '@app/features/trainingPlan/v2/TrainingPlanProposalCard';
 import { invalidateWeek } from '@app/hooks/useWeekPlan';
 import { saveEllieNutritionPlan } from '@app/services/supabase/ellie-actions';
 import { invalidateNutritionPlanQueries } from '@app/lib/queryInvalidation';
@@ -96,7 +97,9 @@ type SendExtras = { adjustProposalId?: string | null; discomfortAnswer?: Discomf
 
 // An adjustment replaces the card it was asked from.
 const parentOf = (card: ProposalMessage, extra: SendExtras | undefined) =>
-  (card.kind === 'routineProposal' || card.kind === 'nutritionProposal') &&
+  (card.kind === 'routineProposal' ||
+    card.kind === 'nutritionProposal' ||
+    card.kind === 'trainingPlanProposal') &&
   card.version > 1 &&
   extra?.adjustProposalId
     ? proposalMessageId(extra.adjustProposalId)
@@ -124,6 +127,12 @@ function cardStatus(status: ProposalStatus): RoutineCardStatus {
 
 // get_proposal's status as the state of a plan card.
 function planStatus(status: ProposalStatus): NutritionCardStatus {
+  return status === 'open' || status === 'active' || status === 'discarded' ? status : 'replaced';
+}
+
+// The same for a training plan card (tp-1.2): open, active or discarded as
+// they are; anything else (replaced by a newer version) is replaced.
+function trainingStatus(status: ProposalStatus): TrainingPlanCardStatus {
   return status === 'open' || status === 'active' || status === 'discarded' ? status : 'replaced';
 }
 
@@ -507,13 +516,32 @@ export function useEllieConversation({
   useEffect(() => {
     state.messages.forEach(message => {
       if (
-        (message.kind !== 'routineProposal' && message.kind !== 'nutritionProposal') ||
+        (message.kind !== 'routineProposal' &&
+          message.kind !== 'nutritionProposal' &&
+          message.kind !== 'trainingPlanProposal') ||
         message.status !== 'loading' ||
         requested.current.has(message.id)
       ) {
         return;
       }
       requested.current.add(message.id);
+      if (message.kind === 'trainingPlanProposal') {
+        getProposal(message.proposalId)
+          .then(stored =>
+            dispatch({
+              type: 'trainingPlanLoaded',
+              id: message.id,
+              proposal: stored?.training ?? null,
+              status: stored?.training ? trainingStatus(stored.status) : 'unavailable',
+            }),
+          )
+          .catch(error => {
+            __DEV__ && console.warn('[ellie] No se pudo leer el plan de entrenamiento.', error);
+            requested.current.delete(message.id);
+            dispatch({ type: 'trainingPlanLoaded', id: message.id, proposal: null, status: 'unavailable' });
+          });
+        return;
+      }
       const routine = message.kind === 'routineProposal';
       getProposal(message.proposalId)
         .then(stored => {
@@ -549,9 +577,11 @@ export function useEllieConversation({
     requested.current.delete(id);
     const card = stateRef.current.messages.find(item => item.id === id);
     dispatch(
-      card?.kind === 'nutritionProposal'
-        ? { type: 'nutritionStatus', id, status: 'loading' }
-        : { type: 'proposalStatus', id, status: 'loading' },
+      card?.kind === 'trainingPlanProposal'
+        ? { type: 'trainingPlanStatus', id, status: 'loading' }
+        : card?.kind === 'nutritionProposal'
+          ? { type: 'nutritionStatus', id, status: 'loading' }
+          : { type: 'proposalStatus', id, status: 'loading' },
     );
   }, []);
 
@@ -795,6 +825,9 @@ export function useEllieConversation({
     discardProposal,
     reloadProposal,
     weekPlanRemoved: (id: string) => dispatch({ type: 'weekPlanRemoved', id }),
+    // Plan de entrenamiento: activated (with its start date) or no longer open.
+    trainingPlanStatus: (id: string, status: TrainingPlanCardStatus, startDate?: string | null) =>
+      dispatch({ type: 'trainingPlanStatus', id, status, startDate }),
     submitPrefs,
     reopenPrefs,
     activatePlanProposal,

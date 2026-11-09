@@ -1,7 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQueryClient } from '@tanstack/react-query';
 import { CalendarPlus, Check } from 'lucide-react-native';
 import {
@@ -15,7 +13,7 @@ import {
   useThemeV2,
   useToast,
 } from '@app/components/v2';
-import { APP_ROUTES } from '@app/constants/routes';
+import { useOpenWeek } from '@app/features/trainingPlan/useOpenWeek';
 import {
   addedLine,
   addToWeekError,
@@ -28,7 +26,6 @@ import { invalidateWeek, useWeekPlan } from '@app/hooks/useWeekPlan';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import { createUuid } from '@app/lib/uuid';
 import { planRoutineForDay, ProposalError } from '@app/services/ellie/ellieProposals';
-import type { AppStackParamList } from '@app/types/navigation';
 
 // "Agregar a semana": the current week and the next one; past days are
 // disabled and the days that have a routine show its name. Picking a day calls
@@ -69,7 +66,8 @@ export function AddToWeekSheet({
   const language = useProfileLanguage();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  // "Ver semana" (31.4): the single route that picks the view by the plan.
+  const openWeek = useOpenWeek();
   const current = useWeekPlan(open);
   const nextStart = current.data ? addDays(current.data.weekStart, 7) : null;
   const next = useWeekPlan(open && nextStart !== null, nextStart);
@@ -102,7 +100,7 @@ export function AddToWeekSheet({
     toast.show(addedLine(language, date), {
       action: {
         label: addToWeekText(language, 'addToWeek.viewWeek'),
-        onPress: () => navigation.navigate(APP_ROUTES.Week, { weekStart: weekStartOf(date), date }),
+        onPress: () => openWeek({ weekStart: weekStartOf(date), date }),
       },
     });
   };

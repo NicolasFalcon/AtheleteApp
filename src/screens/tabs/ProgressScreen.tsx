@@ -25,6 +25,11 @@ import {
   useThemeV2,
 } from '@app/components/v2';
 import { APP_ROUTES } from '@app/constants/routes';
+import { weekPlanLine } from '@app/features/trainingPlan/trainingPlanModel';
+import { useOpenWeek } from '@app/features/trainingPlan/useOpenWeek';
+import { WeekPlanRow } from '@app/features/trainingPlan/v2/PlanParts';
+import { useWeekPlan } from '@app/hooks/useWeekPlan';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import {
   useOpenCore33,
   useOpenCore33Discovery,
@@ -84,6 +89,10 @@ export function ProgressScreen({ navigation, route }: Props) {
   const openCore33 = useOpenCore33();
   const openCore33Discovery = useOpenCore33Discovery();
   const summary = useProgressSummary();
+  // Tu semana for "Plan de la semana" (31.4).
+  const weekPlan = useWeekPlan();
+  const language = useProfileLanguage();
+  const openWeek = useOpenWeek();
   // Sueño · 7 noches (only with Apple Health), the same read as Sueño.
   const sleepQuery = useSleepOverview();
 
@@ -324,6 +333,10 @@ export function ProgressScreen({ navigation, route }: Props) {
             <GuideAnchor id="progress.capsules">
               <TrainingWeekBlock week={week} empty={!hasData} />
             </GuideAnchor>
+            {/* "Plan de la semana" (31.4) → the single "Ver semana" route. */}
+            {weekPlan.data ? (
+              <WeekPlanRow line={weekPlanLine(language, weekPlan.data)} onPress={() => openWeek()} />
+            ) : null}
             <NutritionHydrationRow
               nutrition={model.nutrition}
               hydration={model.hydration}

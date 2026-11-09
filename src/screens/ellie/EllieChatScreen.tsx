@@ -31,8 +31,13 @@ import {
 import { APP_ROUTES, ROOT_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import {
   CANNED_PROMPTS,
+  proposalMessageId,
   showSuggestions,
 } from '@app/features/ellie/chatModel';
+import { TrainingPlanProposalCard } from '@app/features/trainingPlan/v2/TrainingPlanProposalCard';
+import { useTrainingPlanActivation } from '@app/features/trainingPlan/useTrainingPlanActivation';
+import { useOpenWeek } from '@app/features/trainingPlan/useOpenWeek';
+import { useTrainingPlanState } from '@app/features/trainingPlan/useTrainingPlanState';
 import {
   DiscomfortCheckCard,
   RoutineProposalCard,
@@ -232,6 +237,26 @@ export function EllieChatScreen({ navigation, route }: Props) {
     setSheetId(null);
     setPlanSheetId(null);
   };
+
+  // Plan de entrenamiento (tp-1.2 · v2.21 §31.2): the card whose adjust chips
+  // are open, the activation (its sheets live in the hook) and "Ver Tu
+  // semana" through the single "Ver semana" route.
+  const openWeek = useOpenWeek();
+  const trainingState = useTrainingPlanState();
+  const [planChipsId, setPlanChipsId] = useState<string | null>(null);
+  const trainingActivation = useTrainingPlanActivation({
+    onActivated: (proposalId, startDate) =>
+      chat.trainingPlanStatus(proposalMessageId(proposalId), 'active', startDate),
+    onNotOpen: proposalId => chat.trainingPlanStatus(proposalMessageId(proposalId), 'replaced'),
+  });
+  // Ajustar from the detail (31.3): back here with that card's chips open.
+  const planAdjustAt = params?.planAdjust?.at;
+  const planAdjustId = params?.planAdjust?.proposalId;
+  useEffect(() => {
+    if (planAdjustId && planAdjustAt) {
+      setPlanChipsId(proposalMessageId(planAdjustId));
+    }
+  }, [planAdjustAt, planAdjustId]);
 
   // The saved food preferences (get_food_preferences): "Cambiar" opens the
   // questions with them, and answered cards of the history show them.
@@ -603,7 +628,7 @@ export function EllieChatScreen({ navigation, route }: Props) {
           card={message}
           undoing={undoingId === message.id}
           onViewWeek={() =>
-            navigation.navigate(APP_ROUTES.Week, {
+            openWeek({
               weekStart: weekStartOf(message.added.date),
               date: message.added.date,
             })
@@ -644,6 +669,45 @@ export function EllieChatScreen({ navigation, route }: Props) {
             });
           }}
           onChange={() => chat.reopenPrefs(message.id)}
+        />
+      );
+    }
+    if (message.kind === 'trainingPlanProposal') {
+      const planId = message.proposal?.planId ?? null;
+      // Active here, or already the active (or paused) plan elsewhere.
+      const isActive =
+        message.status === 'active' ||
+        (message.status === 'open' &&
+          Boolean(planId) &&
+          planId === trainingState.data?.planId &&
+          (trainingState.data?.state === 'active' || trainingState.data?.state === 'paused'));
+      return (
+        <TrainingPlanProposalCard
+          key={message.id}
+          proposal={message.proposal}
+          status={isActive ? 'active' : message.status}
+          version={message.version}
+          activating={trainingActivation.busyId === message.proposalId}
+          startDate={message.startDate}
+          chipsOpen={planChipsId === message.id}
+          disabled={state.thinking}
+          onActivate={() => {
+            setPlanChipsId(null);
+            trainingActivation
+              .activate({ proposalId: message.proposalId, startDate: message.proposal?.startDate ?? null })
+              .catch(() => undefined);
+          }}
+          onToggleChips={() => setPlanChipsId(current => (current === message.id ? null : message.id))}
+          onChip={text => {
+            closeSheets();
+            setPlanChipsId(null);
+            chat.send(text, undefined, null, { adjustProposalId: message.proposalId });
+          }}
+          onViewAll={() =>
+            navigation.navigate(APP_ROUTES.TrainingPlanPreview, { proposalId: message.proposalId })
+          }
+          onViewWeek={() => openWeek()}
+          onReload={() => chat.reloadProposal(message.id)}
         />
       );
     }
@@ -855,6 +919,8 @@ export function EllieChatScreen({ navigation, route }: Props) {
       />
 
       {addToWeek.sheet}
+
+      {trainingActivation.sheets}
 
       <PhotoSourceSheet
         open={photoMenu}

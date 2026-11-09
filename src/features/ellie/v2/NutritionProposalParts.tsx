@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
+import { FEATURES } from '@app/lib/config/features';
 import Animated, {
   FadeInUp,
   useAnimatedStyle,
@@ -895,7 +896,7 @@ export function NutritionProposalSheet({
           </View>
         ) : null}
 
-        {shopping.length > 0 ? (
+        {FEATURES.nutritionShopping && shopping.length > 0 ? (
           <Block title="LISTA DE COMPRAS · SEMANA" trailing={`${shopping.length} productos`}>
             {shownShopping.map((item, index) => (
               <View

@@ -22,6 +22,7 @@ import {
   type ProposalCard,
 } from '@app/services/ellie/ellieProposals';
 import { parseNutritionProposal } from '@app/services/ellie/nutritionProposals';
+import { parseTrainingPlanProposal } from '@app/services/supabase/trainingPlan';
 import { DISCOMFORT_CHIPS, discomfortFromText } from '@app/features/ellie/discomfortModel';
 
 // Reading of the tool data of ellie-chat (docs/backend/ELLIE_SHAPES.md):
@@ -201,6 +202,25 @@ export function proposalToMessage(card: ProposalCard, fallbackId: string): Propo
   }
   if (!card.proposalId) {
     return null;
+  }
+  if (card.type === 'training_plan_proposal') {
+    const plan = card.payload
+      ? parseTrainingPlanProposal(card.proposalId, card.payload, {
+          version: card.version,
+          adjustLabel: card.adjustLabel,
+        })
+      : null;
+    return {
+      id,
+      role: 'assistant',
+      kind: 'trainingPlanProposal',
+      proposalId: card.proposalId,
+      version: card.version,
+      adjustLabel: card.adjustLabel,
+      proposal: plan,
+      status: plan ? 'open' : 'loading',
+      startDate: null,
+    };
   }
   if (card.type === 'nutrition_plan_proposal') {
     const plan = card.payload

@@ -28,7 +28,6 @@ import {
   resolveHomeMode,
   resolveHomeSlides,
   sessionActiveSeconds,
-  trainedMinutesToday,
   toGlasses,
   waterGoalGlasses,
   type DayRingKind,
@@ -69,6 +68,7 @@ import { buildPlan } from '@app/features/session/sessionModel';
 import { fetchSessionDetail } from '@app/services/supabase/session';
 import { useRoutine, useTodaySuggestion } from '@app/hooks/useRoutines';
 import { useWeekPlan } from '@app/hooks/useWeekPlan';
+import { useOpenWeek } from '@app/features/trainingPlan/useOpenWeek';
 import { getGreeting, getLocalDateKey } from '@app/lib/date';
 import { isRouteSession } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
@@ -112,6 +112,9 @@ export function HomeScreen({ navigation }: Props) {
   const { profile } = useAuth();
   const coverContext = useRoutineCoverContext();
   const homeQuery = useHomeFeed();
+  // "Ver semana" (31.4): Tu día, Ver semana and the workout ring on a rest
+  // day all open the view the training plan's state decides.
+  const openWeek = useOpenWeek();
   // Guía de Inicio (25.4): 4 steps, once per user.
   const scrollRef = useRef<ScrollView>(null);
   useGuide('home', { scrollRef });
@@ -366,9 +369,10 @@ export function HomeScreen({ navigation }: Props) {
         openCore33();
         return;
       case 'workout':
-        // Rest day → Semana; nothing planned → Entrenos; else the routine.
+        // Rest day → Semana ("Ver semana", 31.4); nothing planned →
+        // Entrenos; else the routine.
         if (dayWorkout.plan === 'rest') {
-          navigation.navigate(APP_ROUTES.Week);
+          openWeek();
         } else if (dayWorkout.plan === 'none') {
           openWorkouts();
         } else if (resumable) {
@@ -476,7 +480,7 @@ export function HomeScreen({ navigation }: Props) {
           }
           onOpenCore33={openCore33}
           onStartWorkout={startHeroWorkout}
-          onOpenWeek={() => navigation.navigate(APP_ROUTES.Week)}
+          onOpenWeek={() => openWeek()}
           onResume={resumeSession}
           onOpenProgress={() => navigation.navigate(TAB_ROUTES.Progress)}
         />
@@ -514,7 +518,7 @@ export function HomeScreen({ navigation }: Props) {
                     onTrain={openWorkouts}
                     week={weekQuery.data ?? null}
                     weekLoading={weekQuery.isLoading}
-                    onOpenWeek={() => navigation.navigate(APP_ROUTES.Week)}
+                    onOpenWeek={() => openWeek()}
                     // No insight from today's data yet (the sleep one needs
                     // Apple Health, §28.12): the note stays hidden.
                     insight={null}

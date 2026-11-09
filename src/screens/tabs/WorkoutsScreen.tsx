@@ -27,6 +27,8 @@ import { useIsCoach } from '@app/features/coach/useCoach';
 import { CoachStudentsView } from '@app/features/coach/v2/CoachStudentsView';
 import { isCoachDay } from '@app/features/week/weekModel';
 import { useWeekPlan } from '@app/hooks/useWeekPlan';
+import { PlanEntryCard } from '@app/features/trainingPlan/v2/PlanParts';
+import { useTrainingPlanState } from '@app/features/trainingPlan/useTrainingPlanState';
 import { useAuth } from '@app/hooks/useAuth';
 import { useCatalogTotal } from '@app/hooks/useCatalog';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
@@ -50,6 +52,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
   const routinesQuery = useRoutineList('all', { exhaust: true });
   const categoriesQuery = useRoutineCategories();
   const suggestionQuery = useTodaySuggestion();
+  const trainingPlan = useTrainingPlanState();
   const catalogTotal = useCatalogTotal();
   const favorites = useFavoriteWorkouts();
   const [segment, setSegment] = useState<Segment>(
@@ -199,6 +202,14 @@ export function WorkoutsScreen({ navigation, route }: Props) {
               navigation.navigate(APP_ROUTES.RoutineList, { collection })
             }
             onCreateRoutine={() => navigation.navigate(APP_ROUTES.CreateRoutine)}
+            // Crear plan (31.4): without a plan or with it finished; gone
+            // while one is active or paused.
+            afterHero={
+              <PlanEntryCard
+                plan={trainingPlan.data}
+                onCreate={() => navigation.navigate(APP_ROUTES.TrainingPlanCreate)}
+              />
+            }
             onSearch={() =>
               navigation.navigate(APP_ROUTES.RoutineList, {
                 collection: 'all',
