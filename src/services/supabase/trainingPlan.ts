@@ -349,7 +349,7 @@ export class TrainingPlanError extends Error {
   readonly code: TrainingPlanErrorCode;
   // week_has_sessions.
   readonly sessions: PlannedSession[];
-  // plan_active_exists: the name of the plan that is active now.
+  // plan_active_exists: `plan.name`, the plan that is active now.
   readonly currentPlanName: string | null;
   constructor(
     code: TrainingPlanErrorCode,
@@ -373,9 +373,6 @@ function errorFrom(body: Raw): TrainingPlanError {
   const nested = rec(body.error);
   const raw = str(body.error) ?? str(nested?.code);
   const code = KNOWN.find(item => item === raw) ?? 'unknown';
-  // "con el plan actual" (§7): read from whichever key carries it.
-  const current =
-    rec(body.plan) ?? rec(body.current_plan) ?? rec(body.active_plan) ?? rec(body.current) ?? rec(nested?.plan);
   return new TrainingPlanError(code, str(nested?.message) ?? raw, {
     sessions: list(body.sessions ?? nested?.sessions).map(row => ({
       date: day(row.date),
@@ -383,7 +380,8 @@ function errorFrom(body: Raw): TrainingPlanError {
       source: str(row.source),
       coachName: str(row.coach_name),
     })),
-    currentPlanName: str(current?.name) ?? str(body.plan_name),
+    // plan_active_exists: `{ ok:false, error, plan: { plan_id, name } }`.
+    currentPlanName: str(rec(body.plan)?.name),
   });
 }
 
@@ -426,6 +424,23 @@ export async function fetchTrainingPlanPreview(proposalId: string): Promise<Trai
   return parseTrainingPlanPreview(await call('get_training_plan_preview', { p_proposal_id: proposalId }));
 }
 
+// get_goal_target_estimates() → `{ ok, items: [{ exercise_slug, e1rm_kg,
+// max_reps }] }`, always the four targets (bench, squat, deadlift,
+// pull-ups); e1rm_kg and max_reps are nullable.
+export type GoalTargetEstimate = {
+  exerciseSlug: string;
+  e1rmKg: number | null;
+  maxReps: number | null;
+};
+
+export async function fetchGoalTargetEstimates(): Promise<GoalTargetEstimate[]> {
+  const body = await call('get_goal_target_estimates', {});
+  return list(body.items).flatMap(row => {
+    const exerciseSlug = str(row.exercise_slug);
+    return exerciseSlug ? [{ exerciseSlug, e1rmKg: num(row.e1rm_kg), maxReps: num(row.max_reps) }] : [];
+  });
+}
+
 export type ActivatedPlan = {
   planId: string | null;
   state: TrainingPlanStateName | null;
@@ -459,4 +474,232 @@ export async function activateTrainingPlan(args: {
     replacedSessions: Array.isArray(body.replaced_sessions) ? body.replaced_sessions : [],
     replayed: body.replayed === true,
   };
+}
+
+// ── get_training_plan (§7 · 31.6) ──────────────────────────────────────────
+// `{ ok, plan, blocks: [{ block_index, phase, weeks: [{ week_index, kind,
+// load, start_date, end_date }] }], progress_pct, adherence_pct,
+// sessions_done, sessions_missed, sessions_total, goal_target, anchors: [{
+// exercise_id, name, delta_kg, e1rm_by_week: [{ week_index, e1rm }],
+// projection: [{ week_index, recommended_kg, rep_max }] }] }`.
+export type PlanDetailWeek = {
+  weekIndex: number;
+  kind: PlanWeekKind;
+  // Relative load of the week (the server's scale; the app normalises it).
+  load: number | null;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+export type PlanDetailBlock = { blockIndex: number; phase: PlanPhase; weeks: PlanDetailWeek[] };
+
+export type PlanDetailGoal = {
+  exerciseId: string | null;
+  exerciseSlug: string | null;
+  exerciseName: string | null;
+  kind: 'kg' | 'reps';
+  target: number;
+  startEstimate: number | null;
+};
+
+export type PlanAnchor = {
+  exerciseId: string;
+  name: string;
+  deltaKg: number | null;
+  // Only the weeks with real sets carry a value (the rest come null).
+  e1rmByWeek: { weekIndex: number; e1rm: number | null }[];
+  // The planned load, apart from the e1RM already registered.
+  projection: { weekIndex: number; recommendedKg: number | null; repMax: number | null }[];
+};
+
+export type TrainingPlanDetail = {
+  planId: string | null;
+  name: string | null;
+  status: string | null;
+  weeks: number;
+  startDate: string | null;
+  endDate: string | null;
+  blocks: PlanDetailBlock[];
+  progressPct: number | null;
+  adherencePct: number | null;
+  sessionsDone: number;
+  sessionsMissed: number;
+  sessionsTotal: number;
+  goalTarget: PlanDetailGoal | null;
+  anchors: PlanAnchor[];
+};
+
+export function parsePlanDetailGoal(value: unknown): PlanDetailGoal | null {
+  const row = rec(value);
+  const target = num(row?.target);
+  if (!row || target === null) {
+    return null;
+  }
+  return {
+    exerciseId: str(row.exercise_id),
+    exerciseSlug: str(row.exercise_slug),
+    exerciseName: str(row.exercise_name) ?? str(row.name),
+    kind: row.kind === 'reps' ? 'reps' : 'kg',
+    target,
+    startEstimate: num(row.start_estimate),
+  };
+}
+
+export function parseTrainingPlanDetail(body: Raw): TrainingPlanDetail {
+  const plan = rec(body.plan) ?? {};
+  const blocks = list(body.blocks)
+    .map((block, index): PlanDetailBlock => {
+      const blockIndex = num(block.block_index) ?? index + 1;
+      return {
+        blockIndex,
+        phase: phaseOf(block.phase) ?? phaseForBlock(blockIndex, list(body.blocks).length),
+        weeks: list(block.weeks)
+          .map(week => ({
+            weekIndex: num(week.week_index) ?? 0,
+            kind: weekKindOf(week.kind) ?? 'carga',
+            load: num(week.load),
+            startDate: day(week.start_date),
+            endDate: day(week.end_date),
+          }))
+          .filter(week => week.weekIndex > 0)
+          .sort((a, b) => a.weekIndex - b.weekIndex),
+      };
+    })
+    .sort((a, b) => a.blockIndex - b.blockIndex);
+  const countedWeeks = blocks.reduce((sum, block) => sum + block.weeks.length, 0);
+  return {
+    planId: str(plan.id) ?? str(plan.plan_id),
+    name: str(plan.name),
+    status: str(plan.status),
+    weeks: num(plan.weeks) ?? countedWeeks,
+    startDate: day(plan.start_date),
+    endDate: day(plan.end_date),
+    blocks,
+    progressPct: num(body.progress_pct),
+    adherencePct: num(body.adherence_pct),
+    sessionsDone: num(body.sessions_done) ?? 0,
+    sessionsMissed: num(body.sessions_missed) ?? 0,
+    sessionsTotal: num(body.sessions_total) ?? 0,
+    goalTarget: parsePlanDetailGoal(body.goal_target),
+    anchors: list(body.anchors).flatMap(anchor => {
+      const exerciseId = str(anchor.exercise_id);
+      return exerciseId
+        ? [
+            {
+              exerciseId,
+              name: str(anchor.name) ?? '',
+              deltaKg: num(anchor.delta_kg),
+              e1rmByWeek: list(anchor.e1rm_by_week).map(row => ({
+                weekIndex: num(row.week_index) ?? 0,
+                e1rm: num(row.e1rm),
+              })),
+              projection: list(anchor.projection).map(row => ({
+                weekIndex: num(row.week_index) ?? 0,
+                recommendedKg: num(row.recommended_kg),
+                repMax: num(row.rep_max),
+              })),
+            },
+          ]
+        : [];
+    }),
+  };
+}
+
+export async function fetchTrainingPlanDetail(planId?: string | null): Promise<TrainingPlanDetail> {
+  return parseTrainingPlanDetail(await call('get_training_plan', planId ? { p_plan_id: planId } : {}));
+}
+
+// ── get_training_plan_month (§7 · 31.5) ────────────────────────────────────
+// The contract: "semanas del mes con week_index, kind y por día { date,
+// session_type?, status?, in_pause?, added_routine? }". The week list may
+// come as `weeks` (each with its `days`) or the days as a flat list: both are
+// read, and a week is also matched to a day by its dates.
+export type MonthDayStatus = 'done' | 'missed' | 'pending' | 'substituted' | 'skipped' | null;
+
+export type PlanMonthDay = {
+  date: string;
+  type: SessionType | null;
+  status: MonthDayStatus;
+  inPause: boolean;
+  addedRoutine: boolean;
+  // The plan week it belongs to, when the answer says so.
+  weekIndex: number | null;
+};
+
+export type PlanMonthWeek = {
+  weekIndex: number;
+  kind: PlanWeekKind;
+  startDate: string | null;
+  endDate: string | null;
+};
+
+export type PlanMonth = { weeks: PlanMonthWeek[]; days: PlanMonthDay[]; recognized: boolean };
+
+export function monthStatusOf(value: unknown): MonthDayStatus {
+  const text = typeof value === 'string' ? value.toLowerCase() : '';
+  if (text.startsWith('done') || text.startsWith('complet')) {
+    return 'done';
+  }
+  if (text.startsWith('miss')) {
+    return 'missed';
+  }
+  if (text.startsWith('subst')) {
+    return 'substituted';
+  }
+  if (text.startsWith('skip')) {
+    return 'skipped';
+  }
+  return text ? 'pending' : null;
+}
+
+export function parsePlanMonth(body: Raw): PlanMonth {
+  const rows = Array.isArray(body.weeks) ? list(body.weeks) : [];
+  const flat = Array.isArray(body.days) ? list(body.days) : [];
+  const weeks: PlanMonthWeek[] = [];
+  const days: PlanMonthDay[] = [];
+  const readDay = (row: Raw, weekIndex: number | null) => {
+    const date = day(row.date);
+    if (!date) {
+      return;
+    }
+    const added = row.added_routine;
+    days.push({
+      date,
+      type: isSessionType(row.session_type) ? row.session_type : null,
+      status: monthStatusOf(row.status),
+      inPause: row.in_pause === true,
+      addedRoutine: added !== null && added !== undefined && added !== false,
+      weekIndex: num(row.week_index) ?? weekIndex,
+    });
+  };
+  rows.forEach(row => {
+    const weekIndex = num(row.week_index);
+    if (weekIndex !== null) {
+      weeks.push({
+        weekIndex,
+        kind: weekKindOf(row.kind) ?? 'carga',
+        startDate: day(row.start_date),
+        endDate: day(row.end_date),
+      });
+    }
+    list(row.days).forEach(item => readDay(item, weekIndex));
+  });
+  flat.forEach(item => readDay(item, null));
+  return { weeks, days, recognized: rows.length > 0 || flat.length > 0 };
+}
+
+// `month`: any date of the month; the RPC takes its first day.
+export async function fetchTrainingPlanMonth(month: string): Promise<PlanMonth> {
+  const result = parsePlanMonth(await call('get_training_plan_month', { p_month: `${month.slice(0, 7)}-01` }));
+  if (__DEV__ && !result.recognized) {
+    console.warn('[training-plan] get_training_plan_month: no `weeks` or `days` in the answer.');
+  }
+  return result;
+}
+
+// ── resume_training_plan(p_client_id) ──────────────────────────────────────
+// Back to `active` from today; the pending sessions move to the next
+// training days. Errors: plan_not_active.
+export async function resumeTrainingPlan(clientId: string): Promise<void> {
+  await call('resume_training_plan', { p_client_id: clientId });
 }

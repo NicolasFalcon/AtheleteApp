@@ -11,9 +11,9 @@ import type { AppStackParamList } from '@app/types/navigation';
 // Agregada al {día} and Ver semana). It decides the view from the plan's
 // state; no screen decides on its own.
 //   none / completed → the current week as always
-//   active / paused  → the plan view
-// The plan view arrives in part 2: until then `view: 'plan'` opens the same
-// current week.
+//   active / paused  → the plan view (Semana · Mes · Plan)
+// `view` is the hint from the state cached now; WeekRoute reads the live
+// state and makes the final choice, so no screen decides on its own.
 export function useOpenWeek() {
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const plan = useTrainingPlanState();

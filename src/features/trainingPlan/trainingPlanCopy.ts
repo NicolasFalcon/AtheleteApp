@@ -118,6 +118,8 @@ const COPY = {
   'meta.kgTitle': { es: '{name} a', en: '{name} to' },
   'meta.repsTitle': { es: '{name} · repeticiones', en: '{name} · reps' },
   'meta.kgHint': { es: 'En kilos, de 2,5 en 2,5', en: 'In kilos, in 2.5 steps' },
+  'meta.todayKg': { es: 'Hoy: {n} kg estimado', en: 'Today: {n} kg estimated' },
+  'meta.todayReps': { es: 'Hoy: {n} reps', en: 'Today: {n} reps' },
   'meta.repsHint': { es: 'Repeticiones seguidas', en: 'Reps in a row' },
   'meta.less': { es: 'Menos', en: 'Less' },
   'meta.more': { es: 'Más', en: 'More' },
@@ -137,6 +139,10 @@ const COPY = {
   'gen.step3': { es: 'Programando descargas y test final', en: 'Scheduling deloads and the final test' },
   'gen.step4': { es: 'Calculando tus pesos de partida', en: 'Working out your starting weights' },
   'gen.errorTitle': { es: 'No pudimos armar tu plan', en: "We couldn't build your plan" },
+  'gen.errorBodyGeneric': {
+    es: 'Algo salió mal al armar tu plan. Inténtalo de nuevo; tus respuestas quedan guardadas.',
+    en: 'Something went wrong while building your plan. Try again; your answers are saved.',
+  },
   'gen.errorBody': {
     es: 'Se cortó la conexión con Athelete Intelligence. Tus respuestas quedan guardadas.',
     en: 'The connection with Athelete Intelligence dropped. Your answers are saved.',
@@ -232,12 +238,12 @@ const COPY = {
     en: 'Your coach {name} assigned you {sessions}. They are replaced too.',
   },
   'replaceWeek.confirm': { es: 'Reemplazar y activar', en: 'Replace and activate' },
-  'replacePlan.title': { es: 'Ya tienes un plan activo', en: 'You already have an active plan' },
+  'replacePlan.title': { es: 'Ya tienes activo {name}. ¿Reemplazarlo?', en: '{name} is already active. Replace it?' },
+  'replacePlan.titleNoName': { es: 'Ya tienes un plan activo. ¿Reemplazarlo?', en: 'You already have an active plan. Replace it?' },
   'replacePlan.body': {
-    es: 'Si activas este, {name} se reemplaza y deja de estar activo. Tu historial no cambia.',
-    en: 'If you activate this one, {name} is replaced and stops being active. Your history stays the same.',
+    es: 'Al activar este, el plan actual se reemplaza y deja de estar activo. Tu historial no cambia.',
+    en: 'When you activate this one, the current plan is replaced and stops being active. Your history stays the same.',
   },
-  'replacePlan.current': { es: 'tu plan actual', en: 'your current plan' },
   'replacePlan.confirm': { es: 'Reemplazar y activar', en: 'Replace and activate' },
   'activate.cancel': { es: 'Cancelar', en: 'Cancel' },
   'activate.error': {
@@ -263,6 +269,163 @@ const COPY = {
   'progress.none': { es: 'Sin sesiones planificadas', en: 'No sessions planned' },
   'when.today': { es: 'hoy', en: 'today' },
   'when.tomorrow': { es: 'mañana', en: 'tomorrow' },
+
+  // ── Tu semana · vista de plan (31.4 – 31.6, 31.13) ──
+  'screen.title': { es: 'Tu semana', en: 'Your week' },
+  'view.week': { es: 'Semana', en: 'Week' },
+  'view.month': { es: 'Mes', en: 'Month' },
+  'view.plan': { es: 'Plan', en: 'Plan' },
+  'menu.manage': { es: 'Gestionar el plan', en: 'Manage the plan' },
+  'menu.soon': { es: 'Gestionar el plan llega pronto', en: 'Managing the plan is coming soon' },
+  'phase.big': { es: 'Semana {n}', en: 'Week {n}' },
+  'phase.of': { es: 'de {n}', en: 'of {n}' },
+  'phase.sub': { es: 'Bloque {b} · {phase} · {range}', en: 'Block {b} · {phase} · {range}' },
+  'phase.paused': { es: 'En pausa hasta el {date}', en: 'Paused until {date}' },
+  'phase.starts': { es: 'Empieza el {date}', en: 'Starts {date}' },
+  'phase.backToCurrent': { es: 'Volver a esta semana', en: 'Back to this week' },
+  'week.prev': { es: 'Semana anterior', en: 'Previous week' },
+  'week.next': { es: 'Semana siguiente', en: 'Next week' },
+  'pause.title': { es: 'Plan en pausa hasta el {date}', en: 'Plan paused until {date}' },
+  'pause.body.one': {
+    es: 'Los días de la pausa quedan libres y las sesiones que faltan se corren una semana. El plan termina el {end}.',
+    en: 'The days of the pause stay free and the sessions left move back one week. The plan ends {end}.',
+  },
+  'pause.body.two': {
+    es: 'Los días de la pausa quedan libres y las sesiones que faltan se corren dos semanas. El plan termina el {end}.',
+    en: 'The days of the pause stay free and the sessions left move back two weeks. The plan ends {end}.',
+  },
+  'pause.resume': { es: 'Retomar', en: 'Resume' },
+  'pause.error': {
+    es: 'No pudimos retomar tu plan. Inténtalo de nuevo.',
+    en: "We couldn't resume your plan. Try again.",
+  },
+  'pause.resumed': { es: 'Plan retomado', en: 'Plan resumed' },
+  'calib.title': { es: 'Semana de calibración', en: 'Calibration week' },
+  'calib.body': {
+    es: 'Aún no tienes pesos registrados. Esta semana elige pesos con los que te queden 2 repeticiones en reserva; con eso ajustamos el resto del plan.',
+    en: "You don't have weights logged yet. This week pick weights that leave you 2 reps in reserve; we use that to adjust the rest of the plan.",
+  },
+  'deload.title': { es: 'Semana de descarga', en: 'Deload week' },
+  'deload.body': {
+    es: 'Menos series y más repeticiones en reserva para recuperar y llegar fuerte al bloque {n}. Los pesos bajan un 10 %.',
+    en: 'Fewer sets and more reps in reserve to recover and arrive strong at block {n}. Weights drop 10 %.',
+  },
+  'deload.bodyLast': {
+    es: 'Última semana: las primeras sesiones son de descarga y las últimas, test de tus ejercicios ancla.',
+    en: 'Last week: the first sessions are deloads and the last ones test your anchor lifts.',
+  },
+  'day.rest': { es: 'Descanso en tu plan', en: 'Rest in your plan' },
+  'day.inPause': { es: 'en pausa', en: 'paused' },
+  'state.done': { es: 'Hecha', en: 'Done' },
+  'state.missed': { es: 'Perdida', en: 'Missed' },
+  'state.today': { es: 'Hoy', en: 'Today' },
+  'state.pending': { es: 'Pendiente', en: 'Pending' },
+  'state.substituted': { es: 'Sustituida', en: 'Substituted' },
+  'state.skipped': { es: 'Omitida', en: 'Skipped' },
+  'state.added': { es: 'Añadida', en: 'Added' },
+  'state.moved': { es: 'Movida desde el {date}', en: 'Moved from {date}' },
+  'row.by': { es: 'Por {name}', en: 'By {name}' },
+  'hero.today': { es: 'Hoy · {day}', en: 'Today · {day}' },
+  'hero.next': { es: 'Próxima · {day}', en: 'Next · {day}' },
+  'hero.afterResume': { es: 'Al retomar · {day}', en: 'On resume · {day}' },
+  'hero.meta': { es: '{min} min · {n} ejercicios', en: '{min} min · {n} exercises' },
+  'hero.metaMin': { es: '{min} min', en: '{min} min' },
+  'hero.calibration': { es: ' · calibración', en: ' · calibration' },
+  'list.title': { es: 'Sesiones', en: 'Sessions' },
+  'list.count': { es: '{done} de {n} hechas', en: '{done} of {n} done' },
+  'list.empty': { es: 'Sin sesiones esta semana', en: 'No sessions this week' },
+  'review.title': { es: 'Revisión semanal', en: 'Weekly review' },
+  'review.sub': { es: 'Cada domingo a las 19:00', en: 'Every Sunday at 7:00 pm' },
+  'month.sub': { es: 'Semanas {a} a {b}', en: 'Weeks {a} to {b}' },
+  'month.subOne': { es: 'Semana {a}', en: 'Week {a}' },
+  'month.weekLabel': { es: 'S{n}', en: 'W{n}' },
+  'month.deload': { es: 'DESC', en: 'DEL' },
+  'month.pause': { es: 'PAUSA', en: 'PAUSE' },
+  'month.prev': { es: 'Mes anterior', en: 'Previous month' },
+  'month.next': { es: 'Mes siguiente', en: 'Next month' },
+  'legend.title': { es: 'Leyenda', en: 'Legend' },
+  'legend.done': { es: 'Hecha', en: 'Done' },
+  'legend.missed': { es: 'Perdida', en: 'Missed' },
+  'legend.pending': { es: 'Pendiente', en: 'Pending' },
+  'legend.substituted': { es: 'Sustituida', en: 'Substituted' },
+  'legend.pause': { es: 'Pausa', en: 'Pause' },
+  'legend.deloadWeek': { es: 'Semana de descarga', en: 'Deload week' },
+  'plan.progress': { es: 'Avance', en: 'Progress' },
+  'plan.adherence': { es: 'Adherencia', en: 'Adherence' },
+  'plan.sessions': { es: 'Sesiones', en: 'Sessions' },
+  'plan.legend.done': { es: 'Hecha', en: 'Done' },
+  'plan.legend.current': { es: 'Actual', en: 'Current' },
+  'plan.legend.upcoming': { es: 'Por venir', en: 'Upcoming' },
+  'plan.legend.deload': { es: 'Descarga', en: 'Deload' },
+  'plan.legend.test': { es: 'Test', en: 'Test' },
+  'plan.week': { es: 'S{n}', en: 'W{n}' },
+  'plan.weekA11y': { es: 'Semana {n}', en: 'Week {n}' },
+  'plan.manage': { es: 'Gestionar plan', en: 'Manage plan' },
+  'goal.eyebrow': { es: 'Tu meta', en: 'Your target' },
+  'goal.titleKg': { es: '{name} a {n} kg', en: '{name} to {n} kg' },
+  'goal.titleReps': { es: '{name} a {n} reps', en: '{name} to {n} reps' },
+  'goal.ofKg': { es: 'de {n} kg · 1RM estimado', en: 'of {n} kg · estimated 1RM' },
+  'goal.ofReps': { es: 'de {n} reps · máximo', en: 'of {n} reps · max' },
+  'goal.remainingKg': { es: 'Faltan {n} kg.', en: '{n} kg to go.' },
+  'goal.remainingReps': { es: 'Faltan {n} reps.', en: '{n} reps to go.' },
+  'goal.reach': {
+    es: ' Al ritmo del plan llegas en la semana {w}, antes del test.',
+    en: ' At the plan’s pace you get there in week {w}, before the test.',
+  },
+  'goal.reachLast': {
+    es: ' Al ritmo del plan llegas en la semana {w}.',
+    en: ' At the plan’s pace you get there in week {w}.',
+  },
+  'goal.reached': { es: 'Meta alcanzada.', en: 'Target reached.' },
+  'goal.noData': {
+    es: 'Tu 1RM estimado aparece después de la semana de calibración.',
+    en: 'Your estimated 1RM shows up after the calibration week.',
+  },
+  'anchors.title': { es: 'Ejercicios ancla', en: 'Anchor lifts' },
+  'anchors.sub': { es: '1RM estimado', en: 'Estimated 1RM' },
+  'anchor.delta': { es: '+{n} kg desde la semana 1', en: '+{n} kg since week 1' },
+  'anchor.deltaDown': { es: '{n} kg desde la semana 1', en: '{n} kg since week 1' },
+  'anchor.empty': { es: 'Sin registros todavía', en: 'No records yet' },
+  'anchor.projection': { es: 'Proyección {n} kg', en: 'Projection {n} kg' },
+  'anchor.weekFirst': { es: 'Semana 1', en: 'Week 1' },
+  'anchor.weekLast': { es: 'Semana {n}', en: 'Week {n}' },
+  'load.title': { es: 'Cargando tu plan…', en: 'Loading your plan…' },
+  'err.title': { es: 'No pudimos cargar tu plan', en: "We couldn't load your plan" },
+  'err.body': {
+    es: 'Revisa tu conexión e inténtalo de nuevo. Tu plan y tus registros están guardados.',
+    en: 'Check your connection and try again. Your plan and your records are saved.',
+  },
+  'err.retry': { es: 'Reintentar', en: 'Retry' },
+  'empty.eyebrow': { es: 'Plan de 1 a 3 meses', en: '1 to 3 month plan' },
+  'empty.title': { es: 'Aún no tienes un plan', en: "You don't have a plan yet" },
+  'empty.body': {
+    es: 'Athelete Intelligence arma 4, 8 o 12 semanas según tu objetivo, con todas las sesiones detalladas y los pesos que se ajustan después de cada entreno.',
+    en: 'Athelete Intelligence builds 4, 8 or 12 weeks around your goal, with every session detailed and weights that adjust after each workout.',
+  },
+  'empty.create': { es: 'Crear plan', en: 'Create plan' },
+  'empty.weekOnly': { es: 'Planificar solo esta semana', en: 'Plan only this week' },
+
+  // ── Inicio y Entrenos con plan (31.4) ──
+  'home.weekLine': {
+    es: 'Semana {n} de {weeks} · {done} de {total} sesiones',
+    en: 'Week {n} of {weeks} · {done} of {total} sessions',
+  },
+  'home.weekLineOne': {
+    es: 'Semana {n} de {weeks} · {done} de 1 sesión',
+    en: 'Week {n} of {weeks} · {done} of 1 session',
+  },
+  'home.weekLineStart': { es: 'Empieza el {date}', en: 'Starts {date}' },
+  'home.pausedLine': { es: 'Plan en pausa hasta el {date}', en: 'Plan paused until {date}' },
+  'home.ring.train': { es: 'Entreno · {type}', en: 'Workout · {type}' },
+  'home.ring.rest': { es: 'Descanso', en: 'Rest' },
+  'home.ring.paused': { es: 'En pausa', en: 'Paused' },
+  'home.hero.today': { es: 'Hoy · Semana {n} de {weeks}', en: 'Today · Week {n} of {weeks}' },
+  'home.hero.tomorrow': { es: 'Mañana · Semana {n} de {weeks}', en: 'Tomorrow · Week {n} of {weeks}' },
+  'home.hero.day': { es: '{day} · Semana {n} de {weeks}', en: '{day} · Week {n} of {weeks}' },
+  'home.hero.paused': { es: 'Plan en pausa · hasta el {date}', en: 'Plan paused · until {date}' },
+  'home.hero.start': { es: 'Empezar', en: 'Start' },
+  'home.hero.view': { es: 'Ver sesión', en: 'View session' },
+  'home.hero.resume': { es: 'Retomar plan', en: 'Resume plan' },
 
   // ── Tipos, semanas y fases ──
   'type.pesado': { es: 'Pesado', en: 'Heavy' },
@@ -370,4 +533,33 @@ export function joinNames(language: EllieLanguage, names: string[]): string {
   }
   const and = language === 'es' ? ' y ' : ' and ';
   return `${items.slice(0, -1).join(', ')}${and}${items[items.length - 1]}`;
+}
+
+const MONTH_NAMES: Record<EllieLanguage, string[]> = {
+  es: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'],
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+};
+
+// "Noviembre 2026" / "November 2026" of a "YYYY-MM" month.
+export function monthTitle(language: EllieLanguage, month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return `${MONTH_NAMES[language][m - 1]} ${y}`;
+}
+
+// "Lunes 9" / "Monday 9": the name capitalised and the day's number.
+export function dayName(language: EllieLanguage, date: string): string {
+  const name = weekdayOf(language, date);
+  return `${name.charAt(0).toUpperCase()}${name.slice(1)} ${parts(date).d}`;
+}
+
+// "2 – 8 nov" / "Nov 2 – 8", and across months "29 sep – 5 oct" / "Sep 29 – Oct 5".
+export function weekRangeText(language: EllieLanguage, weekStart: string): string {
+  const [y, m, d] = weekStart.split('-').map(Number);
+  const end = new Date(Date.UTC(y, m - 1, d + 6, 12)).toISOString().slice(0, 10);
+  const a = parts(weekStart);
+  const b = parts(end);
+  if (a.m !== b.m) {
+    return `${shortDate(language, weekStart)} – ${shortDate(language, end)}`;
+  }
+  return language === 'es' ? `${a.d} – ${b.d} ${MONTHS.es[b.m - 1]}` : `${MONTHS.en[b.m - 1]} ${a.d} – ${b.d}`;
 }

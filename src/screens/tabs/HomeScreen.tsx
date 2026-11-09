@@ -8,7 +8,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { StatusBarV2, TextV2, useThemeV2 } from '@app/components/v2';
+import { StatusBarV2, TextV2, useThemeV2, useToast } from '@app/components/v2';
 import { APP_ROUTES, TAB_ROUTES } from '@app/constants/routes';
 import { resolveCore33Invite } from '@app/features/core33/core33Invite';
 import { useCore33InviteDismissals } from '@app/features/core33/useCore33InviteDismissals';
@@ -46,6 +46,7 @@ import { DayRingsCard } from '@app/features/home/v2/DayRingsCard';
 import {
   HERO_HEIGHT,
   HomeHero,
+  type HeroPlan,
   type HeroWorkout,
 } from '@app/features/home/v2/HomeHero';
 import { workoutTypeLabel } from '@app/features/home/v2/homeLabels';
@@ -69,6 +70,10 @@ import { fetchSessionDetail } from '@app/services/supabase/session';
 import { useRoutine, useTodaySuggestion } from '@app/hooks/useRoutines';
 import { useWeekPlan } from '@app/hooks/useWeekPlan';
 import { useOpenWeek } from '@app/features/trainingPlan/useOpenWeek';
+import { planHeroInfo, planStripInfo, planToday as planTodayView } from '@app/features/trainingPlan/planHome';
+import { useTrainingPlanText } from '@app/features/trainingPlan/trainingPlanCopy';
+import { usePlanToday, useResumeTrainingPlan } from '@app/features/trainingPlan/usePlanViews';
+import { sessionTypePhoto } from '@app/features/trainingPlan/v2/planCovers';
 import { getGreeting, getLocalDateKey } from '@app/lib/date';
 import { isRouteSession } from '@app/shared';
 import type { TabScreenProps } from '@app/types/navigation';
@@ -115,6 +120,12 @@ export function HomeScreen({ navigation }: Props) {
   // "Ver semana" (31.4): Tu día, Ver semana and the workout ring on a rest
   // day all open the view the training plan's state decides.
   const openWeek = useOpenWeek();
+  // Training plan (31.4): with one active or paused, Tu día, the ring and the
+  // hero follow the plan's week and its next session.
+  const plan = usePlanToday();
+  const planText = useTrainingPlanText();
+  const resumePlan = useResumeTrainingPlan();
+  const toast = useToast();
   // Guía de Inicio (25.4): 4 steps, once per user.
   const scrollRef = useRef<ScrollView>(null);
   useGuide('home', { scrollRef });
@@ -283,13 +294,29 @@ export function HomeScreen({ navigation }: Props) {
     enabled: Boolean(resumable?.id),
     queryFn: () => fetchSessionDetail(resumable!.id),
   });
+  const planInput = {
+    today: getLocalDateKey(),
+    state: plan.state,
+    ctx: plan.ctx,
+    week: plan.week,
+    next: plan.next,
+    language: planText.language,
+  };
+  const planDay = plan.on ? planTodayView(planInput) : null;
+  const planRingLabel =
+    planDay?.type !== undefined && planDay?.type !== null
+      ? planText.t('home.ring.train', { type: planText.t(`type.${planDay.type}` as 'type.pesado') })
+      : undefined;
   const dayWorkout: DayWorkout =
-    resumable || completedToday || suggestion
+    plan.paused && planDay?.state === 'pause' && !resumable && !completedToday
+      ? { plan: 'paused', text: planText.t('home.ring.paused') }
+      : resumable || completedToday || suggestion
       ? {
           plan: 'session',
           setsDone: resumeDetail.data?.sets.length ?? 0,
           setsTotal: completedToday && isRouteSession(completedToday) ? null : setsTotal,
           completedToday: Boolean(completedToday),
+          label: planRingLabel,
         }
       : restDay
       ? { plan: 'rest' }
@@ -337,6 +364,34 @@ export function HomeScreen({ navigation }: Props) {
     }
     openWorkouts();
   };
+
+  // The plan's session on the hero: Empezar / Ver sesión open the routine's
+  // detail (the session with its weight is part 3); Retomar plan resumes it.
+  const heroPlanInfo = plan.on ? planHeroInfo(planInput) : null;
+  const heroPlan: HeroPlan | null = heroPlanInfo
+    ? {
+        eyebrow: heroPlanInfo.eyebrow,
+        type: heroPlanInfo.type,
+        typeLabel: heroPlanInfo.typeLabel,
+        title: heroPlanInfo.title,
+        minutes: heroPlanInfo.minutes,
+        exercises: heroPlanInfo.exercises,
+        ctaLabel: heroPlanInfo.ctaLabel,
+        busy: resumePlan.resuming,
+        photo: sessionTypePhoto(heroPlanInfo.type),
+        onPress: () => {
+          if (heroPlanInfo.cta === 'resume') {
+            resumePlan.resume().then(ok => {
+              toast.show(planText.t(ok ? 'pause.resumed' : 'pause.error'), ok ? undefined : { tone: 'error' });
+            });
+          } else if (heroPlanInfo.routineId) {
+            navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: heroPlanInfo.routineId });
+          } else {
+            openWorkouts();
+          }
+        },
+      }
+    : null;
 
   const resumeSession = () => {
     const workoutId = resumable?.workoutId;
@@ -435,6 +490,7 @@ export function HomeScreen({ navigation }: Props) {
                 }
               : null,
             workout: toHeroWorkout(heroWorkoutSource, coverContext),
+            plan: heroPlan,
             restDay: restDay ? { kind: restDay.kind } : null,
             resume: resumable
               ? {
@@ -519,6 +575,7 @@ export function HomeScreen({ navigation }: Props) {
                     week={weekQuery.data ?? null}
                     weekLoading={weekQuery.isLoading}
                     onOpenWeek={() => openWeek()}
+                    plan={plan.on ? planStripInfo(planInput) : null}
                     // No insight from today's data yet (the sleep one needs
                     // Apple Health, §28.12): the note stays hidden.
                     insight={null}

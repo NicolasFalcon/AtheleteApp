@@ -262,8 +262,18 @@ export type DayRing = {
 // Today's training: a planned session (its sets), a rest day of the week
 // plan, or nothing planned.
 export type DayWorkout =
-  | { plan: 'session'; setsDone: number; setsTotal: number | null; completedToday: boolean }
+  | {
+      plan: 'session';
+      setsDone: number;
+      setsTotal: number | null;
+      completedToday: boolean;
+      // Training plan (v2.21 §31.4): "Entreno · Pesado" instead of
+      // "Entrenamiento".
+      label?: string;
+    }
   | { plan: 'rest' }
+  // Training plan paused: today is one of the free days of the pause.
+  | { plan: 'paused'; text: string }
   | { plan: 'none' };
 
 export type DayRingsInput = {
@@ -281,7 +291,14 @@ const clamp01 = (value: number) =>
 export { formatThousands } from '@app/features/nutrition/nutritionModel';
 
 function workoutRing(workout: DayWorkout): DayRing {
-  const base = { kind: 'workout' as const, label: 'Entrenamiento', unit: '' };
+  const base = {
+    kind: 'workout' as const,
+    label: workout.plan === 'session' && workout.label ? workout.label : 'Entrenamiento',
+    unit: '',
+  };
+  if (workout.plan === 'paused') {
+    return { ...base, value: workout.text, progress: 1, done: false, text: true, opacity: 0.3 };
+  }
   if (workout.plan === 'rest') {
     return { ...base, value: 'Descanso', progress: 1, done: false, text: true, opacity: 0.3 };
   }

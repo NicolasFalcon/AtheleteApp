@@ -11,13 +11,13 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { haptics } from '@app/components/v2';
 import { getLocalDateKey } from '@app/lib/date';
-import { DaySessionsSheet, DaySummarySheet } from '@app/features/week/v2/DayHistorySheets';
 import { dayHistoryText } from '@app/features/week/dayHistoryCopy';
-import { fetchDaySessions, fetchFirstSessionDate, type DaySession } from '@app/services/supabase/session';
+import { useOpenPastDay } from '@app/features/week/useOpenPastDay';
+import { fetchFirstSessionDate } from '@app/services/supabase/session';
 import {
   BackButton,
   Button,
@@ -109,8 +109,8 @@ export function WeekScreen({ navigation, route }: Props) {
   const home = useHomeFeed();
   const library = useRoutineList('all', { exhaust: true });
   // Plan de entrenamiento (31.4): Crear plan above "Planificar la semana"
-  // without a plan, Plan terminado once it ended, nothing while active or
-  // paused. `route.params.view` ('plan') waits for the plan view (part 2).
+  // without a plan, Plan terminado once it ended. With a plan active or
+  // paused WeekRoute opens TrainingPlanScreen instead of this screen.
   const trainingPlan = useTrainingPlanState();
   const week = query.data ?? null;
   const today = week?.today ?? '';
@@ -126,11 +126,8 @@ export function WeekScreen({ navigation, route }: Props) {
   const [minutesOverride, setMinutesOverride] = useState<Record<string, number>>({});
   const [movedMiss, setMovedMiss] = useState<{ title: string; date: string } | null>(null);
   const minuteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  // Past days: several sessions of a day, and the day summary sheet.
-  const queryClient = useQueryClient();
-  const [daySessions, setDaySessions] = useState<{ date: string; sessions: DaySession[] } | null>(null);
-  const [summaryDate, setSummaryDate] = useState<string | null>(null);
-  const opening = useRef(false);
+  // Past days: their summary, the list of several sessions and the day sheet.
+  const pastDay = useOpenPastDay(today);
 
   // Back to the week of the first session, at most 52 weeks; ahead, only up
   // to the current week.
@@ -405,36 +402,10 @@ export function WeekScreen({ navigation, route }: Props) {
   };
   const movedTo = (day: WeekDay) => days.find(item => item.movedFrom === day.date)?.date ?? null;
 
-  // A past day: its completed sessions (local day, by start time) decide.
-  // One → its summary (historial); several → the list; none → the routine
-  // that was planned ("No completada") or the day summary.
-  const openPastDay = async (day: WeekDay) => {
-    if (!profile?.id || opening.current) {
-      return;
-    }
-    opening.current = true;
-    try {
-      const sessions = await queryClient.fetchQuery({
-        queryKey: ['day-sessions', profile.id, day.date],
-        staleTime: 60 * 1000,
-        queryFn: () => fetchDaySessions(profile.id, day.date),
-      });
-      if (sessions.length === 1) {
-        navigation.navigate(APP_ROUTES.WorkoutSummary, { sessionId: sessions[0].id, mode: 'history' });
-      } else if (sessions.length > 1) {
-        setDaySessions({ date: day.date, sessions });
-      } else if (day.kind === 'session' && day.routine) {
-        navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: day.routine.id, missedOn: day.date });
-      } else {
-        setSummaryDate(day.date);
-      }
-    } catch (error) {
-      __DEV__ && console.warn('[week] No se pudo abrir el día:', error);
-      toast.show(dayHistoryText(language, 'day.error'), { tone: 'error' });
-    } finally {
-      opening.current = false;
-    }
-  };
+  // A past day: its summary (useOpenPastDay); none done and a routine
+  // planned → that routine as "No completada".
+  const openPastDay = (day: WeekDay) =>
+    pastDay.open(day.date, day.kind === 'session' ? day.routine?.id ?? null : null);
 
   // Core 33 block: a past day opens that day read only; today, the tracker.
   const openCore33 = (day: WeekDay) =>
@@ -733,26 +704,7 @@ export function WeekScreen({ navigation, route }: Props) {
         ) : null}
       </Sheet>
 
-      <DaySessionsSheet
-        open={daySessions !== null}
-        title={daySessions ? dayLabel(daySessions.date, today) : ''}
-        sessions={daySessions?.sessions ?? []}
-        onClose={() => setDaySessions(null)}
-        onOpenSession={sessionId => {
-          setDaySessions(null);
-          navigation.navigate(APP_ROUTES.WorkoutSummary, { sessionId, mode: 'history' });
-        }}
-      />
-
-      <DaySummarySheet
-        date={summaryDate}
-        title={summaryDate ? dayLabel(summaryDate, today) : ''}
-        onClose={() => setSummaryDate(null)}
-        onCore33={date => {
-          setSummaryDate(null);
-          navigation.navigate(APP_ROUTES.Core33, { date });
-        }}
-      />
+      {pastDay.sheets}
     </View>
   );
 }

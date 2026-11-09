@@ -7,7 +7,7 @@ import { SettingsScreen } from '@app/screens/profile/SettingsScreen';
 import { HealthSettingsScreen } from '@app/screens/profile/HealthSettingsScreen';
 import { NotificationSettingsScreen } from '@app/screens/profile/NotificationSettingsScreen';
 import { WeekEllieScreen } from '@app/screens/week/WeekEllieScreen';
-import { WeekScreen } from '@app/screens/week/WeekScreen';
+import { WeekRoute } from '@app/screens/week/WeekRoute';
 import { SleepScreen } from '@app/screens/sleep/SleepScreen';
 import { BreatheScreen } from '@app/screens/breathe/BreatheScreen';
 import { EllieChatScreen } from '@app/screens/ellie/EllieChatScreen';
@@ -194,7 +194,7 @@ export function RootNavigator() {
             component={EllieChatScreen}
             options={{ gestureEnabled: false }}
           />
-          <Stack.Screen name={APP_ROUTES.Week} component={WeekScreen} />
+          <Stack.Screen name={APP_ROUTES.Week} component={WeekRoute} />
           <Stack.Screen name={APP_ROUTES.Sleep} component={SleepScreen} />
           <Stack.Screen
             name={APP_ROUTES.Breathe}

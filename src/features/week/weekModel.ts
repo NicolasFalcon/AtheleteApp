@@ -1,6 +1,7 @@
 import { parseRoutineFocus } from '@app/features/workouts/routineFocus';
 import { parseRoutineCategory } from '@app/shared/data/workouts';
 import type { RoutineFocus, Workout, WorkoutType } from '@app/shared/domain/types';
+import type { PlanPhase, PlanWeekKind } from '@app/services/supabase/trainingPlan';
 
 // Tu semana (handoff v2.15 §25.1, contract docs/backend/V2_15_SHAPES.md §2):
 // the shapes of get_week_plan and plan_week_with_ellie as the app reads them,
@@ -29,6 +30,23 @@ export type WeekRoutine = {
   thumbKey: string | null;
 };
 
+// tp-1.2: the session of the training plan a day carries (`plan_session`).
+export type PlanSessionType = 'pesado' | 'volumen' | 'tecnico' | 'descarga' | 'test';
+export type PlanSessionStatus = 'pending' | 'done' | 'missed' | 'substituted' | 'skipped' | 'paused';
+
+export type PlanSessionInfo = {
+  id: string;
+  title: string;
+  type: PlanSessionType | null;
+  minutes: number | null;
+  status: PlanSessionStatus;
+  // Moved to this day (original_date differs): still pending, startable.
+  moved: boolean;
+  originalDate: string | null;
+  // Substituted: the name of the routine that replaced it.
+  substitutedByName: string | null;
+};
+
 export type WeekDay = {
   date: string;
   kind: WeekDayKind;
@@ -42,6 +60,10 @@ export type WeekDay = {
   source?: 'coach' | null;
   coachName?: string | null;
   assignmentId?: string | null;
+  // Training plan (tp-1.2): the day's plan session, and "Descanso en tu plan"
+  // on its rest days.
+  planSession?: PlanSessionInfo | null;
+  restLabel?: string | null;
 };
 
 export type WeekFocus = 'strength' | 'hypertrophy' | 'endurance' | 'mixed';
@@ -64,10 +86,25 @@ export type WeekPlanInfo = {
   hasPreview: boolean;
 };
 
+// get_week_plan · `plan` when the week belongs to a training plan (tp-1.2 §7).
+export type WeekTrainingPlan = {
+  planId: string;
+  name: string;
+  // Null before the plan's start date.
+  weekIndex: number | null;
+  weeks: number;
+  blockIndex: number | null;
+  phase: PlanPhase | null;
+  weekKind: PlanWeekKind | null;
+  pausedUntil: string | null;
+  segments: { weekIndex: number; kind: PlanWeekKind; state: 'done' | 'current' | 'upcoming' }[];
+};
+
 export type WeekPlan = {
   weekStart: string;
   today: string;
   plan: WeekPlanInfo | null;
+  trainingPlan?: WeekTrainingPlan | null;
   days: WeekDay[];
   summary: { sessionsDone: number; sessionsPlanned: number; restDays: number };
   missed: { date: string; routineId: string | null; proposedDate: string | null } | null;
@@ -135,6 +172,70 @@ export function weekRoutineFrom(workout: Workout): WeekRoutine {
   };
 }
 
+const PLAN_TYPES: readonly PlanSessionType[] = ['pesado', 'volumen', 'tecnico', 'descarga', 'test'];
+const PLAN_STATUSES: readonly PlanSessionStatus[] = [
+  'pending',
+  'done',
+  'missed',
+  'substituted',
+  'skipped',
+  'paused',
+];
+const PLAN_WEEK_KINDS: readonly PlanWeekKind[] = ['calibracion', 'carga', 'descarga', 'descarga_test'];
+const PLAN_PHASES: readonly PlanPhase[] = ['base', 'desarrollo', 'pico'];
+
+// plan_session: `{ id, title, session_type, minutes, status, moved,
+// original_date, substituted_by_name }`.
+export function parsePlanSession(raw: unknown): PlanSessionInfo | null {
+  const row = asRecord(raw);
+  const id = str(row?.id);
+  if (!row || !id) {
+    return null;
+  }
+  return {
+    id,
+    title: str(row.title) ?? '',
+    type: PLAN_TYPES.find(item => item === row.session_type) ?? null,
+    minutes: num(row.minutes),
+    status: PLAN_STATUSES.find(item => item === row.status) ?? 'pending',
+    moved: row.moved === true,
+    originalDate: str(row.original_date),
+    substitutedByName: str(row.substituted_by_name),
+  };
+}
+
+export function parseWeekTrainingPlan(raw: unknown): WeekTrainingPlan | null {
+  const row = asRecord(raw);
+  const planId = str(row?.plan_id);
+  if (!row || !planId) {
+    return null;
+  }
+  return {
+    planId,
+    name: str(row.name) ?? '',
+    weekIndex: num(row.week_index),
+    weeks: num(row.weeks) ?? 0,
+    blockIndex: num(row.block_index),
+    phase: PLAN_PHASES.find(item => item === row.phase) ?? null,
+    weekKind: PLAN_WEEK_KINDS.find(item => item === row.week_kind) ?? null,
+    pausedUntil: str(row.paused_until),
+    segments: (Array.isArray(row.segments) ? row.segments : []).flatMap(item => {
+      const segment = asRecord(item);
+      const weekIndex = num(segment?.week_index);
+      const state = segment?.state;
+      return segment && weekIndex !== null
+        ? [
+            {
+              weekIndex,
+              kind: PLAN_WEEK_KINDS.find(kind => kind === segment.kind) ?? 'carga',
+              state: state === 'done' || state === 'current' ? state : 'upcoming',
+            } as const,
+          ]
+        : [];
+    }),
+  };
+}
+
 function parseKind(value: unknown): WeekDayKind {
   return KINDS.find(item => item === value) ?? 'empty';
 }
@@ -164,6 +265,8 @@ export function parseWeekDay(raw: unknown): WeekDay {
     source: row.source === 'coach' ? 'coach' : null,
     coachName: str(row.coach_name),
     assignmentId: str(row.assignment_id),
+    planSession: parsePlanSession(row.plan_session),
+    restLabel: str(row.rest_label),
   };
 }
 
@@ -191,6 +294,7 @@ export function parseWeekPlan(body: Record<string, unknown>): WeekPlan {
             hasPreview: plan.has_preview === true,
           }
         : null,
+    trainingPlan: parseWeekTrainingPlan(plan),
     days: Array.isArray(body.days) ? body.days.map(parseWeekDay) : [],
     summary: {
       sessionsDone: num(summary.sessions_done) ?? 0,

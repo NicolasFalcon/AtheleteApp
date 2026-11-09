@@ -37,7 +37,6 @@ import {
   DURATIONS,
   SESSION_LENGTHS,
   TARGETS,
-  answersKey,
   blocksOf,
   buildPlanRequest,
   canContinueDays,
@@ -48,7 +47,9 @@ import {
   requestMessage,
   stepTarget,
   styleOptions,
+  targetEstimate,
   targetOption,
+  targetStart,
   toggleDay,
   totalSessions,
   type CreateAnswers,
@@ -59,8 +60,13 @@ import { useAuth } from '@app/hooks/useAuth';
 import { useRoutineCategories } from '@app/hooks/useRoutines';
 import { createUuid } from '@app/lib/uuid';
 import { safeGoBack } from '@app/navigation/safeGoBack';
-import { sendEllieMessage } from '@app/services/ellie/ellieService';
-import { TRAINING_GOALS, type TrainingGoal } from '@app/services/supabase/trainingPlan';
+import { EllieError, sendEllieMessage } from '@app/services/ellie/ellieService';
+import { useQuery } from '@tanstack/react-query';
+import {
+  TRAINING_GOALS,
+  fetchGoalTargetEstimates,
+  type TrainingGoal,
+} from '@app/services/supabase/trainingPlan';
 import type { AppScreenProps } from '@app/types/navigation';
 
 type Props = AppScreenProps<'TrainingPlanCreate'>;
@@ -93,14 +99,26 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
   const { profile } = useAuth();
   const { t, language } = useTrainingPlanText();
   const categories = useRoutineCategories();
+  // "Hoy: … estimado" of the four targets (get_goal_target_estimates).
+  const estimates = useQuery({
+    queryKey: ['training-plan', 'goal-target-estimates', profile?.id],
+    enabled: Boolean(profile?.id),
+    staleTime: 5 * 60 * 1000,
+    queryFn: fetchGoalTargetEstimates,
+  });
+  const estimateOf = (key: CreateAnswers['target']) =>
+    targetEstimate(targetOption(key), estimates.data ?? []);
   const [phase, setPhase] = useState<Phase>(0);
   const [answers, setAnswers] = useState<CreateAnswers>(() => initialAnswers(profile));
   const [marked, setMarked] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const mounted = useRef(true);
-  // One client_message_id per set of answers: a retry with the same answers
-  // is the same message for ellie-chat (never two plans).
-  const messageIds = useRef<Record<string, string>>({});
+  // The last send: its answers and its client_message_id, generated once
+  // per send and reused by Reintentar (ellie-chat never builds two plans).
+  const lastSend = useRef<{ answers: CreateAnswers; messageId: string } | null>(null);
+  // invalid_input (e.g. goal_target.exercise_slug) gets the generic error;
+  // anything else, the dropped connection.
+  const [failure, setFailure] = useState<'generic' | 'connection'>('connection');
   const scroll = useRef<ScrollView>(null);
 
   const profileGoal = goalFromProfile(profile?.goal);
@@ -131,22 +149,27 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
     return option?.name ?? t(`style.${key}` as TrainingPlanCopyKey);
   };
 
-  const generate = async (chosen: CreateAnswers) => {
+  // A new send (Crear plan / Omitir y crear) gets a new id; Reintentar
+  // sends the same request with the same id.
+  const generate = async (send: { answers: CreateAnswers; messageId: string }) => {
+    lastSend.current = send;
+    const chosen = send.answers;
     timers.current.forEach(clearTimeout);
     timers.current = STEP_MS.map((ms, index) => setTimeout(() => setMarked(index + 1), ms));
     setMarked(0);
     goTo('generating');
-    const key = answersKey(chosen);
-    messageIds.current[key] = messageIds.current[key] ?? createUuid();
     const style = styles_.find(item => item.key === chosen.style) ?? null;
     const started = Date.now();
     try {
+      // JSON (stream: false): this sheet shows Generando, not the text, and
+      // the chat reads the card from the conversation's history.
       const reply = await sendEllieMessage({
         conversationId: null,
-        clientMessageId: messageIds.current[key],
+        clientMessageId: send.messageId,
         message: requestMessage(language, chosen, styleName(chosen.style)),
+        mode: 'generate_training_plan',
         clientContext: 'training_plan_create',
-        trainingPlanRequest: buildPlanRequest(chosen, style?.slug ?? null),
+        trainingPlanRequest: buildPlanRequest(chosen, style?.slug ?? null, estimateOf(chosen.target)),
       });
       const left = MIN_GENERATING_MS - (Date.now() - started);
       if (left > 0) {
@@ -169,6 +192,7 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
       __DEV__ && console.warn('[training-plan] training_plan_request:', error);
       timers.current.forEach(clearTimeout);
       if (mounted.current) {
+        setFailure(error instanceof EllieError && error.code === 'invalid_input' ? 'generic' : 'connection');
         haptics.error();
         goTo('error');
       }
@@ -177,14 +201,14 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
 
   const next = () => {
     if (phase === 'error') {
-      generate(answers).catch(() => undefined);
+      generate(lastSend.current ?? { answers, messageId: createUuid() }).catch(() => undefined);
       return;
     }
     if (phase === 2 && !canContinueDays(answers.days)) {
       return;
     }
     if (phase === 3) {
-      generate(answers).catch(() => undefined);
+      generate({ answers, messageId: createUuid() }).catch(() => undefined);
       return;
     }
     if (typeof phase === 'number') {
@@ -196,7 +220,7 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
   const skip = () => {
     const chosen = { ...answers, target: 'none' as const, targetValue: 0, style: null };
     setAnswers(chosen);
-    generate(chosen).catch(() => undefined);
+    generate({ answers: chosen, messageId: createUuid() }).catch(() => undefined);
   };
 
   const close = () => safeGoBack(navigation, BACK_FALLBACKS);
@@ -418,6 +442,7 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
   );
 
   const target = targetOption(answers.target);
+  const todayEstimate = estimateOf(answers.target);
   const stepTargetStyle = (
     <>
       {titleBlock(
@@ -441,7 +466,8 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
                 accessibilityState={{ selected: on }}
                 onPress={() => {
                   haptics.selection();
-                  update({ target: option.key, targetValue: option.initial });
+                  // From today's estimate + one step, else the handoff's.
+                  update({ target: option.key, targetValue: targetStart(option, estimateOf(option.key)) });
                 }}
                 style={[styles.pill, { backgroundColor: on ? colors.cta.primary : colors.surface.muted }]}
               >
@@ -459,7 +485,11 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
                 {t(target.unit === 'kg' ? 'meta.kgTitle' : 'meta.repsTitle', { name: t(target.labelKey) })}
               </TextV2>
               <TextV2 variant="caption" color={colors.text.secondary}>
-                {t(target.unit === 'kg' ? 'meta.kgHint' : 'meta.repsHint')}
+                {todayEstimate !== null
+                  ? t(target.unit === 'kg' ? 'meta.todayKg' : 'meta.todayReps', {
+                      n: formatTarget(language, todayEstimate),
+                    })
+                  : t(target.unit === 'kg' ? 'meta.kgHint' : 'meta.repsHint')}
               </TextV2>
             </View>
             <PressableScale
@@ -610,7 +640,7 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
         {t('gen.errorTitle')}
       </AntonText>
       <TextV2 variant="body" color={colors.text.secondary} align="center" style={styles.errorBody}>
-        {t('gen.errorBody')}
+        {t(failure === 'generic' ? 'gen.errorBodyGeneric' : 'gen.errorBody')}
       </TextV2>
     </View>
   );

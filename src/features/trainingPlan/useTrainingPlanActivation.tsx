@@ -169,11 +169,18 @@ export function useTrainingPlanActivation(options: {
           </View>
         </View>
       </Sheet>
-      <Sheet open={confirm?.kind === 'plan'} onClose={close} title={t('replacePlan.title')} footer={footer}>
+      <Sheet
+        open={confirm?.kind === 'plan'}
+        onClose={close}
+        title={
+          confirm?.kind === 'plan' && confirm.currentName
+            ? t('replacePlan.title', { name: confirm.currentName })
+            : t('replacePlan.titleNoName')
+        }
+        footer={footer}
+      >
         <TextV2 variant="body" tone="secondary">
-          {t('replacePlan.body', {
-            name: confirm?.kind === 'plan' && confirm.currentName ? confirm.currentName : t('replacePlan.current'),
-          })}
+          {t('replacePlan.body')}
         </TextV2>
       </Sheet>
     </>

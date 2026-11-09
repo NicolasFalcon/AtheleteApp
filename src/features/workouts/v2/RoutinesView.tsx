@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, type ImageSourcePropType } from 'react-native';
 import {
   routineCoverSource,
   useRoutineCoverContext,
@@ -45,7 +45,22 @@ import type { WeekRoutine } from '@app/features/week/weekModel';
 import { CoachTag } from '@app/features/coach/v2/CoachParts';
 import type { Workout } from '@app/shared';
 
+// The training plan's session as "Tu próxima sesión" (v2.21 §31.4): its type
+// chip, "Hoy · Semana 6 de 12" and the colour cover of its type. Paused:
+// "Plan en pausa · hasta el 20 nov" with Retomar plan.
+export type RoutinesPlanHero = {
+  image: ImageSourcePropType;
+  eyebrow: string;
+  chip: ReactNode;
+  title: string;
+  meta: string;
+  paused: boolean;
+  ctaLabel: string;
+  onPress: () => void;
+};
+
 export type RoutinesViewProps = {
+  planHero?: RoutinesPlanHero | null;
   workouts: Workout[];
   categories: RoutineLibraryCategory[];
   // get_today_suggestion (null: none today → no hero).
@@ -81,6 +96,7 @@ export function RoutinesView({
   workouts,
   categories,
   suggestion,
+  planHero = null,
   coachSession = null,
   loading,
   error,
@@ -139,6 +155,24 @@ export function RoutinesView({
               .filter(Boolean)
               .join(' · ')}
             metaTrailing={<PlayDisc />}
+          />
+        </PressableScale>
+      ) : planHero ? (
+        <PressableScale
+          accessibilityRole="button"
+          accessibilityLabel={`${planHero.eyebrow}: ${planHero.title}. ${planHero.meta}`}
+          onPress={planHero.onPress}
+          style={{ marginHorizontal: -layout.gutter }}
+        >
+          <WorkoutHero
+            image={planHero.image}
+            dim={false}
+            height={300}
+            eyebrow={planHero.eyebrow}
+            eyebrowLeading={planHero.chip}
+            title={planHero.title}
+            meta={planHero.meta}
+            metaTrailing={planHero.paused ? <ResumePill label={planHero.ctaLabel} /> : <PlayDisc />}
           />
         </PressableScale>
       ) : suggestion ? (
@@ -262,6 +296,17 @@ export function suggestionMeta(suggestion: RoutineSuggestion): string {
   ]
     .filter(Boolean)
     .join(' · ');
+}
+
+function ResumePill({ label }: { label: string }) {
+  const { scene } = useThemeV2();
+  return (
+    <View style={[styles.resume, { backgroundColor: scene.cta.onScene }]}>
+      <TextV2 variant="label" color={scene.cta.onSceneText}>
+        {label}
+      </TextV2>
+    </View>
+  );
 }
 
 function PlayDisc() {
@@ -406,6 +451,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 10,
+  },
+  resume: {
+    minHeight: 44,
+    paddingHorizontal: 18,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   play: {
     width: 44,

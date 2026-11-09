@@ -10,7 +10,8 @@ import { parseProposalCard, type ProposalCard } from '@app/services/ellie/ellieP
 // (stream=false) or SSE (stream=true) with the session of the signed-in user;
 // always with the phone's time (client_now, ctx-1) and the v2 cards (prop-1).
 
-export type EllieMode = 'chat' | 'generate_workout' | 'generate_nutrition';
+// generate_training_plan: Crear plan (TRAINING_PLAN_SHAPES tp-1.2 §4).
+export type EllieMode = 'chat' | 'generate_workout' | 'generate_nutrition' | 'generate_training_plan';
 
 export type EllieUsage = {
   used: number;
@@ -61,11 +62,9 @@ export type EllieSendInput = {
   adjustProposalId?: string | null;
   // The answer to a discomfort_check card.
   discomfortAnswer?: DiscomfortAnswer | null;
-  // Crear plan (TRAINING_PLAN_SHAPES tp-1.2 §4): the structured message
-  // `{ type: 'training_plan_request', goal, weeks, days_of_week,
-  // session_minutes, goal_target?, style_category? }`. The contract does not
-  // name its key in the body; it travels as `training_plan_request`, next to
-  // `message`, which carries the same choice in words.
+  // Crear plan (TRAINING_PLAN_SHAPES tp-1.2 §4): the structured request in
+  // the body's root key `training_plan_request` (never inside `message`,
+  // which stays required for the history), with mode generate_training_plan.
   trainingPlanRequest?: Record<string, unknown> | null;
 };
 

@@ -44,19 +44,44 @@ export type PlanTarget = 'none' | 'bench' | 'squat' | 'deadlift' | 'pullups';
 export type TargetOption = {
   key: PlanTarget;
   labelKey: TrainingPlanCopyKey;
+  // goal_target.exercise_slug (§4): the only four the server accepts.
+  slug: string | null;
   unit: 'kg' | 'reps';
-  // Stepper start (handoff) and step: ±2.5 kg, pull-ups ±1 rep.
+  // Stepper start without an estimate (handoff) and step: ±2.5 kg,
+  // pull-ups ±1 rep.
   initial: number;
   step: number;
 };
 
 export const TARGETS: readonly TargetOption[] = [
-  { key: 'none', labelKey: 'meta.none', unit: 'kg', initial: 0, step: 0 },
-  { key: 'bench', labelKey: 'meta.bench', unit: 'kg', initial: 100, step: 2.5 },
-  { key: 'squat', labelKey: 'meta.squat', unit: 'kg', initial: 130, step: 2.5 },
-  { key: 'deadlift', labelKey: 'meta.deadlift', unit: 'kg', initial: 160, step: 2.5 },
-  { key: 'pullups', labelKey: 'meta.pullups', unit: 'reps', initial: 12, step: 1 },
+  { key: 'none', labelKey: 'meta.none', slug: null, unit: 'kg', initial: 0, step: 0 },
+  { key: 'bench', labelKey: 'meta.bench', slug: 'barbell-bench-press', unit: 'kg', initial: 100, step: 2.5 },
+  { key: 'squat', labelKey: 'meta.squat', slug: 'barbell-squat', unit: 'kg', initial: 130, step: 2.5 },
+  { key: 'deadlift', labelKey: 'meta.deadlift', slug: 'barbell-deadlift', unit: 'kg', initial: 160, step: 2.5 },
+  { key: 'pullups', labelKey: 'meta.pullups', slug: 'pull-ups', unit: 'reps', initial: 12, step: 1 },
 ];
+
+// ── "Hoy: … estimado" (get_goal_target_estimates) ──────────────────────────
+// Today's estimate of a target: e1RM rounded to 2.5 kg, or max reps for
+// pull-ups. null: no data (no line, start_estimate null).
+export function targetEstimate(
+  option: TargetOption,
+  estimates: { exerciseSlug: string; e1rmKg: number | null; maxReps: number | null }[],
+): number | null {
+  const item = option.slug ? estimates.find(row => row.exerciseSlug === option.slug) : undefined;
+  if (!item) {
+    return null;
+  }
+  if (option.unit === 'kg') {
+    return item.e1rmKg !== null ? Math.round(item.e1rmKg / 2.5) * 2.5 : null;
+  }
+  return item.maxReps;
+}
+
+// Where the stepper starts: the estimate plus one step, else the handoff's.
+export function targetStart(option: TargetOption, estimate: number | null): number {
+  return estimate !== null ? estimate + option.step : option.initial;
+}
 
 export const targetOption = (key: PlanTarget): TargetOption =>
   TARGETS.find(option => option.key === key) ?? TARGETS[0];
@@ -192,13 +217,22 @@ export type TrainingPlanRequest = {
   weeks: TrainingPlanWeeks;
   days_of_week: number[];
   session_minutes: SessionMinutes;
-  // The app has no catalog ids for these lifts: it sends the name and the
-  // kind; the server resolves the exercise.
-  goal_target?: { exercise_name: string; kind: 'kg' | 'reps'; target: number };
-  style_category?: string;
+  // By exercise_slug (the server adds exercise_id). "Sin meta" → null.
+  goal_target: {
+    exercise_slug: string;
+    kind: 'kg' | 'reps';
+    target: number;
+    start_estimate: number | null;
+  } | null;
+  style_category: string | null;
 };
 
-export function buildPlanRequest(answers: CreateAnswers, styleSlug: string | null): TrainingPlanRequest {
+export function buildPlanRequest(
+  answers: CreateAnswers,
+  styleSlug: string | null,
+  // "Hoy: … estimado" of the chosen target (targetEstimate), or null.
+  startEstimate: number | null,
+): TrainingPlanRequest {
   const option = targetOption(answers.target);
   return {
     type: 'training_plan_request',
@@ -206,17 +240,15 @@ export function buildPlanRequest(answers: CreateAnswers, styleSlug: string | nul
     weeks: answers.weeks,
     days_of_week: answers.days,
     session_minutes: answers.minutes,
-    ...(answers.target !== 'none'
+    goal_target: option.slug
       ? {
-          goal_target: {
-            // Spanish names: the catalog's language.
-            exercise_name: trainingPlanText('es', option.labelKey),
-            kind: option.unit,
-            target: answers.targetValue,
-          },
+          exercise_slug: option.slug,
+          kind: option.unit,
+          target: answers.targetValue,
+          start_estimate: startEstimate,
         }
-      : {}),
-    ...(styleSlug ? { style_category: styleSlug } : {}),
+      : null,
+    style_category: styleSlug,
   };
 }
 
@@ -251,9 +283,6 @@ export function requestMessage(
   }
   return text;
 }
-
-// Same answers → same request (the client message id is reused on retry).
-export const answersKey = (answers: CreateAnswers) => JSON.stringify(answers);
 
 // ── Propuesta (31.2) ────────────────────────────────────────────────────────
 // The kind of each week: the server's week_kinds, or built from the plan's

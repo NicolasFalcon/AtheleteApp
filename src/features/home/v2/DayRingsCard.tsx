@@ -14,6 +14,8 @@ import type { DayRing, DayRingKind } from '@app/features/home/homePriority';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { WeekPills } from '@app/features/week/v2/WeekParts';
 import { stripLine, type WeekPlan } from '@app/features/week/weekModel';
+import type { PlanDayView } from '@app/features/trainingPlan/planViewModel';
+import { PlanPills } from '@app/features/trainingPlan/v2/PlanDayParts';
 
 // Ring colours, option A (v2.18 §28.14): Entrenamiento Ember, Core 33 peach,
 // Nutrición sage, Hidratación Recovery Blue. Same in Light and Dark.
@@ -39,6 +41,9 @@ type DayRingsCardProps = {
   week: WeekPlan | null;
   weekLoading: boolean;
   onOpenWeek: () => void;
+  // With an active or paused training plan (v2.21 §31.4): the plan's seven
+  // days with their type and "Semana 6 de 12 · 2 de 4 sesiones" under them.
+  plan?: { views: PlanDayView[]; line: string } | null;
   insight: DayInsight | null;
 };
 
@@ -58,6 +63,7 @@ export function DayRingsCard({
   week,
   weekLoading,
   onOpenWeek,
+  plan = null,
   insight,
 }: DayRingsCardProps) {
   const { colors, mode, shadow } = useThemeV2();
@@ -95,22 +101,26 @@ export function DayRingsCard({
         <GuideAnchor id="home.week">
           <PressableScale
             accessibilityRole="button"
-            accessibilityLabel={`Tu semana. ${stripLine(week)}`}
+            accessibilityLabel={`Tu semana. ${plan ? plan.line : stripLine(week)}`}
             onPress={onOpenWeek}
             style={styles.week}
           >
             <View pointerEvents="none">
               {/* The same pills as Semana; grey on the white card. */}
-              <WeekPills
-                days={week.days}
-                today={week.today}
-                compact
-                fill={colors.surface.muted}
-              />
+              {plan ? (
+                <PlanPills views={plan.views} today={week.today} compact fill={colors.surface.muted} />
+              ) : (
+                <WeekPills
+                  days={week.days}
+                  today={week.today}
+                  compact
+                  fill={colors.surface.muted}
+                />
+              )}
             </View>
             <View style={styles.weekLine}>
-              <TextV2 variant="meta" tone="secondary">
-                {`Semana · ${stripLine(week)}`}
+              <TextV2 variant="meta" tone="secondary" style={styles.weekLineText}>
+                {plan ? plan.line : `Semana · ${stripLine(week)}`}
               </TextV2>
               <View style={styles.weekLink}>
                 <TextV2 variant="metaStrong">Ver semana</TextV2>
@@ -282,6 +292,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   faint: { opacity: 0.5 },
   week: { gap: 12 },
+  weekLineText: { flexShrink: 1 },
   weekLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',

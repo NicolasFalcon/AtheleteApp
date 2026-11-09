@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Image,
   Pressable,
+  type ImageSourcePropType,
   ScrollView,
   StyleSheet,
   View,
@@ -19,10 +20,12 @@ import {
   Eyebrow,
   IconButton,
   Scrim,
+  SessionTypeChip,
   Skeleton,
   SkeletonGroup,
   TextV2,
   useThemeV2,
+  type SessionType,
 } from '@app/components/v2';
 import {
   slidesKey,
@@ -55,7 +58,24 @@ export type HeroWorkout = {
   cover?: RoutineCoverInfo;
 };
 
+// Training plan (v2.21 §31.4): the plan's session takes the "workout" slide,
+// with its type chip, "Hoy · Semana 6 de 12" and the colour cover of its
+// type. Paused: "Plan en pausa · hasta el 20 nov" and "Retomar plan".
+export type HeroPlan = {
+  eyebrow: string;
+  type: SessionType | null;
+  typeLabel: string | null;
+  title: string;
+  minutes: number | null;
+  exercises: number | null;
+  ctaLabel: string;
+  busy?: boolean;
+  photo: ImageSourcePropType;
+  onPress: () => void;
+};
+
 export type HomeHeroData = {
+  plan?: HeroPlan | null;
   // Core 33 (mode core33 / workoutDone)
   core: {
     day: number;
@@ -213,6 +233,7 @@ export function HomeHero(props: HomeHeroProps) {
               bottom={multi ? CONTENT_BOTTOM_MANY : CONTENT_BOTTOM_ONE}
               coverTop={insets.top + 8 + TOP_BAR_HEIGHT + 16}
               cover={slide && !props.error ? slideCover(slide, props.data) : null}
+              photo={slide?.kind === 'workout' ? props.data.plan?.photo ?? null : null}
             >
               <HeroContent {...props} slide={slide} />
             </HeroPage>
@@ -233,6 +254,8 @@ export function HomeHero(props: HomeHeroProps) {
 function slideCover(slide: HomeSlide, data: HomeHeroData): RoutineCoverInfo | null {
   switch (slide.kind) {
     case 'workout':
+      // The plan's session has the colour cover of its type, not a routine cover.
+      return data.plan ? null : data.workout?.cover ?? null;
     case 'new':
       return data.workout?.cover ?? null;
     case 'resume':
@@ -252,6 +275,7 @@ function HeroPage({
   bottom,
   coverTop,
   cover,
+  photo,
   children,
 }: {
   slide: HomeSlide | null;
@@ -260,6 +284,8 @@ function HeroPage({
   bottom: number;
   coverTop: number;
   cover: RoutineCoverInfo | null;
+  // The training plan's session cover (colour photo by type).
+  photo?: ImageSourcePropType | null;
   children: ReactNode;
 }) {
   const [textsTop, setTextsTop] = useState<number | null>(null);
@@ -275,7 +301,7 @@ function HeroPage({
         />
       ) : slide ? (
         <Image
-          source={HERO_PHOTO[SLIDE_PHOTO[slide.kind]].source}
+          source={photo ?? HERO_PHOTO[SLIDE_PHOTO[slide.kind]].source}
           resizeMode="cover"
           style={styles.photo}
           accessibilityIgnoresInvertColors
@@ -622,6 +648,9 @@ function WorkoutContent({
   onOpenWeek,
   data,
 }: HomeHeroProps & { workout: HeroWorkout | null }) {
+  if (data.plan) {
+    return <PlanContent plan={data.plan} />;
+  }
   if (!workout && data.restDay) {
     return <RestContent kind={data.restDay.kind} onOpenWeek={onOpenWeek} />;
   }
@@ -656,6 +685,38 @@ function WorkoutContent({
         iconPosition="end"
         fullWidth
         onPress={onStartWorkout}
+      />
+    </View>
+  );
+}
+
+// The plan's session (v2.21 §31.4): eyebrow with the day and the week of the
+// plan, the type chip, the name, its figures and Empezar · Ver sesión ·
+// Retomar plan.
+function PlanContent({ plan }: { plan: HeroPlan }) {
+  return (
+    <View style={styles.content}>
+      <Eyebrow tone="tertiary" numberOfLines={1}>
+        {plan.eyebrow}
+      </Eyebrow>
+      {plan.type && plan.typeLabel ? <SessionTypeChip type={plan.type} label={plan.typeLabel} /> : null}
+      <TextV2 variant="title22" numberOfLines={2} style={styles.tight}>
+        {plan.title}
+      </TextV2>
+      {plan.minutes !== null || plan.exercises !== null ? (
+        <View style={styles.stats}>
+          {plan.minutes !== null ? <Stat value={plan.minutes} label="minutos" /> : null}
+          {typeof plan.exercises === 'number' ? <Stat value={plan.exercises} label="ejercicios" /> : null}
+        </View>
+      ) : null}
+      <Button
+        label={plan.ctaLabel}
+        variant="onScene"
+        icon={Play}
+        iconPosition="end"
+        fullWidth
+        loading={plan.busy}
+        onPress={plan.onPress}
       />
     </View>
   );

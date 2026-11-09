@@ -248,8 +248,8 @@ export type AppStackParamList = {
   EllieChat: EllieChatRouteParams | undefined;
   // weekStart: a Monday (YYYY-MM-DD) to open Tu semana on that week; date: the
   // day whose card it opens on. view: what "Ver semana" decided from the
-  // training plan's state (31.4); 'plan' opens the current week until the
-  // plan view exists (part 2).
+  // training plan's state (31.4): 'plan' for an active or paused plan.
+  // WeekRoute makes the final choice with the live state.
   Week: { weekStart?: string; date?: string; view?: 'current' | 'plan' } | undefined;
   // Plan de entrenamiento (v2.21 §31): Crear plan (a sheet below the status
   // bar) and the detail of a proposal before activating it.

@@ -29,6 +29,12 @@ import { isCoachDay } from '@app/features/week/weekModel';
 import { useWeekPlan } from '@app/hooks/useWeekPlan';
 import { PlanEntryCard } from '@app/features/trainingPlan/v2/PlanParts';
 import { useTrainingPlanState } from '@app/features/trainingPlan/useTrainingPlanState';
+import { planHeroInfo } from '@app/features/trainingPlan/planHome';
+import { useTrainingPlanText } from '@app/features/trainingPlan/trainingPlanCopy';
+import { usePlanToday, useResumeTrainingPlan } from '@app/features/trainingPlan/usePlanViews';
+import { sessionTypePhoto } from '@app/features/trainingPlan/v2/planCovers';
+import { SessionTypeChip, useToast } from '@app/components/v2';
+import type { RoutinesPlanHero } from '@app/features/workouts/v2/RoutinesView';
 import { useAuth } from '@app/hooks/useAuth';
 import { useCatalogTotal } from '@app/hooks/useCatalog';
 import { useFavoriteWorkouts } from '@app/hooks/useFavoriteWorkouts';
@@ -53,6 +59,12 @@ export function WorkoutsScreen({ navigation, route }: Props) {
   const categoriesQuery = useRoutineCategories();
   const suggestionQuery = useTodaySuggestion();
   const trainingPlan = useTrainingPlanState();
+  // Training plan (31.4): its next session is "Tu próxima sesión" while the
+  // plan is active or paused (a coach's session still goes first).
+  const plan = usePlanToday();
+  const planText = useTrainingPlanText();
+  const resumePlan = useResumeTrainingPlan();
+  const toast = useToast();
   const catalogTotal = useCatalogTotal();
   const favorites = useFavoriteWorkouts();
   const [segment, setSegment] = useState<Segment>(
@@ -106,6 +118,47 @@ export function WorkoutsScreen({ navigation, route }: Props) {
   );
 
   const workouts = routinesQuery.items;
+
+  const heroInfo = plan.on
+    ? planHeroInfo({
+        today: plan.ctx.today,
+        state: plan.state,
+        ctx: plan.ctx,
+        week: plan.week,
+        next: plan.next,
+        language: planText.language,
+      })
+    : null;
+  const planHero: RoutinesPlanHero | null = heroInfo
+    ? {
+        image: sessionTypePhoto(heroInfo.type),
+        // Paused: the pause line leads; else "Tu próxima sesión" with the
+        // type chip and "Hoy · Semana 6 de 12" in the meta line.
+        eyebrow: heroInfo.paused ? heroInfo.eyebrow : 'Tu próxima sesión',
+        chip: heroInfo.type && heroInfo.typeLabel ? <SessionTypeChip type={heroInfo.type} label={heroInfo.typeLabel} /> : null,
+        title: heroInfo.title,
+        meta: heroInfo.paused
+          ? ''
+          : [
+              heroInfo.eyebrow,
+              heroInfo.minutes ? `${heroInfo.minutes} min` : null,
+              heroInfo.exercises ? `${heroInfo.exercises} ejercicios` : null,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+        paused: heroInfo.paused,
+        ctaLabel: heroInfo.ctaLabel,
+        onPress: () => {
+          if (heroInfo.paused) {
+            resumePlan.resume().then(ok => {
+              toast.show(planText.t(ok ? 'pause.resumed' : 'pause.error'), ok ? undefined : { tone: 'error' });
+            });
+          } else if (heroInfo.routineId) {
+            navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: heroInfo.routineId });
+          }
+        },
+      }
+    : null;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg }]}>
@@ -183,6 +236,7 @@ export function WorkoutsScreen({ navigation, route }: Props) {
             workouts={workouts}
             categories={categoriesQuery.data ?? []}
             suggestion={suggestionQuery.data?.suggestion ?? null}
+            planHero={planHero}
             coachSession={coachSession}
             loading={routinesQuery.isLoading || categoriesQuery.isLoading || !favorites.loaded}
             error={Boolean(routinesQuery.error || categoriesQuery.error)}
