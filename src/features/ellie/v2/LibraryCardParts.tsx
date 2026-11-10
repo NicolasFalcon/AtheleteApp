@@ -6,7 +6,12 @@ import { RoutineCover } from '@app/components/v2/RoutineCover';
 import { focusWord } from '@app/features/workouts/routineFocus';
 import { useAuth } from '@app/hooks/useAuth';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
-import type { RoutineLibraryMessage, WeekPlanAddedMessage } from '@app/features/ellie/chatModel';
+import type {
+  RoutineLibraryMessage,
+  WeekPlanAddedMessage,
+  WeekPlanConflictMessage,
+} from '@app/features/ellie/chatModel';
+import { PlanReplacementPreview } from '@app/features/week/v2/AddToWeekSheet';
 import { COMPACT_ROWS, exerciseDetail } from '@app/features/ellie/routineProposalModel';
 import {
   CARD_SHADOW,
@@ -252,7 +257,7 @@ export function WeekPlanAddedCard({
             disabled={undoing}
             style={styles.flex}
           />
-          {active ? (
+          {active && !added.substitutes ? (
             <Button
               label={addToWeekText(language, undoing ? 'weekAdded.undoing' : 'weekAdded.undo')}
               variant="outline"
@@ -265,6 +270,65 @@ export function WeekPlanAddedCard({
           ) : null}
         </View>
       )}
+    </View>
+  );
+}
+
+// ELLIE · week_plan_conflict: the plan session is crossed out into the new
+// routine. Replacing writes immediately; choosing another day reuses the
+// Add-to-week sheet with the same routine reference.
+export function WeekPlanConflictCard({
+  card,
+  replacing,
+  failed,
+  onReplace,
+  onChooseAnother,
+}: {
+  card: WeekPlanConflictMessage;
+  replacing: boolean;
+  failed: boolean;
+  onReplace: () => void;
+  onChooseAnother: () => void;
+}) {
+  const tone = useProposalColors();
+  const { colors } = useThemeV2();
+  const language = useProfileLanguage();
+  const { conflict } = card;
+  return (
+    <View style={[styles.card, styles.week, { backgroundColor: tone.card, boxShadow: CARD_SHADOW }]}>
+      <TextV2 variant="bodyStrong">
+        {addToWeekText(language, 'addToWeek.conflict.title')}
+      </TextV2>
+      <PlanReplacementPreview
+        date={conflict.date}
+        planTitle={conflict.planSession.title}
+        planType={conflict.planSession.sessionType}
+        routineName={conflict.routineName}
+      />
+      {failed ? (
+        <TextV2 variant="meta" color={colors.plan.emT}>
+          {addToWeekText(language, 'addToWeek.error.generic')}
+        </TextV2>
+      ) : null}
+      <View style={styles.actions}>
+        <Button
+          label={addToWeekText(language, 'addToWeek.conflict.other')}
+          variant="secondary"
+          size="md"
+          disabled={replacing}
+          onPress={onChooseAnother}
+          style={styles.flex}
+        />
+        <Button
+          label={addToWeekText(language, 'addToWeek.conflict.replace')}
+          size="md"
+          loading={replacing}
+          loadingLabel={addToWeekText(language, 'addToWeek.adding')}
+          disabled={replacing}
+          onPress={onReplace}
+          style={styles.flex}
+        />
+      </View>
     </View>
   );
 }

@@ -8,6 +8,7 @@ import { plainMarkdown } from '@app/features/ellie/markdown';
 import type {
   RoutineLibrary,
   RoutineProposal,
+  WeekPlanConflict,
   WeekPlanAdded,
 } from '@app/services/ellie/ellieProposals';
 import type { FoodPrefs, NutritionProposal } from '@app/services/ellie/nutritionProposals';
@@ -174,6 +175,15 @@ export type WeekPlanAddedMessage = {
   removed: boolean;
 };
 
+// week_plan_conflict: ELLIE tried to put a routine on a plan-session day.
+// The app either replaces it directly or reopens Add to week for another day.
+export type WeekPlanConflictMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'weekPlanConflict';
+  conflict: WeekPlanConflict;
+};
+
 // training_plan_proposal (tp-1.2 · v2.21 §31.2): the plan of 1 to 3 months.
 // Activating happens on the card (or the detail); `startDate` is the date
 // the activation answered with.
@@ -207,6 +217,7 @@ export type ProposalMessage =
   | NutritionPrefsMessage
   | DiscomfortCheckMessage
   | RoutineLibraryMessage
+  | WeekPlanConflictMessage
   | WeekPlanAddedMessage;
 
 export type CardMessage = NutritionCardMessage | WorkoutCardMessage | MealCardMessage;
@@ -221,6 +232,7 @@ export type ChatMessage =
   | NutritionPrefsMessage
   | DiscomfortCheckMessage
   | RoutineLibraryMessage
+  | WeekPlanConflictMessage
   | WeekPlanAddedMessage
   | TrainingPlanProposalMessage
   | PlanAdjustmentMessage;
@@ -252,6 +264,7 @@ export type ChatAction =
   | { type: 'proposal'; card: ProposalMessage; parentId?: string | null }
   | { type: 'discomfortAnswered'; id: string; answer: DiscomfortReply }
   | { type: 'weekPlanRemoved'; id: string }
+  | { type: 'weekPlanConflictResolved'; id: string; added: WeekPlanAdded }
   | { type: 'planAdjustmentAnswered'; id: string; action: AdjustmentAction }
   | { type: 'proposalLoaded'; id: string; proposal: RoutineProposal | null; status: RoutineCardStatus }
   | { type: 'proposalStatus'; id: string; status: RoutineCardStatus }
@@ -481,6 +494,21 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages: state.messages.map(message =>
           message.id === action.id && message.kind === 'weekPlanAdded'
             ? { ...message, removed: true }
+            : message,
+        ),
+      };
+    case 'weekPlanConflictResolved':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'weekPlanConflict'
+            ? {
+                id: message.id,
+                role: 'assistant' as const,
+                kind: 'weekPlanAdded' as const,
+                added: action.added,
+                removed: false,
+              }
             : message,
         ),
       };

@@ -827,6 +827,8 @@ export function useEllieConversation({
     discardProposal,
     reloadProposal,
     weekPlanRemoved: (id: string) => dispatch({ type: 'weekPlanRemoved', id }),
+    weekPlanConflictResolved: (id: string, added: WeekPlanAdded) =>
+      dispatch({ type: 'weekPlanConflictResolved', id, added }),
     planAdjustmentAnswered: (id: string, action: AdjustmentAction) =>
       dispatch({ type: 'planAdjustmentAnswered', id, action }),
     // A routine added to a day from a card of the chat: the confirmation card.

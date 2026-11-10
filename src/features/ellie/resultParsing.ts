@@ -17,17 +17,13 @@ import {
   parseDiscomfortCheck,
   parseRoutineLibrary,
   parseRoutineProposal,
+  parseWeekPlanConflict,
   parseWeekPlanAdded,
   storedCards,
   type ProposalCard,
 } from '@app/services/ellie/ellieProposals';
 import { parseNutritionProposal } from '@app/services/ellie/nutritionProposals';
 import { parseTrainingPlanProposal } from '@app/services/supabase/trainingPlan';
-import {
-  parseAdjustment,
-  type AdjustmentAction,
-  type PlanAdjustment,
-} from '@app/services/supabase/trainingPlanSession';
 import { DISCOMFORT_CHIPS, discomfortFromText } from '@app/features/ellie/discomfortModel';
 
 // Reading of the tool data of ellie-chat (docs/backend/ELLIE_SHAPES.md):
@@ -175,22 +171,6 @@ export function parseTool(tool: EllieTool, id: string, content: string): ParsedT
   };
 }
 
-// An adjustment read from the history that was already answered shows its
-// confirmation: what the status says the athlete chose (null: still waiting,
-// or closed without an answer).
-function answeredFromStatus(adjustment: PlanAdjustment): AdjustmentAction | null {
-  switch (adjustment.status) {
-    case 'approved':
-      return 'approve';
-    case 'rejected':
-      return 'reject';
-    case 'reverted':
-      return 'revert';
-    default:
-      return null;
-  }
-}
-
 // A card of cards_v2 as a chat message. With its payload (stream / JSON) the
 // routine is ready; from the history (proposal_id only) it is `loading` until
 // get_proposal answers. A routine card without proposal_id is not shown.
@@ -210,22 +190,12 @@ export function proposalToMessage(card: ProposalCard, fallbackId: string): Propo
   if (card.type === 'nutrition_prefs_request') {
     return { id, role: 'assistant', kind: 'nutritionPrefs', prefs: null, answered: false };
   }
-  // The adjustment of the plan (31.8): the payload is the adjustment itself
-  // (`{ id, kind, status, payload }`, or wrapped in `adjustment`).
+  // Reserved for part 4: keep the component/model, but the backend does not
+  // emit plan_adjustment cards yet, so do not wire it into the chat parser.
   if (card.type === 'plan_adjustment') {
-    const payload = card.payload as { adjustment?: unknown } | null;
-    const adjustment = parseAdjustment(payload?.adjustment ?? card.payload);
-    return adjustment
-      ? {
-          id: `${fallbackId}-${card.type}-${adjustment.id}`,
-          role: 'assistant',
-          kind: 'planAdjustment',
-          adjustment,
-          answered: answeredFromStatus(adjustment),
-        }
-      : null;
+    return null;
   }
-  // prop-2: these two have no proposal_id; their payload is the card.
+  // prop-2: these cards have no proposal_id; their payload is the card.
   if (card.type === 'routine_library') {
     const library = parseRoutineLibrary(card.payload);
     return library ? { id: `${fallbackId}-${card.type}-${library.routineId}`, role: 'assistant', kind: 'routineLibrary', library } : null;
@@ -234,6 +204,17 @@ export function proposalToMessage(card: ProposalCard, fallbackId: string): Propo
     const added = parseWeekPlanAdded(card.payload);
     return added
       ? { id: `${fallbackId}-${card.type}-${added.date}`, role: 'assistant', kind: 'weekPlanAdded', added, removed: false }
+      : null;
+  }
+  if (card.type === 'week_plan_conflict') {
+    const conflict = parseWeekPlanConflict(card.payload);
+    return conflict
+      ? {
+          id: `${fallbackId}-${card.type}-${conflict.date}`,
+          role: 'assistant',
+          kind: 'weekPlanConflict',
+          conflict,
+        }
       : null;
   }
   if (!card.proposalId) {

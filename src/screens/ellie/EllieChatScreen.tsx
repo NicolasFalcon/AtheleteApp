@@ -17,6 +17,7 @@ import {
   Button,
   EllieComposer,
   AuraMark,
+  haptics,
   IconButton,
   PressableScale,
   Sheet,
@@ -45,6 +46,7 @@ import {
 } from '@app/features/ellie/v2/RoutineProposalParts';
 import {
   RoutineLibraryCard,
+  WeekPlanConflictCard,
   WeekPlanAddedCard,
 } from '@app/features/ellie/v2/LibraryCardParts';
 import { PlanAdjustmentChatCard } from '@app/features/trainingPlan/v2/PlanAdjustmentCard';
@@ -73,6 +75,7 @@ import {
 } from '@app/services/ellie/nutritionProposals';
 import {
   NO_EDITS,
+  planRoutineForDay,
   ProposalError,
   unplanRoutineForDay,
   type RoutineEdits,
@@ -104,9 +107,11 @@ import { draftFromAnalysis, toSaveInput } from '@app/features/nutrition/mealDraf
 import { mealRegistrar } from '@app/features/nutrition/mealRegistrar';
 import { PhotoSourceSheet } from '@app/features/vision/v2/PhotoSourceSheet';
 import { usePhotoAttachment } from '@app/features/vision/usePhotoAttachment';
+import { createUuid } from '@app/lib/uuid';
 import type {
   MealCardMessage,
   RoutineLibraryMessage,
+  WeekPlanConflictMessage,
   WeekPlanAddedMessage,
 } from '@app/features/ellie/chatModel';
 import type { AppScreenProps } from '@app/types/navigation';
@@ -381,6 +386,44 @@ export function EllieChatScreen({ navigation, route }: Props) {
     }
   };
 
+  // week_plan_conflict: replace the plan session directly with the exact
+  // routine/proposal reference carried by the card. On success the same card
+  // becomes the week_plan_added receipt.
+  const [replacingConflictId, setReplacingConflictId] = useState<string | null>(null);
+  const [failedConflictId, setFailedConflictId] = useState<string | null>(null);
+  const replacePlanConflict = async (message: WeekPlanConflictMessage) => {
+    if (replacingConflictId) {
+      return;
+    }
+    const { conflict } = message;
+    setReplacingConflictId(message.id);
+    setFailedConflictId(null);
+    try {
+      const result = await planRoutineForDay({
+        date: conflict.date,
+        routineId: conflict.routineId,
+        proposalId: conflict.proposalId,
+        replace: true,
+        clientId: createUuid(),
+      });
+      chat.weekPlanConflictResolved(message.id, {
+        date: result.date,
+        routineId: result.routineId,
+        name: result.name || conflict.routineName,
+        replaced: true,
+        substitutes: conflict.planSession.title,
+        planOn: true,
+      });
+      haptics.success();
+      invalidateWeek(queryClient).catch(() => undefined);
+    } catch {
+      haptics.error();
+      setFailedConflictId(message.id);
+    } finally {
+      setReplacingConflictId(null);
+    }
+  };
+
   const SAVE_FAILED = 'No se pudo guardar. Intenta de nuevo.';
 
   // Guardar (card): the version as ELLIE proposed it.
@@ -630,6 +673,26 @@ export function EllieChatScreen({ navigation, route }: Props) {
             navigation.navigate(APP_ROUTES.WorkoutDetail, { workoutId: message.library.routineId })
           }
           onAdjust={() => sendText(addToWeekText(language, 'library.adjust'))}
+        />
+      );
+    }
+    if (message.kind === 'weekPlanConflict') {
+      return (
+        <WeekPlanConflictCard
+          key={message.id}
+          card={message}
+          replacing={replacingConflictId === message.id}
+          failed={failedConflictId === message.id}
+          onReplace={() => {
+            replacePlanConflict(message).catch(() => undefined);
+          }}
+          onChooseAnother={() =>
+            addToWeek.open({
+              name: message.conflict.routineName,
+              routineId: message.conflict.routineId,
+              proposalId: message.conflict.proposalId,
+            })
+          }
         />
       );
     }

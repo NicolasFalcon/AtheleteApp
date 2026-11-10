@@ -12,9 +12,10 @@ import type {
 // Ajustes de tu plan (handoff v2.21 §31.8): which adjustments the card shows,
 // its buttons by type, and the confirmation that replaces them.
 
-// An adjustment still waits for the athlete: an open one, or the discomfort
-// that was already applied and has not been answered (it is the only one that
-// applies before asking, so it is the only one with "Entendido / Revertir").
+// An adjustment still waits for the athlete: an open one, or discomfort that
+// was already applied and has not been acknowledged. For discomfort, `ack`
+// deliberately keeps status `applied`; only `responded_at` distinguishes
+// unseen from "Entendido" (there is no acknowledged/response field).
 export function needsAnswer(adjustment: PlanAdjustment): boolean {
   return (
     adjustment.status === 'open' ||

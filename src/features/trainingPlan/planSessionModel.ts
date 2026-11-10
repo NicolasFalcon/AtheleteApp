@@ -32,17 +32,16 @@ export function schemeLine(exercise: PlanSessionExercise, t: TrainingPlanT): str
   return exercise.rir !== null ? `${base} · ${t('session.rir', { n: exercise.rir })}` : base;
 }
 
-// "Última vez": "{reps} reps con {kg} kg", "{reps} reps" when the kg is null,
-// "Sin registros todavía" with no data. `last_time.sets` is never used: it is
-// the historic total, not the sets of that session.
+// "Última vez": "{sets} × {reps} con {kg} kg", without kg for bodyweight,
+// or "Sin registros todavía" with no data.
 export function lastTimeLine(exercise: Pick<PlanSessionExercise, 'lastTime'>, t: TrainingPlanT): string {
   const last = exercise.lastTime;
   if (!last) {
     return t('session.lastNone');
   }
   return last.kg !== null
-    ? t('session.last', { reps: last.reps, kg: kgValue(last.kg) })
-    : t('session.lastNoKg', { reps: last.reps });
+    ? t('session.last', { sets: last.sets, reps: last.reps, kg: kgValue(last.kg) })
+    : t('session.lastNoKg', { sets: last.sets, reps: last.reps });
 }
 
 export type WeightLine =

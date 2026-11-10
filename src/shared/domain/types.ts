@@ -66,7 +66,7 @@ export type PlanExerciseTarget = {
   // null: bodyweight (calibrate false) or still to calibrate (calibrate true).
   recommendedKg: number | null;
   calibrate: boolean;
-  lastTime: { kg: number | null; reps: number } | null;
+  lastTime: { sets: number; kg: number | null; reps: number } | null;
 };
 
 export type WorkoutExercise = {

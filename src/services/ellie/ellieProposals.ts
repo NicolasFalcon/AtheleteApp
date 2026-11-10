@@ -1,4 +1,5 @@
 import { getSupabaseClient } from '@app/services/supabase/client';
+import { isSessionType, type SessionType } from '@app/components/v2/SessionTypeChip';
 import { focusFromTargetGroups, parseRoutineFocus } from '@app/features/workouts/routineFocus';
 import {
   parseNutritionProposal,
@@ -32,6 +33,7 @@ export type ProposalCardType =
   // a routine added to a day of the week.
   | 'routine_library'
   | 'week_plan_added'
+  | 'week_plan_conflict'
   // tp-1.2: the training plan of 1 to 3 months (ellie_proposals.kind =
   // 'training_plan').
   | 'training_plan_proposal'
@@ -45,6 +47,7 @@ export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'discomfort_check',
   'routine_library',
   'week_plan_added',
+  'week_plan_conflict',
   'plan_adjustment',
   'training_plan_proposal',
 ];
@@ -348,6 +351,49 @@ export function parseWeekPlanAdded(payloadValue: unknown): WeekPlanAdded | null 
     routineId: str(payload.routine_id),
     name: str(payload.name) ?? '',
     replaced: payload.replaced === true,
+  };
+}
+
+// ── week_plan_conflict (prop-2 · ELLIE_CARDS_FLOW) ─────────────────────────
+export type WeekPlanConflict = {
+  date: string;
+  routineId: string | null;
+  proposalId: string | null;
+  routineName: string;
+  planSession: {
+    id: string;
+    title: string;
+    sessionType: SessionType | null;
+  };
+};
+
+export function parseWeekPlanConflict(payloadValue: unknown): WeekPlanConflict | null {
+  const payload = rec(payloadValue);
+  const planSession = rec(payload?.plan_session);
+  const date = str(payload?.date);
+  const routineId = str(payload?.routine_id);
+  const proposalId = str(payload?.proposal_id);
+  const planSessionId = str(planSession?.id);
+  if (
+    !payload ||
+    !date ||
+    (!routineId && !proposalId) ||
+    (routineId && proposalId) ||
+    !planSession ||
+    !planSessionId
+  ) {
+    return null;
+  }
+  return {
+    date,
+    routineId,
+    proposalId,
+    routineName: str(payload.routine_name) ?? '',
+    planSession: {
+      id: planSessionId,
+      title: str(planSession.title) ?? '',
+      sessionType: isSessionType(planSession.session_type) ? planSession.session_type : null,
+    },
   };
 }
 

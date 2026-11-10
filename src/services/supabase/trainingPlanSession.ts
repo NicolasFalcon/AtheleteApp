@@ -12,8 +12,7 @@ import {
 // Sesión del plan (docs/backend/TRAINING_PLAN_SHAPES.md, tp-1.2 §7 · 31.7) y
 // ajustes del plan (31.8): get_plan_session, start_plan_session,
 // get_plan_session_outcome, list_plan_adjustments and respond_plan_adjustment.
-// The first three have their shape confirmed with the real backend; the two
-// of the adjustments do NOT yet (see parseAdjustment).
+// All five shapes are defined by the tp-1.2 backend contract.
 
 const PLAN_STATUSES = ['pending', 'done', 'missed', 'substituted', 'skipped', 'paused'] as const;
 export type PlanSessionStatusName = (typeof PLAN_STATUSES)[number];
@@ -35,9 +34,9 @@ export type PlanSessionExercise = {
   recommendedKg: number | null;
   calibrate: boolean;
   isAnchor: boolean;
-  // The last session of the exercise: `{ kg, reps }`. `last_time.sets` is the
-  // historic total, not the sets of that session, so it is never read.
-  lastTime: { kg: number | null; reps: number } | null;
+  // The last completed session of the exercise. kg/reps belong to its best
+  // effective set; sets is the effective (non-warm-up) set count.
+  lastTime: { sets: number; kg: number | null; reps: number } | null;
 };
 
 export type PlanSessionDetail = {
@@ -58,12 +57,13 @@ export type PlanSessionDetail = {
 
 function parseLastTime(value: unknown): PlanSessionExercise['lastTime'] {
   const row = rec(value);
+  const sets = num(row?.sets);
   const reps = num(row?.reps);
-  if (!row || reps === null || reps <= 0) {
+  if (!row || sets === null || sets <= 0 || reps === null || reps <= 0) {
     return null;
   }
   const kg = num(row.kg);
-  return { kg: kg !== null && kg > 0 ? kg : null, reps };
+  return { sets, kg: kg !== null && kg > 0 ? kg : null, reps };
 }
 
 export function parsePlanSession(body: Raw): PlanSessionDetail | null {
@@ -195,95 +195,128 @@ export type AdjustmentAction = 'approve' | 'reject' | 'move_today' | 'skip' | 'r
 
 export type PlanAdjustment = {
   id: string;
+  planId: string;
   kind: AdjustmentKind;
   status: AdjustmentStatus;
   createdAt: string | null;
   respondedAt: string | null;
-  // From `payload` (the contract only says "antes → después, sesiones
-  // afectadas, motivo"; the keys below are not confirmed, so any of them may
-  // come null and the card then shows what it has).
   reason: string | null;
   before: string | null;
   after: string | null;
   weekIndex: number | null;
-  sessions: string[];
-};
-
-// A scalar or the name of a small object, as a line of text.
-function line(value: unknown): string | null {
-  if (typeof value === 'string') {
-    return str(value);
-  }
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value);
-  }
-  const row = rec(value);
-  return str(row?.name) ?? str(row?.title) ?? str(row?.label);
-}
-
-const firstLine = (row: Raw | null, keys: string[]): string | null => {
-  for (const key of keys) {
-    const found = line(row?.[key]);
-    if (found) {
-      return found;
-    }
-  }
-  return null;
+  sessions: {
+    planSessionId: string;
+    date: string | null;
+    title: string;
+    sessionType: SessionType | null;
+  }[];
+  exerciseId: string | null;
+  exerciseName: string | null;
+  name: string | null;
+  toExerciseId: string | null;
+  toExerciseName: string | null;
+  toName: string | null;
+  fromWeekIndex: number | null;
+  targetWeekIndex: number | null;
+  planSessionId: string | null;
+  date: string | null;
+  title: string | null;
+  moveToDate: string | null;
+  missed: number | null;
+  originalEndDate: string | null;
+  newEndDate: string | null;
+  bodyZone: string | null;
+  feedbackId: string | null;
+  untilDate: string | null;
 };
 
 export function parseAdjustment(value: unknown): PlanAdjustment | null {
   const row = rec(value);
-  const id = str(row?.id) ?? str(row?.adjustment_id);
+  const id = str(row?.id);
+  const planId = str(row?.plan_id);
   const kind = KINDS.find(item => item === row?.kind);
-  if (!row || !id || !kind) {
+  if (!row || !id || !planId || !kind) {
     return null;
   }
   const payload = rec(row.payload);
-  const affected = payload?.sessions ?? payload?.affected_sessions;
+  if (!payload) {
+    return null;
+  }
   return {
     id,
+    planId,
     kind,
     status: STATUSES.find(item => item === row.status) ?? 'open',
     createdAt: str(row.created_at),
     respondedAt: str(row.responded_at),
-    reason: firstLine(payload, ['reason', 'motivo', 'explanation', 'message']),
-    before: firstLine(payload, ['before', 'from', 'antes']),
-    after: firstLine(payload, ['after', 'to', 'despues', 'después']),
-    weekIndex: num(payload?.week_index) ?? num(payload?.week),
-    sessions: Array.isArray(affected)
-      ? affected.map(line).filter((item): item is string => item !== null)
-      : [],
+    reason: str(payload.reason),
+    before: str(payload.before),
+    after: str(payload.after),
+    weekIndex: num(payload.week_index),
+    sessions: list(payload.sessions).flatMap(session => {
+      const planSessionId = str(session.plan_session_id);
+      return planSessionId
+        ? [{
+            planSessionId,
+            date: day(session.date),
+            title: str(session.title) ?? '',
+            sessionType: isSessionType(session.session_type) ? session.session_type : null,
+          }]
+        : [];
+    }),
+    exerciseId: str(payload.exercise_id),
+    exerciseName: str(payload.exercise_name),
+    name: str(payload.name),
+    toExerciseId: str(payload.to_exercise_id),
+    toExerciseName: str(payload.to_exercise_name),
+    toName: str(payload.to_name),
+    fromWeekIndex: num(payload.from_week_index),
+    targetWeekIndex: num(payload.target_week_index),
+    planSessionId: str(payload.plan_session_id),
+    date: day(payload.date),
+    title: str(payload.title),
+    moveToDate: day(payload.move_to_date),
+    missed: num(payload.missed),
+    originalEndDate: day(payload.original_end_date),
+    newEndDate: day(payload.new_end_date),
+    bodyZone: str(payload.body_zone),
+    feedbackId: str(payload.feedback_id),
+    untilDate: day(payload.until_date),
   };
 }
 
-// `list_plan_adjustments` answers "las abiertas y las aplicadas recientes":
-// the rows are read from any of the lists the answer may carry.
+// `{ ok, plan_id, items }`: open adjustments and recent applied/approved/
+// reverted adjustments. There are no alternative list keys in tp-1.2.
 export function parseAdjustments(body: Raw): PlanAdjustment[] {
-  const seen = new Set<string>();
-  return ['adjustments', 'items', 'open', 'applied', 'recent']
-    .flatMap(key => (Array.isArray(body[key]) ? (body[key] as unknown[]) : []))
-    .flatMap(item => {
-      const parsed = parseAdjustment(item);
-      if (!parsed || seen.has(parsed.id)) {
-        return [];
-      }
-      seen.add(parsed.id);
-      return [parsed];
-    });
+  return (Array.isArray(body.items) ? body.items : [])
+    .map(parseAdjustment)
+    .filter((item): item is PlanAdjustment => item !== null);
 }
 
 export async function fetchPlanAdjustments(planId?: string | null): Promise<PlanAdjustment[]> {
   return parseAdjustments(await call('list_plan_adjustments', planId ? { p_plan_id: planId } : {}));
 }
 
+export type RespondedPlanAdjustment = {
+  adjustmentId: string;
+  action: AdjustmentAction;
+  replayed: boolean;
+};
+
 export async function respondPlanAdjustment(args: {
   adjustmentId: string;
   action: AdjustmentAction;
   clientId: string;
-}): Promise<void> {
-  await call('respond_plan_adjustment', {
+}): Promise<RespondedPlanAdjustment> {
+  const body = await call('respond_plan_adjustment', {
     p_adjustment_id: args.adjustmentId,
     p_action: args.action,
     p_client_id: args.clientId,
   });
+  return {
+    adjustmentId: str(body.adjustment_id) ?? args.adjustmentId,
+    action: (['approve', 'reject', 'move_today', 'skip', 'revert', 'ack'] as const)
+      .find(action => action === body.action) ?? args.action,
+    replayed: body.replayed === true,
+  };
 }

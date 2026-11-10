@@ -40,7 +40,7 @@ export function PlanAdjustmentCard({
   const [main, other] = adjustmentActions(adjustment.kind);
   const title =
     adjustment.kind === 'missed_session' && adjustment.sessions[0]
-      ? adjustment.sessions[0]
+      ? adjustment.sessions[0].title
       : t(`adj.title.${adjustment.kind}` as 'adj.title.variant_stall');
   const body = adjustment.reason ?? t(`adj.body.${adjustment.kind}` as 'adj.body.variant_stall');
   const hasChange = adjustment.before !== null || adjustment.after !== null;

@@ -58,6 +58,46 @@ export type AddedToWeek = {
 // A day with a session of the plan, waiting for "Reemplazar".
 type PlanConflict = { date: string; title: string; type: SessionType | null };
 
+// Shared by the Add-to-week replacement step and ELLIE's
+// week_plan_conflict card so both flows present the same swap.
+export function PlanReplacementPreview({
+  date,
+  planTitle,
+  planType,
+  routineName,
+}: {
+  date: string;
+  planTitle: string;
+  planType: SessionType | null;
+  routineName: string;
+}) {
+  const { colors } = useThemeV2();
+  const language = useProfileLanguage();
+  const planText = useTrainingPlanText();
+  return (
+    <View style={styles.conflict}>
+      <TextV2 variant="eyebrow" color={colors.text.secondary}>
+        {weekdayLabel(language, date).toUpperCase()}
+      </TextV2>
+      <View style={[styles.swap, { backgroundColor: colors.surface.muted }]}>
+        <View style={styles.planLine}>
+          {planType ? (
+            <SessionTypeChip type={planType} label={planText.t(sessionTypeKey(planType))} />
+          ) : null}
+          <TextV2 variant="label" color={colors.text.secondary} style={[styles.flex, styles.struck]}>
+            {planTitle}
+          </TextV2>
+        </View>
+        <ArrowDown size={16} color={colors.text.secondary} strokeWidth={2} />
+        <TextV2 variant="bodyStrong">{routineName}</TextV2>
+      </View>
+      <TextV2 variant="body" color={colors.text.secondary}>
+        {addToWeekText(language, 'addToWeek.conflict.note')}
+      </TextV2>
+    </View>
+  );
+}
+
 export function useAddToWeek(onAdded?: (added: AddedToWeek) => void) {
   const [target, setTarget] = useState<AddToWeekTarget | null>(null);
   // The sheet keeps its target while it closes (no blank frame).
@@ -315,26 +355,12 @@ export function AddToWeekSheet({
       }
     >
       {conflict && target ? (
-        <View style={styles.conflict}>
-          <TextV2 variant="eyebrow" color={colors.text.secondary}>
-            {weekdayLabel(language, conflict.date).toUpperCase()}
-          </TextV2>
-          <View style={[styles.swap, { backgroundColor: colors.surface.muted }]}>
-            <View style={styles.planLine}>
-              {conflict.type ? (
-                <SessionTypeChip type={conflict.type} label={planText.t(sessionTypeKey(conflict.type))} />
-              ) : null}
-              <TextV2 variant="label" color={colors.text.secondary} style={[styles.flex, styles.struck]}>
-                {conflict.title}
-              </TextV2>
-            </View>
-            <ArrowDown size={16} color={colors.text.secondary} strokeWidth={2} />
-            <TextV2 variant="bodyStrong">{target.name}</TextV2>
-          </View>
-          <TextV2 variant="body" color={colors.text.secondary}>
-            {addToWeekText(language, 'addToWeek.conflict.note')}
-          </TextV2>
-        </View>
+        <PlanReplacementPreview
+          date={conflict.date}
+          planTitle={conflict.title}
+          planType={conflict.type}
+          routineName={target.name}
+        />
       ) : loading ? (
         <SkeletonGroup>
           <View style={styles.skeleton}>
