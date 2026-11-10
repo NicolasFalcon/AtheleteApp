@@ -20,7 +20,7 @@ import type { AuthStackParamList } from '@app/types/navigation';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Login'>;
 
-const HERO_PHOTO = require('@app/assets/v2/photos/overhead.jpg');
+const HERO_PHOTO = require('@app/assets/images/esfuerzo.jpg');
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);

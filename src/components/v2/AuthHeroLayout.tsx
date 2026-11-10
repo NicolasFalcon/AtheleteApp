@@ -107,7 +107,7 @@ function AuthHeroContent({
   }, []);
 
   const photoFrame = isScene
-    ? { left: 0, right: 0, height: Math.round(height * 0.6) }
+    ? { left: 0, right: 0, height: Math.round(height * 0.66) }
     : {
         right: 0,
         width: Math.round(width * 0.7),
@@ -140,6 +140,7 @@ function AuthHeroContent({
           <MonoPhoto
             source={photo}
             style={[styles.fill, { backgroundColor: bg }]}
+            imageStyle={isScene ? styles.scenePhotoImage : undefined}
           >
             {isScene ? (
               <Scrim variant="authPoster" />
@@ -163,7 +164,12 @@ function AuthHeroContent({
           </MonoPhoto>
         </Animated.View>
 
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            isScene ? { paddingTop: insets.top + 16 } : null,
+          ]}
+        >
           <BrandLockup />
           {tagline ? (
             <View>
@@ -213,6 +219,14 @@ const styles = StyleSheet.create({
   photo: {
     position: 'absolute',
     top: 0,
+  },
+  // The supplied 3:2 image needs a right-biased crop to match AUTH_01:
+  // more of its right side is sampled, moving the athlete left in-frame.
+  scenePhotoImage: {
+    width: '120%',
+    left: '-7%',
+    transformOrigin: 'top right',
+    transform: [{ scaleX: 1.5 }, { scaleY: 1.5 }],
   },
   header: {
     flexDirection: 'row',

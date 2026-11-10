@@ -3,6 +3,7 @@ import {
   Image,
   StyleSheet,
   View,
+  type ImageStyle,
   type ImageSourcePropType,
   type StyleProp,
   type ViewStyle,
@@ -48,10 +49,12 @@ export function BrandLockup() {
 export function MonoPhoto({
   source,
   style,
+  imageStyle,
   children,
 }: {
   source: ImageSourcePropType;
   style?: StyleProp<ViewStyle>;
+  imageStyle?: StyleProp<ImageStyle>;
   children?: ReactNode;
 }) {
   return (
@@ -59,7 +62,7 @@ export function MonoPhoto({
       <Image
         source={source}
         resizeMode="cover"
-        style={styles.image}
+        style={[styles.image, imageStyle]}
         accessibilityIgnoresInvertColors
       />
       <View style={styles.grayscale} />
