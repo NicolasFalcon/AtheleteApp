@@ -55,13 +55,31 @@ export function getWorkoutThumbnail(
   return DEFAULT_WORKOUT_THUMBNAIL;
 }
 
+// Only an official or editorial routine with a photo of its own keeps it
+// (§28.16); every other routine shows the app's cover (focus word over the
+// brand background, RoutineCover). The one rule for every screen.
+export function routineKeepsPhoto(routine: {
+  origin?: string | null;
+  imageUrl?: string | null;
+}): boolean {
+  return (
+    (routine.origin === 'official' || routine.origin === 'editorial') &&
+    Boolean(routine.imageUrl?.trim())
+  );
+}
+
+// The picture of a routine when it keeps its photo. Without `origin` (or for
+// any routine that is not official / editorial) the `imageUrl` is ignored and
+// the stock thumbnail comes back: screens draw the cover instead (see
+// routineKeepsPhoto) and use this only as the fallback of a failed photo.
 export function resolveWorkoutThumbnailSource(params: {
   imageUrl?: string | null;
+  origin?: string | null;
   type?: string;
   targetMuscles?: string[];
   title?: string;
 }) {
-  if (params.imageUrl && params.imageUrl.trim().length > 0) {
+  if (params.imageUrl && routineKeepsPhoto(params)) {
     return {uri: params.imageUrl};
   }
 

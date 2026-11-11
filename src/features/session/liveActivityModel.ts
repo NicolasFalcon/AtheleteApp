@@ -10,7 +10,9 @@ import type {
 // What the workout Live Activity shows, from the session's state. Pure.
 //
 // Three situations (and "paused"):
-//   rest      the countdown, "Siguiente: …" and a "Saltar" button;
+//   rest      the countdown, "Siguiente: …" with the set that follows and its
+//             "Serie hecha ✓" button (iOS does not redraw on time, so the
+//             flow never depends on the switch to "Ahora");
 //   exercise  the set in course ("Ahora"): "Serie 2 de 3 · 10 reps × 40 kg"
 //             and "Serie hecha ✓" (or, without a weight to log,
 //             "Elige tu peso en la app" with a link to the app);
@@ -36,7 +38,6 @@ type Copy = {
   restOver: string;
   labels: LiveActivityLabels;
   needsWeight: string;
-  needsReps: string;
 };
 
 const COPY: Record<LiveActivityLanguage, Copy> = {
@@ -56,7 +57,6 @@ const COPY: Record<LiveActivityLanguage, Copy> = {
     letsGo: '¡Vamos!',
     restOver: 'Se acabó el descanso.',
     needsWeight: 'Elige tu peso en la app',
-    needsReps: 'Elige tus reps en la app',
     labels: {
       skip: 'Saltar',
       setDone: 'Serie hecha ✓',
@@ -82,7 +82,6 @@ const COPY: Record<LiveActivityLanguage, Copy> = {
     letsGo: "Let's go!",
     restOver: 'Rest is over.',
     needsWeight: 'Pick your weight in the app',
-    needsReps: 'Pick your reps in the app',
     labels: {
       skip: 'Skip',
       setDone: 'Set done ✓',
@@ -116,12 +115,12 @@ export function kgText(value: number, language: LiveActivityLanguage): string {
 }
 
 // What "Serie hecha" would save, or what is missing for it.
-export type SetReadiness = { ready: true } | { ready: false; needs: 'weight' | 'reps' };
+export type SetReadiness = { ready: true } | { ready: false; needs: 'weight' };
 
 // "Serie hecha" saves exactly what the card of the app would save with no
 // editing (draft). It is offered only when that is a complete set:
-//   · reps (and "máx") need the reps the runner loaded; seconds and metres
-//     are the planned amount;
+//   · the reps never block it: they are the runner's, else the routine's or
+//     plan's target (a range loads its lower end);
 //   · the weight is the one loaded; without one, the set is still complete
 //     for a timed or distance set, for a bodyweight exercise of a plan, and
 //     for an exercise whose earlier set of this session was logged with no
@@ -132,10 +131,6 @@ export function setReadiness(
   draft: { reps: number | null; weightKg: number | null },
   sets: LoggedSet[],
 ): SetReadiness {
-  const needsReps = exercise.unit === 'reps' || exercise.unit === 'max';
-  if (needsReps && draft.reps === null) {
-    return { ready: false, needs: 'reps' };
-  }
   if (draft.weightKg !== null || exercise.unit === 'sec' || exercise.unit === 'm') {
     return { ready: true };
   }
@@ -149,26 +144,28 @@ export function setReadiness(
     : { ready: false, needs: 'weight' };
 }
 
-// The amount of one set: "10 reps" · "40 s" · "40 m" · "máx" / "max".
+// The amount of one set: "10" · "40 s" · "40 m" · "máx" / "max". The reps are
+// the runner's, else the target of the routine or plan.
 function amountText(
   exercise: PlannedExercise,
   draftReps: number | null,
   language: LiveActivityLanguage,
-): string | null {
-  const copy = COPY[language];
+): { text: string; isReps: boolean } | null {
   switch (exercise.unit) {
     case 'sec':
-      return exercise.amount !== null ? `${exercise.amount} s` : null;
+      return exercise.amount !== null ? { text: `${exercise.amount} s`, isReps: false } : null;
     case 'm':
-      return exercise.amount !== null ? `${exercise.amount} m` : null;
+      return exercise.amount !== null ? { text: `${exercise.amount} m`, isReps: false } : null;
+    case 'max':
+      return { text: COPY[language].max, isReps: false };
     default: {
-      const reps = draftReps ?? exercise.reps;
-      return reps !== null && reps !== undefined ? `${reps} ${copy.reps}` : null;
+      const reps = draftReps ?? exercise.reps ?? exercise.amount;
+      return reps !== null && reps !== undefined ? { text: String(reps), isReps: true } : null;
     }
   }
 }
 
-// The set in course: "Serie 2 de 3 · 10 reps × 40 kg" · bodyweight "10 reps".
+// The set: "Serie 2 de 3 · 10 × 40 kg" · bodyweight "Serie 2 de 3 · 10 reps".
 // Whatever is missing is left out, never a dash.
 export function setLine(
   exercise: PlannedExercise,
@@ -180,7 +177,8 @@ export function setLine(
   const head = `${copy.set} ${setIndex + 1} ${copy.of} ${exercise.sets}`;
   const amount = amountText(exercise, draft.reps, language);
   const weight = draft.weightKg !== null ? kgText(draft.weightKg, language) : null;
-  const tail = [amount, weight].filter(Boolean).join(' × ');
+  const amountPart = amount ? (amount.isReps && !weight ? `${amount.text} ${copy.reps}` : amount.text) : null;
+  const tail = [amountPart, weight].filter(Boolean).join(' × ');
   return tail ? `${head} · ${tail}` : head;
 }
 
@@ -230,18 +228,11 @@ export function liveActivityState(
   const current = input.current;
   const phase = resting ? 'rest' : current ? 'exercise' : 'done';
 
-  let scheme = '';
-  if (current) {
-    scheme =
-      resting && input.rest?.kind === 'set'
-        ? `${copy.set} ${input.setIndex + 1} ${copy.of} ${current.sets}`
-        : resting
-          ? exerciseLine(current, input.draft, language)
-          : setLine(current, input.setIndex, input.draft, language);
-  }
+  // The set that follows (during a rest) or the one in course.
+  const scheme = current ? setLine(current, input.setIndex, input.draft, language) : '';
 
-  // The set that follows, ready for when the rest ends (staleDate): can it
-  // be logged without opening the app?
+  // The set that follows (or the one in course): can it be logged without
+  // opening the app?
   const readiness: SetReadiness =
     current && !input.paused ? setReadiness(current, input.draft, input.sets) : { ready: true };
   const setAction: LiveActivityButton =
@@ -251,8 +242,6 @@ export function liveActivityState(
   let action: LiveActivityButton = 'none';
   if (phase === 'done') {
     action = 'openApp';
-  } else if (!input.paused && phase === 'rest') {
-    action = 'skipRest';
   } else {
     action = setAction;
   }
@@ -274,7 +263,7 @@ export function liveActivityState(
     pausedRemainingSec: resting && input.paused ? Math.ceil(remainingMs / 1000) : null,
     exerciseName: current?.name ?? '',
     scheme,
-    progress: `${input.doneCount} ${copy.of} ${input.total} ${copy.exercises}`,
+    progress: `${input.doneCount} ${copy.of} ${input.total}`,
     headline,
     prefix: phase === 'rest' ? `${copy.next}: ` : '',
     compact:
@@ -286,12 +275,12 @@ export function liveActivityState(
             ? `${copy.set} ${input.setIndex + 1}`
             : '',
     action,
-    hint: readiness.ready ? '' : readiness.needs === 'weight' ? copy.needsWeight : copy.needsReps,
+    hint: readiness.ready ? '' : copy.needsWeight,
     position: current?.position ?? 0,
     setIndex: input.setIndex,
     labels: copy.labels,
     nowHeadline: copy.now,
-    setScheme: current ? setLine(current, input.setIndex, input.draft, language) : '',
+    setScheme: scheme,
     setCompact: current ? `${copy.set} ${input.setIndex + 1}` : '',
     setAction,
   };
@@ -349,7 +338,8 @@ export type ActionTarget = {
 
 // What a button's action does with the session as it is now:
 //   'logSet'   the set it was taken for is the one at the cursor and is a
-//              complete set: it is logged as the app's "hecha" would;
+//              complete set: it is logged as the app's "hecha" would (during
+//              a rest too: the card shows the set that follows);
 //   'skipRest' there is a rest running;
 //   'ignore'   anything else (another session, a set that is no longer the
 //              current one — a second tap on the same button —, a pause, an
@@ -374,5 +364,5 @@ export function actionDecision(
     target.cursor !== null &&
     target.cursor.position === action.position &&
     target.cursor.setIndex === action.setIndex;
-  return sameSet && !target.resting && target.readiness?.ready === true ? 'logSet' : 'ignore';
+  return sameSet && target.readiness?.ready === true ? 'logSet' : 'ignore';
 }

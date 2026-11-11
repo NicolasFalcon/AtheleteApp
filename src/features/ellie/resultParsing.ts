@@ -24,6 +24,11 @@ import {
 } from '@app/services/ellie/ellieProposals';
 import { parseNutritionProposal } from '@app/services/ellie/nutritionProposals';
 import { parseTrainingPlanProposal } from '@app/services/supabase/trainingPlan';
+import {
+  parseAdjustmentCard,
+  parsePlanActionConfirm,
+  parsePlanReviewCard,
+} from '@app/features/ellie/planCardsModel';
 import { DISCOMFORT_CHIPS, discomfortFromText } from '@app/features/ellie/discomfortModel';
 
 // Reading of the tool data of ellie-chat (docs/backend/ELLIE_SHAPES.md):
@@ -190,10 +195,38 @@ export function proposalToMessage(card: ProposalCard, fallbackId: string): Propo
   if (card.type === 'nutrition_prefs_request') {
     return { id, role: 'assistant', kind: 'nutritionPrefs', prefs: null, answered: false };
   }
-  // Reserved for part 4: keep the component/model, but the backend does not
-  // emit plan_adjustment cards yet, so do not wire it into the chat parser.
+  // Training-plan cards (no proposal_id; the payload is the card). Their ids
+  // carry what tells two cards of one reply apart.
   if (card.type === 'plan_adjustment') {
-    return null;
+    const adjustment = parseAdjustmentCard(card.payload);
+    return adjustment
+      ? {
+          id: `${fallbackId}-${card.type}-${adjustment.id}`,
+          role: 'assistant',
+          kind: 'planAdjustment',
+          adjustment,
+          answered: null,
+        }
+      : null;
+  }
+  if (card.type === 'plan_review') {
+    const review = parsePlanReviewCard(card.payload);
+    return review
+      ? { id: `${fallbackId}-${card.type}-${review.weekIndex}`, role: 'assistant', kind: 'planReview', review }
+      : null;
+  }
+  if (card.type === 'plan_action_confirm') {
+    const confirm = parsePlanActionConfirm(card.payload);
+    return confirm
+      ? {
+          id: `${fallbackId}-${card.type}-${confirm.action}`,
+          role: 'assistant',
+          kind: 'planActionConfirm',
+          confirm,
+          status: 'open',
+          pausedUntil: null,
+        }
+      : null;
   }
   // prop-2: these cards have no proposal_id; their payload is the card.
   if (card.type === 'routine_library') {

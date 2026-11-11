@@ -57,8 +57,8 @@ const NOW = 1_700_000_000_000;
 
 describe('set line (the set in course)', () => {
   it('writes the set with reps and weight', () => {
-    expect(setLine(exercise(), 1, { reps: 10, weightKg: 40 }, 'es')).toBe('Serie 2 de 3 · 10 reps × 40 kg');
-    expect(setLine(exercise(), 1, { reps: 8, weightKg: 42.5 }, 'en')).toBe('Set 2 of 3 · 8 reps × 42.5 kg');
+    expect(setLine(exercise(), 1, { reps: 10, weightKg: 40 }, 'es')).toBe('Serie 2 de 3 · 10 × 40 kg');
+    expect(setLine(exercise(), 1, { reps: 8, weightKg: 42.5 }, 'en')).toBe('Set 2 of 3 · 8 × 42.5 kg');
   });
   it('is only the reps for bodyweight, and never has a dash', () => {
     const line = setLine(exercise(), 0, { reps: 12, weightKg: null }, 'es');
@@ -66,7 +66,7 @@ describe('set line (the set in course)', () => {
     expect(line).not.toContain('—');
   });
   it('uses the target reps when the runner has none loaded', () => {
-    expect(setLine(exercise(), 0, { reps: null, weightKg: 20 }, 'es')).toBe('Serie 1 de 3 · 10 reps × 20 kg');
+    expect(setLine(exercise(), 0, { reps: null, weightKg: 20 }, 'es')).toBe('Serie 1 de 3 · 10 × 20 kg');
   });
   it('writes a timed set with its seconds', () => {
     const plank = exercise({ unit: 'sec', amount: 40, amountMax: 40, reps: null, durationSec: 40 });
@@ -126,33 +126,40 @@ describe('set readiness (what "Serie hecha" can save)', () => {
     const plank = exercise({ unit: 'sec', amount: 40, reps: null });
     expect(setReadiness(plank, { reps: null, weightKg: null }, [])).toEqual({ ready: true });
   });
-  it('needs the reps when "máx" has none loaded', () => {
+  it('never needs the reps, not even for "máx" with none loaded', () => {
     const max = exercise({ unit: 'max', amount: null, reps: null });
-    expect(setReadiness(max, { reps: null, weightKg: 20 }, [])).toEqual({ ready: false, needs: 'reps' });
+    expect(setReadiness(max, { reps: null, weightKg: 20 }, [])).toEqual({ ready: true });
+    expect(setLine(max, 0, { reps: null, weightKg: 20 }, 'es')).toBe('Serie 1 de 3 · máx × 20 kg');
+  });
+  it('falls back to the routine target when the runner has no reps', () => {
+    expect(setLine(exercise({ reps: null, amount: 8 }), 0, { reps: null, weightKg: 20 }, 'es')).toBe(
+      'Serie 1 de 3 · 8 × 20 kg',
+    );
+    expect(setReadiness(exercise(), { reps: null, weightKg: 20 }, [])).toEqual({ ready: true });
   });
 });
 
 describe('liveActivityState', () => {
   const rest = { kind: 'set' as const, remainingMs: 45_000, phase: 'run' };
 
-  it('rest: countdown, "Siguiente" and the Saltar button', () => {
+  it('rest: countdown, "Siguiente", the set that follows and "Serie hecha ✓"', () => {
     const state = liveActivityState(input({ rest, current: exercise(), setIndex: 1 }), NOW, 'es');
     expect(state).toMatchObject({
       phase: 'rest',
       headline: 'Descanso',
       prefix: 'Siguiente: ',
-      scheme: 'Serie 2 de 3',
-      progress: '2 de 6 ejercicios',
-      action: 'skipRest',
+      scheme: 'Serie 2 de 3 · 10 × 40 kg',
+      progress: '2 de 6',
+      action: 'completeSet',
       restEndsAt: Math.round((NOW + 45_000) / 1000) * 1000,
     });
   });
   it('a rest already carries the set that follows, for the staleDate (iOS draws it by itself)', () => {
     const state = liveActivityState(input({ rest, current: exercise({ position: 2 }), setIndex: 1 }), NOW, 'es');
     expect(state).toMatchObject({
-      action: 'skipRest',
+      action: 'completeSet',
       nowHeadline: 'Ahora',
-      setScheme: 'Serie 2 de 3 · 10 reps × 40 kg',
+      setScheme: 'Serie 2 de 3 · 10 × 40 kg',
       setCompact: 'Serie 2',
       setAction: 'completeSet',
       position: 2,
@@ -161,17 +168,21 @@ describe('liveActivityState', () => {
     });
     expect(liveActivityState(input({ rest }), NOW, 'en')).toMatchObject({
       nowHeadline: 'Now',
-      setScheme: 'Set 2 of 3 · 10 reps × 40 kg',
+      setScheme: 'Set 2 of 3 · 10 × 40 kg',
     });
   });
   it('the set after a rest without a weight to log is not markable from the activity', () => {
     const state = liveActivityState(input({ rest, draft: { reps: 10, weightKg: null } }), NOW, 'es');
     expect(state).toMatchObject({
-      action: 'skipRest',
+      action: 'chooseInApp',
       setAction: 'chooseInApp',
       hint: 'Elige tu peso en la app',
       setScheme: 'Serie 2 de 3 · 10 reps',
     });
+    // Reps never produce a hint; only a missing weight does.
+    expect(
+      liveActivityState(input({ rest, draft: { reps: null, weightKg: 40 } }), NOW, 'es'),
+    ).toMatchObject({ action: 'completeSet', hint: '' });
   });
   it('paused: the following set offers no button either', () => {
     expect(liveActivityState(input({ rest, paused: true }), NOW, 'es').setAction).toBe('none');
@@ -182,7 +193,7 @@ describe('liveActivityState', () => {
       NOW,
       'es',
     );
-    expect(state.scheme).toBe('3 series');
+    expect(state.scheme).toBe('Serie 2 de 3');
     expect(state.scheme).not.toContain('—');
   });
   it('set in course: "Ahora", the line and "Serie hecha ✓" aimed at that set', () => {
@@ -190,7 +201,7 @@ describe('liveActivityState', () => {
     expect(state).toMatchObject({
       phase: 'exercise',
       headline: 'Ahora',
-      scheme: 'Serie 2 de 3 · 10 reps × 40 kg',
+      scheme: 'Serie 2 de 3 · 10 × 40 kg',
       action: 'completeSet',
       position: 2,
       setIndex: 1,
@@ -221,7 +232,7 @@ describe('liveActivityState', () => {
   });
   it('is written in English too', () => {
     const state = liveActivityState(input({ rest }), NOW, 'en');
-    expect(state).toMatchObject({ headline: 'Rest', prefix: 'Next: ', progress: '2 of 6 exercises' });
+    expect(state).toMatchObject({ headline: 'Rest', prefix: 'Next: ', progress: '2 of 6' });
     expect(state.labels.skip).toBe('Skip');
   });
   it('the rest end state is the same state with no rest, ready for the set', () => {
@@ -244,7 +255,7 @@ describe('restEndNotification', () => {
     );
     const note = restEndNotification(state, 'es');
     expect(note?.title).toBe('¡Vamos!');
-    expect(note?.body).toBe('Siguiente: Press de banca · 3 series');
+    expect(note?.body).toBe('Siguiente: Press de banca · Serie 2 de 3');
     expect(note?.body).not.toContain('—');
     expect(restEndNotification(state, 'en')?.title).toBe("Let's go!");
   });
@@ -280,10 +291,12 @@ describe('actionDecision', () => {
     expect(actionDecision(action(), target({ cursor: { position: 0, setIndex: 2 } }), NOW)).toBe('ignore');
     expect(actionDecision(action(), target({ cursor: { position: 1, setIndex: 1 } }), NOW)).toBe('ignore');
   });
-  it('ignores another session, a pause, a rest, an unloaded runner and an incomplete set', () => {
+  it('logs the set the card shows during a rest too', () => {
+    expect(actionDecision(action(), target({ resting: true }), NOW)).toBe('logSet');
+  });
+  it('ignores another session, a pause, an unloaded runner and an incomplete set', () => {
     expect(actionDecision(action({ sessionId: 'other' }), target(), NOW)).toBe('ignore');
     expect(actionDecision(action(), target({ paused: true }), NOW)).toBe('ignore');
-    expect(actionDecision(action(), target({ resting: true }), NOW)).toBe('ignore');
     expect(actionDecision(action(), target({ loaded: false }), NOW)).toBe('ignore');
     expect(actionDecision(action(), target({ readiness: { ready: false, needs: 'weight' } }), NOW)).toBe('ignore');
   });

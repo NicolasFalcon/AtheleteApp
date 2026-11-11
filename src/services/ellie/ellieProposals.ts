@@ -38,7 +38,11 @@ export type ProposalCardType =
   // 'training_plan').
   | 'training_plan_proposal'
   // tp-1.2 §8: an adjustment of the training plan (31.8) in the chat.
-  | 'plan_adjustment';
+  | 'plan_adjustment'
+  // ELLIE_CARDS_FLOW "Tarjetas del plan de entrenamiento": the last closed
+  // week's review, and an action of the plan the athlete must confirm.
+  | 'plan_review'
+  | 'plan_action_confirm';
 
 export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'routine_proposal',
@@ -49,6 +53,8 @@ export const PROPOSAL_CARD_TYPES: readonly ProposalCardType[] = [
   'week_plan_added',
   'week_plan_conflict',
   'plan_adjustment',
+  'plan_review',
+  'plan_action_confirm',
   'training_plan_proposal',
 ];
 
@@ -470,6 +476,22 @@ export function storedCards(toolType: string | null, toolData: unknown): Proposa
     .filter((card): card is ProposalCard => card !== null);
   if (fromList.length > 0) {
     return fromList;
+  }
+  // Several cards of one type (plan_adjustment): tool_data = { type, payloads }.
+  const many = Array.isArray(data?.payloads) ? data.payloads : null;
+  const manyType = isProposalCardType(data?.type)
+    ? data?.type
+    : isProposalCardType(toolType)
+      ? toolType
+      : null;
+  if (many && manyType) {
+    return many.map(payload => ({
+      type: manyType,
+      proposalId: null,
+      version: 1,
+      adjustLabel: null,
+      payload,
+    }));
   }
   const proposalId = str(data?.proposal_id);
   const type = isProposalCardType(toolType)

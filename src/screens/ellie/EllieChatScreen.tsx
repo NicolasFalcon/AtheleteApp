@@ -50,6 +50,7 @@ import {
   WeekPlanAddedCard,
 } from '@app/features/ellie/v2/LibraryCardParts';
 import { PlanAdjustmentChatCard } from '@app/features/trainingPlan/v2/PlanAdjustmentCard';
+import { PlanActionConfirmCard, PlanReviewChatCard } from '@app/features/ellie/v2/PlanChatCards';
 import { useAddToWeek } from '@app/features/week/v2/AddToWeekSheet';
 import { addToWeekText } from '@app/features/week/addToWeekCopy';
 import { weekStartOf } from '@app/features/week/weekModel';
@@ -703,6 +704,29 @@ export function EllieChatScreen({ navigation, route }: Props) {
           adjustment={message.adjustment}
           answered={message.answered}
           onAnswered={action => chat.planAdjustmentAnswered(message.id, action)}
+        />
+      );
+    }
+    if (message.kind === 'planReview') {
+      return (
+        <PlanReviewChatCard
+          key={message.id}
+          card={message}
+          onOpen={weekIndex => navigation.navigate(APP_ROUTES.PlanReview, { weekIndex })}
+        />
+      );
+    }
+    if (message.kind === 'planActionConfirm') {
+      return (
+        <PlanActionConfirmCard
+          key={message.id}
+          card={message}
+          onStatus={(status, pausedUntil) => chat.planActionStatus(message.id, status, pausedUntil)}
+          onEnded={planId => {
+            if (planId) {
+              navigation.navigate(APP_ROUTES.PlanReport, { planId });
+            }
+          }}
         />
       );
     }

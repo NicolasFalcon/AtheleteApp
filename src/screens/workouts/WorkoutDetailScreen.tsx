@@ -215,6 +215,7 @@ export function WorkoutDetailScreen({ navigation, route }: Props) {
     ? routineCoverSource(workout.routineFocus, profile?.gender)
     : resolveWorkoutThumbnailSource({
         imageUrl: workout.imageUrl,
+        origin: workout.origin,
         type: workout.type,
         targetMuscles: workout.targetMuscles,
         title: workout.title,

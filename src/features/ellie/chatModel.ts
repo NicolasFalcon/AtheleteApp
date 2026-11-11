@@ -15,6 +15,8 @@ import type { FoodPrefs, NutritionProposal } from '@app/services/ellie/nutrition
 import type { DiscomfortReply } from '@app/features/ellie/discomfortModel';
 import type { AdjustmentAction, PlanAdjustment } from '@app/services/supabase/trainingPlanSession';
 import type { TrainingPlanProposal } from '@app/services/supabase/trainingPlan';
+import type { PlanReview } from '@app/services/supabase/trainingPlanReview';
+import type { PlanActionConfirm } from '@app/features/ellie/planCardsModel';
 import type { TrainingPlanCardStatus } from '@app/features/trainingPlan/v2/TrainingPlanProposalCard';
 
 // ELLIE · conversación v2: pure state of the chat (messages, send states,
@@ -209,7 +211,31 @@ export type PlanAdjustmentMessage = {
   answered: AdjustmentAction | null;
 };
 
+// plan_review: the compact review of the last closed week ("Ver revisión").
+export type PlanReviewMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'planReview';
+  review: PlanReview;
+};
+
+// plan_action_confirm: an action of the plan the athlete confirms or cancels.
+// `confirmed` carries what the write answered (the pause's end date). The
+// status lives in the chat state only: reloading the chat shows the card open
+// again, and confirming twice is safe (the RPCs are idempotent).
+export type PlanActionStatus = 'open' | 'confirmed' | 'cancelled';
+export type PlanActionConfirmMessage = {
+  id: string;
+  role: 'assistant';
+  kind: 'planActionConfirm';
+  confirm: PlanActionConfirm;
+  status: PlanActionStatus;
+  pausedUntil: string | null;
+};
+
 export type ProposalMessage =
+  | PlanReviewMessage
+  | PlanActionConfirmMessage
   | PlanAdjustmentMessage
   | RoutineProposalMessage
   | TrainingPlanProposalMessage
@@ -235,7 +261,9 @@ export type ChatMessage =
   | WeekPlanConflictMessage
   | WeekPlanAddedMessage
   | TrainingPlanProposalMessage
-  | PlanAdjustmentMessage;
+  | PlanAdjustmentMessage
+  | PlanReviewMessage
+  | PlanActionConfirmMessage;
 
 export type ChatState = {
   messages: ChatMessage[];
@@ -266,6 +294,7 @@ export type ChatAction =
   | { type: 'weekPlanRemoved'; id: string }
   | { type: 'weekPlanConflictResolved'; id: string; added: WeekPlanAdded }
   | { type: 'planAdjustmentAnswered'; id: string; action: AdjustmentAction }
+  | { type: 'planActionStatus'; id: string; status: PlanActionStatus; pausedUntil?: string | null }
   | { type: 'proposalLoaded'; id: string; proposal: RoutineProposal | null; status: RoutineCardStatus }
   | { type: 'proposalStatus'; id: string; status: RoutineCardStatus }
   | {
@@ -485,6 +514,19 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages: state.messages.map(message =>
           message.id === action.id && message.kind === 'planAdjustment'
             ? { ...message, answered: action.action }
+            : message,
+        ),
+      };
+    case 'planActionStatus':
+      return {
+        ...state,
+        messages: state.messages.map(message =>
+          message.id === action.id && message.kind === 'planActionConfirm'
+            ? {
+                ...message,
+                status: action.status,
+                pausedUntil: action.pausedUntil !== undefined ? action.pausedUntil : message.pausedUntil,
+              }
             : message,
         ),
       };

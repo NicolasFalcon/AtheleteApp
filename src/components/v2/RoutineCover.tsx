@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { fontsV2 } from '@app/theme/v2/typography';
+import { routineKeepsPhoto } from '@app/lib/workoutThumbnails';
 import type { EllieLanguage } from '@app/features/ellie/ellieCopy';
 import { useAuth } from '@app/hooks/useAuth';
 import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
@@ -43,18 +44,9 @@ export function routineCoverSource(
   return (focus && sex && COVER_PHOTOS[focus]?.[sex]) || COVER_BG;
 }
 
-// Only an official or editorial routine with a photo of its own keeps it.
-// get_routine / list_routines send no routine photo today, so every routine
-// shows its cover.
-export function routineKeepsPhoto(routine: {
-  origin?: string | null;
-  imageUrl?: string | null;
-}): boolean {
-  return (
-    (routine.origin === 'official' || routine.origin === 'editorial') &&
-    Boolean(routine.imageUrl?.trim())
-  );
-}
+// Only an official or editorial routine with a photo of its own keeps it
+// (the rule lives in lib/workoutThumbnails, shared with the raster helpers).
+export { routineKeepsPhoto };
 
 // Language and sex for the covers of a screen.
 export function useRoutineCoverContext(): {

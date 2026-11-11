@@ -15,15 +15,15 @@ import {
 } from '@app/services/supabase/trainingPlan';
 import { endTrainingPlan, type PlanReport } from '@app/services/supabase/trainingPlanReview';
 
-// What a write gives back: only ending carries something (the final report).
-type Sent = { planId: string | null; report: PlanReport | null };
-const NOTHING: Sent = { planId: null, report: null };
+// What a write gives back: ending carries the final report, pausing the date
+// the pause ends.
+type Sent = { planId: string | null; report: PlanReport | null; pausedUntil: string | null };
+const NOTHING: Sent = { planId: null, report: null, pausedUntil: null };
 
 async function send(request: ManageRequest, clientId: string): Promise<Sent> {
   switch (request.kind) {
     case 'pause':
-      await pauseTrainingPlan(request.weeks, clientId);
-      return NOTHING;
+      return { ...NOTHING, pausedUntil: (await pauseTrainingPlan(request.weeks, clientId)).pausedUntil };
     case 'resume':
       await resumeTrainingPlan(clientId);
       return NOTHING;
@@ -35,14 +35,14 @@ async function send(request: ManageRequest, clientId: string): Promise<Sent> {
       return NOTHING;
     default: {
       const ended = await endTrainingPlan(clientId);
-      return { planId: ended.planId, report: ended.report };
+      return { ...NOTHING, planId: ended.planId, report: ended.report };
     }
   }
 }
 
 // `report`: the final report that came inside end_training_plan.
 export type ManageOutcome =
-  | { ok: true; planId: string | null; report: PlanReport | null }
+  | { ok: true; planId: string | null; report: PlanReport | null; pausedUntil: string | null }
   | { ok: false; code: TrainingPlanErrorCode };
 
 // `run` calls the RPC and, settled, reads again the plan's state, the week,
@@ -73,7 +73,7 @@ export function useManagePlan() {
         if (sent.report) {
           seedPlanReport(queryClient, profile?.id, sent.report);
         }
-        return { ok: true, planId: sent.planId, report: sent.report };
+        return { ok: true, planId: sent.planId, report: sent.report, pausedUntil: sent.pausedUntil };
       } catch (error) {
         const failure = error instanceof TrainingPlanError ? error : new TrainingPlanError('unknown');
         __DEV__ && console.warn(`[training-plan] manage ${request.kind}:`, failure.code, failure.message);
