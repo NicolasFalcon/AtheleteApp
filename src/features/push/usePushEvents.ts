@@ -28,6 +28,18 @@ const isLocal = (notification: Notification): boolean =>
 const isCoachPush = (notification: Notification): boolean =>
   String((notification.request.content.data as Record<string, unknown> | undefined)?.type ?? '').startsWith('coach_');
 
+// A training plan push (review, adjustment or report): it changes the plan,
+// its week and Inicio. Same keys as invalidateTrainingPlan, listed here so
+// this module does not pull the screens' hooks (and their UI) with it.
+const PLAN_KEYS = [['training-plan'], ['week'], ['home']] as const;
+const refreshPlan = (client: ReturnType<typeof useQueryClient>) =>
+  Promise.allSettled(PLAN_KEYS.map(queryKey => client.invalidateQueries({ queryKey })));
+
+const isPlanPush = (notification: Notification): boolean => {
+  const kind = targetOf(notification)?.kind;
+  return kind === 'planReview' || kind === 'plan' || kind === 'planReport';
+};
+
 function targetOf(notification: Notification) {
   const data = parsePushData(notification.request.content.data);
   return data ? targetForPush(data) : null;
@@ -77,6 +89,9 @@ export function usePushEvents(): void {
       client.invalidateQueries({ queryKey: ['social'] }).catch(() => undefined);
       if (isCoachPush(response.notification)) {
         client.invalidateQueries({ queryKey: ['coach'] }).catch(() => undefined);
+      }
+      if (isPlanPush(response.notification)) {
+        refreshPlan(client).catch(() => undefined);
       }
     },
     [client, isCoach],
@@ -140,6 +155,9 @@ export function usePushEvents(): void {
     const received = Notifications.addNotificationReceivedListener(notification => {
       if (!isLocal(notification)) {
         client.invalidateQueries({ queryKey: ['social'] }).catch(() => undefined);
+        if (isPlanPush(notification)) {
+          refreshPlan(client).catch(() => undefined);
+        }
         // A coach push changes what Coach, the week or Nutrición show.
         if (isCoachPush(notification)) {
           client.invalidateQueries({ queryKey: ['coach'] }).catch(() => undefined);

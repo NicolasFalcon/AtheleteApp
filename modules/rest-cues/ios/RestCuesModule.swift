@@ -18,19 +18,24 @@ struct RestCuesPlan: Record {
 // The rest cues at absolute times, so they sound with the app in the
 // background or the screen locked (the JS timer is suspended there). JS
 // decides whether they sound at all (Ajustes · Sonido, the session switch).
-// Never throws: on any error the cue is simply silent.
+// At the end of the rest it also posts `RestCuePlayer.restEnded` (the Live
+// Activity takes its next state there, with the app in the background). Never
+// throws: on any error the cue is simply silent.
 public class RestCuesModule: Module {
   private let player = RestCuePlayer()
 
   public func definition() -> ModuleDefinition {
     Name("RestCues")
 
-    // true when at least one cue is still ahead and got scheduled.
+    // true when at least one cue is still ahead and got scheduled. The end of
+    // the rest is also announced (RestCuePlayer.restEnded) while cues run.
+    // With no cue to play nothing starts: the audio background mode is for
+    // sound that is heard.
     AsyncFunction("schedule") { (plan: RestCuesPlan) -> Bool in
       let cues = plan.events.map { event in
         (id: event.id, at: Date(timeIntervalSince1970: plan.restEndsAt / 1000 - event.offsetFromEnd))
       }
-      return self.player.schedule(cues)
+      return self.player.schedule(cues, endAt: Date(timeIntervalSince1970: plan.restEndsAt / 1000))
     }.runOnQueue(.main)
 
     // Stops every cue and gives the audio session back. Idempotent.
@@ -57,6 +62,11 @@ public class RestCuesModule: Module {
 //   app is no longer "playing".
 // Main thread only.
 final class RestCuePlayer {
+  // Posted once, when the rest reaches its end, from the same clock that
+  // sounds rest-go: userInfo ["restEndsAt": epoch ms]. A plain name, so the
+  // Live Activity module listens without depending on this pod.
+  static let restEnded = Notification.Name("com.athelete.restCues.restEnded")
+
   private struct Cue {
     let buffer: AVAudioPCMBuffer
     let at: Date
@@ -74,19 +84,23 @@ final class RestCuePlayer {
   private var graphReady = false
 
   private var cues: [Cue] = []
+  private var endAt: Date?
+  private var endAnnounced = false
   private var timer: DispatchSourceTimer?
   private var observers: [NSObjectProtocol] = []
   private var ownsSession = false
   private var ducking = false
   private var saved: (category: AVAudioSession.Category, mode: AVAudioSession.Mode, options: AVAudioSession.CategoryOptions)?
 
-  func schedule(_ plan: [(id: String, at: Date)]) -> Bool {
+  func schedule(_ plan: [(id: String, at: Date)], endAt end: Date) -> Bool {
     stopPlayback()
     let now = Date()
     cues = plan
       .filter { $0.at.timeIntervalSince(now) > 0.05 }
       .compactMap { item in buffer(for: item.id).map { Cue(buffer: $0, at: item.at) } }
       .sorted { $0.at < $1.at }
+    endAt = end
+    endAnnounced = false
     guard !cues.isEmpty, takeSession() else {
       release()
       return false
@@ -102,6 +116,7 @@ final class RestCuePlayer {
   func release() {
     stopPlayback()
     cues = []
+    endAt = nil
     observers.forEach(NotificationCenter.default.removeObserver)
     observers = []
     guard ownsSession else { return }
@@ -234,13 +249,24 @@ final class RestCuePlayer {
   }
 
   private func tick() {
-    guard ownsSession, let first = cues.first, let last = cues.map(\.end).max() else { return }
+    guard ownsSession else { return }
     let now = Date()
+    // The rest reached zero: announced once, before the session is let go.
+    if !endAnnounced, let endAt, now >= endAt {
+      endAnnounced = true
+      NotificationCenter.default.post(
+        name: Self.restEnded,
+        object: nil,
+        userInfo: ["restEndsAt": endAt.timeIntervalSince1970 * 1000]
+      )
+    }
+    // The session is let go after the last cue and after the end of the rest.
+    let last = max(cues.map(\.end).max() ?? now, endAt ?? now)
     if now >= last.addingTimeInterval(Self.releaseTail) {
       release()
       return
     }
-    if !ducking && now >= first.at.addingTimeInterval(-Self.duckLead) {
+    if !ducking, let first = cues.first, now >= first.at.addingTimeInterval(-Self.duckLead) {
       duck()
     }
     if !engine.isRunning {

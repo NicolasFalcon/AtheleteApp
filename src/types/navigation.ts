@@ -9,6 +9,7 @@ import type {
 } from '@react-navigation/native-stack';
 import type { Core33ChallengeId } from '@app/features/core33/core33Catalog';
 import type { LibraryExercise, Workout, WorkoutType } from '@app/shared';
+import type { TrainingGoal } from '@app/services/supabase/trainingPlan';
 import type { PlayAnswerPayload, PlayRound, PlayRoute } from '@app/services/supabase/play';
 
 export type AuthStackParamList = {
@@ -253,12 +254,21 @@ export type AppStackParamList = {
   // day whose card it opens on. view: what "Ver semana" decided from the
   // training plan's state (31.4): 'plan' for an active or paused plan.
   // WeekRoute makes the final choice with the live state.
-  Week: { weekStart?: string; date?: string; view?: 'current' | 'plan' } | undefined;
+  // adjustmentId: the plan adjustment a push points to, shown first.
+  Week:
+    | { weekStart?: string; date?: string; view?: 'current' | 'plan'; adjustmentId?: string }
+    | undefined;
   // Plan de entrenamiento (v2.21 §31): Crear plan (a sheet below the status
   // bar) and the detail of a proposal before activating it.
-  TrainingPlanCreate: undefined;
+  // goal / weeks: preselected answers ("Ver propuesta" of the final report).
+  TrainingPlanCreate: { goal?: TrainingGoal; weeks?: 4 | 8 | 12 } | undefined;
   TrainingPlanPreview: { proposalId: string };
   PlanSession: { planSessionId: string };
+  // Revisión semanal (31.9): the review of a week, the last closed one
+  // without weekIndex. Reporte final (31.10) of a plan (the last one without
+  // planId).
+  PlanReview: { weekIndex?: number } | undefined;
+  PlanReport: { planId?: string } | undefined;
   Sleep: undefined;
   Breathe: undefined;
   WeekEllie: undefined;
@@ -271,7 +281,11 @@ export type AppStackParamList = {
   RouteActive: undefined;
   RouteResult: { activityId?: string; viewer?: boolean } | undefined;
   // Compartir en Instagram (v2.16 §26): a finished workout or route.
-  Share: { kind: 'workout'; sessionId: string } | { kind: 'route'; activityId: string };
+  Share:
+    | { kind: 'workout'; sessionId: string }
+    | { kind: 'route'; activityId: string }
+    // Reporte final del plan (v2.21 §31.10).
+    | { kind: 'plan'; planId: string };
   Wear: undefined;
   PersonalRecords: PersonalRecordsRouteParams | undefined;
   RegisterPr: RegisterPrRouteParams | undefined;

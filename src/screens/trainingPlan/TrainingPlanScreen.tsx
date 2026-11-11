@@ -24,12 +24,16 @@ import {
   type PlanDayState,
   type PlanDayView,
 } from '@app/features/trainingPlan/planViewModel';
+import { detailFromState, isPlanPaywalled } from '@app/features/trainingPlan/managePlanModel';
 import { isPlanOn } from '@app/features/trainingPlan/trainingPlanModel';
 import { useTrainingPlanText } from '@app/features/trainingPlan/trainingPlanCopy';
 import { useTrainingPlanDetail } from '@app/features/trainingPlan/usePlanViews';
 import { useTrainingPlanState } from '@app/features/trainingPlan/useTrainingPlanState';
+import { ManagePlanSheet } from '@app/features/trainingPlan/v2/ManagePlanSheet';
 import { PlanMonthView } from '@app/features/trainingPlan/v2/PlanMonthView';
 import { PlanOverview } from '@app/features/trainingPlan/v2/PlanOverview';
+import { PlanLockedView } from '@app/features/trainingPlan/v2/PlanPremium';
+import { PremiumSheet } from '@app/features/trainingPlan/v2/PremiumSheet';
 import { PlanEmpty, PlanError, PlanLoading } from '@app/features/trainingPlan/v2/PlanStates';
 import { PlanWeekView } from '@app/features/trainingPlan/v2/PlanWeekView';
 import { useOpenPastDay } from '@app/features/week/useOpenPastDay';
@@ -53,7 +57,9 @@ const clamp = (value: string, first: string, last: string) => (value < first ? f
 // a day opens as in the current week: past → its summary; today or ahead →
 // the routine's detail (the session with its recommended weight is part 3);
 // a rest day opens nothing; a substituted session opens the routine that
-// replaced it. The "···" menu is part 4: shown, disabled.
+// replaced it. The "···" menu and "Gestionar plan" open Gestionar el plan
+// (31.11). In the free version (31.12, off) Mes and Plan carry a lock and
+// open the Premium card; Crear plan opens the Premium sheet.
 export function TrainingPlanScreen({ navigation, route }: Props) {
   const { colors, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
@@ -65,10 +71,13 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
   const state = useTrainingPlanState();
   const on = isPlanOn(state.data?.state);
   const detail = useTrainingPlanDetail(on);
+  const locked = isPlanPaywalled(state.data);
   const pastDay = useOpenPastDay(today);
   const [tab, setTab] = useState<Tab>('week');
   const [weekStart, setWeekStart] = useState<string | null>(route.params?.weekStart ?? null);
   const [month, setMonth] = useState<string | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [premiumOpen, setPremiumOpen] = useState(false);
 
   const startDate = state.data?.startDate ?? null;
   const endDate = state.data?.endDate ?? detail.data?.endDate ?? null;
@@ -129,22 +138,31 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
     detail.refetch().catch(() => undefined);
   };
 
-  const failed = state.isError || (on && detail.isError);
-  const loading = !failed && (state.isLoading || (on && detail.isLoading) || (on && !detail.data));
+  // Without the multi-week entitlement get_training_plan says premium_required
+  // yet the plan stays visible: the week runs on what the state says.
+  const detailData =
+    detail.data ?? (on && detail.isError && state.data?.multiWeek === false ? detailFromState(state.data) : null);
+  const failed = state.isError || (on && detail.isError && !detailData);
+  const loading = !failed && (state.isLoading || (on && detail.isLoading) || (on && !detailData));
 
   let body;
   if (failed) {
     body = <PlanError onRetry={retry} />;
   } else if (loading) {
     body = <PlanLoading />;
-  } else if (!on || !state.data || !detail.data) {
+  } else if (!on || !state.data || !detailData) {
     // No plan (or it ended while this was open): "Aún no tienes un plan".
     body = (
       <PlanEmpty
-        onCreate={() => navigation.navigate(APP_ROUTES.TrainingPlanCreate)}
+        locked={locked}
+        onCreate={() =>
+          locked ? setPremiumOpen(true) : navigation.navigate(APP_ROUTES.TrainingPlanCreate)
+        }
         onWeekOnly={() => navigation.setParams({ view: 'current' })}
       />
     );
+  } else if (locked && tab !== 'week') {
+    body = <PlanLockedView kind={tab} onBackToWeek={() => setTab('week')} />;
   } else if (tab === 'week') {
     body = (
       <PlanWeekView
@@ -152,10 +170,12 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
         range={range}
         today={today}
         planState={state.data}
-        detail={detail.data}
+        detail={detailData}
         onChangeWeek={setWeekStart}
         onBackToCurrent={() => setWeekStart(null)}
         onOpenDay={openDay}
+        onOpenReview={() => navigation.navigate(APP_ROUTES.PlanReview)}
+        highlightAdjustmentId={route.params?.adjustmentId ?? null}
       />
     );
   } else if (tab === 'month') {
@@ -173,9 +193,10 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
   } else {
     body = (
       <PlanOverview
-        detail={detail.data}
+        detail={detailData}
         currentWeek={state.data.weekIndex ?? 0}
         onOpenWeek={openWeekOf}
+        onManage={() => setManageOpen(true)}
       />
     );
   }
@@ -187,13 +208,12 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
         title={t('screen.title')}
         left={<BackButton onPress={() => safeGoBack(navigation, BACK_FALLBACKS)} />}
         right={
-          // Gestionar el plan arrives in part 4: visible, disabled.
           <IconButton
             icon={MoreHorizontal}
             variant="muted"
-            disabled
-            accessibilityLabel={t('menu.soon')}
-            onPress={() => undefined}
+            disabled={!on || !state.data}
+            accessibilityLabel={t('menu.manage')}
+            onPress={() => setManageOpen(true)}
           />
         }
       />
@@ -207,8 +227,18 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
         <Segmented
           options={[
             { key: 'week', label: t('view.week') },
-            { key: 'month', label: t('view.month') },
-            { key: 'plan', label: t('view.plan') },
+            {
+              key: 'month',
+              label: t('view.month'),
+              locked,
+              accessibilityLabel: locked ? t('lock.tab', { name: t('view.month') }) : undefined,
+            },
+            {
+              key: 'plan',
+              label: t('view.plan'),
+              locked,
+              accessibilityLabel: locked ? t('lock.tab', { name: t('view.plan') }) : undefined,
+            },
           ]}
           value={tab}
           onChange={setTab}
@@ -216,6 +246,21 @@ export function TrainingPlanScreen({ navigation, route }: Props) {
         {body}
       </ScrollView>
       {pastDay.sheets}
+      <ManagePlanSheet
+        open={manageOpen}
+        onClose={() => setManageOpen(false)}
+        planState={state.data ?? null}
+        detail={detail.data ?? null}
+        // Ended: Tu semana shows "Plan terminado" (the state is `completed`)
+        // and the final report opens on top, from the answer's own report.
+        onEnded={planId => {
+          navigation.setParams({ view: 'current', adjustmentId: undefined });
+          if (planId) {
+            navigation.navigate(APP_ROUTES.PlanReport, { planId });
+          }
+        }}
+      />
+      <PremiumSheet open={premiumOpen} onClose={() => setPremiumOpen(false)} />
     </View>
   );
 }

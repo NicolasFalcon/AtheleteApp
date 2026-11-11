@@ -28,6 +28,8 @@ import { CoachJoinScreen } from '@app/screens/coach/CoachJoinScreen';
 import { CoachStudentScreen } from '@app/screens/coach/CoachStudentScreen';
 import { CoachStudentsScreen } from '@app/screens/coach/CoachStudentsScreen';
 import { MyCoachScreen } from '@app/screens/coach/MyCoachScreen';
+import { PlanReportScreen } from '@app/screens/trainingPlan/PlanReportScreen';
+import { PlanReviewScreen } from '@app/screens/trainingPlan/PlanReviewScreen';
 import { TrainingPlanCreateScreen } from '@app/screens/trainingPlan/TrainingPlanCreateScreen';
 import { TrainingPlanPreviewScreen } from '@app/screens/trainingPlan/TrainingPlanPreviewScreen';
 import { PlanSessionScreen } from '@app/screens/trainingPlan/PlanSessionScreen';
@@ -442,6 +444,8 @@ export function RootNavigator() {
           />
           <Stack.Screen name={APP_ROUTES.TrainingPlanPreview} component={TrainingPlanPreviewScreen} />
           <Stack.Screen name={APP_ROUTES.PlanSession} component={PlanSessionScreen} />
+          <Stack.Screen name={APP_ROUTES.PlanReview} component={PlanReviewScreen} />
+          <Stack.Screen name={APP_ROUTES.PlanReport} component={PlanReportScreen} />
         </Stack.Group>
       ) : null}
     </Stack.Navigator>

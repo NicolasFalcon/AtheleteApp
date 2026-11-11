@@ -1,7 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import { Image } from 'expo-image';
 import LinearGradient from 'react-native-linear-gradient';
-import { CircleAlert, RefreshCw } from 'lucide-react-native';
+import { CircleAlert, Lock, RefreshCw } from 'lucide-react-native';
 import {
   AuraMark,
   Button,
@@ -69,7 +69,16 @@ export function PlanError({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-export function PlanEmpty({ onCreate, onWeekOnly }: { onCreate: () => void; onWeekOnly: () => void }) {
+// `locked` (31.12, free version): Crear plan carries the lock.
+export function PlanEmpty({
+  onCreate,
+  onWeekOnly,
+  locked = false,
+}: {
+  onCreate: () => void;
+  onWeekOnly: () => void;
+  locked?: boolean;
+}) {
   const { colors, layout } = useThemeV2();
   const { t } = useTrainingPlanText();
   const cover = CATEGORY_COVERS.fuerza;
@@ -99,7 +108,14 @@ export function PlanEmpty({ onCreate, onWeekOnly }: { onCreate: () => void; onWe
       <TextV2 variant="body" color={colors.text.secondary} style={styles.body}>
         {t('empty.body')}
       </TextV2>
-      <Button label={t('empty.create')} size="lg" fullWidth onPress={onCreate} />
+      <Button
+        label={t('empty.create')}
+        icon={locked ? Lock : undefined}
+        iconPosition="start"
+        size="lg"
+        fullWidth
+        onPress={onCreate}
+      />
       <Button label={t('empty.weekOnly')} variant="secondary" size="md" fullWidth onPress={onWeekOnly} />
     </View>
   );

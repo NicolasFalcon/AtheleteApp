@@ -9,10 +9,14 @@ import {
   improvementOf,
   kmText,
   pickRecord,
+  SHARE_COPY,
   zonesOf,
   type ShareLanguage,
   type StickerData,
 } from '@app/features/share/shareModel';
+import { signedKg, stickerAnchors } from '@app/features/trainingPlan/planReviewModel';
+import { usePlanDetailOf, usePlanReport } from '@app/features/trainingPlan/usePlanReview';
+import { getLocalDateKey } from '@app/lib/date';
 import { useExercises } from '@app/hooks/useCatalog';
 import {
   detectSessionPRs,
@@ -27,7 +31,16 @@ function localDay(key: string): Date {
   return new Date(y, m - 1, d, 12);
 }
 
-export type ShareTarget = { kind: 'workout'; sessionId: string } | { kind: 'route'; activityId: string };
+export type ShareTarget =
+  | { kind: 'workout'; sessionId: string }
+  | { kind: 'route'; activityId: string }
+  | { kind: 'plan'; planId: string };
+
+// "92,5" (es) · "92.5" (en); whole numbers without decimals.
+function kgNumber(value: number, language: ShareLanguage): string {
+  const text = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  return language === 'es' ? text.replace('.', ',') : text;
+}
 
 // The mark of a record, as the summary writes it.
 function recordValue(record: DetectedPR): string {
@@ -66,6 +79,7 @@ function recordImprovement(record: DetectedPR): number | null {
 export function useShareData(target: ShareTarget, language: ShareLanguage) {
   const sessionId = target.kind === 'workout' ? target.sessionId : null;
   const activityId = target.kind === 'route' ? target.activityId : null;
+  const planId = target.kind === 'plan' ? target.planId : null;
 
   // The same cache as the summary.
   const detailQuery = useQuery({
@@ -103,7 +117,31 @@ export function useShareData(target: ShareTarget, language: ShareLanguage) {
     routeSession.finished && (!activityId || routeSession.finished.id === activityId) ? routeSession.finished : null;
   const activity = useRouteActivity(activityId ?? finished?.id, finished).data ?? null;
 
+  // The final report of a plan (it may already be in the cache: it came
+  // inside end_training_plan) and the plan's weeks and dates.
+  const reportQuery = usePlanReport(planId);
+  const planDetail = usePlanDetailOf(planId);
+
   const data = useMemo((): StickerData | null => {
+    if (target.kind === 'plan') {
+      const report = reportQuery.data;
+      if (!report) {
+        return null;
+      }
+      // The day the plan closed (ended early: today), at noon.
+      const today = getLocalDateKey();
+      const end = planDetail.data?.endDate;
+      return {
+        kind: 'plan',
+        date: localDay(end && end < today ? end : today),
+        weeks: planDetail.data?.weeks || 0,
+        anchors: stickerAnchors(report.anchors).map(anchor => ({
+          name: anchor.name,
+          after: `${kgNumber(anchor.after, language)} kg`,
+          delta: `${signedKg(anchor.delta, language)} kg`,
+        })),
+      };
+    }
     if (target.kind === 'route') {
       if (!activity) {
         return null;
@@ -145,24 +183,37 @@ export function useShareData(target: ShareTarget, language: ShareLanguage) {
       record: pickRecord(named),
       zones: zonesOf(session.completedExercises.map(id => exercises.byId[id]?.bodyPart)),
     };
-  }, [activity, detail, exercises.byId, records, target.kind]);
+  }, [activity, detail, exercises.byId, language, planDetail.data, records, reportQuery.data, target.kind]);
 
   // "Total Body Dumbbell · 42:08" / "Carrera de tarde · 8,42 km": the same
   // duration and rounding as the sticker (clockText of durationSec).
-  const context = data
-    ? data.kind === 'workout'
-      ? `${data.title} · ${clockText(data.durationSec)}`
-      : `${data.title} · ${kmText(data.distanceM, language)} km`
-    : '';
+  const context = !data
+    ? ''
+    : data.kind === 'plan'
+      ? SHARE_COPY[language].planTitle
+      : data.kind === 'workout'
+        ? `${data.title} · ${clockText(data.durationSec)}`
+        : `${data.title} · ${kmText(data.distanceM, language)} km`;
 
   return {
     data,
     context,
     activity,
-    loading: target.kind === 'workout' ? detailQuery.isLoading : !activity,
-    error: target.kind === 'workout' ? Boolean(detailQuery.error) : false,
+    loading:
+      target.kind === 'workout'
+        ? detailQuery.isLoading
+        : target.kind === 'plan'
+          ? reportQuery.isLoading
+          : !activity,
+    error:
+      target.kind === 'workout'
+        ? Boolean(detailQuery.error)
+        : target.kind === 'plan'
+          ? Boolean(reportQuery.error)
+          : false,
     retry: () => {
       detailQuery.refetch().catch(() => undefined);
+      reportQuery.refetch().catch(() => undefined);
     },
   };
 }

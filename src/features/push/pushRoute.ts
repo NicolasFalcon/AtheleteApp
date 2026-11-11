@@ -10,6 +10,13 @@ export type PushData = {
   // coach_routine_assigned, student_template_id. No entity_type/entity_id.
   linkId?: string | null;
   templateId?: string | null;
+  // Plan de entrenamiento (v2.21 §31): `data.screen` names the screen
+  // (training_plan_review | training_plan | training_plan_report) and the
+  // payload brings week_index, adjustment_id or plan_id.
+  screen?: string | null;
+  planId?: string | null;
+  weekIndex?: number | null;
+  adjustmentId?: string | null;
 };
 
 export type PushTarget =
@@ -32,15 +39,29 @@ export type PushTarget =
   | { kind: 'nutrition' }
   // The other side ended the link. The payload has no role: the coach goes
   // to Mis alumnos, the student to Perfil (where "Tengo un coach" is back).
-  | { kind: 'coachLinkEnded' };
+  | { kind: 'coachLinkEnded' }
+  // Plan de entrenamiento (v2.21 §31): the weekly review of a week (null: the
+  // last one), Tu semana in its plan view with an adjustment shown first, and
+  // the final report of a plan (null: the last one).
+  | { kind: 'planReview'; weekIndex: number | null }
+  | { kind: 'plan'; adjustmentId: string | null }
+  | { kind: 'planReport'; planId: string | null };
 
 const str = (value: unknown): string | null => (typeof value === 'string' && value.length > 0 ? value : null);
+
+// A week index comes as a number or, in a push payload, as a string.
+const positiveInt = (value: unknown): number | null => {
+  const number = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof number === 'number' && Number.isInteger(number) && number > 0 ? number : null;
+};
 
 // `data` of the payload as it arrives in the notification content. Anything
 // that is not an object with a type is not ours: null.
 export function parsePushData(value: unknown): PushData | null {
   const record = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
-  const type = str(record?.type);
+  // The plan pushes carry no `type`: `screen` stands in only so the payload
+  // is recognised as ours; the plan routing reads `screen` itself.
+  const type = str(record?.type) ?? str(record?.screen);
   if (!record || !type) {
     return null;
   }
@@ -51,7 +72,27 @@ export function parsePushData(value: unknown): PushData | null {
     entityId: str(record.entity_id),
     linkId: str(record.link_id),
     templateId: str(record.student_template_id),
+    screen: str(record.screen),
+    planId: str(record.plan_id),
+    weekIndex: positiveInt(record.week_index),
+    adjustmentId: str(record.adjustment_id),
   };
+}
+
+// Plan pushes, by `data.screen` alone (never `type`): review { plan_id,
+// week_index }, adjustment { plan_id, adjustment_id, kind } and end of the
+// plan { plan_id, name }.
+function planTarget(data: PushData): PushTarget | null {
+  switch (data.screen) {
+    case 'training_plan_review':
+      return { kind: 'planReview', weekIndex: data.weekIndex ?? null };
+    case 'training_plan':
+      return { kind: 'plan', adjustmentId: data.adjustmentId ?? null };
+    case 'training_plan_report':
+      return { kind: 'planReport', planId: data.planId ?? null };
+    default:
+      return null;
+  }
 }
 
 // coach_* pushes (6 types, COACH_SHAPES §7).
@@ -90,6 +131,10 @@ export function targetForPush(data: PushData): PushTarget {
   const coach = coachTarget(data);
   if (coach) {
     return coach;
+  }
+  const plan = planTarget(data);
+  if (plan) {
+    return plan;
   }
   switch (type) {
     case 'friend_request':

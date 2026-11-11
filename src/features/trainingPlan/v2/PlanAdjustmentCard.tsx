@@ -22,6 +22,7 @@ export function PlanAdjustmentCard({
   busy,
   failed,
   closed = false,
+  highlighted = false,
   onRespond,
 }: {
   adjustment: PlanAdjustment;
@@ -31,6 +32,8 @@ export function PlanAdjustmentCard({
   failed: boolean;
   // Already closed with no answer to show (an old card): no buttons.
   closed?: boolean;
+  // The one a push points to: an Ember ring.
+  highlighted?: boolean;
   onRespond: (action: AdjustmentAction) => void;
 }) {
   const { colors } = useThemeV2();
@@ -46,7 +49,13 @@ export function PlanAdjustmentCard({
   const hasChange = adjustment.before !== null || adjustment.after !== null;
 
   return (
-    <View style={[styles.card, { backgroundColor: blue ? colors.plan.rbS : colors.surface.raised }]}>
+    <View
+      style={[
+        styles.card,
+        { backgroundColor: blue ? colors.plan.rbS : colors.surface.raised },
+        highlighted ? [styles.highlight, { borderColor: colors.ember.base }] : null,
+      ]}
+    >
       <TextV2 variant="eyebrow" color={accent}>
         {t(`adj.eyebrow.${adjustment.kind}` as 'adj.eyebrow.variant_stall').toUpperCase()}
       </TextV2>
@@ -155,7 +164,7 @@ type Answered = Record<string, { adjustment: PlanAdjustment; action: AdjustmentA
 
 // The adjustments waiting for an answer, on top of Tu semana (31.4). An
 // answered one stays with its confirmation until the screen is left.
-export function PlanAdjustmentsStack() {
+export function PlanAdjustmentsStack({ highlightId = null }: { highlightId?: string | null }) {
   const query = usePlanAdjustments();
   const { respond, busyId } = useRespondAdjustment();
   const [answered, setAnswered] = useState<Answered>({});
@@ -163,7 +172,10 @@ export function PlanAdjustmentsStack() {
 
   const waiting = (query.data ?? []).filter(item => needsAnswer(item) && !answered[item.id]);
   const done = Object.values(answered).map(entry => entry.adjustment);
-  const shown = [...waiting, ...done];
+  // The adjustment a push points to goes first.
+  const shown = [...waiting, ...done].sort(
+    (a, b) => Number(b.id === highlightId) - Number(a.id === highlightId),
+  );
   if (shown.length === 0) {
     return null;
   }
@@ -186,6 +198,7 @@ export function PlanAdjustmentsStack() {
         <PlanAdjustmentCard
           key={adjustment.id}
           adjustment={adjustment}
+          highlighted={adjustment.id === highlightId}
           answered={answered[adjustment.id]?.action ?? null}
           busy={busyId === adjustment.id}
           failed={failedId === adjustment.id}
@@ -202,6 +215,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   stack: { gap: 12 },
   card: { borderRadius: 20, padding: 16, gap: 10 },
+  highlight: { borderWidth: 2 },
   title: { fontWeight: '600' },
   change: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14 },
   changeCol: { flex: 1, gap: 2 },

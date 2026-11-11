@@ -618,6 +618,7 @@ export function WeekScreen({ navigation, route }: Props) {
             plan={trainingPlan.data}
             finished
             onCreate={() => navigation.navigate(APP_ROUTES.TrainingPlanCreate)}
+            onReport={planId => navigation.navigate(APP_ROUTES.PlanReport, { planId })}
             style={styles.planEntry}
           />
         ) : null}

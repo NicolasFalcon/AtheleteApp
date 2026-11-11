@@ -58,8 +58,15 @@ import {
   type SessionVariantReason,
   type SessionVariants,
 } from '@app/features/session/variantModel';
+import { actionDecision, setReadiness } from '@app/features/session/liveActivityModel';
 import { restCue } from '@app/features/sound/soundModel';
 import { playCue, playSound, useSoundPreload } from '@app/features/sound/soundService';
+import {
+  ackLiveActivityAction,
+  pendingLiveActivityActions,
+  subscribeLiveActivityActions,
+  type LiveActivityButtonAction,
+} from '@app/lib/liveActivity';
 import { cancelRestCues, nativeRestCues, scheduleRestCues } from '@app/lib/restCues';
 import type { Workout } from '@app/shared';
 
@@ -451,6 +458,99 @@ export function useSessionRunner({
     setRest(null);
     setYourTurnUntil(null);
   }, [rest]);
+
+  // ── Buttons of the Live Activity (iOS 17+) ───────────────────────────────
+  // "Serie hecha ✓" and "Saltar" of the activity arrive here (an event while
+  // JS runs; the queue the native side kept otherwise). They do exactly what
+  // the buttons of the app do — logSet / skipRest — so the set is saved, the
+  // rest starts and the activity updates through the usual path, with the
+  // same offline queue. Each action is closed (acked) once seen, applied or
+  // not; one is applied only if its set is the current one, so a second tap
+  // never logs a set twice.
+  const actionState = useRef({
+    logSet,
+    skipRest,
+    target: {
+      sessionId,
+      loaded: false,
+      paused,
+      cursor,
+      resting: Boolean(rest),
+      readiness: null as ReturnType<typeof setReadiness> | null,
+    },
+  });
+  actionState.current = {
+    logSet,
+    skipRest,
+    target: {
+      sessionId,
+      loaded: loadState === 'ready' && !halted,
+      paused,
+      cursor,
+      resting: Boolean(rest),
+      readiness: current ? setReadiness(current, draft, sets) : null,
+    },
+  };
+  const actionQueue = useRef<LiveActivityButtonAction[]>([]);
+  const seenActions = useRef(new Set<string>());
+  const loggedFromActivity = useRef(new Set<string>());
+
+  const drainActions = useCallback(() => {
+    const queue = actionQueue.current;
+    while (queue.length > 0) {
+      const action = queue.shift() as LiveActivityButtonAction;
+      const { logSet: log, skipRest: skip, target } = actionState.current;
+      const setKey = `${action.sessionId}:${action.position}:${action.setIndex}`;
+      const decision =
+        action.kind === 'completeSet' && loggedFromActivity.current.has(setKey)
+          ? 'ignore'
+          : actionDecision(action, target, Date.now());
+      ackLiveActivityAction(action.id).catch(() => undefined);
+      if (decision === 'logSet') {
+        loggedFromActivity.current.add(setKey);
+        log();
+        // The next action waits for the state this one produced.
+        return;
+      }
+      if (decision === 'skipRest') {
+        skip();
+        return;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (loadState !== 'ready' || !sessionId) {
+      return undefined;
+    }
+    let cancelled = false;
+    const take = (action: LiveActivityButtonAction) => {
+      if (seenActions.current.has(action.id)) {
+        return;
+      }
+      seenActions.current.add(action.id);
+      actionQueue.current = [...actionQueue.current, action].sort((a, b) => a.at - b.at);
+      drainActions();
+    };
+    const unsubscribe = subscribeLiveActivityActions(take);
+    // Taps that came while JS was not running.
+    pendingLiveActivityActions()
+      .then(list => {
+        if (!cancelled) {
+          list.forEach(take);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [drainActions, loadState, sessionId]);
+
+  // Whatever is still waiting is applied against the state each render brings.
+  useEffect(() => {
+    drainActions();
+  });
 
   const waitForWrites = () => Promise.allSettled([...pendingWrites.current]);
 

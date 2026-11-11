@@ -332,6 +332,9 @@ export type TrainingPlanErrorCode =
   | 'week_has_sessions'
   | 'proposal_not_open'
   | 'plan_not_active'
+  | 'pause_limit'
+  | 'invalid_days'
+  | 'invalid_duration'
   | 'not_found'
   | 'invalid_input'
   | 'unauthorized'
@@ -344,6 +347,9 @@ const KNOWN: readonly TrainingPlanErrorCode[] = [
   'week_has_sessions',
   'proposal_not_open',
   'plan_not_active',
+  'pause_limit',
+  'invalid_days',
+  'invalid_duration',
   'not_found',
   'invalid_input',
   'unauthorized',
@@ -529,6 +535,12 @@ export type TrainingPlanDetail = {
   planId: string | null;
   name: string | null;
   status: string | null;
+  // The plan's header, for Gestionar el plan: its goal, its training days
+  // (ISO 1..7) and the weeks of pause already used (max 2 in total; it comes
+  // in the `plan` object of get_training_plan, never in the state).
+  goal: TrainingGoal | null;
+  daysOfWeek: number[];
+  pauseWeeksUsed: number | null;
   weeks: number;
   startDate: string | null;
   endDate: string | null;
@@ -584,6 +596,9 @@ export function parseTrainingPlanDetail(body: Raw): TrainingPlanDetail {
     planId: str(plan.id) ?? str(plan.plan_id),
     name: str(plan.name),
     status: str(plan.status),
+    goal: goalOf(plan.goal),
+    daysOfWeek: numbers(plan.days_of_week).filter(value => value >= 1 && value <= 7),
+    pauseWeeksUsed: num(plan.pause_weeks_used),
     weeks: num(plan.weeks) ?? countedWeeks,
     startDate: day(plan.start_date),
     endDate: day(plan.end_date),
@@ -710,4 +725,69 @@ export async function fetchTrainingPlanMonth(month: string): Promise<PlanMonth> 
 // training days. Errors: plan_not_active.
 export async function resumeTrainingPlan(clientId: string): Promise<void> {
   await call('resume_training_plan', { p_client_id: clientId });
+}
+
+
+// ── Gestionar el plan (31.11) ──────────────────────────────────────────────
+// Every write carries a p_client_id (idempotent per user + client id); the
+// same id on a retry answers the same result with `replayed: true`.
+
+export type ManageResult = {
+  planId: string | null;
+  state: TrainingPlanStateName | null;
+  replayed: boolean;
+};
+
+const manageResult = (body: Raw): ManageResult => ({
+  planId: str(body.plan_id),
+  state: STATES.find(item => item === body.state) ?? null,
+  replayed: body.replayed === true,
+});
+
+// pause_training_plan(p_weeks, p_client_id) → `{ ok, plan_id, state:
+// 'paused', paused_until, replayed }`. Errors: pause_limit (the two weeks are
+// used), plan_not_active.
+export async function pauseTrainingPlan(
+  weeks: 1 | 2,
+  clientId: string,
+): Promise<ManageResult & { pausedUntil: string | null }> {
+  const body = await call('pause_training_plan', { p_weeks: weeks, p_client_id: clientId });
+  return { ...manageResult(body), pausedUntil: day(body.paused_until) };
+}
+
+// change_plan_days(p_days, p_client_id) → `{ ok, plan_id, days_of_week,
+// replayed }`. p_days: ISO 1..7, from 2 to 6. Error: invalid_days.
+export async function changePlanDays(
+  days: number[],
+  clientId: string,
+): Promise<ManageResult & { daysOfWeek: number[] }> {
+  const body = await call('change_plan_days', { p_days: days, p_client_id: clientId });
+  return { ...manageResult(body), daysOfWeek: numbers(body.days_of_week) };
+}
+
+// change_plan_goal_duration(p_goal, p_weeks, p_client_id) → `{ ok, plan_id,
+// goal, weeks, replayed }`. Error: invalid_duration (shorter than the weeks
+// already done).
+export async function changePlanGoalDuration(
+  args: { goal: TrainingGoal; weeks: TrainingPlanWeeks; clientId: string },
+): Promise<ManageResult & { goal: TrainingGoal | null; weeks: number | null }> {
+  const body = await call('change_plan_goal_duration', {
+    p_goal: args.goal,
+    p_weeks: args.weeks,
+    p_client_id: args.clientId,
+  });
+  return { ...manageResult(body), goal: goalOf(body.goal), weeks: num(body.weeks) };
+}
+
+// save_plan_session_to_routines(p_plan_session_id, p_client_id) → `{ ok,
+// routine_id, replayed }`.
+export async function savePlanSessionToRoutines(
+  planSessionId: string,
+  clientId: string,
+): Promise<{ routineId: string | null; replayed: boolean }> {
+  const body = await call('save_plan_session_to_routines', {
+    p_plan_session_id: planSessionId,
+    p_client_id: clientId,
+  });
+  return { routineId: str(body.routine_id), replayed: body.replayed === true };
 }

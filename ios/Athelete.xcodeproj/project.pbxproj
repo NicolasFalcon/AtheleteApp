@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-Athelete.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Athelete.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1D0473A730A3F3E500A6D8F3 /* LiveActivityIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D0473A630A3F3E500A6D8F3 /* LiveActivityIntents.swift */; };
 		1D3D3FA430801C4B00A69C23 /* MapLibre in Frameworks */ = {isa = PBXBuildFile; productRef = 52CEB72016FE35E6BE452BEF /* MapLibre */; };
 		1DB052953093D5DA000719A5 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DB052943093D5D9000719A5 /* WidgetKit.framework */; };
 		1DB052973093D5DA000719A5 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DB052963093D5DA000719A5 /* SwiftUI.framework */; };
@@ -50,6 +51,7 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Athelete/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Athelete/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Athelete/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		1D0473A630A3F3E500A6D8F3 /* LiveActivityIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = LiveActivityIntents.swift; path = Athelete/LiveActivityIntents.swift; sourceTree = "<group>"; };
 		1D3D3FA630801CF400A69C23 /* Athelete.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = Athelete.entitlements; path = Athelete/Athelete.entitlements; sourceTree = "<group>"; };
 		1DB052933093D5D9000719A5 /* AtheleteLiveActivityExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = AtheleteLiveActivityExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1DB052943093D5D9000719A5 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -66,7 +68,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		1DB052AC3093D5DD000719A5 /* Exceptions for "AtheleteLiveActivity" folder in "AtheleteLiveActivityExtension" target */ = {
+		1DB052AC3093D5DD000719A5 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -76,18 +78,7 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1DB052983093D5DA000719A5 /* AtheleteLiveActivity */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				1DB052AC3093D5DD000719A5 /* Exceptions for "AtheleteLiveActivity" folder in "AtheleteLiveActivityExtension" target */,
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = AtheleteLiveActivity;
-			sourceTree = "<group>";
-		};
+		1DB052983093D5DA000719A5 /* AtheleteLiveActivity */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (1DB052AC3093D5DD000719A5 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = AtheleteLiveActivity; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -122,6 +113,7 @@
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
+				1D0473A630A3F3E500A6D8F3 /* LiveActivityIntents.swift */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
 			);
 			name = Athelete;
@@ -332,9 +324,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Athelete/Pods-Athelete-frameworks-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Embed Pods Frameworks";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Athelete/Pods-Athelete-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -414,9 +410,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Athelete/Pods-Athelete-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Athelete/Pods-Athelete-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -432,6 +432,7 @@
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				3946AC63E42CD2D11FEE037A /* ExpoModulesProvider.swift in Sources */,
+				1D0473A730A3F3E500A6D8F3 /* LiveActivityIntents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -460,7 +461,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Athelete/Athelete.entitlements;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = 6H5XKX54N3;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Athelete/Info.plist;
@@ -494,7 +495,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Athelete/Athelete.entitlements;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEVELOPMENT_TEAM = 6H5XKX54N3;
 				INFOPLIST_FILE = Athelete/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.4;
@@ -532,7 +533,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = 6H5XKX54N3;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -580,7 +581,7 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 9;
+				CURRENT_PROJECT_VERSION = 10;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = 6H5XKX54N3;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;

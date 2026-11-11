@@ -7,6 +7,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { Lock } from 'lucide-react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -20,6 +21,9 @@ export type SegmentedOption<K extends string> = {
   key: K;
   label: string;
   badge?: number;
+  // A lock after the label (a feature behind Premium); it stays tappable.
+  locked?: boolean;
+  accessibilityLabel?: string;
 };
 
 export type SegmentedProps<K extends string> = {
@@ -112,7 +116,7 @@ export function Segmented<K extends string>({
             key={option.key}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
-            accessibilityLabel={option.label}
+            accessibilityLabel={option.accessibilityLabel ?? option.label}
             onPress={() => {
               if (!selected) {
                 haptics.selection();
@@ -129,6 +133,14 @@ export function Segmented<K extends string>({
             >
               {option.label}
             </TextV2>
+            {option.locked ? (
+              <Lock
+                size={12}
+                color={labelColor}
+                strokeWidth={2.2}
+                style={selected ? undefined : styles.idleLock}
+              />
+            ) : null}
             {option.badge ? (
               <View
                 style={[
@@ -168,6 +180,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  idleLock: {
+    opacity: 0.72,
   },
   badge: {
     minWidth: 18,

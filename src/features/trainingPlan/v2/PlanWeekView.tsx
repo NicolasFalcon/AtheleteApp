@@ -58,6 +58,8 @@ export function PlanWeekView({
   onChangeWeek,
   onBackToCurrent,
   onOpenDay,
+  onOpenReview,
+  highlightAdjustmentId,
 }: {
   weekStart: string;
   range: { first: string; last: string; current: string };
@@ -67,6 +69,10 @@ export function PlanWeekView({
   onChangeWeek: (weekStart: string) => void;
   onBackToCurrent: () => void;
   onOpenDay: (view: PlanDayView) => void;
+  // "Revisión semanal" (31.9): opens the last review.
+  onOpenReview: () => void;
+  // The adjustment a push points to: shown first, with a ring.
+  highlightAdjustmentId?: string | null;
 }) {
   const { colors } = useThemeV2();
   const { t, language } = useTrainingPlanText();
@@ -165,7 +171,8 @@ export function PlanWeekView({
 
   return (
     <>
-      <PlanAdjustmentsStack />
+      {/* read_only (§10): no adjustments are shown. */}
+      {planState.readOnly ? null : <PlanAdjustmentsStack highlightId={highlightAdjustmentId ?? null} />}
       <View style={styles.phase}>
         <View style={styles.phaseHead}>
           <View style={styles.phaseTexts}>
@@ -382,8 +389,8 @@ export function PlanWeekView({
 
       <PressableScale
         accessibilityRole="button"
-        accessibilityState={{ disabled: true }}
-        disabled
+        accessibilityLabel={`${t('review.title')}. ${t('review.sub')}`}
+        onPress={onOpenReview}
         style={[styles.review, { backgroundColor: colors.surface.raised }, styles.reviewShadow]}
       >
         <View style={[styles.reviewIcon, { backgroundColor: colors.surface.muted }]}>

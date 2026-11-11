@@ -38,6 +38,7 @@ describe('type → screen of a tapped push', () => {
   it('reads the data of the payload, and ignores anything that is not ours', () => {
     expect(parsePushData({ type: 'post_like', notification_id: 'n', entity_type: 'post', entity_id: 'p' })).toEqual({
       type: 'post_like', notificationId: 'n', entityType: 'post', entityId: 'p',
+      linkId: null, templateId: null, screen: null, planId: null, weekIndex: null, adjustmentId: null,
     });
     expect(parsePushData({ foo: 1 })).toBeNull();
     expect(parsePushData(null)).toBeNull();
@@ -118,5 +119,119 @@ describe('inbox: the new challenge types', () => {
     expect(parseNotificationType(type)).toBe(type);
     expect(destinationOf(row(type))).toEqual({ kind: 'challenge', challengeId: 'ch1' });
     expect(groupNotifications([row(type)])).toHaveLength(1);
+  });
+});
+
+describe('plan pushes (data.screen)', () => {
+  const parse = (payload: Record<string, unknown>) => {
+    const parsed = parsePushData(payload);
+    return parsed ? targetForPush(parsed) : null;
+  };
+  it('opens the review of the week_index, as a number or a string', () => {
+    expect(parse({ screen: 'training_plan_review', week_index: 6 })).toEqual({ kind: 'planReview', weekIndex: 6 });
+    expect(parse({ screen: 'training_plan_review', week_index: '6' })).toEqual({ kind: 'planReview', weekIndex: 6 });
+    expect(parse({ screen: 'training_plan_review' })).toEqual({ kind: 'planReview', weekIndex: null });
+  });
+  it('opens the plan view with the adjustment', () => {
+    expect(parse({ screen: 'training_plan', adjustment_id: 'a1' })).toEqual({ kind: 'plan', adjustmentId: 'a1' });
+    expect(parse({ screen: 'training_plan' })).toEqual({ kind: 'plan', adjustmentId: null });
+  });
+  it('opens the report of the plan', () => {
+    expect(parse({ screen: 'training_plan_report', plan_id: 'p1' })).toEqual({ kind: 'planReport', planId: 'p1' });
+  });
+  it('routes by screen alone, never by type', () => {
+    expect(parse({ screen: 'training_plan', plan_id: 'p1', adjustment_id: 'a1', kind: 'deload_early' })).toEqual({
+      kind: 'plan',
+      adjustmentId: 'a1',
+    });
+    expect(parse({ screen: 'training_plan_report', plan_id: 'p1', name: 'Plan' })).toEqual({
+      kind: 'planReport',
+      planId: 'p1',
+    });
+    // A type that names a plan screen, without `screen`, is not a plan push.
+    expect(parse({ type: 'training_plan_review', week_index: 2 })).toEqual({ kind: 'inbox' });
+  });
+  it('navigates to the right route', () => {
+    const calls: [string, object | undefined][] = [];
+    const go = (name: string, params?: object) => calls.push([name, params]);
+    navigateToTarget(go, { kind: 'post', postId: 'p1' });
+    navigateToTarget(go, { kind: 'challenge', challengeId: 'c1' });
+    navigateToTarget(go, { kind: 'profile', userId: 'u1' });
+    navigateToTarget(go, { kind: 'inbox' });
+    expect(calls).toEqual([
+      ['SocialPost', { postId: 'p1' }],
+      ['SocialChallenge', { challengeId: 'c1' }],
+      ['SocialProfile', { userId: 'u1' }],
+      ['SocialNotifications', undefined],
+    ]);
+  });
+
+  it('no banner when the person is already on that screen', () => {
+    expect(isAlreadyThere({ name: 'SocialPost', params: { postId: 'p1' } }, { kind: 'post', postId: 'p1' })).toBe(true);
+    expect(isAlreadyThere({ name: 'SocialPost', params: { postId: 'p2' } }, { kind: 'post', postId: 'p1' })).toBe(false);
+    expect(isAlreadyThere({ name: 'SocialNotifications' }, { kind: 'inbox' })).toBe(true);
+    expect(isAlreadyThere({ name: 'SocialNotifications' }, { kind: 'post', postId: 'p1' })).toBe(false);
+    expect(isAlreadyThere(undefined, { kind: 'inbox' })).toBe(false);
+  });
+});
+
+describe('apns_env', () => {
+  it('Debug is sandbox; production only in Release with APP_ENV=production', () => {
+    expect(apnsEnvironment('development', true)).toBe('sandbox');
+    expect(apnsEnvironment('production', true)).toBe('sandbox');
+    expect(apnsEnvironment('development', false)).toBe('sandbox');
+    expect(apnsEnvironment('production', false)).toBe('production');
+  });
+});
+
+describe('inbox: the new challenge types', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { destinationOf, groupNotifications, parseNotificationType } = require('../src/features/social/notificationModel');
+  const row = (type: string) => ({
+    id: type, type, actor_id: null, actor: null, post_id: null, comment_id: null, challenge_id: 'ch1', request_id: null,
+    read_at: null, created_at: '2026-10-14T10:00:00Z',
+  });
+
+  it.each(['challenge_completed', 'challenge_ending', 'official_completed', 'official_new'])('%s opens the challenge', type => {
+    expect(parseNotificationType(type)).toBe(type);
+    expect(destinationOf(row(type))).toEqual({ kind: 'challenge', challengeId: 'ch1' });
+    expect(groupNotifications([row(type)])).toHaveLength(1);
+  });
+});
+
+describe('plan pushes (data.screen)', () => {
+  const parse = (payload: Record<string, unknown>) => {
+    const parsed = parsePushData(payload);
+    return parsed ? targetForPush(parsed) : null;
+  };
+  it('opens the review of the week_index, as a number or a string', () => {
+    expect(parse({ screen: 'training_plan_review', week_index: 6 })).toEqual({ kind: 'planReview', weekIndex: 6 });
+    expect(parse({ screen: 'training_plan_review', week_index: '6' })).toEqual({ kind: 'planReview', weekIndex: 6 });
+    expect(parse({ screen: 'training_plan_review' })).toEqual({ kind: 'planReview', weekIndex: null });
+  });
+  it('opens the plan view with the adjustment', () => {
+    expect(parse({ screen: 'training_plan', adjustment_id: 'a1' })).toEqual({ kind: 'plan', adjustmentId: 'a1' });
+    expect(parse({ screen: 'training_plan' })).toEqual({ kind: 'plan', adjustmentId: null });
+  });
+  it('opens the report of the plan', () => {
+    expect(parse({ screen: 'training_plan_report', plan_id: 'p1' })).toEqual({ kind: 'planReport', planId: 'p1' });
+  });
+  it('still works when the payload also names a type', () => {
+    expect(parse({ type: 'training_plan_review', screen: 'training_plan_review', week_index: 2 })).toEqual({
+      kind: 'planReview',
+      weekIndex: 2,
+    });
+  });
+  it('navigates to the right route with its params', () => {
+    const calls: [string, object | undefined][] = [];
+    const navigate = (name: string, params?: object) => calls.push([name, params]);
+    navigateToTarget(navigate, { kind: 'planReview', weekIndex: 6 });
+    navigateToTarget(navigate, { kind: 'plan', adjustmentId: 'a1' });
+    navigateToTarget(navigate, { kind: 'planReport', planId: 'p1' });
+    expect(calls).toEqual([
+      ['PlanReview', { weekIndex: 6 }],
+      ['Week', { view: 'plan', adjustmentId: 'a1' }],
+      ['PlanReport', { planId: 'p1' }],
+    ]);
   });
 });

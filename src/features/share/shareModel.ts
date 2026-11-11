@@ -42,7 +42,17 @@ export type RouteSticker = {
   points: { lat: number; lon: number }[];
 };
 
-export type StickerData = WorkoutSticker | RouteSticker;
+// Reporte final del plan (v2.21 §31.10): Λ ATHELETE, the date, PLAN
+// COMPLETADO, {n} SEMANAS and up to 3 anchors with their improvement.
+// The values arrive already written (language, decimals).
+export type PlanSticker = {
+  kind: 'plan';
+  date: Date;
+  weeks: number;
+  anchors: { name: string; after: string; delta: string }[];
+};
+
+export type StickerData = WorkoutSticker | RouteSticker | PlanSticker;
 
 // ── Formats ─────────────────────────────────────────────────────────────────
 const MONTHS: Record<ShareLanguage, string[]> = {
@@ -137,6 +147,9 @@ export function zonesLine(zones: ZoneKey[], language: ShareLanguage): string {
 // (speed when cycling) · elevation, in two columns without elevation.
 export function stickerTrio(data: StickerData, language: ShareLanguage): { value: string; label: string }[] {
   const t = SHARE_COPY[language];
+  if (data.kind === 'plan') {
+    return [];
+  }
   if (data.kind === 'workout') {
     return [
       { value: data.volumeKg !== null && data.volumeKg > 0 ? thousands(data.volumeKg, language) : '—', label: t.volume },
@@ -158,6 +171,9 @@ export function stickerTrio(data: StickerData, language: ShareLanguage): { value
 
 // The key figure of the Mínimo variant.
 export function minFigure(data: StickerData, language: ShareLanguage): { value: string; unit: string } {
+  if (data.kind === 'plan') {
+    return { value: String(data.weeks), unit: language === 'es' ? 'sem' : 'wk' };
+  }
   return data.kind === 'workout'
     ? { value: clockText(data.durationSec), unit: 'min' }
     : { value: kmText(data.distanceM, language), unit: 'km' };
@@ -169,6 +185,10 @@ export const STICKER_MARGIN = 24;
 export function stickerSize(data: StickerData, variant: StickerVariant): { width: number; height: number } {
   if (variant === 'min') {
     return { width: 232, height: 72 };
+  }
+  if (data.kind === 'plan') {
+    // Head, title and one line per anchor.
+    return { width: 300, height: 226 + data.anchors.length * 30 };
   }
   if (data.kind === 'route') {
     return { width: 300, height: 400 };
@@ -240,6 +260,9 @@ export const SHARE_COPY = {
     more: 'Más',
     community: 'Comunidad',
     workoutDone: 'ENTRENO COMPLETADO',
+    planDone: 'PLAN COMPLETADO',
+    planWeeks: (n: number) => `${n} ${n === 1 ? 'SEMANA' : 'SEMANAS'}`,
+    planTitle: 'Reporte del plan',
     time: 'tiempo',
     volume: 'kg volumen',
     reps: 'repeticiones',
@@ -288,6 +311,9 @@ export const SHARE_COPY = {
     more: 'More',
     community: 'Community',
     workoutDone: 'WORKOUT COMPLETED',
+    planDone: 'PLAN COMPLETED',
+    planWeeks: (n: number) => `${n} ${n === 1 ? 'WEEK' : 'WEEKS'}`,
+    planTitle: 'Plan report',
     time: 'time',
     volume: 'kg volume',
     reps: 'reps',

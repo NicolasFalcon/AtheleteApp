@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Platform,
   StyleSheet,
@@ -7,10 +7,12 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { ArrowRight, CalendarDays, ChevronRight, Flag } from 'lucide-react-native';
+import { ArrowRight, CalendarDays, ChevronRight, Flag, Lock } from 'lucide-react-native';
 import { PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 import { useTrainingPlanText } from '@app/features/trainingPlan/trainingPlanCopy';
+import { isPlanPaywalled } from '@app/features/trainingPlan/managePlanModel';
 import { isDeloadWeek } from '@app/features/trainingPlan/trainingPlanModel';
+import { PremiumSheet } from '@app/features/trainingPlan/v2/PremiumSheet';
 import type { PlanWeekKind, TrainingPlanState } from '@app/services/supabase/trainingPlan';
 
 // Shared pieces of the training plan (handoff v2.21 §31). The entry cards are
@@ -77,13 +79,22 @@ export function PlanEyebrow({
 
 // "Crear plan" (31.4 · Week above "Planificar la semana", Workouts under
 // "Tu próxima sesión").
-export function CreatePlanCard({ onPress, style }: { onPress: () => void; style?: StyleProp<ViewStyle> }) {
+// `locked` (31.12, free version): the arrow becomes a lock.
+export function CreatePlanCard({
+  onPress,
+  locked = false,
+  style,
+}: {
+  onPress: () => void;
+  locked?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { mode } = useThemeV2();
   const { t } = useTrainingPlanText();
   return (
     <PressableScale
       accessibilityRole="button"
-      accessibilityLabel={`${t('card.create.title')}. ${t('card.create.body')}`}
+      accessibilityLabel={`${t('card.create.title')}. ${t('card.create.body')}${locked ? `. ${t('lock.eyebrow')}` : ''}`}
       onPress={onPress}
       style={[styles.card, styles.createCard, mode === 'dark' ? styles.darkRing : null, style]}
     >
@@ -99,14 +110,18 @@ export function CreatePlanCard({ onPress, style }: { onPress: () => void; style?
         </TextV2>
       </View>
       <View style={styles.arrow}>
-        <ArrowRight size={18} color="#121212" strokeWidth={2.2} />
+        {locked ? (
+          <Lock size={17} color="#121212" strokeWidth={2.2} />
+        ) : (
+          <ArrowRight size={18} color="#121212" strokeWidth={2.2} />
+        )}
       </View>
     </PressableScale>
   );
 }
 
 // "Plan terminado" (31.4): in Tu semana instead of Crear plan. Ver reporte
-// opens the final report (part 4): disabled for now.
+// opens the final report (31.10); without a plan id it stays disabled.
 export function PlanFinishedCard({
   name,
   weeks,
@@ -170,28 +185,52 @@ export function PlanFinishedCard({
 
 // The entry card by the plan's state: none → Crear plan; completed → Plan
 // terminado (only where `finished` is wanted, Tu semana); active, paused or
-// unknown → nothing.
+// unknown → nothing. In the free version (31.12) Crear plan carries the lock
+// and opens the Premium sheet instead of Crear plan.
 export function PlanEntryCard({
   plan,
   finished = false,
   onCreate,
+  onReport,
   style,
 }: {
   plan: TrainingPlanState | null | undefined;
   finished?: boolean;
   onCreate: () => void;
+  // Ver reporte of the finished card, with the id of the plan.
+  onReport?: (planId: string) => void;
   style?: StyleProp<ViewStyle>;
 }) {
+  const [premium, setPremium] = useState(false);
   if (!plan) {
     return null;
   }
+  const locked = isPlanPaywalled(plan);
+  const create = locked ? () => setPremium(true) : onCreate;
+  let card: ReactNode = null;
   if (plan.state === 'completed' && finished) {
-    return <PlanFinishedCard name={plan.name} weeks={plan.weeks} onCreate={onCreate} style={style} />;
+    const reportId = plan.planId;
+    card = (
+      <PlanFinishedCard
+        name={plan.name}
+        weeks={plan.weeks}
+        onCreate={create}
+        onReport={onReport && reportId ? () => onReport(reportId) : undefined}
+        style={style}
+      />
+    );
+  } else if (plan.state === 'none' || plan.state === 'completed') {
+    card = <CreatePlanCard onPress={create} locked={locked} style={style} />;
   }
-  if (plan.state === 'none' || plan.state === 'completed') {
-    return <CreatePlanCard onPress={onCreate} style={style} />;
+  if (!card) {
+    return null;
   }
-  return null;
+  return (
+    <>
+      {card}
+      <PremiumSheet open={premium} onClose={() => setPremium(false)} />
+    </>
+  );
 }
 
 // Miniature line of weeks by block (31.1 durations, 31.2 card): loading

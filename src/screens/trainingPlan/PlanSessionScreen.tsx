@@ -1,6 +1,6 @@
 import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Info, Play, Snowflake, Target } from 'lucide-react-native';
+import { ArrowLeft, BookmarkPlus, Info, Play, Snowflake, Target } from 'lucide-react-native';
 import {
   AppImage,
   BackButton,
@@ -33,7 +33,11 @@ import {
   sessionTypeKey,
   useTrainingPlanText,
 } from '@app/features/trainingPlan/trainingPlanCopy';
-import { useStartPlanSession, usePlanSession } from '@app/features/trainingPlan/usePlanSession';
+import {
+  usePlanSession,
+  useSavePlanSession,
+  useStartPlanSession,
+} from '@app/features/trainingPlan/usePlanSession';
 import { sessionTypePhoto } from '@app/features/trainingPlan/v2/planCovers';
 import { MEDIA_PLACEHOLDER_THUMB } from '@app/features/workouts/workoutAssets';
 import { safeGoBack } from '@app/navigation/safeGoBack';
@@ -60,6 +64,7 @@ export function PlanSessionScreen({ navigation, route }: Props) {
   const toast = useToast();
   const query = usePlanSession(planSessionId);
   const starter = useStartPlanSession(planSessionId);
+  const saver = useSavePlanSession(planSessionId);
   const session = query.data ?? null;
   const back = () => safeGoBack(navigation, [ROOT_ROUTES.MainTabs]);
 
@@ -134,6 +139,27 @@ export function PlanSessionScreen({ navigation, route }: Props) {
       return;
     }
     toast.show(t('session.error.start'), { tone: 'error' });
+  };
+
+  // "Guardar en Mis rutinas": a copy of the session as a routine. The toast
+  // sits above the fixed footer and "Ver" opens Mis rutinas.
+  const saveToRoutines = async () => {
+    if (saver.saved) {
+      return;
+    }
+    const result = await saver.save();
+    if (!result) {
+      toast.show(t('session.saveError'), { tone: 'error', bottomOffset: insets.bottom + 112 });
+      return;
+    }
+    haptics.success();
+    toast.show(t('session.saved'), {
+      bottomOffset: insets.bottom + 112,
+      action: {
+        label: t('session.saved.view'),
+        onPress: () => navigation.navigate(APP_ROUTES.RoutineList, { collection: 'mine' }),
+      },
+    });
   };
 
   return (
@@ -213,6 +239,20 @@ export function PlanSessionScreen({ navigation, route }: Props) {
               <ExerciseRow key={`${exercise.position}-${exercise.exerciseId}`} exercise={exercise} />
             ))}
           </View>
+
+          <Button
+            label={t('session.save')}
+            successLabel={t('session.saved')}
+            success={saver.saved !== null}
+            variant="secondary"
+            icon={BookmarkPlus}
+            iconPosition="start"
+            loading={saver.saving}
+            loadingLabel={t('session.saving')}
+            onPress={() => {
+              saveToRoutines().catch(() => undefined);
+            }}
+          />
 
           <View style={styles.rirNote}>
             <Info size={14} color={colors.text.secondary} strokeWidth={2} style={styles.rirIcon} />

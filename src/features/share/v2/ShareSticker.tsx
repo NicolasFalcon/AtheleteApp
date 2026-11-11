@@ -1,6 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
-import { TextV2 } from '@app/components/v2';
+import { TextV2, useThemeV2 } from '@app/components/v2';
 import { Isologo } from '@app/components/v2/Isologo';
 import { LaunchWordmark } from '@app/components/v2/LaunchWordmark';
 import {
@@ -114,6 +114,7 @@ export function ShareSticker({
   language: ShareLanguage;
 }) {
   const t = TONES[tone];
+  const { fonts } = useThemeV2();
   const size = stickerSize(data, variant);
   const shade = t.textShadow === 'strong' ? styles.textShadowStrong : t.textShadow ? styles.textShadow : null;
   const plate = plateOf(t);
@@ -204,6 +205,30 @@ export function ShareSticker({
             <TextV2 color={t.sec} numberOfLines={1} style={[styles.zones, shade]}>
               {zonesLine(data.zones, language) || ' '}
             </TextV2>
+          </View>
+        </>
+      ) : data.kind === 'plan' ? (
+        <>
+          <View style={styles.gap4}>
+            <Eyebrow text={copy.planDone} color={t.sec} shade={shade} />
+            <TextV2 color={t.fg} style={[styles.planBig, { fontFamily: fonts.display }, shade]}>
+              {copy.planWeeks(data.weeks)}
+            </TextV2>
+          </View>
+          <View style={styles.planAnchors}>
+            {data.anchors.map(anchor => (
+              <View key={anchor.name} style={styles.planAnchor}>
+                <TextV2 color={t.fg} numberOfLines={1} style={[styles.planAnchorName, shade]}>
+                  {anchor.name}
+                </TextV2>
+                <TextV2 color={t.fg} style={[styles.planAnchorValue, shade]}>
+                  {anchor.after}
+                </TextV2>
+                <TextV2 color={t.prFg} style={[styles.planAnchorDelta, shade]}>
+                  {anchor.delta}
+                </TextV2>
+              </View>
+            ))}
           </View>
         </>
       ) : (
@@ -385,6 +410,12 @@ const styles = StyleSheet.create({
   segments: { flexDirection: 'row', gap: 3 },
   segment: { flex: 1, height: 5, borderRadius: 3 },
   zones: { fontSize: 12, fontWeight: '500' },
+  planBig: { fontSize: 44, lineHeight: 46, textTransform: 'uppercase' },
+  planAnchors: { gap: 8 },
+  planAnchor: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  planAnchorName: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '600' },
+  planAnchorValue: { fontSize: 14, fontWeight: '600', fontVariant: ['tabular-nums'] },
+  planAnchorDelta: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
   brandBg: { backgroundColor: '#141312', overflow: 'hidden' },
   brandMark: { position: 'absolute' },
 });

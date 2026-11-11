@@ -93,7 +93,7 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // to ellie-chat (tp-1.2 §4), shows Generando (AURA processing and four
 // steps) and then opens the chat with the proposal. A failure shows the
 // error with Reintentar; the answers stay.
-export function TrainingPlanCreateScreen({ navigation }: Props) {
+export function TrainingPlanCreateScreen({ navigation, route }: Props) {
   const { colors, mode, layout } = useThemeV2();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
@@ -109,7 +109,13 @@ export function TrainingPlanCreateScreen({ navigation }: Props) {
   const estimateOf = (key: CreateAnswers['target']) =>
     targetEstimate(targetOption(key), estimates.data ?? []);
   const [phase, setPhase] = useState<Phase>(0);
-  const [answers, setAnswers] = useState<CreateAnswers>(() => initialAnswers(profile));
+  // "Ver propuesta" of the final report arrives with the goal and the weeks
+  // already chosen; "Crear otro" and every other entry starts from the profile.
+  const [answers, setAnswers] = useState<CreateAnswers>(() => ({
+    ...initialAnswers(profile),
+    ...(route.params?.goal ? { goal: route.params.goal } : null),
+    ...(route.params?.weeks ? { weeks: route.params.weeks } : null),
+  }));
   const [marked, setMarked] = useState(0);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const mounted = useRef(true);

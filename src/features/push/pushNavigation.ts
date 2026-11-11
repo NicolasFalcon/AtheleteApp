@@ -63,6 +63,19 @@ export function navigateToTarget(
       navigate(context.isCoach === true ? APP_ROUTES.CoachStudents : APP_ROUTES.Profile);
       break;
     }
+    case 'planReview':
+      navigate(APP_ROUTES.PlanReview, target.weekIndex ? { weekIndex: target.weekIndex } : undefined);
+      break;
+    case 'plan':
+      // Tu semana in its plan view; WeekRoute still checks the live state.
+      navigate(APP_ROUTES.Week, {
+        view: 'plan',
+        ...(target.adjustmentId ? { adjustmentId: target.adjustmentId } : null),
+      });
+      break;
+    case 'planReport':
+      navigate(APP_ROUTES.PlanReport, target.planId ? { planId: target.planId } : undefined);
+      break;
     case 'friends':
       navigate(ROOT_ROUTES.MainTabs, { screen: TAB_ROUTES.Community, params: { segment: 'amigos' } });
       break;
@@ -108,6 +121,13 @@ export function isAlreadyThere(
       return current.name === APP_ROUTES.WorkoutDetail && params.workoutId === target.workoutId;
     case 'nutrition':
       return current.name === APP_ROUTES.NutritionPlan;
+    case 'planReview':
+      return current.name === APP_ROUTES.PlanReview && (params.weekIndex ?? null) === target.weekIndex;
+    case 'planReport':
+      return current.name === APP_ROUTES.PlanReport && (params.planId ?? null) === target.planId;
+    case 'plan':
+      // The adjustment must be seen, not only the screen: a banner is shown.
+      return false;
     case 'workouts':
     case 'coachLinkEnded':
       return false;

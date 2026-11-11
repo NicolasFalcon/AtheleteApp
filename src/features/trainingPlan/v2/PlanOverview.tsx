@@ -37,16 +37,18 @@ function goalName(detail: TrainingPlanDetail, t: TrainingPlanT): string {
 // open that week), the dark scene with progress, adherence and sessions, Tu
 // meta (only with a goal_target), and an anchor card per exercise with its
 // e1RM, its delta and the weekly bars (registered in ink, projection in
-// outline). Gestionar plan arrives in part 4: disabled.
+// outline). "Gestionar plan" opens the manage sheet (31.11).
 export function PlanOverview({
   detail,
   currentWeek,
   onOpenWeek,
+  onManage,
 }: {
   detail: TrainingPlanDetail;
   // The plan's week now (0: before the start).
   currentWeek: number;
   onOpenWeek: (weekStart: string) => void;
+  onManage: () => void;
 }) {
   const { colors, mode } = useThemeV2();
   const { t, language } = useTrainingPlanText();
@@ -293,9 +295,7 @@ export function PlanOverview({
 
       <PressableScale
         accessibilityRole="button"
-        accessibilityState={{ disabled: true }}
-        accessibilityHint={t('menu.soon')}
-        disabled
+        onPress={onManage}
         style={[styles.manage, { backgroundColor: colors.surface.muted }]}
       >
         <SlidersHorizontal size={16} color={colors.text.primary} strokeWidth={2} />
@@ -358,6 +358,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    opacity: 0.5,
   },
 });

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { AppState } from 'react-native';
 import {
   liveActivityKey,
+  liveActivityRestEndState,
   liveActivityState,
   restEndNotification,
+  type LiveActivityLanguage,
 } from '@app/features/session/liveActivityModel';
 import type { SessionRunner } from '@app/features/session/useSessionRunner';
 import { notificationsModule } from '@app/features/push/notificationsNative';
@@ -20,6 +22,7 @@ import {
   type LiveActivityState,
 } from '@app/lib/liveActivity';
 import { restCuesAudible } from '@app/lib/restCues';
+import { useProfileLanguage } from '@app/hooks/useProfileLanguage';
 import type { Workout } from '@app/shared';
 
 export const REST_END_NOTIFICATION_ID = 'athelete-rest-end';
@@ -30,13 +33,19 @@ export const REST_END_KIND = 'rest-end';
 // every change of the rest and cancelled when there is none. One sync after
 // another, so a cancel never lands before a schedule still in flight.
 let notificationChain: Promise<void> = Promise.resolve();
-function syncRestNotification(state: LiveActivityState | null): Promise<void> {
-  const run = notificationChain.then(() => applyRestNotification(state)).catch(() => undefined);
+function syncRestNotification(
+  state: LiveActivityState | null,
+  language: LiveActivityLanguage = 'es',
+): Promise<void> {
+  const run = notificationChain.then(() => applyRestNotification(state, language)).catch(() => undefined);
   notificationChain = run;
   return run;
 }
 
-async function applyRestNotification(state: LiveActivityState | null): Promise<void> {
+async function applyRestNotification(
+  state: LiveActivityState | null,
+  language: LiveActivityLanguage,
+): Promise<void> {
   let Notifications: ReturnType<typeof notificationsModule>;
   try {
     Notifications = notificationsModule();
@@ -44,7 +53,7 @@ async function applyRestNotification(state: LiveActivityState | null): Promise<v
     return;
   }
   await Notifications.cancelScheduledNotificationAsync(REST_END_NOTIFICATION_ID).catch(() => undefined);
-  const plan = state ? restEndNotification(state) : null;
+  const plan = state ? restEndNotification(state, language) : null;
   if (!plan || plan.fireAt.getTime() <= Date.now() + 1000) {
     return;
   }
@@ -81,6 +90,7 @@ export function useSessionLiveActivity({
   workout: Workout | null;
 }): { teardown: (reason: string) => Promise<void> } {
   const ready = runner.loadState === 'ready' && Boolean(sessionId && workout);
+  const language: LiveActivityLanguage = useProfileLanguage() === 'en' ? 'en' : 'es';
   const input = {
     rest: runner.rest,
     paused: runner.paused,
@@ -88,11 +98,22 @@ export function useSessionLiveActivity({
     setIndex: runner.cursor?.setIndex ?? 0,
     doneCount: runner.doneCount,
     total: runner.plan.length,
+    draft: runner.draft,
+    sets: runner.sets,
   };
-  const state = liveActivityState(input, Date.now());
-  const key = liveActivityKey(state);
+  const now = Date.now();
+  const state = liveActivityState(input, now, language);
+  // What the activity shows by itself when this rest reaches zero: the native
+  // rest cues apply it with the app in the background.
+  const endState =
+    state.phase === 'rest' && !state.paused ? liveActivityRestEndState(input, now, language) : null;
+  const key = liveActivityKey(state, endState);
   const stateRef = useRef(state);
   stateRef.current = state;
+  const endStateRef = useRef(endState);
+  endStateRef.current = endState;
+  const languageRef = useRef(language);
+  languageRef.current = language;
   const idRef = useRef<string | null>(null);
   const starting = useRef<Promise<string | null> | null>(null);
   const closed = useRef(false);
@@ -158,7 +179,7 @@ export function useSessionLiveActivity({
       idRef.current = id;
       // Anything that changed while it was starting.
       if (id) {
-        updateLiveActivity(id, stateRef.current).catch(() => undefined);
+        updateLiveActivity(id, stateRef.current, endStateRef.current).catch(() => undefined);
       }
     });
     return () => {
@@ -189,16 +210,16 @@ export function useSessionLiveActivity({
     }
     const id = idRef.current;
     if (id) {
-      updateLiveActivity(id, stateRef.current).catch(() => undefined);
+      updateLiveActivity(id, stateRef.current, endStateRef.current).catch(() => undefined);
     }
-    syncRestNotification(stateRef.current).catch(() => undefined);
+    syncRestNotification(stateRef.current, languageRef.current).catch(() => undefined);
   }, [key, startInfo]);
 
   // Back in the foreground: the real state (the session clock moved on).
   useEffect(() => {
     const subscription = AppState.addEventListener('change', next => {
       if (next === 'active' && idRef.current && !closed.current) {
-        updateLiveActivity(idRef.current, stateRef.current).catch(() => undefined);
+        updateLiveActivity(idRef.current, stateRef.current, endStateRef.current).catch(() => undefined);
       }
     });
     return () => subscription.remove();

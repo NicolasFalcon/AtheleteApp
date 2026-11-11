@@ -116,4 +116,7 @@ export const APP_ROUTES = {
   TrainingPlanPreview: 'TrainingPlanPreview',
   // Sesión del plan con peso recomendado (v2.21 §31.7).
   PlanSession: 'PlanSession',
+  // Revisión semanal (§31.9) y reporte final (§31.10).
+  PlanReview: 'PlanReview',
+  PlanReport: 'PlanReport',
 } as const;

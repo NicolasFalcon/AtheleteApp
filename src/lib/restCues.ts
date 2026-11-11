@@ -56,6 +56,11 @@ function serial(task: () => Promise<unknown>): Promise<void> {
 }
 
 // Replaces whatever was scheduled (a new rest, +30 s, resuming a pause).
+// Nothing runs natively when no cue is audible (Sonido en Silencio, "Sonido de
+// la sesión" off): the audio background mode is used only for sound that is
+// heard. The native side also announces the end of the rest (the Live
+// Activity takes its next state there); without sound the activity gets to
+// the set through its staleDate instead.
 export function scheduleRestCues({
   restEndsAt,
   events = REST_CUE_EVENTS,

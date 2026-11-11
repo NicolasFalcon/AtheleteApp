@@ -91,7 +91,9 @@ export function ShareScreen({ navigation, route }: Props) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [source, setSource] = useState<PhotoSource>('none');
   const [photoKind, setPhotoKind] = useState<PhotoKind>('none');
-  const [variant, setVariant] = useState<StickerVariant>('full');
+  const [chosenVariant, setVariant] = useState<StickerVariant>('full');
+  // The plan report has a single sticker (no Mínimo).
+  const variant: StickerVariant = target.kind === 'plan' ? 'full' : chosenVariant;
   const [remembered, setRemembered] = useState<Partial<Record<PhotoKind, StickerTone>>>({});
   const [tone, setTone] = useState<StickerTone>('glass');
   const [busy, setBusy] = useState<null | 'stories' | 'download' | 'more' | 'community'>(null);
@@ -219,6 +221,9 @@ export function ShareScreen({ navigation, route }: Props) {
 
   // Comunidad: the existing flow of each kind (the photo is never posted).
   const community = () => {
+    if (target.kind === 'plan') {
+      return;
+    }
     if (target.kind === 'workout') {
       navigation.navigate(APP_ROUTES.SocialCompose, { attach: 'workout', sourceId: target.sessionId });
       return;
@@ -343,15 +348,19 @@ export function ShareScreen({ navigation, route }: Props) {
             </TextV2>
           </View>
           <View style={styles.stickerRow}>
-            <Segmented
-              options={[
-                { key: 'full', label: copy.full },
-                { key: 'min', label: copy.min },
-              ]}
-              value={variant}
-              onChange={setVariant}
-              style={styles.flex1}
-            />
+            {target.kind === 'plan' ? (
+              <View style={styles.flex1} />
+            ) : (
+              <Segmented
+                options={[
+                  { key: 'full', label: copy.full },
+                  { key: 'min', label: copy.min },
+                ]}
+                value={variant}
+                onChange={setVariant}
+                style={styles.flex1}
+              />
+            )}
             {SWATCHES.map(item => {
               const on = tone === item.tone;
               return (
@@ -393,7 +402,10 @@ export function ShareScreen({ navigation, route }: Props) {
               { key: 'more', label: copy.more, icon: Share2, run: more },
               { key: 'community', label: copy.community, icon: Users, run: async () => community() },
             ] as const
-          ).map(item => (
+          )
+            // Comunidad has no flow for the plan report.
+            .filter(item => item.key !== 'community' || target.kind !== 'plan')
+            .map(item => (
             <PressableScale
               key={item.key}
               accessibilityRole="button"

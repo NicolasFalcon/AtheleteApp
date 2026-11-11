@@ -7,6 +7,7 @@ import {
   invalidateTrainingPlan,
   trainingPlanKeys,
 } from '@app/features/trainingPlan/useTrainingPlanState';
+import { savePlanSessionToRoutines } from '@app/services/supabase/trainingPlan';
 import {
   fetchPlanAdjustments,
   fetchPlanOutcome,
@@ -108,4 +109,35 @@ export function useRespondAdjustment() {
     [queryClient],
   );
   return { respond, busyId };
+}
+
+// "Guardar en Mis rutinas" (31.7): save_plan_session_to_routines with a client
+// id per attempt, the SAME one on a retry of it. On success the routine lists
+// are read again and `saved` holds the new routine (null: none came back).
+export function useSavePlanSession(planSessionId: string) {
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const clientId = useRef(createUuid());
+  const [failed, setFailed] = useState(false);
+  const [saved, setSaved] = useState<{ routineId: string | null } | null>(null);
+  const mutation = useMutation({
+    mutationFn: () => savePlanSessionToRoutines(planSessionId, clientId.current),
+  });
+  const save = useCallback(async (): Promise<{ routineId: string | null } | null> => {
+    setFailed(false);
+    try {
+      const result = await mutation.mutateAsync();
+      clientId.current = createUuid();
+      setSaved({ routineId: result.routineId });
+      if (profile?.id) {
+        invalidateWorkoutQueries(queryClient, profile.id).catch(() => undefined);
+      }
+      return { routineId: result.routineId };
+    } catch (error) {
+      __DEV__ && console.warn('[training-plan] save_plan_session_to_routines:', error);
+      setFailed(true);
+      return null;
+    }
+  }, [mutation, profile?.id, queryClient]);
+  return { save, saving: mutation.isPending, failed, saved };
 }
