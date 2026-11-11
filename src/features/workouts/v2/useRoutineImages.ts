@@ -35,7 +35,7 @@ export function useRoutineImages() {
     (workout: Workout): AppImageSource =>
       broken[workout.id]
         ? DEFAULT_WORKOUT_THUMBNAIL
-        : resolveWorkoutThumbnailSource({ imageUrl: workout.imageUrl }),
+        : resolveWorkoutThumbnailSource({ imageUrl: workout.imageUrl, origin: workout.origin }),
     [broken],
   );
 

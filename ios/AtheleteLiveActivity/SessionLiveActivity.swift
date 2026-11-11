@@ -7,17 +7,17 @@ import WidgetKit
 // figures, Ember as the accent. The countdown runs on the system clock
 // (Text(timerInterval:)), so iOS updates it without waking the app.
 //
-// Rest → set with no help from the app: the activity's staleDate is the end of
-// the rest, so iOS draws the widget again with context.isStale true when it
-// runs out. A stale rest is drawn as the set in course ("Ahora", the set's
-// line and "Serie hecha ✓") from the `set*` fields the same state carries
-// (resolved(isStale:) below). No audio or background work is involved.
+// Rest → set: iOS does not redraw a stale activity on time (it can take a
+// minute or more), so the flow never depends on it. The rest state already
+// shows the set that follows ("Siguiente: …", "Serie 1 de 3 · 10 × 110 kg") and
+// its "Serie hecha ✓" button, which logs that set during the rest or after it.
+// The staleDate is still the end of the rest: when iOS does redraw, the rest is
+// drawn as the set in course ("Ahora", resolved(isStale:) below).
 //
 // Every string comes in the state, already in the athlete's language. With
-// iOS 17+ the activity has buttons (LiveActivityIntent, ios/…/
-// LiveActivityIntents.swift): "Saltar" during a rest and "Serie hecha ✓" on
-// the set in course; links that open the app where there is nothing to log
-// from here. On iOS 16 the same view, without buttons.
+// iOS 17+ the activity has a button (LiveActivityIntent, ios/…/
+// LiveActivityIntents.swift): "Serie hecha ✓", or a link that opens the app
+// where there is nothing to log from here. On iOS 16 the same view, without it.
 private enum Palette {
   static let plate = Color(red: 0x14 / 255, green: 0x13 / 255, blue: 0x12 / 255)
   static let ember = Color(red: 0xFF / 255, green: 0x5B / 255, blue: 0x1F / 255)
@@ -103,38 +103,48 @@ private struct AuraSmall: View {
   }
 }
 
-// "Siguiente: Círculos de brazos · 3 × 10" during a rest; the name alone
-// otherwise (the set's own line goes under it).
+// "Siguiente: Círculos de brazos" during a rest; the name alone otherwise (the
+// set's own line goes under it).
 private func exerciseLine(_ state: SessionActivityAttributes.ContentState) -> String {
-  if state.phase == "rest" {
-    let tail = state.scheme.isEmpty ? "" : " · \(state.scheme)"
-    return "\(state.prefix)\(state.exerciseName)\(tail)"
-  }
-  return state.exerciseName
+  "\(state.prefix)\(state.exerciseName)"
 }
 
-// A pill: Ember for the main action, a light plate for the secondary one.
+// A pill (40 pt, full radius): Ember for the main action, gray for the link
+// that opens the app.
 private func pill(_ title: String, primary: Bool) -> some View {
   Text(title)
     .font(.system(size: 15, weight: .semibold))
     .foregroundColor(primary ? Palette.onEmber : .white)
     .lineLimit(1)
     .minimumScaleFactor(0.8)
-    .frame(maxWidth: .infinity, minHeight: 40)
+    .frame(maxWidth: .infinity)
+    .frame(height: 40)
     .background(Capsule().fill(primary ? Palette.ember : Color.white.opacity(0.14)))
 }
 
-// The set in course ("Serie 2 de 3 · 10 reps × 40 kg") under the exercise.
+// "Serie 1 de 3 · 10 × 110 kg" (or the hint when there is no weight to log
+// from here, or the line of a finished session).
 private struct SetLine: View {
-  let state: SessionActivityAttributes.ContentState
+  let state: State
+
+  private var text: String {
+    switch state.action {
+    case "chooseInApp": return state.hint.isEmpty ? state.scheme : state.hint
+    case "openApp": return state.labels.doneHint
+    default: return state.scheme
+    }
+  }
+
+  private var warns: Bool { state.action == "chooseInApp" || state.action == "openApp" }
 
   var body: some View {
-    if state.phase == "exercise", !state.scheme.isEmpty {
-      Text(state.scheme)
-        .font(.system(size: 14, weight: .medium))
-        .foregroundColor(.white.opacity(0.85))
+    if !text.isEmpty {
+      Text(text)
+        .font(.system(size: 15, weight: warns ? .semibold : .medium))
+        .foregroundColor(warns ? Palette.ember : .white.opacity(0.85))
         .monospacedDigit()
-        .lineLimit(2)
+        .lineLimit(1)
+        .truncationMode(.tail)
     }
   }
 }
@@ -158,11 +168,6 @@ private struct ActionButtons: View {
 
   var body: some View {
     switch state.action {
-    case "skipRest":
-      Button(intent: SkipRestIntent(sessionId: attributes.sessionId)) {
-        pill(state.labels.skip, primary: false)
-      }
-      .buttonStyle(.plain)
     case "completeSet":
       Button(
         intent: CompleteSetIntent(
@@ -175,25 +180,13 @@ private struct ActionButtons: View {
       }
       .buttonStyle(.plain)
     case "chooseInApp":
-      // No weight (or reps) to log from here: the app opens on the set.
-      VStack(alignment: .leading, spacing: 8) {
-        Text(state.hint)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundColor(Palette.ember)
-          .lineLimit(2)
-        if let url = sessionURL(attributes) {
-          Link(destination: url) { pill(state.labels.chooseInApp, primary: false) }
-        }
+      // No weight to log from here: the app opens on the set.
+      if let url = sessionURL(attributes) {
+        Link(destination: url) { pill(state.labels.chooseInApp, primary: false) }
       }
     case "openApp":
-      VStack(alignment: .leading, spacing: 8) {
-        Text(state.labels.doneHint)
-          .font(.system(size: 14, weight: .semibold))
-          .foregroundColor(Palette.ember)
-          .lineLimit(2)
-        if let url = sessionURL(attributes) {
-          Link(destination: url) { pill(state.labels.openApp, primary: true) }
-        }
+      if let url = sessionURL(attributes) {
+        Link(destination: url) { pill(state.labels.openApp, primary: true) }
       }
     default:
       EmptyView()
@@ -201,42 +194,41 @@ private struct ActionButtons: View {
   }
 }
 
+// Lock Screen: 16 pt around, 8 pt between blocks, inside the ~160 pt a Live
+// Activity gets. The three text rows plus the 40 pt button already fill it
+// (16 + 16 pt margins, 3 × 8 pt gaps): the routine row ("{rutina} · n de total")
+// is the one dropped, and its "n de total" goes after the "Descanso" / "Ahora"
+// label instead of shrinking any text.
 private struct LockScreenView: View {
   let context: Context
 
   var body: some View {
     let state = context.state.resolved(isStale: context.isStale)
-    VStack(alignment: .leading, spacing: 12) {
-      HStack(alignment: .center, spacing: 14) {
-        VStack(alignment: .leading, spacing: 4) {
-          HStack(spacing: 6) {
-            AuraSmall(size: 14)
-            Text(context.attributes.routineName)
-              .font(.system(size: 13, weight: .semibold))
-              .foregroundColor(Palette.meta)
-              .lineLimit(1)
-          }
-          Text(state.headline)
-            .font(.system(size: 13, weight: .medium))
-            .foregroundColor(.white.opacity(0.7))
+    VStack(alignment: .leading, spacing: 8) {
+      HStack(alignment: .center, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
+          Text("\(state.headline) · \(state.progress)")
+            .font(.system(size: 13))
+            .foregroundColor(Palette.meta)
+            .lineLimit(1)
+            .truncationMode(.tail)
           if state.phase != "done" {
             Text(exerciseLine(state))
-              .font(.system(size: 16, weight: .semibold))
+              .font(.system(size: 17, weight: .semibold))
               .foregroundColor(.white)
-              .lineLimit(2)
-            SetLine(state: state)
+              .lineLimit(1)
+              .truncationMode(.tail)
           }
-          Text(state.progress)
-            .font(.system(size: 12))
-            .foregroundColor(Palette.meta)
-            .monospacedDigit()
         }
         Spacer(minLength: 8)
         if state.phase == "rest" {
           Countdown(state: state, size: 40, weight: .semibold)
-            .frame(minWidth: 96, alignment: .trailing)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .fixedSize()
         }
       }
+      SetLine(state: state)
       ActionRow(state: state, attributes: context.attributes)
     }
     .padding(16)
@@ -257,34 +249,31 @@ struct SessionLiveActivity: Widget {
         DynamicIslandExpandedRegion(.leading) {
           HStack(spacing: 8) {
             AuraSmall(size: 22)
-            Text(state.headline)
-              .font(.system(size: 14, weight: .semibold))
-              .foregroundColor(.white)
+            Text("\(state.headline) · \(state.progress)")
+              .font(.system(size: 13))
+              .foregroundColor(Palette.meta)
+              .lineLimit(1)
           }
           .padding(.leading, 4)
         }
         DynamicIslandExpandedRegion(.trailing) {
           if resting {
-            Countdown(state: state, size: 34, weight: .semibold)
+            Countdown(state: state, size: 32, weight: .semibold)
               .frame(minWidth: 84, alignment: .trailing)
               .padding(.trailing, 4)
           }
         }
         DynamicIslandExpandedRegion(.bottom) {
-          VStack(alignment: .leading, spacing: 6) {
+          VStack(alignment: .leading, spacing: 8) {
             if state.phase != "done" {
               Text(exerciseLine(state))
-                .font(.system(size: 15, weight: .medium))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
-              SetLine(state: state)
+                .truncationMode(.tail)
             }
-            Text(state.progress)
-              .font(.system(size: 12))
-              .foregroundColor(Palette.meta)
-              .monospacedDigit()
+            SetLine(state: state)
             ActionRow(state: state, attributes: context.attributes)
-              .padding(.top, 2)
           }
           .frame(maxWidth: .infinity, alignment: .leading)
           .padding(.horizontal, 4)

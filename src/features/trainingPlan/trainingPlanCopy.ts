@@ -740,6 +740,25 @@ const COPY = {
   'adj.done.ack': { es: 'Entendido · ajuste mantenido', en: 'Got it · adjustment kept' },
   'adj.done.revert': { es: 'Revertido · vuelven los pesos del plan', en: "Reverted · the plan's weights are back" },
   'adj.error': { es: 'No se pudo responder. Intenta de nuevo.', en: "Couldn't send your answer. Try again." },
+
+  // ── Tarjetas de ELLIE: plan_review y plan_action_confirm ──
+  'chat.review.title': { es: 'Semana {n}', en: 'Week {n}' },
+  'chat.review.sessions': { es: '{done} de {total} sesiones', en: '{done} of {total} sessions' },
+  'chat.review.setsVolume': { es: '{sets} series · {volume} kg', en: '{sets} sets · {volume} kg' },
+  'chat.review.adjust.one': { es: '1 ajuste para revisar', en: '1 adjustment to review' },
+  'chat.review.adjust.other': { es: '{n} ajustes para revisar', en: '{n} adjustments to review' },
+  'chat.review.adjust.none': { es: 'Sin ajustes por revisar', en: 'No adjustments to review' },
+  'chat.review.cta': { es: 'Ver revisión', en: 'See review' },
+  'chat.action.eyebrow': { es: 'CONFIRMA EL CAMBIO', en: 'CONFIRM THE CHANGE' },
+  'chat.action.confirm': { es: 'Confirmar', en: 'Confirm' },
+  'chat.action.cancel': { es: 'Cancelar', en: 'Cancel' },
+  'chat.action.cancelled': { es: 'Cancelado', en: 'Cancelled' },
+  'chat.action.done.pause': { es: 'Plan pausado hasta el {date}', en: 'Plan paused until {date}' },
+  'chat.action.done.pauseNoDate': { es: 'Plan pausado', en: 'Plan paused' },
+  'chat.action.done.resume': { es: 'Plan retomado', en: 'Plan resumed' },
+  'chat.action.done.days': { es: 'Días cambiados', en: 'Days changed' },
+  'chat.action.done.goal': { es: 'Plan actualizado', en: 'Plan updated' },
+  'chat.action.done.end': { es: 'Plan terminado · abriendo tu reporte', en: 'Plan ended · opening your report' },
 } as const satisfies Record<string, Record<EllieLanguage, string>>;
 
 export type TrainingPlanCopyKey = keyof typeof COPY;

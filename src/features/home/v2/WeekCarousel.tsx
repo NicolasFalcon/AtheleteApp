@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Image, ScrollView, StyleSheet, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import {
@@ -10,7 +11,9 @@ import {
 } from '@app/components/v2';
 import { BlockError } from '@app/features/home/v2/BlockError';
 import { difficultyLabel } from '@app/features/home/v2/homeLabels';
-import { resolveWorkoutThumbnailSource } from '@app/lib/workoutThumbnails';
+import { RoutineCover, useRoutineCoverContext } from '@app/components/v2/RoutineCover';
+import { routineFocusWord } from '@app/features/workouts/routineFocus';
+import { resolveWorkoutThumbnailSource, routineKeepsPhoto } from '@app/lib/workoutThumbnails';
 import { SceneScope } from '@app/providers/ThemeProvider';
 import type { Workout } from '@app/shared';
 
@@ -97,6 +100,9 @@ function WorkoutCard({
   onPress: () => void;
 }) {
   const { radius, scene } = useThemeV2();
+  const { language, gender } = useRoutineCoverContext();
+  const [broken, setBroken] = useState(false);
+  const photo = routineKeepsPhoto(workout) && !broken;
 
   return (
     <SceneScope>
@@ -113,19 +119,30 @@ function WorkoutCard({
         ]}
       >
         <View style={StyleSheet.absoluteFill}>
-          <Image
-            source={resolveWorkoutThumbnailSource({
-              imageUrl: workout.imageUrl,
-              type: workout.type,
-              targetMuscles: workout.targetMuscles,
-              title: workout.title,
-            })}
-            resizeMode="cover"
-            style={styles.image}
-          />
+          {photo ? (
+            <Image
+              source={resolveWorkoutThumbnailSource({
+                imageUrl: workout.imageUrl,
+                origin: workout.origin,
+                type: workout.type,
+                targetMuscles: workout.targetMuscles,
+                title: workout.title,
+              })}
+              resizeMode="cover"
+              style={styles.image}
+              onError={() => setBroken(true)}
+            />
+          ) : (
+            <RoutineCover
+              format="thumb"
+              word={routineFocusWord(workout, language)}
+              focus={workout.routineFocus ?? null}
+              gender={gender}
+            />
+          )}
         </View>
         {/* Remote photos are not baked: a dark layer replaces brightness(.82). */}
-        <View style={[StyleSheet.absoluteFill, styles.dim]} />
+        {photo ? <View style={[StyleSheet.absoluteFill, styles.dim]} /> : null}
         <LinearGradient
           colors={['rgba(20,19,18,0)', 'rgba(20,19,18,.92)']}
           locations={[0.38, 1]}

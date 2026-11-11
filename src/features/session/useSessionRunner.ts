@@ -117,7 +117,9 @@ export function useSessionRunner({
   const [rest, setRest] = useState<RestState | null>(null);
   const [yourTurnUntil, setYourTurnUntil] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [draft, setDraft] = useState<SessionDraft>({ reps: null, weightKg: null });
+  const [storedDraft, setDraft] = useState<SessionDraft>({ reps: null, weightKg: null });
+  // The set the stored draft was proposed for (see `draft` below).
+  const [draftOwner, setDraftOwner] = useState<string | null>(null);
   const [lastWeights, setLastWeights] = useState<Record<string, number>>({});
   const [busy, setBusy] = useState<null | 'save' | 'finish' | 'discard'>(null);
   // STATE_09: the workout could not be saved (finishing or saving for later).
@@ -302,6 +304,16 @@ export function useSessionRunner({
   const cursor: Cursor | null = currentCursor(plan, sets);
   const current = cursor ? plan[cursor.position] ?? null : null;
 
+  // The values for the set at the cursor. The stored draft is only filled by
+  // the effect below, one render after the cursor moves; until then the same
+  // proposal is computed here, so the first thing built from a new cursor (the
+  // Live Activity, the logged set) never sees the previous set's or empty values.
+  const cursorKey = cursor ? `${cursor.position}:${cursor.setIndex}` : null;
+  const draft: SessionDraft =
+    current && draftOwner !== cursorKey
+      ? suggestedSet(current, sets, current.exerciseId ? lastWeights[current.exerciseId] : null)
+      : storedDraft;
+
   // Proposed values when the cursor moves to a new set.
   useEffect(() => {
     const key = cursor ? `${cursor.position}:${cursor.setIndex}` : null;
@@ -309,6 +321,7 @@ export function useSessionRunner({
       return;
     }
     draftKey.current = key;
+    setDraftOwner(key);
     setDraft(
       suggestedSet(
         current,
@@ -508,6 +521,11 @@ export function useSessionRunner({
       ackLiveActivityAction(action.id).catch(() => undefined);
       if (decision === 'logSet') {
         loggedFromActivity.current.add(setKey);
+        if (target.resting) {
+          // Closes the running rest (its real length is kept) before the
+          // set's own rest starts.
+          skip();
+        }
         log();
         // The next action waits for the state this one produced.
         return;
