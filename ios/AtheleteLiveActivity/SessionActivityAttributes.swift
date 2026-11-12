@@ -22,6 +22,15 @@ enum ActivityLog {
   static let log = OSLog(subsystem: "com.athelete.app", category: "LiveActivity")
 }
 
+// The one way to log. The whole message is built with Swift interpolation and
+// reaches os_log as a SINGLE argument ("%{public}@"), so the number of
+// arguments always matches the format, whatever is logged. Never pass os_log a
+// format with several specifiers: a count that does not match (build 12: six
+// specifiers, four arguments forwarded) reads garbage and kills the process.
+func laLog(_ type: OSLogType, _ message: String) {
+  os_log("%{public}@", log: ActivityLog.log, type: type, message)
+}
+
 // Texts of the buttons and hints, already in the athlete's language.
 public struct ActivityLabels: Codable, Hashable {
   public var skip: String
@@ -153,11 +162,9 @@ public struct SessionActivityAttributes: ActivityAttributes {
       self.setCompact = read(.setCompact, "")
       self.setAction = read(.setAction, "none")
       if !missing.isEmpty {
-        os_log(
+        laLog(
           .error,
-          log: ActivityLog.log,
-          "ContentState with missing fields (state from an older build?): %{public}@",
-          missing.joined(separator: ",")
+          "ContentState with missing fields (state from an older build?): \(missing.joined(separator: ","))"
         )
       }
     }
