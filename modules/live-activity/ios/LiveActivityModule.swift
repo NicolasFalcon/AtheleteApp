@@ -1,6 +1,35 @@
 import ActivityKit
 import ExpoModulesCore
 import Foundation
+import os
+
+// Logs go to Consola (subsystem com.athelete.app, category LiveActivity) with
+// os_log, not os.Logger: ExpoModulesCore has its own `Logger` type.
+private func laLog(_ type: OSLogType, _ message: StaticString, _ args: CVarArg...) {
+  // os_log needs the format and its arguments together; a switch on the count
+  // keeps the StaticString format intact.
+  switch args.count {
+  case 0: os_log(type, log: ActivityLog.log, message)
+  case 1: os_log(type, log: ActivityLog.log, message, args[0])
+  case 2: os_log(type, log: ActivityLog.log, message, args[0], args[1])
+  case 3: os_log(type, log: ActivityLog.log, message, args[0], args[1], args[2])
+  default: os_log(type, log: ActivityLog.log, message, args[0], args[1], args[2], args[3])
+  }
+}
+
+// The size ActivityKit will see: attributes + state as JSON. iOS refuses an
+// activity over 4 KB (request throws, update is dropped), so it is logged and
+// a state close to the limit is flagged.
+private let activityKitLimit = 4096
+private func encodedSize(
+  _ attributes: SessionActivityAttributes?,
+  _ state: SessionActivityAttributes.ContentState
+) -> Int {
+  let encoder = JSONEncoder()
+  let stateBytes = (try? encoder.encode(state).count) ?? -1
+  let attributeBytes = attributes.flatMap { try? encoder.encode($0).count } ?? 0
+  return stateBytes < 0 ? -1 : stateBytes + attributeBytes
+}
 
 struct LiveActivityStart: Record {
   @Field var routineName: String = ""
@@ -161,30 +190,66 @@ public class LiveActivityModule: Module {
 
     // Returns the activity id, or nil when it could not start.
     AsyncFunction("start") { (start: LiveActivityStart, state: LiveActivityState) -> String? in
-      guard ActivityAuthorizationInfo().areActivitiesEnabled else { return nil }
+      guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+        laLog(.default, "start: skipped, Live Activities are off (Ajustes)")
+        return nil
+      }
       let attributes = SessionActivityAttributes(
         routineName: start.routineName,
         sessionId: start.sessionId,
         workoutId: start.workoutId
       )
+      let size = encodedSize(attributes, state.content)
+      if size < 0 || size > activityKitLimit - 512 {
+        laLog(.fault, "start: payload %ld B of %ld (could not encode, or too close to the limit)", size, activityKitLimit)
+      }
       do {
         let activity = try Activity.request(
           attributes: attributes,
           content: ActivityContent(state: state.content, staleDate: state.staleDate),
           pushType: nil
         )
+        laLog(
+          .default,
+          "start: ok id=%{public}@ phase=%{public}@ payload=%ld B",
+          activity.id, state.phase, size
+        )
         return activity.id
       } catch {
+        // ActivityAuthorizationError / ActivityKit: too many activities, over
+        // the size limit, app not in the foreground, not allowed…
+        laLog(
+          .error,
+          "start: Activity.request failed (%{public}@) payload=%ld B: %{public}@",
+          String(describing: type(of: error)), size, String(describing: error)
+        )
         return nil
       }
     }
 
     AsyncFunction("update") { (id: String, state: LiveActivityState, endState: LiveActivityState?) in
       guard let activity = Activity<SessionActivityAttributes>.activities.first(where: { $0.id == id }) else {
+        laLog(
+          .error,
+          "update: no activity with id=%{public}@ (ended or dismissed); %ld alive",
+          id, Activity<SessionActivityAttributes>.activities.count
+        )
         return
       }
       self.arm(id: id, state: state, endState: endState)
+      let size = encodedSize(activity.attributes, state.content)
+      if size < 0 || size > activityKitLimit - 512 {
+        laLog(.fault, "update: payload %ld B of %ld (could not encode, or too close to the limit)", size, activityKitLimit)
+      }
+      let before = String(describing: activity.activityState)
       await activity.update(ActivityContent(state: state.content, staleDate: state.staleDate))
+      // `update` does not throw: a dropped update shows only as a state that is
+      // not .active afterwards, so it is logged here.
+      laLog(
+        .default,
+        "update: id=%{public}@ phase=%{public}@ action=%{public}@ payload=%ld B state %{public}@ → %{public}@",
+        id, state.phase, state.action, size, before, String(describing: activity.activityState)
+      )
     }
 
     // Ends one activity and removes it at once.
@@ -192,6 +257,7 @@ public class LiveActivityModule: Module {
       self.disarm(id: id)
       for activity in Activity<SessionActivityAttributes>.activities where activity.id == id {
         await activity.end(nil, dismissalPolicy: .immediate)
+        laLog(.default, "end: id=%{public}@", id)
       }
     }
 
@@ -200,6 +266,7 @@ public class LiveActivityModule: Module {
       self.disarmAll()
       for activity in Activity<SessionActivityAttributes>.activities {
         await activity.end(nil, dismissalPolicy: .immediate)
+        laLog(.default, "endAll: ended id=%{public}@", activity.id)
       }
     }
 
@@ -250,6 +317,11 @@ public class LiveActivityModule: Module {
       for activity in Activity<SessionActivityAttributes>.activities {
         guard let next = due[activity.id] else { continue }
         await activity.update(ActivityContent(state: next.content, staleDate: nil))
+        laLog(
+          .default,
+          "restEnded: id=%{public}@ now %{public}@",
+          activity.id, String(describing: activity.activityState)
+        )
       }
     }
   }

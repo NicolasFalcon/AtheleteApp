@@ -309,3 +309,41 @@ describe('actionDecision', () => {
     expect(actionDecision(skip, target({ resting: false }), NOW)).toBe('ignore');
   });
 });
+
+// ActivityKit refuses an activity over 4 KB (attributes + state as JSON): the
+// request throws and an update is dropped, which the athlete sees as a card
+// that does not change. This keeps the worst case well under that.
+describe('payload size (ActivityKit limit: 4096 bytes)', () => {
+  // Size of the JSON in UTF-8 (no Buffer: the project has no node types).
+  const bytes = (value: unknown): number => {
+    let total = 0;
+    for (const char of JSON.stringify(value)) {
+      const code = char.codePointAt(0) ?? 0;
+      total += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+    }
+    return total;
+  };
+  const long = (n: number): string => 'é'.repeat(n); // 2 bytes per char in UTF-8
+  const attributes = (routineName: string) => ({
+    routineName,
+    sessionId: '7d143a1f-0000-4000-8000-000000000000',
+    workoutId: '7d143a1f-0000-4000-8000-000000000001',
+  });
+
+  it('stays under 3.5 KB with 120-char routine and exercise names, in a rest', () => {
+    const worst = exercise({ name: long(120), sets: 12, amount: 100, amountMax: 120 });
+    const rest = { kind: 'set', remainingMs: 300_000, phase: 'rest' } as NonNullable<LiveActivityInput['rest']>;
+    const args = input({ current: worst, rest, setIndex: 11, doneCount: 12, total: 12, draft: { reps: 100, weightKg: 142.5 } });
+    for (const language of ['es', 'en'] as const) {
+      const state = liveActivityState(args, NOW, language);
+      const end = liveActivityRestEndState(args, NOW, language);
+      expect(bytes(state) + bytes(attributes(long(120)))).toBeLessThan(3500);
+      expect(bytes(end) + bytes(attributes(long(120)))).toBeLessThan(3500);
+    }
+  });
+
+  it('a typical state is far smaller', () => {
+    const state = liveActivityState(input(), NOW, 'es');
+    expect(bytes(state) + bytes(attributes('Pierna A'))).toBeLessThan(1500);
+  });
+});

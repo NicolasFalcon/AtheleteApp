@@ -38,12 +38,19 @@ extension SessionActivityAttributes.ContentState {
     var next = self
     next.phase = "exercise"
     next.restEndsAt = nil
-    next.headline = nowHeadline
+    if !nowHeadline.isEmpty { next.headline = nowHeadline }
     next.prefix = ""
     next.scheme = setScheme
     next.compact = setCompact
     next.action = setAction
     return next
+  }
+
+  // "Descanso · 2 de 6": whatever part is empty is left out. Never an empty
+  // string (the routine's name stands in), so the card always has a first line.
+  fileprivate func headerLine(fallback: String) -> String {
+    let line = [headline, progress].filter { !$0.isEmpty }.joined(separator: " · ")
+    return line.isEmpty ? fallback : line
   }
 }
 
@@ -62,6 +69,14 @@ private func clock(_ seconds: Int) -> String {
   return String(format: "%d:%02d", safe / 60, safe % 60)
 }
 
+// now...end, read once. `ends > Date()` and then `Date()...ends` read the clock
+// twice: if the rest ended in between, the range has its bounds reversed and
+// the widget traps (an empty plate). nil: it has already run out.
+private func countdownRange(to ends: Date) -> ClosedRange<Date>? {
+  let now = Date()
+  return ends > now ? now...ends : nil
+}
+
 // The rest countdown, or the frozen time when paused.
 private struct Countdown: View {
   let state: SessionActivityAttributes.ContentState
@@ -73,8 +88,8 @@ private struct Countdown: View {
       if state.paused {
         Text(clock(state.pausedRemainingSec ?? 0))
           .foregroundColor(Palette.meta)
-      } else if let ends = state.restEndsAt, ends > Date() {
-        Text(timerInterval: Date()...ends, countsDown: true, showsHours: false)
+      } else if let ends = state.restEndsAt, let range = countdownRange(to: ends) {
+        Text(timerInterval: range, countsDown: true, showsHours: false)
           .foregroundColor(Palette.ember)
       } else {
         // Ran out and the system has not drawn it stale yet: 0:00.
@@ -105,8 +120,12 @@ private struct AuraSmall: View {
 
 // "Siguiente: Círculos de brazos" during a rest; the name alone otherwise (the
 // set's own line goes under it).
-private func exerciseLine(_ state: SessionActivityAttributes.ContentState) -> String {
-  "\(state.prefix)\(state.exerciseName)"
+private func exerciseLine(
+  _ state: SessionActivityAttributes.ContentState,
+  fallback: String
+) -> String {
+  let line = "\(state.prefix)\(state.exerciseName)"
+  return state.exerciseName.isEmpty ? fallback : line
 }
 
 // A pill (40 pt, full radius): Ember for the main action, gray for the link
@@ -207,13 +226,13 @@ private struct LockScreenView: View {
     VStack(alignment: .leading, spacing: 8) {
       HStack(alignment: .center, spacing: 8) {
         VStack(alignment: .leading, spacing: 0) {
-          Text("\(state.headline) · \(state.progress)")
+          Text(state.headerLine(fallback: context.attributes.routineName))
             .font(.system(size: 13))
             .foregroundColor(Palette.meta)
             .lineLimit(1)
             .truncationMode(.tail)
           if state.phase != "done" {
-            Text(exerciseLine(state))
+            Text(exerciseLine(state, fallback: context.attributes.routineName))
               .font(.system(size: 17, weight: .semibold))
               .foregroundColor(.white)
               .lineLimit(1)
@@ -222,10 +241,15 @@ private struct LockScreenView: View {
         }
         Spacer(minLength: 8)
         if state.phase == "rest" {
+          // Fixed width, not .fixedSize(): Text(timerInterval:) is greedy in
+          // width, and its ideal width pushed the whole card wider than the
+          // Lock Screen (an empty plate in the rest card, build 11). 96 pt fits
+          // "10:00" at 40 pt; the text on the left is the one that yields.
           Countdown(state: state, size: 40, weight: .semibold)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            .fixedSize()
+            .frame(width: 96, alignment: .trailing)
+            .layoutPriority(1)
         }
       }
       SetLine(state: state)
@@ -249,7 +273,7 @@ struct SessionLiveActivity: Widget {
         DynamicIslandExpandedRegion(.leading) {
           HStack(spacing: 8) {
             AuraSmall(size: 22)
-            Text("\(state.headline) · \(state.progress)")
+            Text(state.headerLine(fallback: context.attributes.routineName))
               .font(.system(size: 13))
               .foregroundColor(Palette.meta)
               .lineLimit(1)
@@ -266,7 +290,7 @@ struct SessionLiveActivity: Widget {
         DynamicIslandExpandedRegion(.bottom) {
           VStack(alignment: .leading, spacing: 8) {
             if state.phase != "done" {
-              Text(exerciseLine(state))
+              Text(exerciseLine(state, fallback: context.attributes.routineName))
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(.white)
                 .lineLimit(1)
@@ -285,7 +309,8 @@ struct SessionLiveActivity: Widget {
           Countdown(state: state, size: 14)
             .frame(width: 42, alignment: .trailing)
         } else {
-          Text(state.compact)
+          // Never an empty compact slot: the progress ("2 de 6") stands in.
+          Text(state.compact.isEmpty ? state.progress : state.compact)
             .font(.system(size: 12, weight: .semibold))
             .foregroundColor(Palette.meta)
             .monospacedDigit()

@@ -1,13 +1,26 @@
 import ActivityKit
 import Foundation
+import os
 
 // The workout Live Activity (Dynamic Island + Lock Screen).
 //
 // KEEP IN SYNC: this file exists, byte for byte, in
-// modules/live-activity/ios/ (the app's bridge), in
-// ios/AtheleteLiveActivity/ (the widget extension) and in
-// ios/_LiveActivitySrc/ (mirror of the extension). ActivityKit matches the
+// modules/live-activity/ios/ (the app's bridge) and in
+// ios/AtheleteLiveActivity/ (the widget extension). ActivityKit matches the
 // bridge and the extension by type name and Codable shape.
+//
+// DECODING IS LENIENT ON PURPOSE. An activity outlives the app that started
+// it (an update from TestFlight, a kill): the widget of the NEW build then has
+// to draw the state the OLD build left, which lacks every field added since.
+// A strict decoder fails there and iOS draws an empty plate. So every field
+// takes a default when it is missing or has another type, and the gap is
+// logged (Consola: subsystem com.athelete.app, category LiveActivity). Any
+// new field goes into CodingKeys + init(from:) with a default, never strict.
+
+// Logs of the Live Activity (the app's bridge and the widget extension).
+enum ActivityLog {
+  static let log = OSLog(subsystem: "com.athelete.app", category: "LiveActivity")
+}
 
 // Texts of the buttons and hints, already in the athlete's language.
 public struct ActivityLabels: Codable, Hashable {
@@ -32,6 +45,28 @@ public struct ActivityLabels: Codable, Hashable {
     self.openApp = openApp
     self.doneHint = doneHint
     self.pausedHint = pausedHint
+  }
+
+  // Nothing to say (a state from a build that had no labels).
+  public static let empty = ActivityLabels(
+    skip: "", setDone: "", chooseInApp: "", openApp: "", doneHint: "", pausedHint: ""
+  )
+
+  private enum CodingKeys: String, CodingKey {
+    case skip, setDone, chooseInApp, openApp, doneHint, pausedHint
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    func text(_ key: CodingKeys) -> String {
+      ((try? container.decodeIfPresent(String.self, forKey: key)) ?? nil) ?? ""
+    }
+    skip = text(.skip)
+    setDone = text(.setDone)
+    chooseInApp = text(.chooseInApp)
+    openApp = text(.openApp)
+    doneHint = text(.doneHint)
+    pausedHint = text(.pausedHint)
   }
 }
 
@@ -74,6 +109,58 @@ public struct SessionActivityAttributes: ActivityAttributes {
     public var setScheme: String
     public var setCompact: String
     public var setAction: String
+
+    private enum CodingKeys: String, CodingKey {
+      case phase, restEndsAt, paused, pausedRemainingSec, exerciseName, scheme
+      case progress, headline, prefix, compact, action, hint, position, setIndex
+      case labels, nowHeadline, setScheme, setCompact, setAction
+    }
+
+    // Lenient (see the top of the file): a missing or mistyped field takes a
+    // default that still draws something sensible, and is logged.
+    public init(from decoder: Decoder) throws {
+      let container = try decoder.container(keyedBy: CodingKeys.self)
+      var missing: [String] = []
+      func read<T: Decodable>(_ key: CodingKeys, _ fallback: T) -> T {
+        if let value = (try? container.decodeIfPresent(T.self, forKey: key)) ?? nil {
+          return value
+        }
+        missing.append(key.stringValue)
+        return fallback
+      }
+      let phase: String = read(.phase, "exercise")
+      self.phase = phase
+      // nil is a real value here (no rest running), not a gap.
+      self.restEndsAt = (try? container.decodeIfPresent(Date.self, forKey: .restEndsAt)) ?? nil
+      self.paused = read(.paused, false)
+      self.pausedRemainingSec = (try? container.decodeIfPresent(Int.self, forKey: .pausedRemainingSec)) ?? nil
+      self.exerciseName = read(.exerciseName, "")
+      self.scheme = read(.scheme, "")
+      self.progress = read(.progress, "")
+      self.headline = read(
+        .headline,
+        phase == "rest" ? "Descanso" : phase == "done" ? "Sesión completa" : "Ahora"
+      )
+      self.prefix = read(.prefix, "")
+      self.compact = read(.compact, "")
+      self.action = read(.action, "none")
+      self.hint = read(.hint, "")
+      self.position = read(.position, 0)
+      self.setIndex = read(.setIndex, 0)
+      self.labels = read(.labels, ActivityLabels.empty)
+      self.nowHeadline = read(.nowHeadline, "Ahora")
+      self.setScheme = read(.setScheme, "")
+      self.setCompact = read(.setCompact, "")
+      self.setAction = read(.setAction, "none")
+      if !missing.isEmpty {
+        os_log(
+          .error,
+          log: ActivityLog.log,
+          "ContentState with missing fields (state from an older build?): %{public}@",
+          missing.joined(separator: ",")
+        )
+      }
+    }
 
     public init(
       phase: String,
