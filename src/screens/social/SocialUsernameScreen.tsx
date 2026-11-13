@@ -241,6 +241,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   at: { fontSize: 32, fontWeight: '500', letterSpacing: -0.64 },
-  input: { flex: 1, fontSize: 32, fontWeight: '500', letterSpacing: -0.64, padding: 0 },
+  input: { flex: 1, fontSize: 32, fontWeight: '500', letterSpacing: -0.64, padding: 0, minHeight: 42 },
   footer: { paddingTop: 12 },
 });

@@ -174,6 +174,10 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     paddingVertical: 0,
+    // Full height of the 54 pt box: with no height of its own the iOS input
+    // is measured shorter than its placeholder and clips it (B-29).
+    alignSelf: 'stretch',
+    minHeight: 24,
   },
   eye: {
     width: 38,

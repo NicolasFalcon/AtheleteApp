@@ -88,7 +88,7 @@ const styles = StyleSheet.create({
     paddingRight: 5,
     gap: 8,
   },
-  input: { flex: 1, fontSize: 15, padding: 0 },
+  input: { flex: 1, fontSize: 15, padding: 0, alignSelf: 'stretch', minHeight: 20 },
   send: {
     width: 36,
     height: 36,

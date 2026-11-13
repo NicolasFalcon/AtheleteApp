@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
   stepBtn: { width: 40, height: 36, alignItems: 'center', justifyContent: 'center' },
   grams: { minWidth: 56, textAlign: 'center' },
   hintField: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 52, borderRadius: 26, paddingLeft: 14, paddingRight: 6 },
-  hintInput: { flex: 1, fontSize: 15, padding: 0 },
+  hintInput: { flex: 1, fontSize: 15, padding: 0, alignSelf: 'stretch', minHeight: 20 },
   send: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 12, paddingHorizontal: 20 },
 });

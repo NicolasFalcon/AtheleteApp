@@ -6,6 +6,7 @@ import { ProfileAvatar } from '@app/components/profile/ProfileAvatar';
 import { Button, PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 import { Sheet } from '@app/components/v2/Sheet';
 import { initialsOf } from '@app/features/social/socialModel';
+import { antonLine } from '@app/theme/v2/typography';
 import { normalizeProfilePhotoReference } from '@app/services/supabase/profile-photo';
 
 // Shared pieces of ATHELETE Coach (handoff v2.20 §30). Scenes (#141312) are
@@ -23,7 +24,7 @@ export function antonStyle(fontFamily: string, size: number): TextStyle {
     fontFamily,
     fontSize: size,
     fontWeight: Platform.OS === 'ios' ? '700' : '400',
-    lineHeight: Math.round(size * 1.12),
+    ...antonLine(size, 1.12),
     letterSpacing: 0,
   };
 }

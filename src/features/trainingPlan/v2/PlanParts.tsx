@@ -10,6 +10,7 @@ import {
 import { ArrowRight, CalendarDays, ChevronRight, Flag, Lock } from 'lucide-react-native';
 import { PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
 import { useTrainingPlanText } from '@app/features/trainingPlan/trainingPlanCopy';
+import { antonLine } from '@app/theme/v2/typography';
 import { isPlanPaywalled } from '@app/features/trainingPlan/managePlanModel';
 import { isDeloadWeek } from '@app/features/trainingPlan/trainingPlanModel';
 import { PremiumSheet } from '@app/features/trainingPlan/v2/PremiumSheet';
@@ -30,7 +31,7 @@ export function antonText(fontFamily: string, size: number): TextStyle {
     fontFamily,
     fontSize: size,
     fontWeight: Platform.OS === 'ios' ? '700' : '400',
-    lineHeight: Math.round(size * 1.12),
+    ...antonLine(size, 1.12),
     letterSpacing: 0,
     textTransform: 'uppercase',
   };

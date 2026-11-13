@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 import Svg, { Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { TextV2, useThemeV2 } from '@app/components/v2';
+import { antonLine, figureLine } from '@app/theme/v2/typography';
 import { Isologo } from '@app/components/v2/Isologo';
 import { LaunchWordmark } from '@app/components/v2/LaunchWordmark';
 import {
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
   full: { borderRadius: 28, paddingTop: 20, paddingHorizontal: 22, paddingBottom: 22, justifyContent: 'space-between' },
   min: { borderRadius: 36, flexDirection: 'row', alignItems: 'center', gap: 14, paddingLeft: 14, paddingRight: 24 },
   minFigure: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  minValue: { fontSize: 36, lineHeight: 38, fontWeight: '600', letterSpacing: -1.08, fontVariant: ['tabular-nums'] },
+  minValue: { fontSize: 36, ...figureLine(36, 38 / 36), fontWeight: '600', letterSpacing: -1.08, fontVariant: ['tabular-nums'] },
   minUnit: { fontSize: 15, fontWeight: '600' },
   minDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: EMBER, boxShadow: '0 0 0 4px rgba(255,91,31,.2)' },
   textShadow: { textShadowColor: 'rgba(0,0,0,.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
@@ -384,7 +385,7 @@ const styles = StyleSheet.create({
   eyebrowText: { fontSize: 11, fontWeight: '600', letterSpacing: 0.88, flexShrink: 1 },
   name: { fontSize: 24, lineHeight: 28, fontWeight: '600', letterSpacing: -0.24 },
   bigRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  big: { fontSize: 60, lineHeight: 60, fontWeight: '600', letterSpacing: -2.4, fontVariant: ['tabular-nums'] },
+  big: { fontSize: 60, ...figureLine(60, 1), fontWeight: '600', letterSpacing: -2.4, fontVariant: ['tabular-nums'] },
   bigLabel: { fontSize: 13, fontWeight: '500' },
   km: { fontSize: 20, fontWeight: '600' },
   trio: { flexDirection: 'row', alignItems: 'center' },
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
   segments: { flexDirection: 'row', gap: 3 },
   segment: { flex: 1, height: 5, borderRadius: 3 },
   zones: { fontSize: 12, fontWeight: '500' },
-  planBig: { fontSize: 44, lineHeight: 46, textTransform: 'uppercase' },
+  planBig: { fontSize: 44, ...antonLine(44, 1.05), textTransform: 'uppercase' },
   planAnchors: { gap: 8 },
   planAnchor: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   planAnchorName: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '600' },

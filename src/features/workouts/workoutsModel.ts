@@ -1,4 +1,6 @@
 import {
+  equipmentLabels,
+  equipmentToFilter,
   ROUTINE_CATEGORY_VALUES,
   type LibraryExercise,
   type RoutineCategory,
@@ -383,7 +385,12 @@ export const EQUIPMENT: { key: EquipmentKey; label: string }[] = [
 ];
 
 export function equipmentLabel(key?: string | null): string {
-  return EQUIPMENT.find(item => item.key === key)?.label ?? key ?? '';
+  return (
+    EQUIPMENT.find(item => item.key === key)?.label ??
+    (key ? equipmentLabels[equipmentToFilter[key] ?? key] : undefined) ??
+    key ??
+    ''
+  );
 }
 
 export function zoneLabel(key?: string | null): string {

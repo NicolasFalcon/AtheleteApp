@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { PressableScale, TextV2, useThemeV2 } from '@app/components/v2';
+import { figureLine } from '@app/theme/v2/typography';
 import type { RouteSport } from '@app/features/route/routeTypes';
 
 // Small pieces shared by the Ruta screens. `dark` = the dark scenes of the
@@ -156,7 +157,7 @@ export function BigFigure({
         minimumFontScale={0.6}
         style={{
           fontSize: size,
-          lineHeight: size * 0.9,
+          ...figureLine(size, 0.9),
           fontWeight: '800',
           letterSpacing: -size * 0.05,
           color: color ?? colors.text.primary,

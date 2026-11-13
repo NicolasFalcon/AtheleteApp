@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     paddingRight: 6,
   },
-  describeInput: { flex: 1, fontSize: 17, padding: 0 },
+  describeInput: { flex: 1, fontSize: 17, padding: 0, alignSelf: 'stretch', minHeight: 24 },
   mic: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   tiles: { flexDirection: 'row', gap: 10 },
   tile: { flex: 1, borderRadius: 22, padding: 14, gap: 14, minHeight: 112, justifyContent: 'space-between' },

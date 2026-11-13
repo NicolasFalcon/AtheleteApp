@@ -93,5 +93,5 @@ export type {
   DisplayStyleV2,
   TextStyleV2,
 } from '@app/theme/v2/typography';
-export { em, tightLine } from '@app/theme/v2/typography';
+export { antonLine, em, figureLine, tightLine } from '@app/theme/v2/typography';
 export { alpha, gradients, palette } from '@app/theme/v2/palette';

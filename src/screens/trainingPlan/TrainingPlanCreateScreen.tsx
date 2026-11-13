@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
   why: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 16 },
   whyMark: { marginTop: 1 },
   daysRow: { flexDirection: 'row', gap: 6 },
-  dayChip: { flex: 1, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  dayChip: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   lengthBlock: { gap: 10, marginTop: 6 },
   segmented: { flexDirection: 'row', padding: 3, borderRadius: 999, gap: 2 },
   segment: { flex: 1, minHeight: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },

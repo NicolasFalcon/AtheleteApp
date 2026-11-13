@@ -118,6 +118,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 17,
     paddingVertical: 0,
+    // See TextField: keep the placeholder from being clipped on iOS (B-29).
+    alignSelf: 'stretch',
+    minHeight: 24,
   },
   flex: {
     flex: 1,

@@ -32,6 +32,49 @@ export function tightLine(
   return { lineHeight: safe, marginVertical: (target - safe) / 2 };
 }
 
+// Anton's own line box is 1.505 em (ascender 2409 + descender 674 over 2048
+// units). With a tighter lineHeight iOS sets the glyphs at the bottom of the
+// line, so the top of the first line (capital accents Á É Í Ó Ú, Ñ) falls
+// outside the Text view and is cut. The line height stays as designed; the
+// room comes from padding on the first / last line, cancelled with a negative
+// margin so the layout does not move. Multi-line pitch is unchanged.
+// Needs ancestors without overflow: 'hidden' around the text.
+const ANTON_ROOM_TOP = 0.36;
+const ANTON_ROOM_BOTTOM = 0.1;
+
+type LineRoom = Pick<
+  TextStyle,
+  'lineHeight' | 'paddingTop' | 'marginTop' | 'paddingBottom' | 'marginBottom'
+>;
+
+function lineWithRoom(
+  fontSize: number,
+  lineHeightRatio: number,
+  top: number,
+  bottom: number,
+): LineRoom {
+  const paddingTop = Math.ceil(fontSize * top);
+  const paddingBottom = Math.ceil(fontSize * bottom);
+
+  return {
+    lineHeight: Math.round(fontSize * lineHeightRatio),
+    paddingTop,
+    marginTop: -paddingTop,
+    paddingBottom,
+    marginBottom: -paddingBottom,
+  };
+}
+
+export function antonLine(fontSize: number, lineHeightRatio: number): LineRoom {
+  return lineWithRoom(fontSize, lineHeightRatio, ANTON_ROOM_TOP, ANTON_ROOM_BOTTOM);
+}
+
+// Big system-font figures with a tight line height ("0,00", digits and
+// commas): same idea, room above for the digit tops and below for the comma.
+export function figureLine(fontSize: number, lineHeightRatio: number): LineRoom {
+  return lineWithRoom(fontSize, lineHeightRatio, 0.2, 0.2);
+}
+
 type Weight = '400' | '500' | '600' | '700';
 
 export function em(value: number, fontSize: number): number {
