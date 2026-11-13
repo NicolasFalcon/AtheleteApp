@@ -44,6 +44,14 @@ export function lastTimeLine(exercise: Pick<PlanSessionExercise, 'lastTime'>, t:
     : t('session.lastNoKg', { sets: last.sets, reps: last.reps });
 }
 
+// Equipment that adds no external load. Unknown equipment (null) counts as
+// bodyweight, as before, until the backend sends it.
+const NO_LOAD_EQUIPMENT = ['bodyweight', 'bench', 'pull_up_bar', 'mat', 'none'];
+
+export function hasExternalLoad(exercise: Pick<PlanSessionExercise, 'equipment'>): boolean {
+  return Boolean(exercise.equipment?.some(slug => !NO_LOAD_EQUIPMENT.includes(slug)));
+}
+
 export type WeightLine =
   | { kind: 'kg'; value: string; unit: 'kg' }
   | { kind: 'calibrate'; text: string }
@@ -52,11 +60,23 @@ export type WeightLine =
 // The weight on the right of the row: the recommended kg in big figures;
 // "Calibrar · elige tu peso" when it has to be calibrated; "Peso corporal"
 // without a weight (recommended_kg null and not calibrating).
-export function weightLine(exercise: PlanSessionExercise, t: TrainingPlanT): WeightLine {
+export function weightLine(
+  exercise: PlanSessionExercise,
+  t: TrainingPlanT,
+  calibrationWeek = false,
+): WeightLine {
   if (exercise.calibrate) {
     return { kind: 'calibrate', text: t('session.weight.calibrate') };
   }
   if (exercise.recommendedKg === null) {
+    // Only a real bodyweight exercise says "Peso corporal"; one with an
+    // external load and no kg yet asks for a weight.
+    if (hasExternalLoad(exercise)) {
+      return {
+        kind: 'calibrate',
+        text: t(calibrationWeek ? 'session.weight.calibrate' : 'session.weight.choose'),
+      };
+    }
     return { kind: 'bodyweight', text: t('session.weight.body') };
   }
   return { kind: 'kg', value: kgValue(exercise.recommendedKg), unit: 'kg' };

@@ -108,6 +108,15 @@ export function useSessionLiveActivity({
   const endState =
     state.phase === 'rest' && !state.paused ? liveActivityRestEndState(input, now, language) : null;
   const key = liveActivityKey(state, endState);
+  // B-16: log every change of the button the activity offers.
+  const lastAction = useRef(state.action);
+  if (__DEV__ && lastAction.current !== state.action) {
+    console.log(
+      `[LA] action ${lastAction.current} -> ${state.action}`,
+      JSON.stringify({ position: state.position, setIndex: state.setIndex, draft: runner.draft }),
+    );
+  }
+  lastAction.current = state.action;
   const stateRef = useRef(state);
   stateRef.current = state;
   const endStateRef = useRef(endState);

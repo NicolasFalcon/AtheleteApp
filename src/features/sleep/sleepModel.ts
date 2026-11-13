@@ -271,7 +271,7 @@ export function shiftDate(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
-const LETTERS = ['D', 'L', 'M', 'X', 'J', 'V', 'S'];
+const LETTERS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
 
 // The 7 days ending today, each with its night (or null).
 export function weekSlots(overview: SleepOverview): {

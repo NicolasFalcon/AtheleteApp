@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -95,6 +95,9 @@ const BACK_FALLBACKS = [ROOT_ROUTES.MainTabs];
 // error with Reintentar; the answers stay.
 export function TrainingPlanCreateScreen({ navigation, route }: Props) {
   const { colors, mode, layout } = useThemeV2();
+  const { width: windowWidth } = useWindowDimensions();
+  // Seven equal columns (design: grid repeat(7, minmax(0, 1fr)), gap 6).
+  const dayWidth = Math.floor((windowWidth - 2 * layout.gutter - 6 * 6) / 7);
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const { t, language } = useTrainingPlanText();
@@ -124,7 +127,7 @@ export function TrainingPlanCreateScreen({ navigation, route }: Props) {
   const lastSend = useRef<{ answers: CreateAnswers; messageId: string } | null>(null);
   // invalid_input (e.g. goal_target.exercise_slug) gets the generic error;
   // anything else, the dropped connection.
-  const [failure, setFailure] = useState<'generic' | 'connection'>('connection');
+  const [failure, setFailure] = useState<'generic' | 'connection' | 'timeout'>('connection');
   const scroll = useRef<ScrollView>(null);
 
   const profileGoal = goalFromProfile(profile?.goal);
@@ -198,7 +201,13 @@ export function TrainingPlanCreateScreen({ navigation, route }: Props) {
       __DEV__ && console.warn('[training-plan] training_plan_request:', error);
       timers.current.forEach(clearTimeout);
       if (mounted.current) {
-        setFailure(error instanceof EllieError && error.code === 'invalid_input' ? 'generic' : 'connection');
+        setFailure(
+          error instanceof EllieError && error.code === 'invalid_input'
+            ? 'generic'
+            : error instanceof EllieError && error.code === 'ai_timeout'
+              ? 'timeout'
+              : 'connection',
+        );
         haptics.error();
         goTo('error');
       }
@@ -256,7 +265,7 @@ export function TrainingPlanCreateScreen({ navigation, route }: Props) {
   const titleBlock = (title: string, body: string, trailing?: ReactNode) => (
     <View style={styles.titleBlock}>
       <View style={styles.titleRow}>
-        <AntonText size={36} style={styles.shrink}>
+        <AntonText size={36} lineRatio={1} style={styles.shrink}>
           {title}
         </AntonText>
         {trailing}
@@ -404,6 +413,7 @@ export function TrainingPlanCreateScreen({ navigation, route }: Props) {
               }}
               style={[
                 styles.dayChip,
+                { width: dayWidth },
                 { backgroundColor: on ? colors.cta.primary : colors.surface.muted },
               ]}
             >
@@ -439,7 +449,7 @@ export function TrainingPlanCreateScreen({ navigation, route }: Props) {
         </View>
       </View>
       <View style={[styles.summary, { backgroundColor: colors.surface.muted }]}>
-        <AntonText size={32}>{t('days.total', { n: total })}</AntonText>
+        <AntonText size={32} lineRatio={1.05}>{t('days.total', { n: total })}</AntonText>
         <TextV2 variant="label" color={colors.text.secondary} style={styles.regular}>
           {t('days.totalLine', { days: answers.days.length, min: answers.minutes, weeks: answers.weeks })}
         </TextV2>
@@ -603,7 +613,7 @@ export function TrainingPlanCreateScreen({ navigation, route }: Props) {
         <TextV2 color={colors.text.secondary} style={styles.genEyebrow}>
           {t('gen.eyebrow')}
         </TextV2>
-        <AntonText size={32} style={styles.centerTitle}>
+        <AntonText size={32} lineRatio={1.05} style={styles.centerTitle}>
           {t('gen.title')}
         </AntonText>
       </View>
@@ -642,11 +652,11 @@ export function TrainingPlanCreateScreen({ navigation, route }: Props) {
       <View style={[styles.errorIcon, { backgroundColor: colors.plan.emS }]}>
         <CircleAlert size={28} color={colors.text.primary} strokeWidth={2} />
       </View>
-      <AntonText size={32} style={styles.centerTitle}>
+      <AntonText size={32} lineRatio={1.05} style={styles.centerTitle}>
         {t('gen.errorTitle')}
       </AntonText>
       <TextV2 variant="body" color={colors.text.secondary} align="center" style={styles.errorBody}>
-        {t(failure === 'generic' ? 'gen.errorBodyGeneric' : 'gen.errorBody')}
+        {t(failure === 'generic' ? 'gen.errorBodyGeneric' : failure === 'timeout' ? 'gen.errorBodyTimeout' : 'gen.errorBody')}
       </TextV2>
     </View>
   );
@@ -810,8 +820,8 @@ const styles = StyleSheet.create({
   miniWeek: { width: 14, height: 5, borderRadius: 3 },
   why: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 14, borderRadius: 16 },
   whyMark: { marginTop: 1 },
-  daysRow: { flexDirection: 'row', gap: 6 },
-  dayChip: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  daysRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  dayChip: { height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   lengthBlock: { gap: 10, marginTop: 6 },
   segmented: { flexDirection: 'row', padding: 3, borderRadius: 999, gap: 2 },
   segment: { flex: 1, minHeight: 40, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },

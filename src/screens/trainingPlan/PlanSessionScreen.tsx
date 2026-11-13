@@ -236,7 +236,11 @@ export function PlanSessionScreen({ navigation, route }: Props) {
               {t('session.exercises').toUpperCase()}
             </TextV2>
             {main.map(exercise => (
-              <ExerciseRow key={`${exercise.position}-${exercise.exerciseId}`} exercise={exercise} />
+              <ExerciseRow
+                key={`${exercise.position}-${exercise.exerciseId}`}
+                exercise={exercise}
+                calibrationWeek={banners.calibration}
+              />
             ))}
           </View>
 
@@ -310,10 +314,10 @@ function WarmupRow({ exercise }: { exercise: PlanSessionExercise }) {
 
 // A main exercise: thumbnail, name, "3 × 6–9 · RIR 2", "Última vez" and the
 // recommended weight in big figures on the right.
-function ExerciseRow({ exercise }: { exercise: PlanSessionExercise }) {
+function ExerciseRow({ exercise, calibrationWeek }: { exercise: PlanSessionExercise; calibrationWeek: boolean }) {
   const { colors } = useThemeV2();
   const { t } = useTrainingPlanText();
-  const weight = weightLine(exercise, t);
+  const weight = weightLine(exercise, t, calibrationWeek);
   return (
     <View style={[styles.row, { borderBottomColor: colors.divider }]}>
       <AppImage source={{ mediaKey: exercise.image, fallback: MEDIA_PLACEHOLDER_THUMB }} style={styles.thumb} />

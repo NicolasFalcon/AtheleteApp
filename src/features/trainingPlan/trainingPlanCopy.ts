@@ -143,6 +143,10 @@ const COPY = {
     es: 'Algo salió mal al armar tu plan. Inténtalo de nuevo; tus respuestas quedan guardadas.',
     en: 'Something went wrong while building your plan. Try again; your answers are saved.',
   },
+  'gen.errorBodyTimeout': {
+    es: 'Está tardando más de lo normal. Intenta de nuevo.',
+    en: "It's taking longer than usual. Try again.",
+  },
   'gen.errorBody': {
     es: 'Se cortó la conexión con Athelete Intelligence. Tus respuestas quedan guardadas.',
     en: 'The connection with Athelete Intelligence dropped. Your answers are saved.',
@@ -648,8 +652,8 @@ const COPY = {
   'session.exercises': { es: 'Ejercicios', en: 'Exercises' },
   'session.banner.calibration.title': { es: 'Semana de calibración', en: 'Calibration week' },
   'session.banner.calibration.body': {
-    es: 'Elige un peso con 2 repeticiones en reserva. Con él calculamos tus cargas.',
-    en: 'Pick a weight with 2 reps in reserve. We build your loads from it.',
+    es: 'Esta semana sirve para encontrar tus pesos de partida. Las siguientes se calculan con lo que registres.',
+    en: 'This week is for finding your starting weights. The following ones are worked out from what you log.',
   },
   'session.banner.deload.title': { es: 'Semana de descarga', en: 'Deload week' },
   'session.banner.deload.body': {
@@ -661,6 +665,7 @@ const COPY = {
   'session.lastNoKg': { es: 'Última vez: {sets} × {reps}', en: 'Last time: {sets} × {reps}' },
   'session.lastNone': { es: 'Sin registros todavía', en: 'No records yet' },
   'session.weight.body': { es: 'Peso corporal', en: 'Bodyweight' },
+  'session.weight.choose': { es: 'Elige tu peso', en: 'Pick your weight' },
   'session.weight.calibrate': { es: 'Calibrar · elige tu peso', en: 'Calibrate · pick your weight' },
   'session.rirNote': {
     es: 'RIR = repeticiones en reserva al terminar la serie. Si completas el rango alto con el RIR indicado, la próxima vez sube el peso.',

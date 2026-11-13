@@ -78,7 +78,7 @@ export function slotLabel(slot: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-export const DAY_LETTERS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'] as const;
+export const DAY_LETTERS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'] as const;
 export const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'] as const;
 
 // Today, Monday = 0.

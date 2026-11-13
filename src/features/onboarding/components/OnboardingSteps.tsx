@@ -370,7 +370,7 @@ export function LevelStep({ answers, update }: StepProps) {
 }
 
 // ── 7 · Días por semana ────────────────────────────────────────────────────
-const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const WEEKDAY_NAMES = [
   'Lunes',
   'Martes',

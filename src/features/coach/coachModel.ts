@@ -12,7 +12,7 @@ import { CoachError, type MacroTargets } from '@app/services/coach/coachService'
 export const ISO_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
 
 const LETTERS: Record<EllieLanguage, string[]> = {
-  es: ['L', 'M', 'X', 'J', 'V', 'S', 'D'],
+  es: ['L', 'M', 'M', 'J', 'V', 'S', 'D'],
   en: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
 };
 const SHORT: Record<EllieLanguage, string[]> = {

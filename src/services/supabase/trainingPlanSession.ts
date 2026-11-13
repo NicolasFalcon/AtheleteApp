@@ -33,6 +33,10 @@ export type PlanSessionExercise = {
   // null: bodyweight (calibrate false) or to calibrate (calibrate true).
   recommendedKg: number | null;
   calibrate: boolean;
+  // Equipment slugs of the exercise, when get_plan_session sends them (the
+  // backend does not yet): null = unknown. Tells a bodyweight exercise from
+  // one with an external load that has no kg yet.
+  equipment: string[] | null;
   isAnchor: boolean;
   // The last completed session of the exercise. kg/reps belong to its best
   // effective set; sets is the effective (non-warm-up) set count.
@@ -106,6 +110,9 @@ export function parsePlanSession(body: Raw): PlanSessionDetail | null {
             restS: num(item.rest_s),
             recommendedKg: num(item.recommended_kg),
             calibrate: item.calibrate === true,
+            equipment: Array.isArray(item.equipment)
+              ? item.equipment.filter((slug): slug is string => typeof slug === 'string')
+              : null,
             isAnchor: item.is_anchor === true,
             lastTime: parseLastTime(item.last_time),
           },

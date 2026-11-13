@@ -131,6 +131,8 @@ export function useSessionRunner({
   );
   const pendingWrites = useRef<Promise<unknown>[]>([]);
   const draftKey = useRef<string | null>(null);
+  // The set whose draft the user edited by hand (never overwritten).
+  const editedKey = useRef<string | null>(null);
   // Real rest taken before the next set that gets logged (null: none yet).
   const lastRestSec = useRef<number | null>(null);
   // Whole seconds of the rest on screen at the last tick (rest cues).
@@ -309,15 +311,37 @@ export function useSessionRunner({
   // proposal is computed here, so the first thing built from a new cursor (the
   // Live Activity, the logged set) never sees the previous set's or empty values.
   const cursorKey = cursor ? `${cursor.position}:${cursor.setIndex}` : null;
+  const suggestion = current
+    ? suggestedSet(current, sets, current.exerciseId ? lastWeights[current.exerciseId] : null)
+    : null;
+  const baseDraft: SessionDraft =
+    suggestion && draftOwner !== cursorKey ? suggestion : storedDraft;
+  // A weight that is still empty takes the proposal (e.g. the last weight
+  // arrives after the cursor moved) unless the user edited this set: the
+  // Live Activity, the logged set and the card then agree.
   const draft: SessionDraft =
-    current && draftOwner !== cursorKey
-      ? suggestedSet(current, sets, current.exerciseId ? lastWeights[current.exerciseId] : null)
-      : storedDraft;
+    suggestion && baseDraft.weightKg === null && editedKey.current !== cursorKey
+      ? { ...baseDraft, weightKg: suggestion.weightKg }
+      : baseDraft;
 
   // Proposed values when the cursor moves to a new set.
   useEffect(() => {
     const key = cursor ? `${cursor.position}:${cursor.setIndex}` : null;
-    if (!current || key === draftKey.current) {
+    if (!current) {
+      return;
+    }
+    if (key === draftKey.current) {
+      // Same set: a late last weight fills an empty weight, nothing else.
+      if (editedKey.current !== key) {
+        const late = suggestedSet(
+          current,
+          sets,
+          current.exerciseId ? lastWeights[current.exerciseId] : null,
+        ).weightKg;
+        if (late !== null) {
+          setDraft(value => (value.weightKg === null ? { ...value, weightKg: late } : value));
+        }
+      }
       return;
     }
     draftKey.current = key;
@@ -330,6 +354,11 @@ export function useSessionRunner({
       ),
     );
   }, [current, cursor, lastWeights, sets]);
+
+  const setDraftByUser = useCallback<typeof setDraft>(value => {
+    editedKey.current = draftKey.current;
+    setDraft(value);
+  }, []);
 
   // Set when the workout is finished: from then on the clock never moves
   // again (summary, saving, error and retry all show this figure).
@@ -824,7 +853,7 @@ export function useSessionRunner({
       : null,
     yourTurn: Boolean(yourTurnUntil),
     draft,
-    setDraft,
+    setDraft: setDraftByUser,
     logSet,
     pause,
     resume,

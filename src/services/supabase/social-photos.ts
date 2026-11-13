@@ -41,11 +41,14 @@ export async function prefetchSocialPhotoUrls(
     .from(BUCKET)
     .createSignedUrls(missing, TTL_SECONDS);
   if (error || !data) {
+    __DEV__ && console.warn('[social-photo] createSignedUrls failed:', error?.message);
     return;
   }
   data.forEach(item => {
     if (item.path && item.signedUrl) {
       remember(item.path, item.signedUrl);
+    } else if (__DEV__) {
+      console.warn('[social-photo] not signed:', item.path, item.error);
     }
   });
 }
@@ -70,6 +73,8 @@ export async function resolveSocialPhotoUrl(path: string): Promise<string | null
       .from(BUCKET)
       .createSignedUrl(path, TTL_SECONDS);
     if (error || !data?.signedUrl) {
+      __DEV__ &&
+        console.warn('[social-photo] createSignedUrl failed:', path, error?.message);
       return null;
     }
     remember(path, data.signedUrl);

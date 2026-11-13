@@ -52,7 +52,11 @@ const kgText = (kg: number) =>
 export function exerciseDetail(exercise: Pick<ProposalExercise, 'sets' | 'reps' | 'units' | 'kg' | 'restS'>): string {
   const parts = [`${exercise.sets} × ${exercise.reps}`];
   if (exercise.kg !== null && exercise.kg > 0) {
-    parts.push(`${Math.max(1, exercise.units)} × ${kgText(exercise.kg)} kg`);
+    parts.push(
+      exercise.units === null
+        ? `${kgText(exercise.kg)} kg`
+        : `${Math.max(1, exercise.units)} × ${kgText(exercise.kg)} kg`,
+    );
   }
   parts.push(`${exercise.restS} s`);
   return parts.join(' · ');
@@ -122,6 +126,8 @@ export function editedMain(proposal: RoutineProposal, edits: RoutineEdits): Shee
         ...exercise,
         exerciseId: variant.exerciseId,
         name: variant.name,
+        // The weight belongs to the replaced exercise, not to the variant.
+        kg: null,
         image: variant.image ?? exercise.image,
         // The variant's video and cues are not in the proposal.
         video: null,

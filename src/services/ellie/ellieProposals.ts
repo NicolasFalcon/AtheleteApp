@@ -86,7 +86,8 @@ export type ProposalExercise = {
   video: string | null;
   sets: number;
   reps: number;
-  units: number;
+  // null: no units (barbell, machine); 1 = one dumbbell per side.
+  units: number | null;
   kg: number | null;
   restS: number;
   tag: ProposalChangeTag | null;
@@ -221,7 +222,7 @@ function parseExercise(row: Raw): ProposalExercise {
     video: str(row.video),
     sets: num(row.sets) ?? 3,
     reps: num(row.reps) ?? 10,
-    units: num(row.units) ?? 1,
+    units: num(row.units),
     kg: num(row.kg),
     restS: num(row.rest_s) ?? 60,
     tag,

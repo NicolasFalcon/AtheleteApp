@@ -151,7 +151,9 @@ const asNumber = (value: unknown): number | undefined =>
 // status. When the body is unreadable the status decides.
 export function parseEllieError(status: number, body: unknown): EllieError {
   const record = asRecord(body);
-  const raw = typeof record?.error === 'string' ? record.error : '';
+  const rawError = typeof record?.error === 'string' ? record.error : '';
+  // The server's own limit (Crear plan, 90 s) answers 'timeout' with a 504.
+  const raw = rawError === 'timeout' ? 'ai_timeout' : rawError;
   const code = (KNOWN_CODES as readonly string[]).includes(raw)
     ? (raw as EllieErrorCode)
     : status === 401
@@ -290,6 +292,48 @@ export const invokeEllieChatWithImage: EllieInvoke = invokeFunction('ellie-chat'
   timeoutMs: AI_REQUEST_TIMEOUT_MS,
 });
 
+// Crear plan: the server cuts at 90 s, the app waits 105 s. fetch and
+// functions.invoke cannot set the native request timeout (iOS: 60 s without
+// bytes), but XMLHttpRequest.timeout reaches NSURLRequest.timeoutInterval, so
+// this call goes through XHR.
+export const PLAN_REQUEST_TIMEOUT_MS = 105_000;
+
+export function invokeFunctionXhr(name: string, timeoutMs: number): EllieInvoke {
+  return async body => {
+    const client = getSupabaseClient();
+    if (!client) {
+      throw new EllieError('unknown', { message: 'Supabase no está configurado.' });
+    }
+    const { data: auth } = await client.auth.getSession();
+    const token = auth.session?.access_token;
+    if (!token) {
+      throw new EllieError('unauthorized');
+    }
+    return new Promise<InvokeResult>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${env.supabase.url}/functions/v1/${name}`);
+      xhr.timeout = timeoutMs;
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.setRequestHeader('apikey', env.supabase.anonKey);
+      xhr.onload = () => {
+        let parsed: unknown = null;
+        try {
+          parsed = JSON.parse(xhr.responseText);
+        } catch {
+          parsed = null;
+        }
+        resolve({ status: xhr.status, body: parsed });
+      };
+      xhr.ontimeout = () => reject(transportError(new Error('Request timed out'), true));
+      xhr.onerror = () => reject(transportError(new Error('Network request failed'), false));
+      xhr.send(JSON.stringify(body));
+    });
+  };
+}
+
+export const invokeEllieChatPlan: EllieInvoke = invokeFunctionXhr('ellie-chat', PLAN_REQUEST_TIMEOUT_MS);
+
 // ── Sending ─────────────────────────────────────────────────────────────────
 // 409 duplicate_in_progress: the same message is still being answered. Wait and
 // ask again with the same id, silently, at most 3 attempts in total.
@@ -331,7 +375,13 @@ export async function sendEllieMessage(
   input: EllieSendInput,
   deps: { invoke?: EllieInvoke; sleep?: (ms: number) => Promise<void> } = {},
 ): Promise<EllieReply> {
-  const invoke = deps.invoke ?? (input.imagePath ? invokeEllieChatWithImage : invokeEllieChat);
+  const invoke =
+    deps.invoke ??
+    (input.mode === 'generate_training_plan'
+      ? invokeEllieChatPlan
+      : input.imagePath
+        ? invokeEllieChatWithImage
+        : invokeEllieChat);
   const sleep = deps.sleep ?? (ms => new Promise<void>(resolve => setTimeout(resolve, ms)));
   const body = requestBody(input, false);
 

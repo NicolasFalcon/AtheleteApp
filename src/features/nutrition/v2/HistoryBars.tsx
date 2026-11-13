@@ -12,7 +12,7 @@ export type HistoryDay = {
 
 const BAR_MAX = 180;
 const WEEKDAYS: Record<EllieLanguage, string[]> = {
-  es: ['D', 'L', 'M', 'X', 'J', 'V', 'S'],
+  es: ['D', 'L', 'M', 'M', 'J', 'V', 'S'],
   en: ['S', 'M', 'T', 'W', 'T', 'F', 'S'],
 };
 

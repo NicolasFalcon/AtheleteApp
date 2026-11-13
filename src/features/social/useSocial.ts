@@ -285,6 +285,8 @@ export function useUserPosts(userId: string | null, enabled = true) {
   };
 }
 
+const PHOTO_RETRY_WAITS_MS = [1500, 3000] as const;
+
 // Source of a post photo: a signed URL of `social-photos`.
 // TODO(social-wire): cache signed URLs for the session, like profile-photo.ts.
 export function usePostPhotoSource(path: string | null): ImageSourcePropType | null {
@@ -296,20 +298,41 @@ export function usePostPhotoSource(path: string | null): ImageSourcePropType | n
       setSource(null);
       return undefined;
     }
-    getSocialService()
-      .getPostPhotoSource(path)
-      .then(value => {
-        if (active) {
-          setSource(value);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setSource(null);
-        }
-      });
+    // B-18: the first signing can fail right after the account is created;
+    // two more tries, 1.5 s and 3 s later, before leaving the placeholder.
+    const waits = PHOTO_RETRY_WAITS_MS;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const attempt = (index: number) => {
+      getSocialService()
+        .getPostPhotoSource(path)
+        .then(value => {
+          if (!active) {
+            return;
+          }
+          if (value || index >= waits.length) {
+            setSource(value);
+            return;
+          }
+          __DEV__ && console.warn(`[social-photo] retry ${index + 1} for ${path}`);
+          timer = setTimeout(() => attempt(index + 1), waits[index]);
+        })
+        .catch(() => {
+          if (!active) {
+            return;
+          }
+          if (index >= waits.length) {
+            setSource(null);
+            return;
+          }
+          timer = setTimeout(() => attempt(index + 1), waits[index]);
+        });
+    };
+    attempt(0);
     return () => {
       active = false;
+      if (timer) {
+        clearTimeout(timer);
+      }
     };
   }, [path]);
 

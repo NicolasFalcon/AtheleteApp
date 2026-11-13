@@ -26,12 +26,12 @@ const EYEBROW_EMBER = '#FF8A5C';
 
 // Anton for headlines, phases and big figures, always caps (§31.0). A line
 // height of 1.12 (as Coach §30) so a long English title can wrap.
-export function antonText(fontFamily: string, size: number): TextStyle {
+export function antonText(fontFamily: string, size: number, lineRatio = 1.12): TextStyle {
   return {
     fontFamily,
     fontSize: size,
     fontWeight: Platform.OS === 'ios' ? '700' : '400',
-    ...antonLine(size, 1.12),
+    ...antonLine(size, lineRatio),
     letterSpacing: 0,
     textTransform: 'uppercase',
   };
@@ -39,12 +39,14 @@ export function antonText(fontFamily: string, size: number): TextStyle {
 
 export function AntonText({
   size,
+  lineRatio,
   color,
   children,
   style,
   numberOfLines,
 }: {
   size: number;
+  lineRatio?: number;
   color?: string;
   children: ReactNode;
   style?: StyleProp<TextStyle>;
@@ -52,7 +54,7 @@ export function AntonText({
 }) {
   const { fonts } = useThemeV2();
   return (
-    <TextV2 color={color} numberOfLines={numberOfLines} style={[antonText(fonts.display, size), style]}>
+    <TextV2 color={color} numberOfLines={numberOfLines} style={[antonText(fonts.display, size, lineRatio), style]}>
       {children}
     </TextV2>
   );
