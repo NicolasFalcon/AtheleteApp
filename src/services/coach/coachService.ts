@@ -22,6 +22,8 @@ export type CoachErrorCode =
   | 'invalid_targets'
   | 'invalid_input'
   | 'unauthorized'
+  | 'profile_not_found'
+  | 'too_many_attempts'
   | 'offline'
   | 'unknown';
 
@@ -40,6 +42,8 @@ const KNOWN_CODES: readonly CoachErrorCode[] = [
   'invalid_targets',
   'invalid_input',
   'unauthorized',
+  'profile_not_found',
+  'too_many_attempts',
 ];
 
 export class CoachError extends Error {
@@ -506,6 +510,10 @@ export function createCoachService(rpc: CoachRpc = coachSupabaseRpc) {
   });
   return {
     // ── Coach ──
+    // B-28: makes the signed-in user a coach (idempotent) and returns the code.
+    async register(): Promise<CoachInvite> {
+      return invite(await call('coach_register'));
+    },
     async getInvite(): Promise<CoachInvite> {
       return invite(await call('coach_get_invite'));
     },

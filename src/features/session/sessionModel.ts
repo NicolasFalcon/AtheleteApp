@@ -48,6 +48,8 @@ export type PlannedExercise = {
   templateExerciseId: string | null;
   exerciseId: string | null;
   name: string;
+  // Routine block; warm-up and cool-down carry no external load.
+  block?: 'warmup' | 'main' | 'cooldown';
   sets: number;
   // Unit of the work: reps, seconds, metres, or "máx" (as many as possible).
   unit: SetsRepsUnit;
@@ -79,16 +81,27 @@ export function activePlan(exercise: PlannedExercise): PlanExerciseTarget | null
 
 // `recommendedFor` gives the library's recommended_sets_reps of an exercise:
 // it fills in a routine row that has neither reps nor time.
+export const COOLDOWN_DEFAULT_SEC = 180;
+
+// Warm-up and cool-down rows are done without an external load: no weight is
+// asked or logged for them.
+export const isNoLoadBlock = (exercise: { block?: string }) =>
+  exercise.block === 'warmup' || exercise.block === 'cooldown';
+
 export function buildPlan(
   exercises: WorkoutExercise[],
   recommendedFor?: (exerciseId: string) => unknown,
 ): PlannedExercise[] {
   return exercises.map((exercise, position) => {
-    let sets = exercise.sets && exercise.sets > 0 ? exercise.sets : DEFAULT_SETS;
-    let unit: SetsRepsUnit = exercise.duration ? 'sec' : 'reps';
-    let amount: number | null = exercise.duration
-      ? exercise.duration
-      : exercise.reps ?? null;
+    const cooldown = exercise.block === 'cooldown';
+    let sets = cooldown ? 1 : exercise.sets && exercise.sets > 0 ? exercise.sets : DEFAULT_SETS;
+    const cooldownSec = cooldown ? exercise.duration || COOLDOWN_DEFAULT_SEC : null;
+    let unit: SetsRepsUnit = cooldown || exercise.duration ? 'sec' : 'reps';
+    let amount: number | null = cooldown
+      ? cooldownSec
+      : exercise.duration
+        ? exercise.duration
+        : exercise.reps ?? null;
     let amountMax = exercise.repsMax && amount !== null ? exercise.repsMax : amount;
     let perSide = false;
 
@@ -111,6 +124,7 @@ export function buildPlan(
       templateExerciseId: exercise.id || null,
       exerciseId: exercise.exerciseId ?? null,
       name: exercise.name,
+      block: exercise.block,
       sets,
       unit,
       perSide,

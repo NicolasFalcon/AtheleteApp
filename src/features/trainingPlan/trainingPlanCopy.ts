@@ -649,6 +649,7 @@ const COPY = {
   'session.start': { es: 'Empezar', en: 'Start' },
   'session.starting': { es: 'Empezando', en: 'Starting' },
   'session.warmup': { es: 'Calentamiento', en: 'Warm-up' },
+  'session.cooldown': { es: 'Vuelta a la calma', en: 'Cool-down' },
   'session.exercises': { es: 'Ejercicios', en: 'Exercises' },
   'session.banner.calibration.title': { es: 'Semana de calibración', en: 'Calibration week' },
   'session.banner.calibration.body': {

@@ -53,6 +53,7 @@ import {
   formatCountdown,
   formatDuration,
   formatKg,
+  isNoLoadBlock,
   parseNumberInput,
   planAmount,
   planScheme,
@@ -659,14 +660,18 @@ function CurrentCard({
               onChange={reps => onDraft({ ...draft, reps })}
             />
           )}
-          <View style={styles.metricDivider} />
-          <EditableMetric
-            value={draft.weightKg}
-            label={variantTag ? 'kg · ajusta el peso' : 'kg'}
-            accessibilityLabel="Peso de la serie en kilos"
-            keyboardType="decimal-pad"
-            onChange={weightKg => onDraft({ ...draft, weightKg })}
-          />
+          {isNoLoadBlock(exercise) ? null : (
+            <>
+              <View style={styles.metricDivider} />
+              <EditableMetric
+                value={draft.weightKg}
+                label={variantTag ? 'kg · ajusta el peso' : 'kg'}
+                accessibilityLabel="Peso de la serie en kilos"
+                keyboardType="decimal-pad"
+                onChange={weightKg => onDraft({ ...draft, weightKg })}
+              />
+            </>
+          )}
           <View style={styles.metricDivider} />
           <Metric
             value={`${exercise.restSec} s`}

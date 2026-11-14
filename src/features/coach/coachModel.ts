@@ -234,6 +234,7 @@ export function coachErrorMessage(error: unknown, language: EllieLanguage, name?
     case 'link_not_active':
     case 'invalid_targets':
     case 'invalid_input':
+    case 'too_many_attempts':
     case 'offline':
       return coachText(language, `coach.error.${error.code}`);
     case 'kcal_out_of_range':

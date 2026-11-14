@@ -15,6 +15,7 @@ import type {
 export const BLOCKS = ['Tú', 'Tu objetivo', 'Tu semana'] as const;
 
 export type StepKind =
+  | 'role'
   | 'name'
   | 'birthDate'
   | 'gender'
@@ -35,6 +36,13 @@ export type StepDefinition = {
 };
 
 export const STEPS: StepDefinition[] = [
+  {
+    kind: 'role',
+    block: 0,
+    question: '¿Cómo vas a usar ATHELETE?',
+    title: ['¿CÓMO VAS A USAR', 'ATHELETE?'],
+    subtitle: 'Si eres entrenador, también entrenas y guías a tus alumnos desde aquí.',
+  },
   {
     kind: 'name',
     block: 0,
@@ -97,6 +105,22 @@ export const STEPS: StepDefinition[] = [
     question: '¿Cuánto dura tu sesión ideal?',
     title: ['¿CUÁNTO DURA', 'TU SESIÓN IDEAL?'],
     subtitle: 'Elige lo que de verdad puedes sostener.',
+  },
+];
+
+export type OnboardingRole = 'athlete' | 'coach';
+
+// B-28: "Entrenador" calls coach_register() once the profile is saved.
+export const ROLES: ReadonlyArray<{
+  value: OnboardingRole;
+  label: string;
+  subtitle: string;
+}> = [
+  { value: 'athlete', label: 'Atleta', subtitle: 'Entreno para mí.' },
+  {
+    value: 'coach',
+    label: 'Entrenador',
+    subtitle: 'Entreno y también guío a mis alumnos.',
   },
 ];
 
@@ -199,6 +223,7 @@ export const HEIGHT_RANGE = { min: 120, max: 220 } as const;
 export const DAYS_RANGE = { min: 1, max: 7 } as const;
 
 export type OnboardingAnswers = {
+  role: OnboardingRole;
   name: string;
   birthDate: string | null; // YYYY-MM-DD
   gender: ProfileGender | null;
@@ -217,6 +242,7 @@ export type OnboardingAnswers = {
 
 export function initialAnswers(name = ''): OnboardingAnswers {
   return {
+    role: 'athlete',
     name,
     birthDate: null,
     gender: null,
@@ -236,6 +262,8 @@ export function canContinue(
   answers: OnboardingAnswers,
 ): boolean {
   switch (kind) {
+    case 'role':
+      return true;
     case 'name':
       return answers.name.trim().length > 0;
     case 'birthDate':

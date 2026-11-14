@@ -36,6 +36,7 @@ import {
   GoalStep,
   LevelStep,
   NameStep,
+  RoleStep,
 } from '@app/features/onboarding/components/OnboardingSteps';
 import { em } from '@app/theme/v2/typography';
 
@@ -54,7 +55,7 @@ const BLOCK_OF_STEP = STEPS.map(step => step.block);
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
-// ONB_02 · Onboarding (9 steps): back · isotipo · "0N / 09", segmented
+// ONB_02 · Onboarding (10 steps): back · isotipo · "0N / 10", segmented
 // progress (4·2·3), Ember eyebrow of the block, the question in Anton and a
 // fixed "Siguiente" ("Terminar" in Ember on the last step).
 export function OnboardingWizard({
@@ -99,6 +100,7 @@ export function OnboardingWizard({
         onSubmit={ready ? onNext : undefined}
       />
     ),
+    role: <RoleStep answers={answers} update={update} />,
     birthDate: <BirthDateStep answers={answers} update={update} />,
     gender: <GenderStep answers={answers} update={update} />,
     body: <BodyStep answers={answers} update={update} />,

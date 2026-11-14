@@ -27,6 +27,7 @@ import {
   type LoggedSet,
   type PlannedExercise,
   type RestState,
+  isNoLoadBlock,
 } from '@app/features/session/sessionModel';
 import {
   completeSession,
@@ -319,10 +320,16 @@ export function useSessionRunner({
   // A weight that is still empty takes the proposal (e.g. the last weight
   // arrives after the cursor moved) unless the user edited this set: the
   // Live Activity, the logged set and the card then agree.
-  const draft: SessionDraft =
+  const weightedDraft: SessionDraft =
     suggestion && baseDraft.weightKg === null && editedKey.current !== cursorKey
       ? { ...baseDraft, weightKg: suggestion.weightKg }
       : baseDraft;
+  // Warm-up and cool-down rows have no external load: no weight is loaded,
+  // shown in the Live Activity or logged for them.
+  const draft: SessionDraft =
+    current && isNoLoadBlock(current) && weightedDraft.weightKg !== null
+      ? { ...weightedDraft, weightKg: null }
+      : weightedDraft;
 
   // Proposed values when the cursor moves to a new set.
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { setsFor, type LoggedSet, type PlannedExercise, type RestKind } from '@app/features/session/sessionModel';
-import { activePlan } from '@app/features/session/sessionModel';
+import { activePlan, isNoLoadBlock } from '@app/features/session/sessionModel';
 import type {
   LiveActivityButton,
   LiveActivityButtonAction,
@@ -123,7 +123,7 @@ export type SetReadiness = { ready: true } | { ready: false; needs: 'weight' };
 //     plan's target (a range loads its lower end);
 //   · the weight is the one loaded; without one, the set is still complete
 //     for a timed or distance set, for a bodyweight exercise of a plan, and
-//     for an exercise whose earlier set of this session was logged with no
+//     for a warm-up or cool-down row (no external load), for an exercise whose earlier set of this session was logged with no
 //     weight on purpose. A calibration set or an exercise with no weight to
 //     start from is not: the athlete picks it in the app.
 export function setReadiness(
@@ -131,7 +131,7 @@ export function setReadiness(
   draft: { reps: number | null; weightKg: number | null },
   sets: LoggedSet[],
 ): SetReadiness {
-  if (draft.weightKg !== null || exercise.unit === 'sec' || exercise.unit === 'm') {
+  if (draft.weightKg !== null || exercise.unit === 'sec' || exercise.unit === 'm' || isNoLoadBlock(exercise)) {
     return { ready: true };
   }
   const plan = activePlan(exercise);

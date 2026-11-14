@@ -38,6 +38,7 @@ import {
   HEIGHT_RANGE,
   LEVELS,
   RECOMMENDED_DURATION,
+  ROLES,
   WEIGHT_RANGE,
   countWeekDays,
   daysLine,
@@ -212,6 +213,36 @@ export function BirthDateStep({ answers, update }: StepProps) {
           />
         </Sheet>
       )}
+    </View>
+  );
+}
+
+// ── 0 · Rol (B-28) ─────────────────────────────────────────────────────────
+// Same selection tiles as the sexo step: Atleta (default) · Entrenador.
+export function RoleStep({ answers, update }: StepProps) {
+  return (
+    <View accessibilityRole="radiogroup" style={styles.gap18}>
+      {ROLES.map(option => (
+        <ChoiceTile
+          key={option.value}
+          selected={answers.role === option.value}
+          showCheck
+          height={120}
+          accessibilityLabel={`${option.label}. ${option.subtitle}`}
+          onPress={() => update({ role: option.value })}
+        >
+          {color => (
+            <View style={styles.roleContent}>
+              <TextV2 variant="bodyStrong" color={color}>
+                {option.label}
+              </TextV2>
+              <TextV2 variant="meta" color={color}>
+                {option.subtitle}
+              </TextV2>
+            </View>
+          )}
+        </ChoiceTile>
+      ))}
     </View>
   );
 }
@@ -689,6 +720,12 @@ const styles = StyleSheet.create({
   },
   capsule: {
     flex: 1,
+  },
+  roleContent: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'flex-end',
+    gap: 4,
   },
   capsuleContent: {
     flex: 1,

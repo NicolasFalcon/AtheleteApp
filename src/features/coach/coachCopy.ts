@@ -100,6 +100,10 @@ const COPY = {
     es: 'Revisa los datos: hay algo que no es válido.',
     en: 'Check the details: something is not valid.',
   },
+  'coach.error.too_many_attempts': {
+    es: 'Demasiados intentos. Prueba de nuevo en una hora.',
+    en: 'Too many attempts. Try again in an hour.',
+  },
   'coach.error.offline': {
     es: 'Sin conexión. Revisa tu red e inténtalo de nuevo.',
     en: "You're offline. Check your connection and try again.",

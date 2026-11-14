@@ -25,6 +25,7 @@ import {
   mainOf,
   schemeLine,
   sessionBanners,
+  cooldownOf,
   warmupOf,
   weightLine,
 } from '@app/features/trainingPlan/planSessionModel';
@@ -116,6 +117,7 @@ export function PlanSessionScreen({ navigation, route }: Props) {
 
   const warmup = warmupOf(session);
   const main = mainOf(session);
+  const cooldown = cooldownOf(session);
   const banners = sessionBanners(session);
   const startable = canStartPlanSession(session);
   const date = session.date ? capitalize(longDate(language, session.date)) : '';
@@ -244,6 +246,17 @@ export function PlanSessionScreen({ navigation, route }: Props) {
             ))}
           </View>
 
+          {cooldown.length > 0 ? (
+            <View style={styles.block}>
+              <TextV2 variant="eyebrow" color={colors.text.secondary}>
+                {t('session.cooldown').toUpperCase()}
+              </TextV2>
+              {cooldown.map(exercise => (
+                <WarmupRow key={`${exercise.position}-${exercise.exerciseId}`} exercise={exercise} />
+              ))}
+            </View>
+          ) : null}
+
           <Button
             label={t('session.save')}
             successLabel={t('session.saved')}
@@ -302,7 +315,11 @@ function WarmupRow({ exercise }: { exercise: PlanSessionExercise }) {
         <TextV2 variant="label" numberOfLines={2}>
           {exercise.name}
         </TextV2>
-        {exercise.sets > 0 && exercise.repMin !== null ? (
+        {exercise.block === 'cooldown' && exercise.duration ? (
+          <TextV2 variant="caption" color={colors.text.secondary}>
+            {`${Math.round(exercise.duration / 60)} min`}
+          </TextV2>
+        ) : exercise.sets > 0 && exercise.repMin !== null ? (
           <TextV2 variant="caption" color={colors.text.secondary}>
             {`${exercise.sets} × ${exercise.repMin}`}
           </TextV2>

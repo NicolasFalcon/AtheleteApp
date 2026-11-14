@@ -19,7 +19,7 @@ export type PlanSessionStatusName = (typeof PLAN_STATUSES)[number];
 
 // ── get_plan_session (31.7) ─────────────────────────────────────────────────
 export type PlanSessionExercise = {
-  block: 'warmup' | 'main';
+  block: 'warmup' | 'main' | 'cooldown';
   position: number;
   exerciseId: string;
   name: string;
@@ -30,6 +30,8 @@ export type PlanSessionExercise = {
   repMax: number | null;
   rir: number | null;
   restS: number | null;
+  // Seconds, for timed rows (warm-up 300, cool-down 180); null on main.
+  duration: number | null;
   // null: bodyweight (calibrate false) or to calibrate (calibrate true).
   recommendedKg: number | null;
   calibrate: boolean;
@@ -98,7 +100,7 @@ export function parsePlanSession(body: Raw): PlanSessionDetail | null {
         }
         return [
           {
-            block: item.block === 'warmup' ? 'warmup' : 'main',
+            block: item.block === 'warmup' || item.block === 'cooldown' ? item.block : 'main',
             position: num(item.position) ?? 0,
             exerciseId,
             name: str(item.name) ?? '',
@@ -108,6 +110,7 @@ export function parsePlanSession(body: Raw): PlanSessionDetail | null {
             repMax: num(item.rep_max),
             rir: num(item.rir),
             restS: num(item.rest_s),
+            duration: num(item.duration),
             recommendedKg: num(item.recommended_kg),
             calibrate: item.calibrate === true,
             equipment: Array.isArray(item.equipment)

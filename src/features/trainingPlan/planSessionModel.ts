@@ -85,8 +85,11 @@ export function weightLine(
 export const warmupOf = (session: PlanSessionDetail) =>
   session.exercises.filter(exercise => exercise.block === 'warmup');
 
+export const cooldownOf = (session: PlanSessionDetail) =>
+  session.exercises.filter(exercise => exercise.block === 'cooldown');
+
 export const mainOf = (session: PlanSessionDetail) =>
-  session.exercises.filter(exercise => exercise.block !== 'warmup');
+  session.exercises.filter(exercise => exercise.block !== 'warmup' && exercise.block !== 'cooldown');
 
 // The banners: calibration (the flag or any exercise to calibrate) and deload.
 export function sessionBanners(session: PlanSessionDetail): { calibration: boolean; deload: boolean } {

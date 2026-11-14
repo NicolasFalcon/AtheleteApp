@@ -1,4 +1,7 @@
 import { useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { coachKeys } from '@app/features/coach/useCoach';
+import { coachService } from '@app/services/coach/coachService';
 import {
   OnboardingFlow,
   type OnboardingFinishTarget,
@@ -16,14 +19,21 @@ import { setPostOnboardingTab } from '@app/lib/postOnboarding';
 // buttons only navigate: refreshProfile() marks the user as onboarded and
 // RootNavigator swaps to the main tabs (Inicio or ELLIE).
 export function OnboardingScreen() {
-  const { profile, saveOnboardingProfile, refreshProfile } = useAuth();
+  const { profile, session, saveOnboardingProfile, refreshProfile } = useAuth();
+  const queryClient = useQueryClient();
 
   const handleSave = useCallback(
     async (answers: OnboardingAnswers) => {
       const payload = toOnboardingPayload(answers);
       await saveOnboardingProfile(payload.data, payload.name);
+      // B-28: only a coach, and only once the profile exists. Idempotent, so
+      // the welcome's "Reintentar" can repeat it. A failure fails the save.
+      if (answers.role === 'coach') {
+        const invite = await coachService.register();
+        queryClient.setQueryData(coachKeys.invite(session?.user.id), invite);
+      }
     },
-    [saveOnboardingProfile],
+    [queryClient, saveOnboardingProfile, session?.user.id],
   );
 
   const handleFinish = useCallback(
